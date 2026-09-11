@@ -54,7 +54,7 @@ orbit-u-datalab/
 ├── database/         # schema.sql + migrations/
 ├── config/           # config.json, config_locations.json
 ├── tests/            # pytest suite
-└── data/datasets/    # Output: {id}_{slug}/{tier}/{source}/{date}/
+└── data/datasets/    # Output: {id}_{slug}/{date}/{tier}/{source}/
 ```
 
 ## Documentation
