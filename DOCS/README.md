@@ -30,16 +30,16 @@ This enables **preprocessing ablation studies** (compare RAW vs PROCESSED inputs
 
 ```bash
 # 1. Clone and set up Python
-git clone <repo-url> && cd orbit-u-datalab
+git clone <repo-url> && cd orbit-u-monitor
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
 # 2. Set up PostgreSQL (14+ with PostGIS; TimescaleDB optional)
-# Default DB name is sentinel1_flood (see .env.example) — a historical leftover
-# from before the project was renamed "Orbit-U: The DataLab", never reconciled.
-psql -U postgres -c "CREATE DATABASE sentinel1_flood;"
-psql -U postgres -d sentinel1_flood -f database/schema.sql
-for f in database/migrations/*.sql; do psql -U postgres -d sentinel1_flood -f "$f"; done
+# Default DB name is orbit_u_monitor (see .env.example), kept distinct from
+# The DataLab's database so both can share one PostgreSQL server safely.
+psql -U postgres -c "CREATE DATABASE orbit_u_monitor;"
+psql -U postgres -d orbit_u_monitor -f database/schema.sql
+for f in database/migrations/*.sql; do psql -U postgres -d orbit_u_monitor -f "$f"; done
 
 # 3. Configure credentials
 cp .env.example .env

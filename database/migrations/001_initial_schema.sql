@@ -10,4 +10,4 @@ VALUES ('001', 'Initial schema: 11 master tables, PostGIS, enums, triggers, seed
 ON CONFLICT (version) DO NOTHING;
 
 -- Note: Full DDL is in database/schema.sql
--- Run: psql sentinel1_flood < database/schema.sql
+-- Run: psql orbit_u_monitor < database/schema.sql

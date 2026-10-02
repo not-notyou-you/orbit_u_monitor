@@ -30,14 +30,14 @@ Tech stack, deployment, database schema, and on-disk layout. (Merged from the fo
 
 ## Database Setup
 
-**Default DB name is `sentinel1_flood`**, not `orbit_u_datalab` — that's what `.env.example`, `etl/config.py`, `etl/database_client.py`'s `from_env()` default, and `docker-compose.yml` all actually use. The project's public name ("Orbit-U: The DataLab") and its database name are historical leftovers from before the rename and were never reconciled; rename it in your own `.env` if you want them to match.
+**Default DB name is `orbit_u_monitor`** — that's what `.env.example`, `etl/config.py`, `etl/database_client.py`'s `from_env()` default, and `docker-compose.yml` all use. It is deliberately distinct from The DataLab's database so both projects can run against the same PostgreSQL server without touching each other's data. `docker-compose.yml` likewise publishes the DB on host port **5433** and the API on **8001** for the same reason; a host-installed PostgreSQL still uses 5432, where the database name alone provides the separation.
 
 ```bash
 # Create database
-psql -U postgres -c "CREATE DATABASE sentinel1_flood;"
+psql -U postgres -c "CREATE DATABASE orbit_u_monitor;"
 
 # Enable extensions
-psql -U postgres -d sentinel1_flood <<EOF
+psql -U postgres -d orbit_u_monitor <<EOF
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;  -- skip if unavailable
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -45,9 +45,9 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 EOF
 
 # Apply schema + migrations
-psql -U postgres -d sentinel1_flood -f database/schema.sql
+psql -U postgres -d orbit_u_monitor -f database/schema.sql
 for f in database/migrations/*.sql; do
-  psql -U postgres -d sentinel1_flood -f "$f"
+  psql -U postgres -d orbit_u_monitor -f "$f"
 done
 ```
 
@@ -61,7 +61,7 @@ The real template is `.env.example` — copy it (`cp .env.example .env`), don't 
 # Database
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=sentinel1_flood
+DB_NAME=orbit_u_monitor
 DB_USER=postgres
 DB_PASSWORD=<strong-password>
 DB_POOL_SIZE=5
@@ -131,31 +131,31 @@ The real `docker-compose.yml` (repo root):
 services:
   db:
     image: timescale/timescaledb-ha:pg14-latest
-    container_name: sentinel1_db
+    container_name: orbit_u_monitor_db
     environment:
-      POSTGRES_DB: sentinel1_flood
+      POSTGRES_DB: orbit_u_monitor
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports: ["5432:5432"]
+    ports: ["5433:5432"]
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - monitor_pgdata:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
       - ./database/seed_data.sql:/docker-entrypoint-initdb.d/02_seed.sql
       - ./database/indexes.sql:/docker-entrypoint-initdb.d/03_indexes.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d sentinel1_flood"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d orbit_u_monitor"]
       interval: 10s
       timeout: 5s
       retries: 5
   api:
     build: .
-    container_name: sentinel1_api
+    container_name: orbit_u_monitor_api
     depends_on:
       db: { condition: service_healthy }
     environment:
       DB_HOST: db
       DB_PORT: 5432
-      DB_NAME: sentinel1_flood
+      DB_NAME: orbit_u_monitor
       DB_USER: postgres
       DB_PASSWORD: postgres
       API_HOST: 0.0.0.0

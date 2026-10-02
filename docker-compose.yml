@@ -1,6 +1,10 @@
 # docker-compose.yml
 # Local development environment: PostgreSQL 14 + PostGIS + TimescaleDB
 #
+# Orbit-U: The Monitor — fully isolated from Orbit-U: The DataLab.
+# Distinct container names, host ports (5433/8001) and volume, so both
+# stacks can run side by side without clobbering each other's data.
+#
 # Usage:
 #   docker-compose up -d        # start DB
 #   docker-compose down         # stop
@@ -13,28 +17,28 @@ version: "3.9"
 services:
   db:
     image: timescale/timescaledb-ha:pg14-latest
-    container_name: sentinel1_db
+    container_name: orbit_u_monitor_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB:       sentinel1_flood
+      POSTGRES_DB:       orbit_u_monitor
       POSTGRES_USER:     postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - monitor_pgdata:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
       - ./database/seed_data.sql:/docker-entrypoint-initdb.d/02_seed.sql
       - ./database/indexes.sql:/docker-entrypoint-initdb.d/03_indexes.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d sentinel1_flood"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d orbit_u_monitor"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   api:
     build: .
-    container_name: sentinel1_api
+    container_name: orbit_u_monitor_api
     restart: unless-stopped
     depends_on:
       db:
@@ -42,18 +46,18 @@ services:
     environment:
       DB_HOST:     db
       DB_PORT:     5432
-      DB_NAME:     sentinel1_flood
+      DB_NAME:     orbit_u_monitor
       DB_USER:     postgres
       DB_PASSWORD: postgres
       API_HOST:    0.0.0.0
       API_PORT:    8000
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - .:/app
       - ./processed:/app/processed
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
-  pgdata:
+  monitor_pgdata:
     driver: local

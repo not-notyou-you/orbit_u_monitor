@@ -18,7 +18,7 @@
 -- dipakai di UPDATE di bawah; psql default (autocommit per statement)
 -- sudah benar.
 --
---   psql -U postgres -d sentinel1_flood -f database/migrations/013_add_fusion_tier_and_source.sql
+--   psql -U postgres -d orbit_u_monitor -f database/migrations/013_add_fusion_tier_and_source.sql
 
 -- ---------------------------------------------------------------------------
 -- 1. Tier FUSION

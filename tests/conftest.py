@@ -53,7 +53,7 @@ def _resolve_test_db_url() -> str:
 
     main_url = os.getenv("DATABASE_URL")
     if not main_url:
-        return "postgresql+psycopg2://postgres:postgres@localhost:5432/sentinel1_flood_test"
+        return "postgresql+psycopg2://postgres:postgres@localhost:5432/orbit_u_monitor_test"
 
     base, _, dbname = main_url.rpartition("/")
     dbname, sep, query = dbname.partition("?")
@@ -109,7 +109,7 @@ def db_client():
         pytest.exit(
             f"Tidak bisa menyiapkan database uji {TEST_DB_URL!r}: {exc}\n"
             "Buat dulu databasenya, mis.:\n"
-            '  psql -U postgres -c "CREATE DATABASE sentinel1_flood_test"',
+            '  psql -U postgres -c "CREATE DATABASE orbit_u_monitor_test"',
             returncode=1,
         )
 
