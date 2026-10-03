@@ -6,7 +6,7 @@ import os
 import tempfile
 import zipfile
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 from api.schemas import (
@@ -32,7 +32,8 @@ from api.schemas import (
     TierStorageItem,
 )
 from etl import folder_manager as fm
-from api.deps import get_db
+from api.deps import Principal, current_principal, get_db, get_etl_db, mark_download, require_role
+from api.errors import ApiError
 from etl.database_client import DatabaseClient
 from etl.dataset_manager import DatasetManager
 from etl.pipeline_logger import PipelineLogManager
@@ -41,8 +42,10 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-def _mgr(db: DatabaseClient) -> DatasetManager:
-    return DatasetManager(db)
+def _mgr(db: DatabaseClient, etl: DatabaseClient | None = None) -> DatasetManager:
+    """`db` = sesi request (role pengguna); `etl` = koneksi monitor_etl untuk
+    thread job/penghapusan yang dipicu request ini (Tahap 2, S1)."""
+    return DatasetManager(db, runner_db=etl)
 
 
 def _slugify(name: str) -> str:
@@ -53,13 +56,16 @@ def _slugify(name: str) -> str:
 async def create_dataset(
     req: CreateDatasetRequest,
     db: DatabaseClient = Depends(get_db),
+    etl: DatabaseClient = Depends(get_etl_db),
+    principal: Principal = Depends(current_principal),
 ) -> DatasetCreateResponse:
     """Buat dataset dari konfigurasi per-satelit (DOCS/INTERFACE.md "Create Dataset").
 
     `tiers` tidak lagi diterima: diturunkan internal dari `sources`.
     """
     try:
-        result = _mgr(db).create_dataset(
+        result = _mgr(db, etl).create_dataset(
+            created_by=principal.user_id,
             region_id=req.region_id,
             location=req.location,
             date_start=req.date_start,
@@ -89,6 +95,7 @@ async def create_dataset(
 )
 async def get_last_dataset_config(
     db: DatabaseClient = Depends(get_db),
+    principal: Principal = Depends(current_principal),
 ) -> DatasetLastConfigResponse:
     """Config dataset terakhir yang dibuat: region, sources + level pemrosesan,
     strategi fusi, opsi preview, dan rentang tanggal.
@@ -97,7 +104,7 @@ async def get_last_dataset_config(
     menduplikasi dataset (DOCS/DECISIONS.md D13). Rentang tanggal diikutkan
     sebagai preset yang bisa diedit di wizard, bukan dikunci.
     """
-    config = db.get_last_dataset_config()
+    config = db.get_last_dataset_config(created_by=principal.user_id)
     if not config:
         raise HTTPException(404, "No dataset found yet")
     return DatasetLastConfigResponse(**config)
@@ -143,9 +150,10 @@ async def pause_dataset(
 
 
 @router.post("/{dataset_id}/resume", response_model=DatasetResumeResponse, summary="Resume dataset")
-async def resume_dataset(dataset_id: int, db: DatabaseClient = Depends(get_db)) -> DatasetResumeResponse:
+async def resume_dataset(dataset_id: int, db: DatabaseClient = Depends(get_db),
+                         etl: DatabaseClient = Depends(get_etl_db)) -> DatasetResumeResponse:
     try:
-        result = _mgr(db).resume_dataset(dataset_id)
+        result = _mgr(db, etl).resume_dataset(dataset_id)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     return DatasetResumeResponse(**result)
@@ -156,9 +164,10 @@ async def cancel_dataset(
     dataset_id: int,
     req: DatasetCancelRequest = DatasetCancelRequest(),
     db: DatabaseClient = Depends(get_db),
+    etl: DatabaseClient = Depends(get_etl_db),
 ) -> DatasetCancelResponse:
     try:
-        result = _mgr(db).cancel_dataset(dataset_id, cascade_delete=req.cascade_delete)
+        result = _mgr(db, etl).cancel_dataset(dataset_id, cascade_delete=req.cascade_delete)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     return DatasetCancelResponse(**result)
@@ -182,14 +191,22 @@ async def get_dataset_logs(
     return DatasetLogsResponse(total=total, limit=limit, logs=logs)
 
 
-@router.delete("/{dataset_id}", response_model=DatasetDeleteResponse, summary="Hapus dataset")
+@router.delete("/{dataset_id}", response_model=DatasetDeleteResponse,
+               summary="Delete a dataset (its creator or ADMIN)")
 async def delete_dataset(
     dataset_id: int,
     force: bool = Query(False, description="Force-stop any running process, then delete"),
     db: DatabaseClient = Depends(get_db),
+    etl: DatabaseClient = Depends(get_etl_db),
+    principal: Principal = Depends(current_principal),
 ) -> DatasetDeleteResponse:
+    info = _mgr(db).get_dataset(dataset_id)
+    if info is None:
+        raise HTTPException(404, f"Dataset {dataset_id} not found")
+    if principal.role_code != "ADMIN" and info.get("created_by") != principal.user_id:
+        raise ApiError(403, "Only the dataset's creator or an ADMIN can delete it", "NOT_DATASET_OWNER")
     try:
-        result = _mgr(db).delete_dataset(dataset_id, force=force)
+        result = _mgr(db, etl).delete_dataset(dataset_id, force=force)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     return DatasetDeleteResponse(**result)
@@ -235,8 +252,10 @@ def _resolve_tier_source(tier: str, source: str | None) -> tuple[str, str | None
     return tier_l, source_l
 
 
-@router.get("/{dataset_id}/download", summary="Unduh dataset (ZIP)")
+@router.get("/{dataset_id}/download", summary="Unduh dataset (ZIP)",
+            dependencies=[Depends(require_role("DATA_ENGINEER", download=True))])
 async def download_dataset(
+    request: Request,
     dataset_id: int,
     tier: str | None = Query(None, description="Limit to one tier, e.g. gold"),
     source: str | None = Query(None, description="Limit to one source, e.g. modis"),
@@ -277,6 +296,9 @@ async def download_dataset(
 
     suffix = "".join(f"_{part}" for part in (tier, source) if part)
     filename = f"{_slugify(info['name'])}{suffix}.zip"
+    fused_only = tier is not None and fm.normalize_tier(tier) == "fused"
+    mark_download(request, "DOWNLOAD_FUSION" if fused_only else "DOWNLOAD_DATASET",
+                  "datasets", dataset_id, tier=tier, source=source, filename=filename)
     return FileResponse(
         tmp.name,
         filename=filename,

@@ -31,7 +31,22 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
-StorageTier = Literal["raw", "bronze", "silver", "gold", "preview", "fusion", "partial"]
+# Nama tier D14 (folder_manager.TIERS). Literal lama raw/bronze/silver/gold
+# membuat /summary gagal KeyError setelah folder_manager pindah ke nama D14
+# (IMPLEMENTATION_NOTES Tahap 2, T12).
+StorageTier = Literal["raw", "aligned", "despeckled", "indices", "accumulated", "cog",
+                      "preview", "fused", "partial"]
+
+_TIER_DESCRIPTIONS = {
+    "raw": "Original downloads in vendor format",
+    "aligned": "Reprojected to EPSG:4326 and cropped to the AOI",
+    "despeckled": "Sentinel-1 after speckle filtering (intermediate)",
+    "indices": "MODIS indices (intermediate)",
+    "accumulated": "GPM accumulations (intermediate)",
+    "cog": "Analysis-ready COG per source",
+    "preview": "PNG previews rendered from COG",
+    "fused": "Multi-modal HDF5 combining all sources",
+}
 
 
 def _dataset_roots() -> list[Path]:
@@ -158,31 +173,8 @@ async def storage_summary() -> JSONResponse:
 
     return JSONResponse(content={
         "tiers": {
-            "raw": {
-                **tiers["raw"],
-                "description": "Original downloaded ZIP files + extracted TIFs",
-                "note":        "Delete this after the pipeline finishes (keep_raw=false)",
-            },
-            "bronze": {
-                **tiers["bronze"],
-                "description": "After cropping to the AOI (Module 2)",
-                "note":        "±50 MB per scene per band",
-            },
-            "silver": {
-                **tiers["silver"],
-                "description": "After Lee-filter noise reduction (Module 3)",
-                "note":        "±45 MB per scene per band",
-            },
-            "gold": {
-                **tiers["gold"],
-                "description": "Analysis-ready COG per source (Module 4) — the most important one",
-                "note":        "DO NOT delete this unless the scene is no longer needed",
-            },
-            "fusion": {
-                **tiers["fusion"],
-                "description": "Multi-modal HDF5 combining all sources (Module 9)",
-                "note":        "Final deliverable — not deleted by tier 'all'",
-            },
+            name: {**tiers[name], "description": _TIER_DESCRIPTIONS.get(name, "")}
+            for name in fm.TIERS
         },
         "by_source": {
             src: {
@@ -208,7 +200,7 @@ async def storage_summary() -> JSONResponse:
 @router.get(
     "/files/{tier}",
     summary="List file per tier",
-    description="List all files in a given tier (raw/bronze/silver/gold).",
+    description="List all files in a given tier (D14 tier names, or partial for .part files).",
 )
 async def list_files(tier: StorageTier) -> JSONResponse:
     tier_paths = _get_tier_paths()

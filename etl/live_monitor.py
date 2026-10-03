@@ -249,8 +249,23 @@ def _granule_date(name: str) -> date | None:
 # ---------------------------------------------------------------------------
 
 class LiveMonitor:
-    def __init__(self, db: DatabaseClient) -> None:
+    def __init__(self, db: DatabaseClient, runner_db: DatabaseClient | None = None) -> None:
         self._db = db
+        # Klien untuk kerja latar/berkas (siklus, retensi, hapus daerah).
+        # Dari request API: `db` = sesi request ADMIN, `runner_db` =
+        # monitor_etl (DATABASE.md §8.1). Di luar API keduanya sama.
+        self._runner_db = runner_db or db
+
+    def _runner(self) -> "LiveMonitor":
+        return self if self._runner_db is self._db else LiveMonitor(self._runner_db)
+
+    def _after_commit(self, fn) -> None:
+        """Kerja latar baru dimulai setelah perubahan pemanggil ter-commit."""
+        hook = getattr(self._db, "call_after_commit", None)
+        if hook is None:
+            fn()
+        else:
+            hook(fn)
 
     # --- log --------------------------------------------------------------
 
@@ -319,7 +334,7 @@ class LiveMonitor:
                  f"Area '{name}' created, retention {retention} scenes",
                  dataset_id=dataset.dataset_id, region_id=region_id)
         if start:
-            self.start_cycle(area_id)
+            self._after_commit(lambda: self._runner().start_cycle(area_id))
         return self.get_area(area_id)
 
     def list_areas(self) -> list[dict]:
@@ -356,12 +371,15 @@ class LiveMonitor:
             a.updated_at = _now()
         if retention is not None:
             self.log(area_id, "RETENTION", "OK", f"Retention changed {old} -> {retention}")
-            # Turun: kelebihan langsung dihapus. Naik: isi kekurangannya.
-            self.enforce_retention(area_id, reason=f"retensi diturunkan ke {retention}")
-            self.refresh_forecast(area_id)
-            if grew:
-                self.start_cycle(area_id)
+            self._after_commit(lambda: self._runner()._apply_retention(area_id, retention, grew))
         return self.get_area(area_id)
+
+    def _apply_retention(self, area_id: int, retention: int, grew: bool) -> None:
+        """Turun: kelebihan langsung dihapus. Naik: isi kekurangannya."""
+        self.enforce_retention(area_id, reason=f"retensi diturunkan ke {retention}")
+        self.refresh_forecast(area_id)
+        if grew:
+            self.start_cycle(area_id)
 
     def delete_area(self, area_id: int) -> dict:
         """Hapus daerah: semua berkas scene-nya dihapus permanen, lalu baris

@@ -10,12 +10,12 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 
 from api.schemas import IntegrityCheckResponse, ProductItem, ProductListResponse
-from api.deps import get_db
+from api.deps import get_db, mark_download, require_role
 from etl.database_client import (
     DataProduct,
     DatabaseClient,
@@ -145,8 +145,10 @@ _MEDIA_TYPE_BY_FORMAT = {
     "/{product_id}/download",
     summary="Download product file",
     description="Stream the output file (fusion HDF5, filtered TIFF) for download.",
+    dependencies=[Depends(require_role("DATA_ENGINEER", download=True))],
 )
 async def download_product(
+    request: Request,
     product_id: int,
     db: DatabaseClient = Depends(get_db),
 ) -> FileResponse:
@@ -157,6 +159,9 @@ async def download_product(
         file_path = Path(p.file_path)
         file_name = p.file_name
         file_format = p.file_format
+        tier = getattr(p.product_tier, "value", p.product_tier)
+        source = getattr(p.source, "value", p.source)
+        is_fusion = tier == tn.FUSED or source == "FUSION"
 
     if not file_path.exists():
         raise HTTPException(
@@ -166,6 +171,8 @@ async def download_product(
         )
 
     media_type = _MEDIA_TYPE_BY_FORMAT.get(file_format, "application/octet-stream")
+    mark_download(request, "DOWNLOAD_FUSION" if is_fusion else "DOWNLOAD_PRODUCT",
+                  "data_products", product_id, filename=file_name)
     return FileResponse(
         path         = str(file_path),
         filename     = file_name,

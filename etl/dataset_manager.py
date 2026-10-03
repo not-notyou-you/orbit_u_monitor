@@ -4,7 +4,7 @@ import logging
 import os
 import threading
 from datetime import date, datetime, timezone
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from etl.database_client import (
     CleanupOperation,
     Dataset,
@@ -204,8 +204,26 @@ def compute_tiers_to_delete(produced_tiers: list[str], required_tiers: list[str]
 
 
 class DatasetManager:
-    def __init__(self, db: DatabaseClient) -> None:
+    def __init__(self, db: DatabaseClient, runner_db: DatabaseClient | None = None) -> None:
         self._db = db
+        # Klien untuk kerja latar (thread job dan penghapusan). Saat dipanggil
+        # dari request API, `db` adalah sesi request (role pengguna, ditutup
+        # setelah respons) dan `runner_db` adalah koneksi monitor_etl
+        # (DATABASE.md §8.1). Di luar API keduanya sama.
+        self._runner_db = runner_db or db
+
+    def _runner(self) -> "DatasetManager":
+        return self if self._runner_db is self._db else DatasetManager(self._runner_db)
+
+    def _after_commit(self, fn) -> None:
+        """Thread latar baru boleh mulai setelah baris yang dibuat/diubah
+        pemanggil ter-commit; kalau tidak, thread (koneksi lain) bisa membaca
+        keadaan lama. Klien request menyediakan call_after_commit."""
+        hook = getattr(self._db, "call_after_commit", None)
+        if hook is None:
+            fn()
+        else:
+            hook(fn)
 
     def create_dataset(
         self,
@@ -223,6 +241,7 @@ class DatasetManager:
         description: str | None = None,
         quality_settings: dict | None = None,
         generate_preview: bool = True,
+        created_by: int | None = None,
     ) -> dict:
         """Buat dataset + job pertamanya.
 
@@ -259,6 +278,9 @@ class DatasetManager:
             generate_preview=generate_preview,
             dataset_kind="STANDARD",
             status="QUEUED",
+            # Pengguna pembuat (INTERFACE.md §4.7): dasar "hapus oleh pembuat
+            # atau ADMIN" dan "Reuse Previous Config" per pengguna.
+            created_by=created_by,
         )
 
         if sources is not None:
@@ -314,7 +336,7 @@ class DatasetManager:
             self.write_metadata_file(dataset_id, total_size_bytes=0)
         except OSError:
             logger.warning("[DATASET] gagal tulis metadata.json awal dataset_id=%d", dataset_id, exc_info=True)
-        self._spawn_job_runner(job_id)
+        self._after_commit(lambda: self._runner()._spawn_job_runner(job_id))
         with self._db.session() as sess:
             job = sess.get(DatasetJob, job_id)
             status = job.status if job else "QUEUED"
@@ -331,11 +353,16 @@ class DatasetManager:
         offset: int = 0,
         include_deleted: bool = False,
         dataset_kind: str | None = None,
+        include_system: bool = False,
     ) -> dict:
         with self._db.session() as sess:
             stmt = select(Dataset)
             if not include_deleted:
                 stmt = stmt.where(Dataset.status != "DELETED")
+            if not include_system:
+                # Dataset sistem (HYDROMET_AOI, PIPELINE.md §3.1) bukan milik
+                # Katalog (INTERFACE.md §4.7).
+                stmt = stmt.where(Dataset.is_system.is_(False))
             if dataset_kind:
                 stmt = stmt.where(Dataset.dataset_kind == dataset_kind)
             else:
@@ -352,9 +379,15 @@ class DatasetManager:
             # kartu dirender ulang tiap polling, jadi fan-out per dataset akan
             # mengalikan beban database dengan jumlah kartu di layar.
             per_source = self._per_source_stats([d.dataset_id for d in rows], sess)
+            creator_ids = sorted({d.created_by for d in rows if d.created_by is not None})
+            creators = dict(sess.execute(
+                text("SELECT user_id, full_name FROM v_users_safe WHERE user_id = ANY(:ids)"),
+                {"ids": creator_ids},
+            ).all()) if creator_ids else {}
             items = []
             for d in rows:
                 item = self._dataset_to_dict(d)
+                item["created_by_name"] = creators.get(d.created_by)
                 stats = per_source.get(d.dataset_id, {})
                 item["scenes_by_source"] = {
                     k: v["scenes"] for k, v in stats.items()
@@ -680,7 +713,7 @@ class DatasetManager:
             dataset.status = new_status
             resume_count = job.resume_count
         get_pause_event(job_id).set()
-        self._spawn_job_runner(job_id)
+        self._after_commit(lambda: self._runner()._spawn_job_runner(job_id))
         logger.info("[DATASET] job_id=%d resumed count=%d status=%s", job_id, resume_count, new_status)
         return {"status": new_status, "resume_count": resume_count}
 
@@ -751,7 +784,7 @@ class DatasetManager:
             dataset.status = "QUEUED"
             job_id = job.job_id
         get_pause_event(job_id).set()
-        self._spawn_job_runner(job_id)
+        self._after_commit(lambda: self._runner()._spawn_job_runner(job_id))
         logger.info("[DATASET] job_id=%d retried", job_id)
         return {"status": "QUEUED", "job_id": job_id}
 
@@ -783,7 +816,9 @@ class DatasetManager:
             from etl.deletion_manager import DeletionManager
             # Sisakan COG + FUSED (rank >= 3): keduanya deliverable, sisanya
             # antara. Kedua kosakata disapu supaya baris pra-D14 ikut terhapus.
-            tier_result = DeletionManager(self._db, dataset_id, dataset_name).delete_tiers(
+            # Menghapus baris data_products: hak pipeline (monitor_etl), bukan
+            # role pengguna. Baris yang disentuh tidak diubah transaksi ini.
+            tier_result = DeletionManager(self._runner_db, dataset_id, dataset_name).delete_tiers(
                 list(tn.tiers_up_to_rank(2))
             )
             deleted_files = tier_result["deleted_count"]
@@ -819,7 +854,9 @@ class DatasetManager:
             # (with cancel set) so it exits instead of leaking forever.
             get_cancel_event(job_id).set()
             get_pause_event(job_id).set()
-        self._spawn_deletion_runner(dataset_id, job_id=job_id)
+        # Penghapusan fisik dikerjakan pipeline (monitor_etl) setelah status
+        # DELETING ter-commit (IMPLEMENTATION_NOTES Tahap 2, S1).
+        self._after_commit(lambda: self._runner()._spawn_deletion_runner(dataset_id, job_id=job_id))
         logger.info("[DATASET] dataset_id=%d deletion triggered force=%s", dataset_id, force)
         return {"status": "DELETING", "dataset_id": dataset_id}
 
@@ -1217,6 +1254,7 @@ class DatasetManager:
             "failed_scenes": d.failed_scenes,
             "total_size_bytes": d.total_size_bytes,
             "is_deletable": d.is_deletable,
+            "created_by": d.created_by,
             # Ikut di `base`, bukan cuma di `detail`: kartu dataset memakainya
             # untuk membedakan "preview sengaja dimatikan" dari "preview belum
             # sempat dibuat", dan daftar kartu tidak mengambil detail.

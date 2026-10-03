@@ -6,7 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 
-from api.deps import get_db
+from api.deps import get_db, get_etl_db
 from etl.database_client import DatabaseClient, ProcessingJob, SatelliteScene
 from etl.dataset_manager import DatasetManager
 from etl.metadata_manager import MetadataManager
@@ -59,8 +59,9 @@ async def current_pipeline_status(db: DatabaseClient = Depends(get_db)) -> dict:
     summary="Retry a failed dataset job",
     description="Re-runs the latest pipeline job for a dataset, only if that job has status FAILED.",
 )
-async def trigger_pipeline(dataset_id: int, db: DatabaseClient = Depends(get_db)) -> dict:
-    mgr = DatasetManager(db)
+async def trigger_pipeline(dataset_id: int, db: DatabaseClient = Depends(get_db),
+                           etl: DatabaseClient = Depends(get_etl_db)) -> dict:
+    mgr = DatasetManager(db, runner_db=etl)
     try:
         result = mgr.retry_dataset_job(dataset_id)
     except ValueError as exc:

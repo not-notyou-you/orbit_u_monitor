@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 
-from api.deps import get_db
+from api.deps import get_db, mark_download, require_role
 from etl.database_client import DatabaseClient
 from etl.dataset_manager import DatasetManager
 from etl.report_generator import ReportGenerationError, ReportGenerator
@@ -23,8 +23,10 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/{dataset_id}/report", summary="Comprehensive PDF report for a dataset")
+@router.get("/{dataset_id}/report", summary="Comprehensive PDF report for a dataset",
+            dependencies=[Depends(require_role("DATA_ENGINEER", download=True))])
 async def get_dataset_report(
+    request: Request,
     dataset_id: int,
     force: bool = Query(False, description="Skip the cache and regenerate the report"),
     db: DatabaseClient = Depends(get_db),
@@ -40,11 +42,14 @@ async def get_dataset_report(
 
     from etl import folder_manager as fm
     filename = f"{fm.slugify(info['name'])}_report.pdf"
+    mark_download(request, "DOWNLOAD_REPORT", "datasets", dataset_id, format="pdf", filename=filename)
     return FileResponse(str(pdf_path), filename=filename, media_type="application/pdf")
 
 
-@router.get("/{dataset_id}/report/json", summary="Report summary in JSON format (Section 10)")
+@router.get("/{dataset_id}/report/json", summary="Report summary in JSON format (Section 10)",
+            dependencies=[Depends(require_role("DATA_ENGINEER", download=True))])
 async def get_dataset_report_json(
+    request: Request,
     dataset_id: int,
     force: bool = Query(False, description="Skip the cache and regenerate the report"),
     db: DatabaseClient = Depends(get_db),
@@ -65,4 +70,5 @@ async def get_dataset_report_json(
 
     from etl import folder_manager as fm
     filename = f"{fm.slugify(info['name'])}_report.json"
+    mark_download(request, "DOWNLOAD_REPORT", "datasets", dataset_id, format="json", filename=filename)
     return FileResponse(str(json_path), filename=filename, media_type="application/json")
