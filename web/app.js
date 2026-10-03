@@ -1457,8 +1457,7 @@ function createDatasetCard(ds) {
     '<div class="card-scenes' + (state.openScenes.has(ds.dataset_id) ? '' : ' hidden') + '" id="scenes-' + ds.dataset_id + '"></div>' +
     '<div class="card-structure' + (state.openStructure.has(ds.dataset_id) ? '' : ' hidden') + '" id="structure-' + ds.dataset_id + '"></div>' +
     '<div class="card-structure card-preview' + (state.openPreview.has(ds.dataset_id) ? '' : ' hidden') + '" id="previewbox-' + ds.dataset_id + '">' +
-      '<div class="preview-section" id="preview-' + ds.dataset_id + '"></div>' +
-      '<div class="mask-section" id="masks-' + ds.dataset_id + '"></div></div>';
+      '<div class="preview-section" id="preview-' + ds.dataset_id + '"></div></div>';
   bindCardShell(el, ds.dataset_id);
   if (state.openScenes.has(ds.dataset_id)) renderSceneTable(el.querySelector('.card-scenes'), ds.dataset_id);
   if (state.openStructure.has(ds.dataset_id)) renderStructurePanel(el.querySelector('.card-structure'), ds.dataset_id);
@@ -1500,10 +1499,9 @@ function updateDatasetCard(el, ds) {
   if (state.openPreview.has(ds.dataset_id)) renderPreviewPanel(ds.dataset_id);
 }
 
-// Panel Preview: galeri PNG per tanggal + layer referensi (mask) per dataset.
+// Panel Preview: galeri PNG per tanggal.
 function renderPreviewPanel(id) {
   renderPreviewGallery(id);
-  renderMaskLayers(id);
 }
 
 // Durasi = selisih timestamp log pertama dataset dan log terbaru; ikut
@@ -2361,111 +2359,7 @@ async function renderStructurePanel(box, id) {
     bindStructurePanel(box, id);
   }
 
-  // Galeri preview dan layer mask ada di panel Preview (menu "⋯").
-}
-
-// ---------------------------------------------------------------------------
-// Layer referensi (masks/): darat-laut dan air permanen.
-//
-// Beda mendasar dari galeri preview di bawah, dan itu yang menentukan
-// bentuk UI-nya: preview itu PER TANGGAL, layer referensi PER DATASET. Garis
-// pantai tidak berubah antar tanggal, jadi tidak ada pemilih tanggal di sini
-// dan tidak boleh ada -- satu berkas berlaku untuk seluruh stack.
-//
-// Angka statistiknya datang dari manifest JSON yang ditulis modul pembuatnya,
-// bukan dihitung ulang di sini, supaya yang dibaca peneliti di layar persis
-// yang tertanam di berkas yang dikirim ke deep learning engineer.
-// ---------------------------------------------------------------------------
-
-async function renderMaskLayers(id) {
-  const box = document.getElementById('masks-' + id);
-  if (!box) return;
-
-  let data;
-  try {
-    data = await api('/api/datasets/' + id + '/masks');
-  } catch (e) {
-    box.innerHTML = '';
-    return;
-  }
-  if (!data.layers || data.layers.length === 0) {
-    // Sengaja kosong tanpa pesan: dataset yang belum sampai fusion memang
-    // belum punya layer ini, dan itu keadaan normal -- bukan sesuatu yang
-    // perlu diumumkan sebagai kekurangan di tiap kartu dataset.
-    box.innerHTML = '';
-    return;
-  }
-
-  const withImg = data.layers.filter(l => l.image_url);
-  const lbItems = [];
-  const cards = data.layers.map(l => {
-    const st = l.statistics || {};
-    let facts = [];
-    if (st.pct_sea !== undefined) {
-      facts.push(['sea', st.pct_sea.toFixed(2) + '%']);
-      facts.push(['land', st.pct_land.toFixed(2) + '%']);
-      if (st.clamp_m) facts.push(['distance clamp', '±' + (st.clamp_m / 1000) + ' km']);
-    }
-    if (st.pct_occurrence_ge_90 !== undefined) {
-      facts.push(['permanent water (≥90%)', st.pct_occurrence_ge_90.toFixed(2) + '%']);
-      facts.push(['seasonal (≥50%)', st.pct_occurrence_ge_50.toFixed(2) + '%']);
-      if (st.source_resolution_m) facts.push(['source', st.source_resolution_m + ' m']);
-    }
-
-    const idx = withImg.indexOf(l);
-    lbItems.push(null);
-    const legend = maskLegendHTML(l);
-    const desc = escapeHTML(l.interpretation || '') +
-      (facts.length ? '<span class="mask-facts">' + facts.map(f =>
-        '<span class="mask-fact"><b>' + escapeHTML(f[1]) + '</b>' + escapeHTML(f[0]) + '</span>').join('') + '</span>' : '') +
-      '<span class="mask-file">' + escapeHTML(l.data_file) + ' · ' + humanBytes(l.size_bytes) + '</span>';
-    if (idx >= 0) lbItems[idx] = { url: l.image_url, title: l.label, source: 'Reference layer · ' + (data.applies_to || ''), legend, noteHTML: desc };
-
-    // Tampilan sama dengan tile Live/preview: gambar + judul saja; legenda,
-    // statistik, dan interpretasi ada di lightbox.
-    return '<div class="lm-tile">' +
-      (l.image_url
-        ? '<button type="button" class="lm-thumb" data-mask-open="' + idx + '" title="Click for legend &amp; description">' +
-            '<img src="' + escapeHTML(l.image_url) + '" alt="' + escapeHTML(l.label) + '" loading="lazy"></button>'
-        : '<div class="lm-noimg">no preview</div>') +
-      '<div class="lm-tile-head"><span>' + escapeHTML(l.label) + '</span></div>' +
-    '</div>';
-  }).join('');
-
-  const html =
-    '<div class="mask-head">' +
-      '<h4>Reference Layers</h4>' +
-      '<span class="mask-sub">' + escapeHTML(data.applies_to) + ' · ' +
-        humanBytes(data.total_size_bytes) + '</span>' +
-    '</div>' +
-    '<p class="mask-note">Supplementary information, not a filter — raw ' +
-      'and fusion data are not modified at all. Rivers and lakes are kept ' +
-      'on purpose, since their overflow is exactly the flood signal of interest.</p>' +
-    '<div class="mask-grid preview-grid lm-row">' + cards + '</div>';
-
-  if (box._html !== html) { box._html = html; box.innerHTML = html; }
-  const items = lbItems.filter(Boolean);
-  box.querySelectorAll('[data-mask-open]').forEach(btn => {
-    btn.onclick = () => openPreviewLightbox(items, Number(btn.dataset.maskOpen));
-  });
-}
-
-// Legenda mask mengikuti warna render_preview di etl/land_mask.py dan
-// etl/water_occurrence.py (manifest tidak membawa colormap).
-function maskLegendHTML(l) {
-  const f = String(l.data_file || l.layer || '');
-  const ramp = (lo, stops, hi) => '<div class="lm-legend"><span>' + lo + '</span>' +
-    '<i class="lm-ramp" style="background:linear-gradient(90deg,' + stops.join(',') + ')"></i><span>' + hi + '</span></div>';
-  if (f.includes('land_distance')) {
-    const km = ((l.statistics || {}).clamp_m || 0) / 1000;
-    return ramp('sea (far)', ['#0000ff', '#000078', '#3c2800', '#ffb400'], 'land' + (km ? ' (≥' + km + ' km)' : '')) +
-      '<div class="lm-legend lm-legend-cat"><span>0 = coastline (blue ↔ orange boundary)</span></div>';
-  }
-  if (f.includes('water_occurrence')) {
-    return ramp('0%', ['#f0f0f0', '#0a5adc'], '100% water') +
-      '<div class="lm-legend lm-legend-cat"><span><i style="background:#808080"></i>no data</span></div>';
-  }
-  return '';
+  // Galeri preview ada di panel Preview (menu "⋯").
 }
 
 function bindStructurePanel(box, id) {

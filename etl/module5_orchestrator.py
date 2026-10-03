@@ -817,34 +817,6 @@ def _finalize_date(jc: _JobContext, members: list[_SceneResult]) -> None:
         primary.produced_files[tn.FUSED] = fused_files
         if tn.FUSED not in primary.produced_tiers:
             primary.produced_tiers.append(tn.FUSED)
-        # Layer referensi darat/laut dan air permanen. Ditaruh SESUDAH fusion
-        # karena baru di situ grid dataset dipaku, dan keduanya harus lahir di
-        # grid yang sama persis dengan stack-nya. Idempoten: tanggal kedua dan
-        # seterusnya cuma memeriksa berkasnya sudah ada.
-        _ensure_reference_layers(jc)
-
-
-def _ensure_reference_layers(jc: _JobContext) -> None:
-    """Layer referensi masks/ dataset ini, sekali saja, tanpa pernah menggagalkan job.
-
-    Bukan mata rantai lineage RAW->FUSION: dataset tanpa layer ini tetap sah
-    dan lengkap. Jadi kegagalannya dicatat dan ditelan, tidak dinaikkan —
-    tabel garis pantai yang belum dimuat tidak boleh menjatuhkan job yang
-    sudah berjam-jam berjalan.
-    """
-    try:
-        from etl import folder_manager as _fm
-        from etl.reference_layers import ensure_reference_layers
-
-        root = _fm.get_dataset_root(jc.dataset_id, jc.dataset_name)
-        status = ensure_reference_layers(
-            jc.db, jc.dataset_id, root, jc.bbox_tuple,
-        )
-        if any(v == "written" for v in status.values()):
-            logger.info("[ORCH] layer referensi dataset=%s: %s",
-                        jc.dataset_id, status)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("[ORCH] layer referensi dilewati: %s", exc)
 
 
 def _fuse_days_without_s1(

@@ -18,8 +18,7 @@ numpy==2.1.3
 scipy==1.14.1
 matplotlib==3.9.3
 # Pillow: penulisan PNG untuk tier PREVIEW (etl/module10_generate_preview.py),
-# preview Live (etl/live_preview.py), dan preview mask di etl/land_mask.py /
-# etl/water_occurrence.py. Sebelumnya cuma tersedia karena
+# dan preview Live (etl/live_preview.py). Sebelumnya cuma tersedia karena
 # ikut terbawa dependensi lain -- dipin di sini supaya install bersih tidak
 # gagal di tahap PREVIEW. Dipin ke versi yang terpasang & teruji di venv
 # ini -- pin yang lebih rendah akan men-downgrade instalasi yang sudah jalan.
