@@ -39,7 +39,7 @@ def fake_hash(label: str) -> str:
 # ---------------------------------------------------------------------------
 
 class TestSchemaCreation:
-    """Verify all 11 master tables exist with required columns."""
+    """Verify the core inherited tables exist with required columns."""
 
     REQUIRED_TABLES = [
         "regions_of_interest",
@@ -48,15 +48,12 @@ class TestSchemaCreation:
         "processing_jobs",
         "data_products",
         "quality_metrics",
-        "processing_rules",
         "data_lineage",
-        "api_access_logs",
         "alert_events",
-        "dataset_versions",
     ]
 
     def test_all_tables_exist(self, db_client):
-        """All 11 master tables must exist in the database."""
+        """All core inherited tables must exist in the database."""
         inspector = inspect(db_client._engine)
         existing  = inspector.get_table_names()
         for table in self.REQUIRED_TABLES:
@@ -440,12 +437,3 @@ class TestNormalization:
             "region_name found in satellite_scenes — transitive dep via region_id."
         )
         assert "region_id" in scene_cols, "region_id FK must exist in satellite_scenes"
-
-    def test_processing_rules_stage_fk(self, db_client):
-        """processing_rules references stage via stage_id FK, not stage_name string."""
-        inspector = inspect(db_client._engine)
-        rule_cols = {c["name"] for c in inspector.get_columns("processing_rules")}
-        assert "stage_id"   in rule_cols, "stage_id FK missing from processing_rules"
-        assert "stage_name" not in rule_cols, (
-            "stage_name in processing_rules is redundant — use stage_id FK"
-        )

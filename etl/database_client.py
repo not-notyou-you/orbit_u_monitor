@@ -98,13 +98,6 @@ class StorageLocationEnum(str, PyEnum):
     AZURE_BLOB = "AZURE_BLOB"
 
 
-class RuleTypeEnum(str, PyEnum):
-    THRESHOLD = "THRESHOLD"
-    TRANSFORMATION = "TRANSFORMATION"
-    VALIDATION = "VALIDATION"
-    FILTER = "FILTER"
-
-
 class AlertSeverityEnum(str, PyEnum):
     INFO = "INFO"
     WARNING = "WARNING"
@@ -117,14 +110,6 @@ class AlertEventTypeEnum(str, PyEnum):
     PIPELINE_ERROR = "PIPELINE_ERROR"
     THRESHOLD_BREACH = "THRESHOLD_BREACH"
     SYSTEM_ALERT = "SYSTEM_ALERT"
-
-
-class HttpMethodEnum(str, PyEnum):
-    GET = "GET"
-    POST = "POST"
-    PUT = "PUT"
-    PATCH = "PATCH"
-    DELETE = "DELETE"
 
 
 class DatasetKindEnum(str, PyEnum):
@@ -519,7 +504,6 @@ class ProcessingStage(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
 
     jobs = relationship("ProcessingJob", back_populates="stage")
-    rules = relationship("ProcessingRule", back_populates="stage")
 
     def __repr__(self) -> str:
         return f"<ProcessingStage id={self.stage_id} name={self.stage_name}>"
@@ -677,7 +661,6 @@ class DataProduct(Base):
     job = relationship("ProcessingJob", back_populates="products")
     dataset = relationship("Dataset", back_populates="products")
     quality_metrics = relationship("QualityMetric", back_populates="product", cascade="all, delete-orphan")
-    versions = relationship("DatasetVersion", back_populates="product")
     # passive_deletes: kolom FK lineage NOT NULL dan FK-nya sudah ON DELETE
     # CASCADE. Tanpa ini ORM mencoba meng-NULL-kan parent/child_product_id
     # saat produk dihapus (mis. scene placeholder NASA_AUX di
@@ -729,31 +712,6 @@ class QualityMetric(Base):
         return f"<QualityMetric id={self.metric_id} scene={self.scene_id} band={self.band_name} score={self.quality_score}>"
 
 
-class ProcessingRule(Base):
-    __tablename__ = "processing_rules"
-    rule_id = Column(Integer, primary_key=True, autoincrement=True)
-    stage_id = Column(Integer, ForeignKey("processing_stages.stage_id",
-                                           ondelete="CASCADE"), nullable=False)
-    rule_name = Column(String(100), nullable=False)
-    rule_code = Column(String(30), nullable=False, unique=True)
-    rule_type = Column(Enum(RuleTypeEnum, name="rule_type_enum"), nullable=False)
-    description = Column(Text)
-    threshold_value = Column(Numeric(12, 4))
-    threshold_unit = Column(String(20))
-    operator = Column(String(10))
-    action_on_fail = Column(String(50), nullable=False, default="WARN")
-    is_mandatory = Column(Boolean, nullable=False, default=True)
-    is_active = Column(Boolean, nullable=False, default=True)
-    version = Column(String(20), nullable=False, default="1.0.0")
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
-
-    stage = relationship("ProcessingStage", back_populates="rules")
-
-    def __repr__(self) -> str:
-        return f"<ProcessingRule id={self.rule_id} code={self.rule_code}>"
-
-
 class DataLineage(Base):
     __tablename__ = "data_lineage"
     __table_args__ = (
@@ -787,33 +745,6 @@ class DataLineage(Base):
         return f"<DataLineage id={self.lineage_id} {self.parent_product_id}->{self.child_product_id}>"
 
 
-class ApiAccessLog(Base):
-    __tablename__ = "api_access_logs"
-    log_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    log_uuid = Column(UUID(as_uuid=True), nullable=False,
-                       server_default=text("uuid_generate_v4()"))
-    endpoint = Column(String(200), nullable=False)
-    http_method = Column(Enum(HttpMethodEnum, name="http_method_enum"),
-                          nullable=False, default=HttpMethodEnum.GET)
-    user_ip = Column(INET, nullable=False)
-    user_agent = Column(Text)
-    request_timestamp = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
-    scene_id_queried = Column(Integer, ForeignKey("satellite_scenes.scene_id",
-                                                    ondelete="SET NULL"))
-    product_id_queried = Column(BigInteger, ForeignKey("data_products.product_id",
-                                                         ondelete="SET NULL"))
-    query_params = Column(JSONB, default={})
-    response_status = Column(SmallInteger, nullable=False)
-    response_time_ms = Column(Integer, nullable=False)
-    response_size_kb = Column(Numeric(12, 3))
-    error_detail = Column(Text)
-    api_key_id = Column(String(50))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
-
-    def __repr__(self) -> str:
-        return f"<ApiAccessLog id={self.log_id} endpoint={self.endpoint} status={self.response_status}>"
-
-
 class AlertEvent(Base):
     __tablename__ = "alert_events"
     alert_id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -842,34 +773,6 @@ class AlertEvent(Base):
 
     def __repr__(self) -> str:
         return f"<AlertEvent id={self.alert_id} type={self.event_type} severity={self.severity}>"
-
-
-class DatasetVersion(Base):
-    __tablename__ = "dataset_versions"
-    __table_args__ = (
-        UniqueConstraint("product_id", "version_number", name="uq_version_product_semver"),
-    )
-    version_id = Column(Integer, primary_key=True, autoincrement=True)
-    version_uuid = Column(UUID(as_uuid=True), nullable=False, unique=True,
-                           server_default=text("uuid_generate_v4()"))
-    product_id = Column(BigInteger, ForeignKey("data_products.product_id",
-                                                ondelete="RESTRICT"), nullable=False)
-    version_number = Column(String(20), nullable=False)
-    release_date = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
-    release_notes = Column(Text)
-    change_log = Column(Text)
-    is_production = Column(Boolean, nullable=False, default=False)
-    is_deprecated = Column(Boolean, nullable=False, default=False)
-    deprecated_at = Column(DateTime(timezone=True))
-    deprecated_reason = Column(Text)
-    released_by = Column(String(100))
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
-
-    product = relationship("DataProduct", back_populates="versions")
-
-    def __repr__(self) -> str:
-        return f"<DatasetVersion id={self.version_id} product={self.product_id} v={self.version_number}>"
 
 
 class Dataset(Base):
