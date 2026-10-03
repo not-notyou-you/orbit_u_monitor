@@ -31,7 +31,7 @@ INCLUDES = {
     "ADMIN": {"ADMIN"},
 }
 
-P, U, DE, A = "PUBLIC", "USER", "DATA_ENGINEER", "ADMIN"
+P, U, AN, DE, A = "PUBLIC", "USER", "ANALYST", "DATA_ENGINEER", "ADMIN"
 DL = "download"
 
 # (metode, path) -> role minimum [, "download"]
@@ -110,6 +110,41 @@ EXPECTED: dict[tuple[str, str], tuple] = {
     ("POST", "/api/live/areas/{area_id}/scenes/{scene_date}/retry"): (A,),
     # wilayah (§4.4)
     ("GET", "/api/regions"): (U,),
+    ("GET", "/api/regions/kecamatan"): (U,),
+    # publik (§4.2, Tahap 3)
+    ("GET", "/api/public/live"): (P,),
+    ("GET", "/api/public/live/{area_id}/preview/{key}.png"): (P,),
+    # hidromet (§4.4)
+    ("GET", "/api/hydromet/today"): (U,),
+    ("GET", "/api/hydromet/observations"): (U,),
+    ("GET", "/api/hydromet/trend"): (U,),
+    ("GET", "/api/hydromet/observations.csv"): (AN, DL),
+    # alert (§4.5)
+    ("GET", "/api/alerts"): (U,),
+    ("GET", "/api/alerts/evaluation"): (AN,),
+    ("POST", "/api/alerts/{alert_id}/acknowledge"): (AN,),
+    ("GET", "/api/alert-rules"): (U,),
+    ("POST", "/api/alert-rules"): (A,),
+    ("PUT", "/api/alert-rules/{rule_id}"): (A,),
+    # kejadian bencana (§4.6)
+    ("GET", "/api/disasters"): (AN,),
+    ("POST", "/api/disasters"): (AN,),
+    ("GET", "/api/disasters/{event_id}"): (AN,),
+    ("PUT", "/api/disasters/{event_id}"): (AN,),
+    ("DELETE", "/api/disasters/{event_id}"): (AN,),
+    ("GET", "/api/disaster-types"): (U,),
+    ("POST", "/api/disaster-types"): (A,),
+    ("PUT", "/api/disaster-types/{type_id}"): (A,),
+    # laporan periodik (§4.8): audiens ANALYST/DATA_ENGINEER dicek di route
+    # (REPORT_AUDIENCE) karena keduanya tidak bertingkat.
+    ("GET", "/api/reports"): (U,),
+    ("GET", "/api/reports/{report_id}/download"): (U, DL),
+    ("POST", "/api/reports/regenerate"): (A,),
+    # administrasi wilayah & ingest (§4.9)
+    ("GET", "/api/admin/regions"): (A,),
+    ("PATCH", "/api/admin/regions/{region_id}"): (A,),
+    ("POST", "/api/admin/rois"): (A,),
+    ("POST", "/api/admin/ingest"): (A,),
 }
 
 PATH_VALUES = {
@@ -117,7 +152,8 @@ PATH_VALUES = {
     "level": "processed", "kind": "grayscale", "filename": "x.png",
 }
 # 403 yang sah walau role cukup: aturan bisnis, bukan role.
-BUSINESS_403 = {"NOT_DATASET_OWNER", "SCENE_OUT_OF_RANGE", "CANNOT_MODIFY_SELF"}
+BUSINESS_403 = {"NOT_DATASET_OWNER", "SCENE_OUT_OF_RANGE", "CANNOT_MODIFY_SELF", "REPORT_AUDIENCE",
+                "DATE_OUT_OF_RANGE", "SCENE_NOT_PUBLIC"}
 ROLE_DENIAL_CODES = {"NOT_AUTHENTICATED", "ROLE_FORBIDDEN", "DB_PERMISSION_DENIED"}
 
 

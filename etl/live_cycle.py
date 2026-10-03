@@ -3,7 +3,8 @@
 
     1. cek scene Sentinel-1 baru (discover_scenes)
     2. unduh + proses S1/MODIS/GPM lewat run_dataset_job (pipeline biasa)
-    3. per scene: metrik -> 8 preview -> kalimat kondisi
+    3. per scene: metrik -> 8 preview -> peta perubahan air (preview ke-9,
+       PIPELINE §4.1) -> kalimat kondisi
     4. hitung ulang forecast
     5. retensi: hapus scene paling lama yang melebihi batas
     6. semua langkah dicatat ke live_events
@@ -20,6 +21,7 @@ from __future__ import annotations
 import logging
 import time
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 from shapely import wkt as shapely_wkt
 from sqlalchemy import select
@@ -444,7 +446,90 @@ def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
                 next(iter(f.values())).name.rsplit("_", 3)[0] for f in inputs["s1"]
             ]
             row.updated_at = _now()
+    if scene_status != "FAILED":
+        try:
+            water_change_stage(mon, area_id, scene_date, files, inputs)
+        except Exception as exc:
+            # Tahap opsional (processing_stages.is_mandatory = false).
+            logger.exception("[LIVE] perubahan air %s gagal", scene_date)
+            mon.log(area_id, "WATER_CHANGE", "FAILED", f"Water change map for {scene_date} failed: {exc}",
+                    scene_date=scene_date)
     return scene_status
+
+
+def _scene_vh(files: _LiveFiles, frames: list, scratch_key: str):
+    """Path VH satu scene (mosaik sementara bila >1 frame) + direktori
+    sementara yang harus dihapus pemanggil (atau None)."""
+    frames = [{b: str(p) for b, p in f.items()} for f in frames or []]
+    if not frames:
+        return None, None
+    if len(frames) == 1:
+        vh = frames[0].get("VH")
+        return (Path(vh) if vh else None), None
+    from etl.s1_mosaic import mosaic_frames
+    scratch = files.root / "_work" / f"wc_{scratch_key}"
+    scratch.mkdir(parents=True, exist_ok=True)
+    s1 = mosaic_frames(frames, scratch, date_key=scratch_key, level="PROCESSED")
+    return (Path(s1["VH"]) if "VH" in s1 else None), scratch
+
+
+def water_change_stage(mon: LiveMonitor, area_id: int, scene_date: date, files: _LiveFiles,
+                       inputs: dict) -> dict | None:
+    """Peta & metrik perubahan air terhadap scene tersimpan sebelumnya yang
+    COG VH-nya masih ada (PIPELINE §4.1). Scene pertama -> tidak ada baris."""
+    import shutil
+
+    from etl import live_metrics as lmx
+    from etl import water_change as wcm
+    from etl.settings import get_setting
+
+    with mon._db.session() as sess:
+        cur = sess.scalar(select(LiveScene).where(
+            LiveScene.area_id == area_id, LiveScene.scene_date == scene_date))
+        prevs = sess.scalars(select(LiveScene).where(
+            LiveScene.area_id == area_id, LiveScene.scene_date < scene_date,
+            LiveScene.deleted_at.is_(None), LiveScene.status.in_(("READY", "PARTIAL")))
+            .order_by(LiveScene.scene_date.desc())).all()
+        threshold = float(get_setting(sess, "water.vh_threshold_db"))
+        cur_id, cur_products = cur.live_scene_id, list(cur.s1_product_ids or [])
+        candidates = [(p.live_scene_id, p.scene_date, list(p.s1_product_ids or [])) for p in prevs]
+    prev = next(((sid, d, prods, fr) for sid, d, prods in candidates
+                 if (fr := lmx.s1_frames(files.root, d))), None)
+    if prev is None:
+        mon.log(area_id, "WATER_CHANGE", "SKIPPED", f"Scene {scene_date}: no comparison scene yet",
+                scene_date=scene_date)
+        return None
+    prev_id, prev_date, prev_products, prev_frames = prev
+    dk = scene_date.strftime("%Y%m%d")
+    cur_vh, s1 = _scene_vh(files, inputs.get("s1"), dk)
+    prev_vh, s2 = _scene_vh(files, prev_frames, prev_date.strftime("%Y%m%d") + "_ref")
+    try:
+        if cur_vh is None or prev_vh is None:
+            mon.log(area_id, "WATER_CHANGE", "SKIPPED", f"Scene {scene_date}: VH band missing",
+                    scene_date=scene_date)
+            return None
+        wc = wcm.compute(cur_vh, prev_vh, threshold)
+        same = wcm.same_orbit(cur_products, prev_products)
+        legend = wcm.render_png(wc, files.preview_dir(scene_date) / f"{wcm.PREVIEW_KEY}.png",
+                                orbit_differs=same is False)
+    finally:
+        for d in (s1, s2):
+            if d is not None:
+                shutil.rmtree(d, ignore_errors=True)
+    with mon._db.session() as sess:
+        wcm.save_metrics(sess, cur_id, prev_id, wc.metrics, same, source_date=prev_date)
+        row = sess.get(LiveScene, cur_id)
+        previews = dict(row.previews or {})
+        items = dict(previews.get("items") or {})
+        items[wcm.PREVIEW_KEY] = {"file": f"{wcm.PREVIEW_KEY}.png", "label": "Perubahan air Sentinel-1",
+                                  "legend": legend, "ref_date": prev_date.isoformat()}
+        previews["items"] = items
+        row.previews = _jsonable(previews)
+    mon.log(area_id, "WATER_CHANGE", "OK",
+            f"Scene {scene_date} vs {prev_date}: new {wc.metrics['new_km2']} km², "
+            f"receded {wc.metrics['receded_km2']} km²" + ("" if same is not False else " (different orbit)"),
+            scene_date=scene_date)
+    return wc.metrics
 
 
 def retry_failed_sources(mon: LiveMonitor, area_id: int, skip: set[date] | None = None,
@@ -488,18 +573,23 @@ def retry_failed_sources(mon: LiveMonitor, area_id: int, skip: set[date] | None 
 def reinterpret_all(mon: LiveMonitor, area_id: int) -> None:
     """Tulis ulang kalimat kondisi semua scene tersimpan, urut tanggal, dengan
     scene tersimpan sebelumnya sebagai pembanding."""
-    from etl.live_interpret import area_status, interpret_scene
+    from etl import water_change as wcm
+    from etl.live_interpret import area_status, interpret_scene, sync_bmkg_thresholds
     from etl.live_metrics import load_scene_metrics
 
     with mon._db.session() as sess:
+        sync_bmkg_thresholds(sess)
         rows = sess.scalars(select(LiveScene).where(
             LiveScene.area_id == area_id, LiveScene.deleted_at.is_(None),
             LiveScene.status.in_(("READY", "PARTIAL"))).order_by(LiveScene.scene_date)).all()
         metrics = load_scene_metrics(sess, rows)
+        changes = wcm.load_metrics(sess, [r.live_scene_id for r in rows])
         prev = None
         for r in rows:
             current = metrics[r.live_scene_id]
             interp = interpret_scene(current, prev, r.source_status or {})
+            if r.live_scene_id in changes or (r.previews or {}).get("items", {}).get(wcm.PREVIEW_KEY):
+                interp[wcm.PREVIEW_KEY] = wcm.sentence(changes.get(r.live_scene_id))
             r.interpretations = _jsonable(interp)
             r.area_status = _jsonable(area_status(interp))
             prev = current

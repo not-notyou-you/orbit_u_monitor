@@ -601,7 +601,8 @@ class LiveMonitor:
 
     def preview_path(self, area_id: int, scene_date: date, key: str) -> Path | None:
         from etl.live_interpret import PREVIEW_KEYS
-        if key not in PREVIEW_KEYS:
+        from etl.water_change import PREVIEW_KEY as WATER_CHANGE_KEY
+        if key not in PREVIEW_KEYS and key != WATER_CHANGE_KEY:
             return None
         with self._db.session() as sess:
             a = sess.get(LiveArea, area_id)

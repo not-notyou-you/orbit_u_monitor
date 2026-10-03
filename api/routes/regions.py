@@ -6,14 +6,16 @@ Hanya baca. ROI dibuat oleh sistem/ADMIN dari kecamatan COD-AB (DATABASE.md
 """
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import APIRouter, Depends, Query
 from geoalchemy2.shape import to_shape
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
+from sqlalchemy.orm import Session
 
 from api.schemas import RegionItem, RegionListResponse
-from api.deps import get_db
+from api.deps import get_db, get_session
 from etl.database_client import DatabaseClient, RegionOfInterest
 
 logger = logging.getLogger(__name__)
@@ -62,3 +64,30 @@ async def list_regions(
         ).all()
         items = [_to_item(r) for r in rows]
     return RegionListResponse(items=items, total=total)
+
+
+@router.get("/kecamatan", summary="Kecamatan (AOI by default) as simplified GeoJSON")
+def kecamatan_geojson(
+    sess: Session = Depends(get_session),
+    all_lebak: bool = Query(False, alias="all", description="All kecamatan of Kabupaten Lebak, not only the AOI"),
+    tolerance: float = Query(0.0005, ge=0, le=0.01, description="ST_SimplifyPreserveTopology tolerance (degrees)"),
+) -> dict:
+    """INTERFACE §4.4 `/regions`: poligon kecamatan disederhanakan
+    ST_SimplifyPreserveTopology. Daftar ROI di `GET /regions` tetap untuk
+    wizard dataset dan Live Area (IMPLEMENTATION_NOTES Tahap 3)."""
+    rows = sess.execute(text(f"""
+        SELECT region_id, pcode, region_name, in_aoi, area_km2,
+               ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, :tol), 6) AS gj
+        FROM administrative_regions
+        WHERE admin_level = 3 {'' if all_lebak else 'AND in_aoi'}
+        ORDER BY region_name"""), {"tol": tolerance}).mappings().all()
+    return {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "id": r["region_id"],
+            "geometry": json.loads(r["gj"]),
+            "properties": {"region_id": r["region_id"], "pcode": r["pcode"], "name": r["region_name"],
+                           "in_aoi": r["in_aoi"], "area_km2": float(r["area_km2"]) if r["area_km2"] is not None else None},
+        } for r in rows],
+    }

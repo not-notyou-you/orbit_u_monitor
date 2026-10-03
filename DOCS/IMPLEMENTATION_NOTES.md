@@ -90,3 +90,54 @@ diterima apa adanya).
 - `GET /api/admin/tokens` ditambahkan untuk tab Token API (§2.8); pencabutan memakai `DELETE /api/auth/tokens/{id}` yang memang mengizinkan ADMIN.
 - Kode error spesifik: `NOT_AUTHENTICATED`, `SESSION_EXPIRED`, `ACCOUNT_INACTIVE`, `INVALID_CREDENTIALS`, `ACCOUNT_LOCKED`, `ROLE_FORBIDDEN`, `DB_PERMISSION_DENIED`, `CSRF_HEADER_REQUIRED`, `TOKEN_INVALID`, `TOKEN_REVOKED`, `TOKEN_EXPIRED`, `TOKEN_WRITE_FORBIDDEN`, `TOKEN_SCOPE_FORBIDDEN`, `RATE_LIMITED`, `NOT_DATASET_OWNER`, `SCENE_OUT_OF_RANGE`, `PASSWORD_POLICY`, `INVALID_OLD_PASSWORD`, `USERNAME_TAKEN`, `CANNOT_MODIFY_SELF`, `TOKEN_ALREADY_REVOKED`, `INVALID_DATE_RANGE`; selebihnya kode bawaan per status (`NOT_FOUND`, `BAD_REQUEST`, `VALIDATION_ERROR`, …).
 - UI: `/masuk` + guard sesi di `/app` (alih ke `/masuk` saat 401), tombol Keluar, dan tab disembunyikan sesuai `permissions` dari `/api/auth/me`. Halaman lain belum diterjemahkan atau diubah.
+
+---
+
+## Tahap 3 — Monitoring & Laporan
+
+Rencana disetujui pemilik proyek (semua rekomendasi diterima). Data nyata
+yang dipakai: batas COD-AB IDN 2020 (BPS/OCHA) adm2 + adm3, dipindah dari
+`data/humdata/` ke `data/external/cod-ab-idn/` (bersama PDF metadatanya dari
+`data/from_glms/`). `data/from_glms/` tidak memuat catatan kejadian GMLS
+(hanya contoh gempa global dan data demografi desa), jadi `import_disasters.py`
+diuji dengan CSV sintetis.
+
+### Keputusan rencana (disetujui)
+
+| # | Temuan | Keputusan |
+|---|---|---|
+| T3-1 | `job_status_enum` dan `dataset_jobs.status` belum punya `WAITING_UPSTREAM` / `SKIPPED_LOCKED` (PIPELINE §7–8). | Ditambahkan ke skema. Status per tanggal hidromet ada di `dataset_jobs` (`HYDROMET_DAILY`, `date_range_start = date_range_end` = hari UTC); run scheduler yang dilewati dicatat sebagai `processing_jobs` tahap `ORCHESTRATE` berstatus `SKIPPED_LOCKED` (`parameters_json.scheduler_job`, `.lock`). |
+| T3-2 | `live_interpret.THRESHOLDS` hujan 24 jam 20/50 mm, sedangkan aturan alert BMKG 50/100/150. | `warn`/`high` = dua ambang aturan `RAIN_24H` aktif terendah (default 50/100), disinkronkan dari `alert_rules` setiap kali kalimat dibuat (`sync_bmkg_thresholds`). 72 jam dan 7 hari tidak punya padanan BMKG → tetap. |
+| T3-3 | Angka operasional yang PIPELINE sebut sebagai default tetapi belum ada di `app_settings`. | Kunci baru: `live.retention_default` (6), `live.default_area_name` ("Lebak Selatan"), `hydromet.min_valid_fraction` (0,1), `hydromet.waiting_max_days` (3), `report.wait_hydromet_minutes` (60). `etl/settings.py` membaca dengan default yang sama dengan seed. |
+
+### Temuan saat pengerjaan
+
+| # | Temuan | Penanganan | Perlu keputusan? |
+|---|---|---|---|
+| T3-4 | **Daftar kecamatan AOI GMLS tidak ada di dokumen maupun data.** COD-AB Lebak berisi 28 kecamatan. | `load_regions.py --aoi` menerima nama/pcode; tanpa `--aoi` hanya batas yang dimuat. Belum dijalankan ke DB produksi. Usulan (9 kecamatan pesisir selatan, cocok dengan asumsi "9 kecamatan" DATABASE §4.3): Malingping, Wanasalam, Panggarangan, Cihara, Bayah, Cilograng, Cibeber, Cijaku, Cigemblong. | **Ya**: konfirmasi daftar. |
+| T3-5 | INTERFACE §4.4 `GET /regions` = kecamatan + GeoJSON, tetapi `/api/regions` sudah dipakai wizard dataset dan Live Area sebagai daftar ROI. | `/api/regions` tetap daftar ROI (UI tidak berubah); GeoJSON kecamatan di `GET /api/regions/kecamatan` (`?all=true` untuk 28 kecamatan, `ST_SimplifyPreserveTopology`). | Ya, bila ingin path persis dokumen (tahap 4 bisa menukar). |
+| T3-6 | Laporan dibuat scheduler (`monitor_etl`), tetapi etl tidak punya SELECT pada `disaster_events`, `v_kejadian_dan_hujan`, `v_evaluasi_alert`, `v_ringkasan_kualitas`, `v_kelengkapan_data`, dan tidak ada sumber "unduhan per role tanpa nama". | GRANT SELECT ke `monitor_etl` pada kelima objek; VIEW baru `v_unduhan_per_role` (agregat per tanggal WIB × aksi × role, tanpa identitas) untuk DATA_ENGINEER, ADMIN, etl. `grant_matrix.sql` diperbarui. | Ya: perluasan GRANT etl (hanya baca). |
+| T3-7 | Jendela `rain_30d` (§3.2) bila ditambahkan ke `SourcePlan` akan membuat setiap dataset Katalog/Live mengunduh 30 granule per tanggal, bukan 7. | `WINDOWS["30d"]` ada di module8, tetapi hanya diminta job hidromet (`windows=HYDROMET_WINDOWS`); dataset lain tetap 24h/72h/7d. | Tidak. |
+| T3-8 | `ensure_gpm_inputs_for_date` menelan semua exception, sehingga "granule belum terbit" tidak bisa dibedakan dari kegagalan. | `GranuleNotPublished` (module8) + argumen `raise_errors` → `WAITING_UPSTREAM`. Lewat `waiting_max_days` hari → `FAILED`. Job harian mencoba ulang tanggal WAITING sebelum "kemarin". | Tidak. |
+| T3-9 | Pembaruan Late → Final: module8 memakai ulang COG yang sudah ada ("output sudah ada, skip"). | `rebuild_non_final=True` membangun ulang berkas yang tag `IMERG_RUNS`-nya bukan F; sebelum itu `final_published()` memeriksa listing GES DISC (di-cache) supaya Late tidak diunduh ulang sia-sia. Jendela pemeriksaan = 153 hari ("4–5 bulan"). | Tidak. |
+| T3-10 | `recover_interrupted_jobs` (startup API) akan menjalankan ulang `dataset_jobs` dataset sistem sebagai job Katalog. | Dataset `is_system` dikecualikan; tanggal hidromet yang terputus diulang job harian/backfill (resume-aware). | Tidak. |
+| T3-11 | `FRACTION` FLOOD: live_metrics menghitung kelas 3 sebagai banjir, PIPELINE §3.3 menyebut kelas 2/3. | Hidromet mengikuti §3.3 (kelas 2 = air berulang, 3 = banjir); kalimat Live tidak diubah. | Tidak. |
+| T3-12 | Kategori kalimat perubahan air tidak diatur dokumen. | Pertambahan bersih (baru − surut) sebagai poin persen luas teramati, dengan ambang yang sama dengan kalimat VH (2 / 5 poin). Metrik tambahan `valid_km2` (penyebutnya) disimpan bersama `new_km2`, `receded_km2`, `persistent_km2`, `same_orbit`. | Tidak. |
+| T3-13 | Orbit relatif S1C/S1D: offset orbit absolut → relatif belum terverifikasi. | `relative_orbit()` hanya untuk S1A (offset 73) dan S1B (27); misi lain → tidak diketahui, `same_orbit` tidak ditulis dan PNG tanpa label. | Ya, bila S1C dipakai. |
+| T3-14 | `generated_reports.file_path` / `checksum_sha256` NOT NULL, padahal laporan FAILED tidak punya berkas. | Baris FAILED: path tujuan, ukuran 0, checksum SHA-256 berkas kosong, `error_message` berisi penyebab. | Tidak. |
+| T3-15 | Regenerasi: "berkas lama dipertahankan" bertabrakan dengan nama `{code}_{period_start}.pdf` yang tetap. | Regenerasi menulis `…_v2.pdf`, `…_v3.pdf`; baris lama SUPERSEDED dalam transaksi yang sama dengan INSERT baris READY (indeks unik READY tetap terjaga). | Tidak. |
+| T3-16 | `/reports` untuk "ANALYST / DATA_ENGINEER", dua role yang tidak bertingkat. | Router `USER` + pemeriksaan audiens (`403 REPORT_AUDIENCE`); RLS menyaring baris, laporan audiens lain → 404. | Tidak. |
+| T3-17 | Batas "USER maks. 30 hari" pada `/hydromet/observations` bisa berarti rentang atau usia data. | Ditafsirkan sama dengan Live: USER hanya data ≥ hari ini − 30 (403 `DATE_OUT_OF_RANGE`); `trend` USER ≤ 30 hari. | Tidak. |
+| T3-18 | `/public/live/{area_id}/preview/{key}.png` tidak memuat tanggal, tetapi "tanggal lain → 403". | Opsional `?date=`; selain tanggal scene terbaru → 403 `SCENE_NOT_PUBLIC`. Path berkas dicari dengan koneksi etl setelah `v_public_live_latest` (role PUBLIC) memastikan scene terbaru. | Tidak. |
+| T3-19 | Ekspor CSV hidromet: skema `v_log_unduhan` sudah memakai aksi `EXPORT_CSV`. | Dicatat sebagai `EXPORT_CSV` (bukan `DOWNLOAD_*`). | Tidak. |
+| T3-20 | Pembaca shapefile: venv tidak punya GDAL/OGR (wheel rasterio tanpa driver vektor), geopandas, fiona. | `pyshp==2.3.1` (pure-Python) ditambahkan ke requirements; geometri dirapikan PostGIS (`ST_MakeValid`, `ST_CollectionExtract`, `ST_Multi`). | Tidak. |
+
+### Detail tambahan (tidak diatur dokumen)
+
+- Live Area default dibuat `load_regions.py` tanpa memulai siklus (status `BACKFILLING`); scheduler melanjutkannya saat API berjalan (`AUTO_RESUME_JOBS`).
+- `ENABLE_SCHEDULER=false` mematikan scheduler pada worker API tambahan; advisory lock tetap menjaga bila tidak dimatikan.
+- `POST /admin/ingest` (HYDROMET) menjalankan `hydromet_job.backfill` di thread di bawah kunci `hydromet` (dilewati bila backfill/scheduler lain berjalan).
+- `etl/live_scheduler.py` dihapus, digantikan `etl/scheduler.py`.
+- Kalimat Live kini berbahasa Indonesia dengan desimal koma; label status area: Normal / Waspada / Tinggi / Tidak tersedia. Asersi teks di `tests/test_live_interpret_forecast.py` diterjemahkan (maknanya sama).
+- Berkas akumulasi GPM (`_crop_to_aoi`) kini ditulis lewat `atomic_path()`; PNG perubahan air dan PDF laporan juga.
+- Laporan: Total hujan AOI = rerata antar kecamatan dari jumlah hujan 24 jam; hari hujan = rerata AOI ≥ 0,1 mm; hari lebat = ≥ 50 mm di ≥ 1 kecamatan. Skor kesehatan = rerata komponen yang tersedia (yang tanpa data ditulis "—", bukan nol).

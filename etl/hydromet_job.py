@@ -378,3 +378,36 @@ def refresh_late_to_final(db, fetchers: Fetchers | None = None,
         if check(ctx, d):
             out.append(run_day(db, d, rebuild_non_final=True, fetchers=fetchers, ctx=ctx))
     return out
+
+
+def backfill(db, date_from: date, date_to: date, *, modis: bool = True, fetchers: Fetchers | None = None,
+             dry_run: bool = False, echo=print) -> dict:
+    """Backfill berurutan dan resume-aware di bawah advisory lock ``hydromet``
+    (scripts/backfill_hydromet.py, POST /admin/ingest). Mengembalikan ringkasan."""
+    import time
+
+    from etl.advisory_lock import advisory_lock
+
+    summary = {"COMPLETED": 0, "WAITING_UPSTREAM": 0, "FAILED": 0, "skipped_done": 0, "locked": False}
+    with advisory_lock(db, "hydromet") as got:
+        if not got:
+            summary["locked"] = True
+            echo("[SKIP] another worker holds the 'hydromet' lock (scheduler or another backfill)")
+            return summary
+        pending = pending_dates(db, date_from, date_to)
+        total = (date_to - date_from).days + 1
+        summary["skipped_done"] = total - len(pending)
+        echo(f"[INFO] {total} days in range, {summary['skipped_done']} already COMPLETED, {len(pending)} to do")
+        if dry_run:
+            for d in pending:
+                echo(f"  {d}")
+            return summary
+        if fetchers is None:
+            fetchers = Fetchers() if modis else Fetchers(modis=None)
+        ctx = context(db)
+        for i, d in enumerate(pending, 1):
+            t0 = time.monotonic()
+            res = run_day(db, d, fetchers=fetchers, ctx=ctx)
+            summary[res.status] = summary.get(res.status, 0) + 1
+            echo(f"[{i}/{len(pending)}] {d} {res.status} ({time.monotonic() - t0:.0f}s) {res.message}")
+    return summary

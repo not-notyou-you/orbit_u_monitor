@@ -20,7 +20,6 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-import time
 from datetime import date
 from pathlib import Path
 
@@ -28,35 +27,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 
-def run(db, date_from: date, date_to: date, *, modis: bool = True, fetchers=None,
-        dry_run: bool = False, echo=print) -> dict:
-    """Inti skrip (dipakai juga tes pemulihan). Mengembalikan ringkasan status."""
-    from etl import hydromet_job as hj
-    from etl.advisory_lock import advisory_lock
-
-    summary = {"COMPLETED": 0, "WAITING_UPSTREAM": 0, "FAILED": 0, "skipped_done": 0, "locked": False}
-    with advisory_lock(db, "hydromet") as got:
-        if not got:
-            summary["locked"] = True
-            echo("[SKIP] another worker holds the 'hydromet' lock (scheduler or another backfill)")
-            return summary
-        pending = hj.pending_dates(db, date_from, date_to)
-        total = (date_to - date_from).days + 1
-        summary["skipped_done"] = total - len(pending)
-        echo(f"[INFO] {total} days in range, {summary['skipped_done']} already COMPLETED, {len(pending)} to do")
-        if dry_run:
-            for d in pending:
-                echo(f"  {d}")
-            return summary
-        if fetchers is None:
-            fetchers = hj.Fetchers() if modis else hj.Fetchers(modis=None)
-        ctx = hj.context(db)
-        for i, d in enumerate(pending, 1):
-            t0 = time.monotonic()
-            res = hj.run_day(db, d, fetchers=fetchers, ctx=ctx)
-            summary[res.status] = summary.get(res.status, 0) + 1
-            echo(f"[{i}/{len(pending)}] {d} {res.status} ({time.monotonic() - t0:.0f}s) {res.message}")
-    return summary
+def run(db, date_from: date, date_to: date, **kwargs) -> dict:
+    """Lihat etl.hydromet_job.backfill (dipakai juga POST /admin/ingest)."""
+    from etl.hydromet_job import backfill
+    return backfill(db, date_from, date_to, **kwargs)
 
 
 def main(argv: list[str]) -> int:

@@ -26,8 +26,8 @@ def test_all_eight_sentences_follow_format():
     out = li.interpret_scene(_m(), _m())
     assert set(out) == set(li.PREVIEW_KEYS)
     for v in out.values():
-        assert v["text"].startswith("Showing ")
-        assert " condition because " in v["text"]
+        assert v["text"].startswith("Menampilkan ")
+        assert " dalam kondisi " in v["text"] and " karena " in v["text"]
         assert any(ch.isdigit() for ch in v["because"])  # selalu ada angka
 
 
@@ -35,34 +35,34 @@ def test_vh_increase_is_flood_indication_with_comparison():
     out = li.interpret_scene(_m(vh_pct=18.0), _m(vh_pct=6.0))
     s = out["s1_vh"]
     assert s["category"] == li.GENANGAN
-    assert "18% of the area has VH < −20 dB" in s["text"]
-    assert "up from 6% in the previous scene" in s["text"]
+    assert "18% area memiliki VH < −20 dB" in s["text"]
+    assert "naik dari 6% pada scene sebelumnya" in s["text"]
 
 
 def test_rain_72h_high_mentions_threshold():
     s = li.interpret_scene(_m(r72=142.0), None)["gpm_rain_72h"]
     assert s["category"] == li.TINGGI
-    assert "142 mm" in s["text"] and "above the 100 mm threshold" in s["text"]
+    assert "142 mm" in s["text"] and "di atas ambang 100 mm" in s["text"]
 
 
 def test_cloudy_modis_is_unavailable_with_cloud_percent():
     s = li.interpret_scene(_m(valid=8.0), None)["modis_ndwi"]
     assert s["category"] == li.NA
-    assert "cloud cover 92%" in s["text"]
+    assert "tutupan awan 92%" in s["text"]
 
 
 def test_missing_source_explained():
     m = _m()
     m["gpm"] = {}
     s = li.interpret_scene(m, None, {"gpm": {"status": "FAILED"}})["gpm_rain_24h"]
-    assert s["category"] == li.NA and "it will be retried" in s["text"]
+    assert s["category"] == li.NA and "akan dicoba lagi" in s["text"]
 
 
 def test_area_status_combines_three_signals():
     it = li.interpret_scene(_m(vh_pct=20.0, r72=150.0), _m(vh_pct=5.0))
     st = li.area_status(it)
-    assert st["label"] == "High"
-    assert "heavy rainfall" in st["text"] and "flooded area is increasing" in st["text"]
+    assert st["label"] == "Tinggi"
+    assert "hujan sangat lebat" in st["text"] and "area tergenang bertambah" in st["text"]
     calm = li.area_status(li.interpret_scene(_m(), _m()))
     assert calm["label"] == "Normal"
 

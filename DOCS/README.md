@@ -244,14 +244,20 @@ psql themonitor -c "ALTER ROLE monitor_app PASSWORD '...'; ALTER ROLE monitor_et
 #    scheduler/pipeline sebagai monitor_etl — tidak pernah sebagai superuser.
 cp .env.example .env
 
-# 4. Wilayah COD-AB level 3 (Kabupaten Lebak) → administrative_regions
-python scripts/load_regions.py --shp idn_admbnda_adm3_bps_20200401.shp --adm2-pcode <pcode Lebak>
+# 4. Wilayah COD-AB adm2 + adm3 (Kabupaten Lebak, ID3602) → administrative_regions,
+#    lalu kecamatan AOI GMLS → ROI AOI, dataset sistem HYDROMET_AOI, Live Area default.
+#    Shapefile default: data/external/cod-ab-idn/idn_admin{2,3}.shp
+python scripts/load_regions.py --aoi "Bayah,Panggarangan,..."
 
 # 5. Admin pertama
 python scripts/create_admin.py --username admin
 
-# 6. Backfill hidromet harian 2023–2025 (GPM + MODIS → region_observations)
-python scripts/backfill_hydromet.py --start 2023-01-01 --end 2025-12-31
+# 6. Backfill hidromet harian 2023–2025 (GPM + MODIS → region_observations →
+#    alert_events). Bisa dihentikan dan dijalankan ulang (tanggal COMPLETED dilewati).
+python scripts/backfill_hydromet.py --from 2023-01-01 --to 2025-12-31
+
+# 6b. (opsional) Catatan kejadian dari CSV terstruktur
+python scripts/import_disasters.py kejadian.csv --username <analis>
 
 # 7. Jalankan
 uvicorn api.main:app --host 0.0.0.0 --port 8000

@@ -1728,6 +1728,21 @@ LEFT JOIN users u ON u.user_id = l.user_id
 WHERE l.action LIKE 'DOWNLOAD\_%' OR l.action = 'EXPORT_CSV';
 COMMENT ON VIEW v_log_unduhan IS 'Log unduhan dan ekspor CSV dari user_activity_logs. ADMIN.';
 
+-- Volume unduhan per hari, jenis, dan role, TANPA identitas pengguna
+-- (Laporan Kesehatan Data §6.3 bagian 8; IMPLEMENTATION_NOTES Tahap 3).
+CREATE VIEW v_unduhan_per_role AS
+SELECT (l.logged_at AT TIME ZONE 'Asia/Jakarta')::date AS log_date_wib,
+       l.action,
+       COALESCE(r.role_code, 'PUBLIC')            AS role_code,
+       count(*)                                    AS n_downloads,
+       COALESCE(sum(l.bytes_sent), 0)::bigint      AS bytes_sent
+FROM user_activity_logs l
+LEFT JOIN users u ON u.user_id = l.user_id
+LEFT JOIN roles r ON r.role_id = u.role_id
+WHERE l.action LIKE 'DOWNLOAD\_%' OR l.action = 'EXPORT_CSV'
+GROUP BY 1, 2, 3;
+COMMENT ON VIEW v_unduhan_per_role IS 'Jumlah dan volume unduhan/ekspor per tanggal WIB, jenis aksi, dan role pengunduh; tanpa nama pengguna. DATA_ENGINEER, ADMIN, ETL (laporan).';
+
 -- =============================================================================
 -- END monitor_schema.sql
 -- =============================================================================

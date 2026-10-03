@@ -1,7 +1,10 @@
 # etl/live_interpret.py
 """Kalimat kondisi Live Monitoring (LIVE_MONITORING.md 4.2), rule-based.
 
-Format wajib:  Showing [what] in [category] condition because [number].
+Format wajib (Bahasa Indonesia, PIPELINE §4):
+    Menampilkan [apa] dalam kondisi [kategori] karena [angka].
+Kode kategori tetap Inggris (normal, alert, high, flood-indicated,
+unavailable): UI menyorotnya di dalam kalimat dan memetakan warnanya.
 
 SATU-SATUNYA tempat ambang: THRESHOLDS di bawah. Ubah angkanya di sini; kalimat,
 status daerah, garis ambang grafik, dan metrik (live_metrics) membacanya dari
@@ -30,8 +33,11 @@ Sumber nilai awal:
   ndwi_water      0,0 (ambang McFeeters 1996 untuk air terbuka).
   ndvi_drop       0,1 turun antar komposit: tekanan vegetasi yang jelas
                   (variasi musiman antar komposit 8 hari umumnya < 0,05).
-  rain_24h        20 / 50 mm: kategori BMKG hujan lebat (20-50 mm/hari) dan
-                  sangat lebat (50-100 mm/hari).
+  rain_24h        50 / 100 mm = ambang aturan alert BMKG aktif (hujan lebat
+                  >= 50, sangat lebat >= 100 mm/hari). Nilai di sini hanya
+                  default; sync_bmkg_thresholds() menimpanya dari alert_rules
+                  sebelum kalimat dibuat, jadi kalimat Live dan alert hidromet
+                  selalu memakai angka yang sama (PIPELINE §4).
   rain_72h        50 / 100 mm akumulasi 3 hari (100 mm = contoh di dokumen
                   spesifikasi, ~ dua hari berturut-turut hujan sangat lebat).
   rain_7d         75 / 150 mm akumulasi sepekan (tanah praktis jenuh).
@@ -52,8 +58,8 @@ THRESHOLDS: dict[str, float] = {
     "ndwi_warn_delta_pct": 2.0,
     "ndwi_flood_delta_pct": 5.0,
     "ndvi_drop": 0.10,
-    "rain_24h_warn_mm": 20.0,
-    "rain_24h_high_mm": 50.0,
+    "rain_24h_warn_mm": 50.0,
+    "rain_24h_high_mm": 100.0,
     "rain_72h_warn_mm": 50.0,
     "rain_72h_high_mm": 100.0,
     "rain_7d_warn_mm": 75.0,
@@ -78,13 +84,25 @@ PREVIEW_KEYS = (
 )
 
 
+def sync_bmkg_thresholds(sess) -> dict:
+    """Ambang hujan 24 jam = aturan alert RAIN_24H aktif: terendah -> warn,
+    berikutnya -> high. Tanpa aturan aktif, default di THRESHOLDS dipakai."""
+    from etl.alert_engine import bmkg_rain24_thresholds
+    levels = [t for t, _sev in bmkg_rain24_thresholds(sess)]
+    if levels:
+        THRESHOLDS["rain_24h_warn_mm"] = levels[0]
+        THRESHOLDS["rain_24h_high_mm"] = levels[1] if len(levels) > 1 else levels[0]
+    return {k: THRESHOLDS[k] for k in ("rain_24h_warn_mm", "rain_24h_high_mm")}
+
+
 def fmt(v, nd: int = 1, signed: bool = False) -> str:
-    """Angka gaya Inggris: titik desimal, minus tipografis."""
+    """Angka gaya Indonesia: koma desimal, minus tipografis."""
     if v is None:
         return "-"
     s = f"{abs(v):.{nd}f}"
-    if "." in s:  # 142.0 -> 142 ; 0.50 -> 0.5
+    if "." in s:  # 142.0 -> 142 ; 0.50 -> 0,5
         s = s.rstrip("0").rstrip(".")
+    s = s.replace(".", ",")
     if v < 0:
         return "−" + s
     return ("+" + s) if signed and v > 0 else s
@@ -96,7 +114,7 @@ def _sentence(what: str, category: str, because: str) -> dict:
         "level": LEVEL[category],
         "what": what,
         "because": because,
-        "text": f"Showing {what} in {category} condition because {because}.",
+        "text": f"Menampilkan {what} dalam kondisi {category} karena {because}.",
     }
 
 
@@ -118,14 +136,14 @@ def _delta_category(delta, warn, high, hi_cat=GENANGAN):
     return NORMAL
 
 
-def _change_phrase(cur, prev, unit: str, nd: int = 1, what="the previous scene") -> str:
+def _change_phrase(cur, prev, unit: str, nd: int = 1, what="scene sebelumnya") -> str:
     if prev is None:
-        return "no comparison scene yet"
+        return "belum ada scene pembanding"
     d = cur - prev
     if abs(d) < 10 ** -nd:
-        return f"same as {what} ({fmt(prev, nd)}{unit})"
-    arah = "up" if d > 0 else "down"
-    return f"{arah} from {fmt(prev, nd)}{unit} in {what}"
+        return f"sama dengan {what} ({fmt(prev, nd)}{unit})"
+    arah = "naik" if d > 0 else "turun"
+    return f"{arah} dari {fmt(prev, nd)}{unit} pada {what}"
 
 
 # ---------------------------------------------------------------------------
@@ -133,33 +151,33 @@ def _change_phrase(cur, prev, unit: str, nd: int = 1, what="the previous scene")
 # ---------------------------------------------------------------------------
 
 def _s1_vv(m, p, status):
-    what = "general surface conditions (VV radar)"
+    what = "kondisi permukaan umum (radar VV)"
     v = _g(m, "sentinel1", "vv_mean_db")
     if v is None:
-        return _sentence(what, NA, "the Sentinel-1 image could not be processed")
+        return _sentence(what, NA, "citra Sentinel-1 tidak dapat diproses")
     prev = _g(p, "sentinel1", "vv_mean_db")
     t = THRESHOLDS["s1_vv_drop_db"]
     if prev is not None and v - prev <= -t:
         return _sentence(what, WASPADA,
-                         f"mean VV is {fmt(v)} dB, down {fmt(prev - v)} dB from the "
-                         f"previous scene (threshold {fmt(t)} dB), so the surface looks wetter")
-    return _sentence(what, NORMAL, f"mean VV is {fmt(v)} dB, "
+                         f"rata-rata VV {fmt(v)} dB, turun {fmt(prev - v)} dB dari scene "
+                         f"sebelumnya (ambang {fmt(t)} dB), sehingga permukaan tampak lebih basah")
+    return _sentence(what, NORMAL, f"rata-rata VV {fmt(v)} dB, "
                      + _change_phrase(v, prev, " dB"))
 
 
 def _s1_vh(m, p, status):
-    what = "the land surface (VH radar)"
+    what = "permukaan lahan (radar VH)"
     pct = _g(m, "sentinel1", "vh_water_pct")
     if pct is None:
-        return _sentence(what, NA, "the Sentinel-1 image could not be processed")
+        return _sentence(what, NA, "citra Sentinel-1 tidak dapat diproses")
     thr = fmt(THRESHOLDS["s1_vh_water_db"], 0)
     prev = _g(p, "sentinel1", "vh_water_pct")
-    base = f"{fmt(pct)}% of the area has VH < {thr} dB"
+    base = f"{fmt(pct)}% area memiliki VH < {thr} dB"
     if prev is None:
         first = THRESHOLDS["s1_vh_first_scene_warn_pct"]
         cat = WASPADA if pct >= first else NORMAL
-        return _sentence(what, cat, f"{base} (no comparison scene yet; alert "
-                         f"threshold {fmt(first, 0)}%)")
+        return _sentence(what, cat, f"{base} (belum ada scene pembanding; ambang "
+                         f"waspada {fmt(first, 0)}%)")
     cat = _delta_category(pct - prev, THRESHOLDS["s1_vh_warn_delta_pct"],
                           THRESHOLDS["s1_vh_flood_delta_pct"])
     return _sentence(what, cat, f"{base}, " + _change_phrase(pct, prev, "%"))
@@ -167,13 +185,13 @@ def _s1_vh(m, p, status):
 
 def _cloud_na(what, entry):
     cloud = _g(entry, "cloud_pct")
-    reason = ("there is no valid imagery"
-              + (f" (cloud cover {fmt(cloud, 0)}%)" if cloud is not None else ""))
+    reason = ("tidak ada citra yang valid"
+              + (f" (tutupan awan {fmt(cloud, 0)}%)" if cloud is not None else ""))
     return _sentence(what, NA, reason)
 
 
 def _modis_flood(m, p, status):
-    what = "the MODIS optical flood map"
+    what = "peta genangan optik MODIS"
     e = _g(m, "modis", "flood")
     if not e:
         return _sentence(what, NA, _missing_reason(status, "modis"))
@@ -182,13 +200,13 @@ def _modis_flood(m, p, status):
     f = e.get("flood_pct") or 0.0
     warn, high = THRESHOLDS["modis_flood_warn_pct"], THRESHOLDS["modis_flood_high_pct"]
     cat = GENANGAN if f >= high else WASPADA if f >= warn else NORMAL
-    return _sentence(what, cat, f"{fmt(f)}% of the observed area is classed as flood (alert threshold "
-                     f"{fmt(warn, 0)}%), with {fmt(e.get('cloud_pct'), 0)}% of the area cloud-covered"
+    return _sentence(what, cat, f"{fmt(f)}% area teramati berkelas genangan (ambang waspada "
+                     f"{fmt(warn, 0)}%), dengan {fmt(e.get('cloud_pct'), 0)}% area tertutup awan"
                      + _nearest_note(e))
 
 
 def _modis_ndvi(m, p, status):
-    what = "vegetation health (NDVI)"
+    what = "kesehatan vegetasi (NDVI)"
     e = _g(m, "modis", "ndvi")
     if not e:
         return _sentence(what, NA, _missing_reason(status, "modis"))
@@ -197,15 +215,15 @@ def _modis_ndvi(m, p, status):
     v, prev = e["mean"], _g(p, "modis", "ndvi", "mean")
     drop = THRESHOLDS["ndvi_drop"]
     if prev is not None and prev - v >= drop:
-        cat, why = WASPADA, (f"mean NDVI is {fmt(v, 2)}, down {fmt(prev - v, 2)} from the "
-                             f"previous scene (threshold {fmt(drop, 2)})")
+        cat, why = WASPADA, (f"rata-rata NDVI {fmt(v, 2)}, turun {fmt(prev - v, 2)} dari scene "
+                             f"sebelumnya (ambang {fmt(drop, 2)})")
     else:
-        cat, why = NORMAL, f"mean NDVI is {fmt(v, 2)}, " + _change_phrase(v, prev, "", 2)
+        cat, why = NORMAL, f"rata-rata NDVI {fmt(v, 2)}, " + _change_phrase(v, prev, "", 2)
     return _sentence(what, cat, why + _composite_note(e))
 
 
 def _modis_ndwi(m, p, status):
-    what = "surface water indication (NDWI)"
+    what = "indikasi air permukaan (NDWI)"
     e = _g(m, "modis", "ndwi")
     if not e:
         return _sentence(what, NA, _missing_reason(status, "modis"))
@@ -214,14 +232,14 @@ def _modis_ndwi(m, p, status):
     v, prev = e["water_pct"], _g(p, "modis", "ndwi", "water_pct")
     cat = _delta_category(None if prev is None else v - prev,
                           THRESHOLDS["ndwi_warn_delta_pct"], THRESHOLDS["ndwi_flood_delta_pct"])
-    return _sentence(what, cat, f"{fmt(v)}% of the observed area has NDWI > "
+    return _sentence(what, cat, f"{fmt(v)}% area teramati memiliki NDWI > "
                      f"{fmt(THRESHOLDS['ndwi_water'], 0)}, " + _change_phrase(v, prev, "%")
                      + _composite_note(e))
 
 
 def _rain(window: str, label: str):
     def _fn(m, p, status):
-        what = f"{label} rainfall"
+        what = f"curah hujan {label}"
         e = _g(m, "gpm", f"rain_{window}")
         if not e or e.get("mean_mm") is None:
             return _sentence(what, NA, _missing_reason(status, "gpm"))
@@ -229,28 +247,28 @@ def _rain(window: str, label: str):
         warn = THRESHOLDS[f"rain_{window}_warn_mm"]
         high = THRESHOLDS[f"rain_{window}_high_mm"]
         if v >= high:
-            cat, ref = TINGGI, f"above the {fmt(high, 0)} mm threshold"
+            cat, ref = TINGGI, f"di atas ambang {fmt(high, 0)} mm"
         elif v >= warn:
-            cat, ref = WASPADA, f"above the {fmt(warn, 0)} mm alert threshold"
+            cat, ref = WASPADA, f"di atas ambang waspada {fmt(warn, 0)} mm"
         else:
-            cat, ref = NORMAL, f"below the {fmt(warn, 0)} mm alert threshold"
+            cat, ref = NORMAL, f"di bawah ambang waspada {fmt(warn, 0)} mm"
         peak = e.get("max_mm")
-        extra = f" (peak {fmt(peak)} mm)" if peak is not None and peak > v else ""
-        note = "" if e.get("imerg_runs") in (None, "F") else " — early IMERG data, not yet gauge-calibrated"
-        return _sentence(what, cat, f"mean accumulation is {fmt(v)} mm{extra}, {ref}{note}")
+        extra = f" (puncak {fmt(peak)} mm)" if peak is not None and peak > v else ""
+        note = "" if e.get("imerg_runs") in (None, "F") else " — data IMERG awal, belum dikalibrasi penakar hujan"
+        return _sentence(what, cat, f"rata-rata akumulasi {fmt(v)} mm{extra}, {ref}{note}")
     return _fn
 
 
 def _missing_reason(status: dict | None, source: str) -> str:
     st = _g(status, source, "status")
     if st == "FAILED":
-        return "the data failed to download or process (it will be retried)"
-    return "the data is not yet available for this date"
+        return "data gagal diunduh atau diproses (akan dicoba lagi)"
+    return "data untuk tanggal ini belum tersedia"
 
 
 def _nearest_note(e: dict) -> str:
     obs = e.get("observation_date") or e.get("matched_date")
-    return f"; using the nearest data ({obs})" if e.get("nearest") and obs else ""
+    return f"; memakai data terdekat ({obs})" if e.get("nearest") and obs else ""
 
 
 def _composite_note(e: dict) -> str:
@@ -258,8 +276,8 @@ def _composite_note(e: dict) -> str:
     per = e.get("composite_period")
     if age is None or age < 1:
         return ""
-    return (f"; 8-day composite (period {per}), observations on average {fmt(age, 0)} days "
-            f"before the scene" if per else f"; observations on average {fmt(age, 0)} days before the scene")
+    return (f"; komposit 8 hari (periode {per}), observasi rata-rata {fmt(age, 0)} hari "
+            f"sebelum scene" if per else f"; observasi rata-rata {fmt(age, 0)} hari sebelum scene")
 
 
 _RULES = {
@@ -268,9 +286,9 @@ _RULES = {
     "modis_flood": _modis_flood,
     "modis_ndvi": _modis_ndvi,
     "modis_ndwi": _modis_ndwi,
-    "gpm_rain_24h": _rain("24h", "24-hour"),
-    "gpm_rain_72h": _rain("72h", "72-hour"),
-    "gpm_rain_7d": _rain("7d", "7-day"),
+    "gpm_rain_24h": _rain("24h", "24 jam"),
+    "gpm_rain_72h": _rain("72h", "72 jam"),
+    "gpm_rain_7d": _rain("7d", "7 hari"),
 }
 
 
@@ -282,7 +300,7 @@ def interpret_scene(metrics: dict, prev_metrics: dict | None,
         try:
             out[key] = _RULES[key](metrics or {}, prev_metrics, source_status)
         except Exception as exc:  # satu aturan rusak tidak boleh menjatuhkan kartu
-            out[key] = _sentence(key, NA, f"interpretation failed ({exc.__class__.__name__})")
+            out[key] = _sentence(key, NA, f"interpretasi gagal ({exc.__class__.__name__})")
     return out
 
 
@@ -300,32 +318,32 @@ def area_status(interp: dict) -> dict:
 
     reasons = []
     if rain == TINGGI:
-        reasons.append("heavy rainfall")
+        reasons.append("hujan sangat lebat")
     elif rain == WASPADA:
-        reasons.append("fairly heavy rainfall")
+        reasons.append("hujan cukup lebat")
     if vh == GENANGAN:
-        reasons.append("flooded area is increasing")
+        reasons.append("area tergenang bertambah")
     elif vh == WASPADA:
-        reasons.append("radar-detected wet area is growing")
+        reasons.append("area basah terdeteksi radar meluas")
     if optic == GENANGAN:
-        reasons.append("optical imagery shows more water")
+        reasons.append("citra optik menunjukkan air bertambah")
     elif optic == WASPADA:
-        reasons.append("optical water indication is slightly up")
+        reasons.append("indikasi air optik sedikit naik")
 
     strong = (vh == GENANGAN and (rain == TINGGI or optic == GENANGAN))
     if strong:
-        label, level = "High", 2
+        label, level = "Tinggi", 2
     elif reasons:
-        label, level = "Alert", 1
+        label, level = "Waspada", 1
     elif all(c == NA for c in (vh, optic, rain)):
-        label, level = "Unavailable", -1
-        reasons = ["this scene's data is incomplete"]
+        label, level = "Tidak tersedia", -1
+        reasons = ["data scene ini belum lengkap"]
     else:
         label, level = "Normal", 0
-        reasons = ["no sign of flooding or heavy rainfall"]
+        reasons = ["tidak ada tanda genangan atau hujan lebat"]
     return {
         "label": label,
         "level": level,
-        "text": f"{label} — " + " and ".join(reasons),
+        "text": f"{label} — " + " dan ".join(reasons),
         "inputs": {"s1_vh": vh, "optic": optic, "rain_72h": rain},
     }

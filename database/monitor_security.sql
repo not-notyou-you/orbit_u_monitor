@@ -117,7 +117,7 @@ GRANT SELECT ON satellite_scenes, nasa_scenes TO monitor_data_engineer;
 GRANT SELECT ON data_products, data_lineage, quality_metrics, quality_alerts,
                 fusion_products, processing_jobs, processing_logs,
                 cleanup_operations TO monitor_data_engineer;
-GRANT SELECT ON v_ringkasan_kualitas, v_kelengkapan_data TO monitor_data_engineer;
+GRANT SELECT ON v_ringkasan_kualitas, v_kelengkapan_data, v_unduhan_per_role TO monitor_data_engineer;
 GRANT SELECT ON generated_reports TO monitor_data_engineer;            -- + RLS
 
 -- ADMIN (mewarisi ANALYST + DATA_ENGINEER) ------------------------------------
@@ -154,6 +154,11 @@ GRANT SELECT, INSERT, UPDATE ON generated_reports TO monitor_etl;
 GRANT SELECT, INSERT, UPDATE ON live_areas, live_scenes, live_events,
                                 live_scene_metrics TO monitor_etl;
 GRANT INSERT ON user_activity_logs TO monitor_etl;
+-- Tahap 3: job laporan (scheduler, monitor_etl) membaca sumber kedua laporan
+-- periodik (PIPELINE §6.2–6.3). Hanya baca; unduhan lewat VIEW agregat tanpa
+-- identitas pengguna.
+GRANT SELECT ON disaster_events, v_kejadian_dan_hujan, v_evaluasi_alert,
+                v_ringkasan_kualitas, v_kelengkapan_data, v_unduhan_per_role TO monitor_etl;
 
 -- Sequence: nextval untuk tabel yang boleh di-INSERT. USAGE saja tidak
 -- memberi hak menulis tabel mana pun.

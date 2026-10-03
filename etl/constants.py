@@ -3,7 +3,7 @@
 Shared dedup-key constants for `nasa_scenes` rows.
 
 The unique key is (source, tile_id, product_short_name, acquisition_date).
-live_scheduler.py (live ingest) and module9_fusion.py (fusion build) must
+etl/live_cycle.py (live ingest) and module9_fusion.py (fusion build) must
 both use these exact values, or they silently create duplicate/orphaned
 rows for the same underlying scene instead of reusing one.
 """

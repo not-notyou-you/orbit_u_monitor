@@ -761,7 +761,7 @@ def _modis_granule(entry: dict, output_date: date_type) -> tuple[str, date_type]
 def _aux_plan(db: DatabaseClient, dataset_id: int, source_name: str) -> SourcePlan | None:
     """Konfigurasi satu sumber aux, dibaca dari dataset_source_config.
 
-    Dipakai pemanggil yang tidak membawa ProcessingPlan sendiri (live_scheduler
+    Dipakai pemanggil yang tidak membawa ProcessingPlan sendiri (siklus Live
     memanggil ensure_*_inputs_for_date langsung per sumber). None berarti
     sumber itu tidak dikonfigurasi untuk dataset ini — pemanggil harus
     melewatinya, bukan memprosesnya dengan default."""
@@ -927,7 +927,7 @@ def ensure_modis_inputs_for_date(
                processing_level='PROCESSED'.
 
     `plan` boleh None; kalau begitu konfigurasinya dibaca dari
-    dataset_source_config (jalur live_scheduler, yang tidak punya plan job).
+    dataset_source_config (jalur siklus Live, yang tidak punya plan job).
 
     Lihat ensure_aux_inputs_for_date untuk kontrak idempotensi & error."""
     from etl.module7_modis_download import MODIS_PRODUCT_TYPES, download_modis_scene
@@ -1121,7 +1121,7 @@ def ensure_aux_inputs_for_date(
 
     # Sumber yang tidak ada di plan dilewati DI SINI, bukan diserahkan ke
     # fungsi per-sumber: fungsi itu punya fallback "baca dari database" untuk
-    # pemanggil lain (live_scheduler), dan fallback itu akan menghidupkan lagi
+    # pemanggil lain (siklus Live), dan fallback itu akan menghidupkan lagi
     # sumber yang justru sengaja tidak dikonfigurasi job ini.
     for source_name, ensure_fn in (
         (MODIS_PLAN_NAME, ensure_modis_inputs_for_date),

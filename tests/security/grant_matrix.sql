@@ -59,9 +59,10 @@ INSERT INTO gm_expected VALUES
     ('app_settings',             '',  'S',   'S',   'S',   'SIU',  'S'),
     -- alert & kejadian; U(ack) analyst = GRANT kolom (bagian 2)
     ('alert_events',             '',  'S',   'S',   'S',   'SIUD', 'SI'),
-    ('disaster_events',          '',  '',    'SIU', '',    'SIU',  ''),
-    ('v_kejadian_dan_hujan',     '',  '',    'S',   '',    'S',    ''),
-    ('v_evaluasi_alert',         '',  '',    'S',   '',    'S',    ''),
+    -- etl S: job laporan Hidromet (Tahap 3)
+    ('disaster_events',          '',  '',    'SIU', '',    'SIU',  'S'),
+    ('v_kejadian_dan_hujan',     '',  '',    'S',   '',    'S',    'S'),
+    ('v_evaluasi_alert',         '',  '',    'S',   '',    'S',    'S'),
     ('region_observations',      '',  'S',   'S',   'S',   'S',    'SIU'),
     -- katalog dataset; D etl = penghapusan fisik dataset (Tahap 2 S1)
     ('datasets',                 '',  '',    '',    'SIU', 'SIUD', 'SIUD'),
@@ -78,8 +79,10 @@ INSERT INTO gm_expected VALUES
     ('processing_jobs',          '',  '',    '',    'S',   'S',    'SIUD'),
     ('processing_logs',          '',  '',    '',    'S',   'S',    'SIU'),
     ('cleanup_operations',       '',  '',    '',    'S',   'S',    'SIU'),
-    ('v_ringkasan_kualitas',     '',  '',    '',    'S',   'S',    ''),
-    ('v_kelengkapan_data',       '',  '',    '',    'S',   'S',    ''),
+    -- etl S: job laporan Kesehatan Data (Tahap 3)
+    ('v_ringkasan_kualitas',     '',  '',    '',    'S',   'S',    'S'),
+    ('v_kelengkapan_data',       '',  '',    '',    'S',   'S',    'S'),
+    ('v_unduhan_per_role',       '',  '',    '',    'S',   'S',    'S'),
     -- laporan (+ RLS, bagian 2)
     ('generated_reports',        '',  '',    'S',   'S',   'SIU',  'SIU'),
     -- akun & log

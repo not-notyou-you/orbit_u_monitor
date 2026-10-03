@@ -23,19 +23,19 @@ from api.activity import ActivityLogMiddleware
 from api.deps import get_db, require_role, set_clients
 from api.security import jwt_secret
 from api.routes import (
-    admin, auth, datasets, health, lineage, live, pipeline, products, quality,
-    regions, report, scenes, storage,
+    admin, admin_monitor, alerts, auth, datasets, disasters, health, hydromet, lineage, live, pipeline,
+    products, public, quality, regions, report, reports, scenes, storage,
 )
 
 logger = logging.getLogger(__name__)
 _app_client: DatabaseClient | None = None
 _etl_client: DatabaseClient | None = None
-_live_scheduler = None
+_scheduler = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    global _app_client, _etl_client, _live_scheduler
+    global _app_client, _etl_client, _scheduler
     jwt_secret()  # gagal keras di startup bila JWT_SECRET kosong/pendek
     # Request API: monitor_app (NOINHERIT, SET LOCAL ROLE per request).
     # Kerja latar (job dataset, Live, penghapusan): monitor_etl.
@@ -58,23 +58,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             except Exception:
                 logger.exception("[API] gagal memulihkan job yang terputus")
 
-    try:
-        from etl.live_scheduler import LiveScheduler
-        _live_scheduler = LiveScheduler(_etl_client)
-        _live_scheduler.start()
-        logger.info("[API] LiveScheduler started")
-    except Exception:
-        logger.exception(
-            "[API] LiveScheduler gagal dimulai (cek instalasi rasterio/apscheduler). "
-            "API tetap jalan, tapi Daerah Live tidak akan dicek terjadwal."
-        )
-        _live_scheduler = None
+    # Scheduler tunggal (PIPELINE §7): hidromet, Live, laporan, masing-masing
+    # di bawah advisory lock PostgreSQL. Bisa dimatikan untuk worker API
+    # tambahan (ENABLE_SCHEDULER=false); advisory lock tetap menjaga bila tidak.
+    if os.getenv("ENABLE_SCHEDULER", "true").lower() in ("1", "true", "yes"):
+        try:
+            from etl.scheduler import Scheduler
+            _scheduler = Scheduler(_etl_client)
+            _scheduler.start()
+            logger.info("[API] Scheduler started")
+        except Exception:
+            logger.exception(
+                "[API] Scheduler gagal dimulai (cek instalasi rasterio/apscheduler). "
+                "API tetap jalan, tapi job terjadwal tidak akan berjalan."
+            )
+            _scheduler = None
 
     yield
 
-    logger.info("[API] shutdown: stopping LiveScheduler")
-    if _live_scheduler:
-        _live_scheduler.shutdown()
+    logger.info("[API] shutdown: stopping Scheduler")
+    if _scheduler:
+        _scheduler.shutdown()
 
     logger.info("[API] shutdown: disposing DatabaseClients")
     set_clients(None, None)
@@ -133,6 +137,7 @@ def _role(min_role: str) -> list:
 # tinggi, atau unduhan, menambah require_role(...) sendiri.
 app.include_router(health.router, prefix="/api", tags=["Health"], dependencies=_role("PUBLIC"))
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(public.router, prefix="/api/public", tags=["Public"], dependencies=_role("PUBLIC"))
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"], dependencies=_role("ADMIN"))
 app.include_router(scenes.router, prefix="/api/scenes", tags=["Scenes"], dependencies=_role("DATA_ENGINEER"))
 app.include_router(products.router, prefix="/api/products", tags=["Products"], dependencies=_role("DATA_ENGINEER"))
@@ -148,6 +153,15 @@ app.include_router(datasets.router, prefix="/api/datasets", tags=["Datasets"], d
 app.include_router(report.router, prefix="/api/datasets", tags=["Report"], dependencies=_role("DATA_ENGINEER"))
 app.include_router(live.router, prefix="/api/live", tags=["Live"], dependencies=_role("USER"))
 app.include_router(regions.router, prefix="/api/regions", tags=["Regions"], dependencies=_role("USER"))
+# Tahap 3: monitoring (INTERFACE.md §4.4–4.6, §4.9).
+app.include_router(admin_monitor.router, prefix="/api/admin", tags=["Admin"], dependencies=_role("ADMIN"))
+app.include_router(hydromet.router, prefix="/api/hydromet", tags=["Hydromet"], dependencies=_role("USER"))
+app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"], dependencies=_role("USER"))
+app.include_router(alerts.rules_router, prefix="/api/alert-rules", tags=["Alerts"], dependencies=_role("USER"))
+app.include_router(disasters.router, prefix="/api/disasters", tags=["Disasters"], dependencies=_role("ANALYST"))
+app.include_router(disasters.types_router, prefix="/api/disaster-types", tags=["Disasters"],
+                   dependencies=_role("USER"))
+app.include_router(reports.router, prefix="/api/reports", tags=["Reports"], dependencies=_role("USER"))
 
 
 def route_min_roles(route) -> list[tuple[str, bool]]:
