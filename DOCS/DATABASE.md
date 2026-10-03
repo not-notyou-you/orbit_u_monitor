@@ -110,7 +110,7 @@ Seluruh master memiliki PK surrogate dan **alternate key** berupa kode (`*_code`
 | # | Tabel | Status | Isi seed |
 |---|---|---|---|
 | M1 | `roles` | [BARU] | PUBLIC, USER, ANALYST, DATA_ENGINEER, ADMIN |
-| M2 | `users` | [BARU] | 1 admin awal |
+| M2 | `users` | [BARU] | kosong; admin pertama dibuat `scripts/create_admin.py` (hash sandi tidak disimpan di SQL) |
 | M3 | `satellite_sources` | [BARU] | SENTINEL1, MODIS, GPM, FUSION |
 | M4 | `spectral_bands` | [BARU] | VV, VH, FLOOD, NDVI, NDWI, RAIN_24H, RAIN_72H, RAIN_7D, RAIN_30D, WATER_PCT, WATER_CHANGE |
 | M5 | `administrative_regions` | [BARU] | COD-AB level 2–3 Kabupaten Lebak |
@@ -174,7 +174,7 @@ Ditambah satu tabel konfigurasi `app_settings` (key–value, tidak dihitung seba
 | `band_code` | VARCHAR(20) UNIQUE NOT NULL | AK |
 | `band_name` | VARCHAR(100) NOT NULL | Label UI |
 | `unit` | VARCHAR(20) | dB, index, %, mm |
-| `valid_min`, `valid_max` | NUMERIC | Dipakai validasi `region_observations` |
+| `valid_min`, `valid_max` | NUMERIC | Dipakai validasi `region_observations`. Diisi **batas fisik**, bukan nilai lazim, supaya hanya data rusak yang ditolak: VV/VH −60..30 dB, NDVI/NDWI −1..1, persen 0..100, hujan 24h/72h/7d/30d ≤ 2000/4000/6000/10000 mm (rekor dunia WMO dibulatkan ke atas) |
 | `aggregation` | VARCHAR(20) NOT NULL | `MEAN` (hujan, NDVI, NDWI), `FRACTION` (FLOOD, WATER_PCT) |
 
 ### 3.5 `administrative_regions`
@@ -206,7 +206,7 @@ Skema DataLab dipertahankan (FK dari `datasets`, `satellite_scenes`, `nasa_scene
 
 ### 3.7 `processing_stages` [WARIS]
 
-Ditambah baris: `HYDROMET_AGGREGATE`, `ALERT_CHECK`, `WATER_CHANGE`, `REPORT_BUILD`. Ditambah `source_code FK → satellite_sources NULL` (NULL = lintas sumber).
+Ditambah baris: `HYDROMET_AGGREGATE` (HA), `ALERT_CHECK` (AC), `WATER_CHANGE` (WC), `REPORT_BUILD` (RB) dengan `stage_order` 10–13. Ditambah `source_code FK → satellite_sources NULL` (NULL = lintas sumber).
 
 ### 3.8 `quality_thresholds`
 
@@ -221,7 +221,7 @@ Ditambah baris: `HYDROMET_AGGREGATE`, `ALERT_CHECK`, `WATER_CHANGE`, `REPORT_BUI
 | `is_active` | BOOLEAN NOT NULL DEFAULT true | |
 | UNIQUE | (`band_id`, `metric_name`) | |
 
-Seed: VV/VH `quality_score` fail < 60 (konstanta DataLab), `valid_fraction` MODIS/GPM warn < 0,5, fail < 0,1. Kode `module6_analytics.py` diubah agar membaca tabel ini, bukan konstanta. **Bobot skor 50/30/20 tetap konstanta di kode** — bobot bukan ambang.
+Seed: VV/VH `quality_score` fail < 60 (konstanta DataLab), `valid_fraction` MODIS/GPM warn < 0,5, fail < 0,1. Kode `module6_analytics.py` diubah agar membaca tabel ini, bukan konstanta; tabel ini **satu-satunya** sumber ambang — `quality_settings.min_quality_score` per dataset warisan DataLab dihapus. `warn_below` menghasilkan flag `WARNING`. **Bobot skor 50/30/20 tetap konstanta di kode** — bobot bukan ambang.
 
 ### 3.9 `disaster_types`
 
@@ -243,7 +243,7 @@ Seed: VV/VH `quality_score` fail < 60 (konstanta DataLab), `valid_fraction` MODI
 | `disaster_type_id` | SMALLINT FK → disaster_types NOT NULL | |
 | `band_id` | SMALLINT FK → spectral_bands NOT NULL | |
 | `comparator` | VARCHAR(2) NOT NULL CHECK IN ('>=','>','<=','<') | |
-| `threshold_value` | NUMERIC(8,2) NOT NULL | |
+| `threshold_value` | NUMERIC(8,2) | Boleh NULL hanya bila aturan nonaktif: `CHECK (NOT is_active OR threshold_value IS NOT NULL)` — ambang longsor belum diketahui |
 | `severity` | VARCHAR(10) NOT NULL CHECK IN ('INFO','WARNING','CRITICAL') | |
 | `reference_source` | VARCHAR(150) NOT NULL | |
 | `is_active` | BOOLEAN NOT NULL DEFAULT true | |
@@ -288,19 +288,19 @@ Seed:
 
 | Tabel | Status | Perubahan |
 |---|---|---|
-| `datasets` | [UBAH] | `+ created_by INT FK → users`; CHECK `dataset_kind IN ('STANDARD','LIVE_AREA')` (LIVE dihapus); `fusion_strategy` FK → fusion_strategies |
+| `datasets` | [UBAH] | `+ created_by INT FK → users`; `+ is_system BOOLEAN` (dataset sistem disembunyikan dari Katalog); `required_tiers` hanya nama tier D14; CHECK `dataset_kind IN ('STANDARD','LIVE_AREA')` (LIVE dihapus); `fusion_strategy` FK → fusion_strategies |
 | `dataset_source_config` | [UBAH] | `source_name` FK → satellite_sources.source_code |
-| `dataset_jobs`, `scene_job_state` | [WARIS] | `dataset_jobs.kind` + nilai `HYDROMET_DAILY` |
+| `dataset_jobs`, `scene_job_state` | [WARIS] | `dataset_jobs.job_type` + nilai `HYDROMET_DAILY` |
 | `satellite_scenes` | [UBAH] | `+ is_valid BOOLEAN DEFAULT true`, `+ invalidated_by`, `+ invalidated_at`, `+ invalid_reason` (soft delete Admin, M24) |
-| `nasa_scenes` | [UBAH] | `+ run_type VARCHAR(5) CHECK IN ('F','L','E') NULL` (GPM, M6); `+ is_valid` dkk. seperti di atas |
-| `processing_jobs` | [UBAH] | `+ parameters JSONB DEFAULT '{}'` (versi software, window Lee, run GPM, threshold) |
+| `nasa_scenes` | [UBAH] | `+ run_type VARCHAR(5) CHECK IN ('F','L','E') NULL` (GPM, M6); `+ is_valid` dkk. seperti di atas; `source` FK → satellite_sources.source_code |
+| `processing_jobs` | [UBAH] | Kolom warisan `parameters_json JSONB DEFAULT '{}'` dipakai untuk parameter (versi software, window Lee, run GPM, threshold); **`scene_id` jadi NULLABLE, `+ nasa_scene_id BIGINT FK → nasa_scenes`, CHECK paling banyak satu terisi** — job S1 berjangkar scene, job MODIS/GPM berjangkar granule, job FUSION tanpa jangkar (M30) |
 | `processing_logs` | [WARIS] | |
-| `data_products` | [UBAH] | `source` FK → satellite_sources.source_code; **`scene_id` jadi NULLABLE, `+ nasa_scene_id BIGINT FK → nasa_scenes`, CHECK tepat satu terisi untuk produk satu sumber; produk FUSION boleh keduanya NULL (asalnya di `fusion_products`)** (M30). Baris palsu `NASA_AUX_*` di `satellite_scenes` tidak dibuat lagi |
+| `data_products` | [UBAH] | `source` FK → satellite_sources.source_code; **`scene_id` jadi NULLABLE, `+ nasa_scene_id BIGINT FK → nasa_scenes`, CHECK `chk_dprods_single_origin`: SENTINEL1 → `scene_id`, MODIS/GPM → `nasa_scene_id`, FUSION → keduanya NULL (asalnya di `fusion_products` + `data_lineage`)** (M30). Baris palsu `NASA_AUX_*` di `satellite_scenes` tidak dibuat lagi |
 | `data_lineage` | [WARIS] | |
 | `quality_metrics` | [WARIS] | |
 | `fusion_products` | [UBAH] | `fusion_strategy` FK → fusion_strategies |
 | `live_areas` | [UBAH] | CHECK `retention` 1–60 (DataLab 1–12); `+ updated_by` |
-| `live_scenes` | [UBAH] | kolom `metrics` **dihapus**, dipindah ke `live_scene_metrics` (M31); `interpretations`, `source_status`, `previews` tetap JSONB (teks tampilan, tidak dikueri) |
+| `live_scenes` | [UBAH] | kolom `metrics` **dihapus**, angka dipindah ke `live_scene_metrics` (M31); deskriptor teks metrik (run IMERG, periode komposit, tanggal observasi) disimpan di `source_status[sumber].meta`; `interpretations`, `source_status`, `previews` tetap JSONB (teks tampilan, tidak dikueri) |
 | `live_events` | [WARIS] | |
 | `cleanup_operations` | [WARIS] | |
 | `alert_events` (DataLab) | [UBAH] | **diganti nama** → `quality_alerts` (isi: skor QA < 60). Nama `alert_events` dipakai untuk alert hujan |
@@ -422,7 +422,7 @@ Append-only, sama seperti di atas.
 | `metric_id` | BIGSERIAL PK | |
 | `live_scene_id` | BIGINT FK → live_scenes NOT NULL | |
 | `band_id` | SMALLINT FK → spectral_bands NOT NULL | VV, VH, WATER_PCT, FLOOD, NDVI, NDWI, RAIN_24H/72H/7D, WATER_CHANGE |
-| `metric_name` | VARCHAR(30) NOT NULL | `mean`, `pct_below_threshold`, `new_km2`, `receded_km2`, `persistent_km2`, `valid_fraction` |
+| `metric_name` | VARCHAR(30) NOT NULL | `mean`, `max`, `pct_below_threshold`, `threshold_db`, `valid_pct`, `cloud_pct`, `flood_pct`, `recurring_pct`, `water_pct`, `age_days_median`, `lookback_days`, `frames`, `valid_pixels`, `new_km2`, `receded_km2`, `persistent_km2`, `same_orbit` (pemetaan lengkap: `etl/live_metrics.METRIC_ROWS`) |
 | `value` | NUMERIC(12,4) | |
 | `source_date` | DATE | tanggal data sumber (MODIS/GPM bisa "terdekat") |
 | `ref_live_scene_id` | BIGINT FK → live_scenes | pembanding untuk WATER_CHANGE |
@@ -579,12 +579,13 @@ CREATE TABLE alert_rules (
   disaster_type_id SMALLINT NOT NULL REFERENCES disaster_types,
   band_id          SMALLINT NOT NULL REFERENCES spectral_bands,
   comparator       VARCHAR(2) NOT NULL CHECK (comparator IN ('>=','>','<=','<')),
-  threshold_value  NUMERIC(8,2) NOT NULL,
+  threshold_value  NUMERIC(8,2),
   severity         VARCHAR(10) NOT NULL CHECK (severity IN ('INFO','WARNING','CRITICAL')),
   reference_source VARCHAR(150) NOT NULL,
   is_active        BOOLEAN NOT NULL DEFAULT true,
   updated_by       INT REFERENCES users,
-  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (NOT is_active OR threshold_value IS NOT NULL)
 );
 
 CREATE TABLE region_observations (
@@ -696,12 +697,14 @@ CREATE TABLE audit_log (
 
 ### Aturan berkas skema (M34)
 
-- **Satu berkas** `database/monitor_schema.sql` membangun seluruh skema (warisan + baru) dari DB kosong. 26 migrasi DataLab tidak diikutkan; nilai enum legacy (`BRONZE`/`SILVER`/`GOLD`/`FUSION`) dan kolom yang hanya dipakai fitur terhapus tidak dibawa.
+- **Satu berkas** `database/monitor_schema.sql` membangun seluruh skema (warisan + baru) dari DB kosong. Default nama DB: `themonitor`. Di Windows/PowerShell ketiga berkas dapat diterapkan dengan `python database/apply_schema.py` (kredensial dari `.env`). 26 migrasi DataLab tidak diikutkan; nilai enum legacy (`BRONZE`/`SILVER`/`GOLD`/`FUSION`) dan kolom yang hanya dipakai fitur terhapus tidak dibawa.
 - **Setiap tabel dan kolom** wajib punya `COMMENT ON` (deskripsi, satuan, domain, contoh). Uji CI `tests/test_schema_comments.py` gagal bila ada kolom tanpa komentar.
 - `tools/data_dictionary.py` membaca `information_schema` + `pg_description` + constraint dan menghasilkan:
-  - `docs/generated/data_dictionary.md` (tabel, kolom, tipe, null, default, PK/FK/UNIQUE/CHECK, komentar);
-  - `docs/generated/erd_physical.mmd` (Mermaid ER) untuk dirender ke gambar.
+  - `DOCS/generated/data_dictionary.md` (tabel, kolom, tipe, null, default, PK/FK/UNIQUE/CHECK, komentar);
+  - `DOCS/generated/erd_physical.mmd` (Mermaid ER) untuk dirender ke gambar.
 - Seed dan keamanan terpisah: `monitor_seed.sql`, `monitor_security.sql`.
+- `product_tier_enum` hanya memuat nama D14 (`RAW, ALIGNED, DESPECKLED, INDICES, ACCUMULATED, COG, FUSED`); nama lama tetap diterima kode sebagai input dan dipetakan.
+- Database uji (`tests/conftest.py`) dibangun dari ketiga berkas yang sama, jadi setiap run tes juga menguji skema.
 - Uji: `psql -v ON_ERROR_STOP=1` ketiga berkas di DB kosong harus sukses (dijalankan di CI).
 
 ---
@@ -884,7 +887,7 @@ bcrypt cost 12; minimal 10 karakter; 5 kali gagal → `locked_until = now() + 15
 |---|---|---|
 | `RAIN_72H`, `RAIN_7D`, `RAIN_30D` disimpan, bukan dihitung saat kueri | Dashboard dan alert memanggilnya setiap muat halaman | Dihitung sekali di job hidromet dari raster akumulasi; upsert idempoten |
 | `alert_events.observed_value/threshold_value/severity` | Membekukan konteks saat terpicu | Diisi sekali oleh pipeline, kolom tidak di-GRANT UPDATE |
-| `live_scenes.metrics` (warisan) | Grafik & forecast tetap hidup setelah berkas dihapus retensi | Ditulis oleh siklus Live |
+| `live_scene_metrics` tidak ikut dihapus retensi | Grafik & forecast tetap hidup setelah berkas dihapus | Ditulis oleh siklus Live (`save_scene_metrics`) |
 | `administrative_regions.area_km2` (generated) | Pembobotan dan laporan | `GENERATED ALWAYS` |
 
 ---

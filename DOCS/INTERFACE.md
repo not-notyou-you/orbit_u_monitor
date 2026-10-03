@@ -121,6 +121,8 @@ Diwariskan dari DataLab View 1 dan View 2 dengan perubahan:
 | Reuse Previous Config | Dipertahankan, per pengguna (`created_by`) |
 | Kartu dataset | Menampilkan pembuat; tombol Hapus hanya untuk pembuat atau ADMIN |
 | Panel Merge, Reference layers | Dihapus |
+| Kolom "Minimum quality score" | Dihapus — ambang QA diatur ADMIN di `quality_thresholds` |
+| Detail produk | `scene_id` (S1) atau `nasa_scene_id` (MODIS/GPM); FUSION keduanya kosong |
 | Unduhan | ZIP dataset, produk satuan, fusion HDF5, laporan dataset — semua tercatat |
 | Lineage | Panel "Asal-usul" pada detail produk (`/products/{id}/lineage`) |
 

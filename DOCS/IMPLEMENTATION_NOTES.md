@@ -25,7 +25,7 @@ Semua keputusan di bawah disetujui pemilik proyek sebelum dikerjakan
 | K9 | Nama di dokumen tidak sama dengan kode: `dataset_jobs.kind` sebenarnya `job_type`; `datasets.is_system` hanya disebut PIPELINE §3.1; seed `users` "1 admin awal" padahal admin pertama dibuat `create_admin.py`; `administrative_regions` diisi `load_regions.py`. | `job_type` + nilai `HYDROMET_DAILY`; `datasets.is_system` ditambahkan. Seed tidak memuat baris `users` (tidak ada hash sandi di SQL), `administrative_regions`, atau `regions_of_interest` — diisi skrip setup tahap berikutnya. |
 | K10 | `docs/generated/` (DATABASE §6) vs folder `DOCS/` yang sudah ada — di Windows keduanya folder yang sama. | Keluaran kamus data ditulis ke `DOCS/generated/`. |
 | K11 | Tes membangun DB uji dengan ORM `create_all`, bukan dari berkas SQL, sehingga skema final tidak pernah teruji. | `tests/conftest.py` membangun DB uji dari ketiga berkas SQL dan membongkarnya dengan `DROP SCHEMA public CASCADE`. ORM menjadi pemetaan saja. |
-| K12 | Langkah 6 (nama DB `orbit_u_monitor`) sudah dikerjakan di commit `7416ac5`. | Hanya diverifikasi; komentar docker di `.env.example` dirapikan. |
+| K12 | Langkah 6 (nama DB) sudah dikerjakan di commit `7416ac5`. | Diverifikasi; kemudian diganti menjadi `themonitor` sesuai keputusan K18. |
 
 ### Detail tambahan (tidak diatur dokumen)
 
@@ -37,9 +37,11 @@ Semua keputusan di bawah disetujui pemilik proyek sebelum dikerjakan
 
 | # | Temuan | Penanganan Tahap 1 | Perlu keputusan? |
 |---|---|---|---|
-| K13 | API/UI Live Area masih membatasi retensi 1–12 (`LiveAreaCreateRequest`/`LiveAreaUpdateRequest`, validasi `app.js`), sementara DB kini 1–60 (M11). | DB dan ORM sudah 1–60; API/UI tidak diubah (di luar lingkup "perubahan UI"). | Ya — naikkan ke 1–60 di tahap Live/UI. |
+| K13 | API/UI Live Area masih membatasi retensi 1–12, sementara DB kini 1–60 (M11). | **Diputuskan: sampai 60.** API, UI, dan `MAX_RETENTION` = 60; lookback 730 hari; prakiraan maks. 4 langkah (M43). | Selesai. |
 | K14 | Penghapusan dataset dulu membersihkan produk MODIS/GPM/FUSION lewat cascade scene placeholder. | `DeletionManager` kini menghapus langsung produk non-S1 milik dataset + job FUSION tanpa jangkar; produk S1 diperlakukan seperti dulu (tetap yatim di scene bersama). | Tidak, kecuali produk S1 juga ingin dihapus. |
-| K15 | Ambang QA: DataLab punya `quality_settings.min_quality_score` per dataset (wizard), dokumen meminta ambang dari `quality_thresholds`. | Tabel = default per band (+ pita WARNING dari `warn_below`); nilai eksplisit di dataset tetap menang atas `fail_below`. | Ya bila override per dataset ingin dihapus. |
-| K16 | Dokumen tidak memberi `valid_min/valid_max` `spectral_bands`, agregasi `WATER_CHANGE`, dan `source_code` per tahap. | Diisi nilai wajar di seed (VV/VH −50..20 dB, NDVI/NDWI −1..1, persen 0..100, hujan 0..1000/2000/3000/6000 mm; `WATER_CHANGE` = MEAN, km², ≥ 0). | Ya — konfirmasi rentang hujan sebelum backfill (trigger `trg_obs_range` menolak nilai di luar rentang). |
+| K15 | Ambang QA per dataset (`quality_settings.min_quality_score`) vs `quality_thresholds`. | **Diputuskan: dihapus.** Satu-satunya sumber `quality_thresholds`; kolom wizard dihapus; klien lama yang masih mengirimnya diabaikan, tidak error (M40). | Selesai. |
+| K16 | Dokumen tidak memberi `valid_min/valid_max` `spectral_bands`. | **Diputuskan: batas fisik** (M42): hujan 24h/72h/7d/30d ≤ 2000/4000/6000/10000 mm (rekor dunia WMO dibulatkan ke atas), VV/VH −60..30 dB, NDVI/NDWI −1..1, persen 0..100. | Selesai. |
 | K17 | Constraint tambahan di luar dokumen: FK `nasa_scenes.source` → `satellite_sources`, CHECK `api_tokens` ≤ 180 hari, CHECK domain `quality_flag`, `sensor_type`, `preview_options`, CHECK alasan wajib saat `is_valid = false`. | Ditambahkan karena aturan yang sama sudah tertulis di teks dokumen/kode. | Tidak. |
-| K18 | `.env` lokal (tidak di-commit) memakai database `themonitor`, bukan `orbit_u_monitor`. | Tidak diubah; semua default di repo sudah `orbit_u_monitor`. | Sesuaikan `.env` lokal bila ingin seragam. |
+| K18 | Nama database. | **Diputuskan: `themonitor`** (uji: `themonitor_test`) di kode, `.env.example`, dan dokumen (M44). | Selesai. |
+
+Catatan: satu run tes penuh sempat crash native GDAL (`0xc0000374` di `rasterio.warp.reproject` saat fusion, multi-thread); run ulang lulus 714/714. Intermiten, tidak terkait perubahan Tahap 1.

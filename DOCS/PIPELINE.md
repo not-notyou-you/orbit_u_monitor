@@ -110,7 +110,7 @@ Mekanisme DataLab D25 dipertahankan: satu `live_areas` + satu dataset `LIVE_AREA
 
 | Perubahan | Rincian |
 |---|---|
-| Retensi | 1–60 scene, default 6, diatur ADMIN (M11). Lookback backfill = `min(730, retention × 12 + 14)` hari |
+| Retensi | 1–60 scene, default 6, diatur ADMIN (M11). Lookback backfill = `min(730, retention × 12 + 14)` hari. Horizon prakiraan `ceil(n/3)` dibatasi maksimal 4 langkah |
 | Batas area | dari `app_settings.live.max_areas` (default 5) |
 | Area default | Live Area "Lebak Selatan" dibuat saat setup dengan ROI = AOI GMLS |
 | Bahasa kalimat | `live_interpret.py` menghasilkan kalimat Bahasa Indonesia (UI); kode kategori tetap Inggris (`normal`, `alert`, `high`, `flood-indicated`, `unavailable`) |
@@ -158,16 +158,16 @@ Wizard, `dataset_source_config`, tiga strategi fusion, RAW/PROCESSED per sumber,
 | Dataset sistem | `HYDROMET_AOI` dan dataset `LIVE_AREA` tidak tampil di Katalog |
 | Unduhan | Setiap unduhan (ZIP dataset, produk, fusion, laporan) mencatat `user_activity_logs` dengan `bytes_sent` |
 
-Tahap S1 [WARIS]: DOWNLOAD → CALIBRATE (LUT σ⁰ linear + reproject GCP) → CROP → LEE_FILTER 7×7 → QUALITY_ANALYTICS → COG_EXPORT; mosaik per tanggal sebelum PREVIEW/FUSION. Perubahan kecil: `module6_analytics` membaca ambang dari `quality_thresholds` dan menulis `quality_alerts` (bukan `alert_events`).
+Tahap S1 [WARIS]: DOWNLOAD → CALIBRATE (LUT σ⁰ linear + reproject GCP) → CROP → LEE_FILTER 7×7 → QUALITY_ANALYTICS → COG_EXPORT; mosaik per tanggal sebelum PREVIEW/FUSION. Perubahan kecil: `module6_analytics` membaca ambang dari `quality_thresholds` (satu-satunya sumber; kolom "Minimum quality score" di wizard dihapus) dan menulis `quality_alerts` (bukan `alert_events`).
 
 ### 5.1 Registrasi produk MODIS/GPM (M30) [UBAH]
 
 DataLab mendaftarkan produk MODIS/GPM pada baris palsu `satellite_scenes` (`NASA_AUX_{SOURCE}_{dataset}_{tanggal}`). Di Monitor:
 
-- `database_client.register_product()` menerima `scene_id` **atau** `nasa_scene_id`; modul 7 dan 8 mengirim `nasa_scene_id` dari baris `nasa_scenes` granule asal (komposit MOD09A1 memakai granule periode terakhir yang dipakai).
+- `MetadataManager.insert_data_product()` dan `insert_processing_job()` menerima `scene_id` **atau** `nasa_scene_id`; `module9_fusion` (tempat produk MODIS/GPM didaftarkan) mengirim `nasa_scene_id` dari baris `nasa_scenes` granule asal (komposit MOD09A1 memakai granule periode terakhir yang dipakai). Job DOWNLOAD/GOLD_EXPORT MODIS/GPM berjangkar granule yang sama; job FUSION tanpa jangkar.
 - Produk FUSION mengisi keduanya NULL; asal-usulnya di `fusion_products` + `data_lineage`.
-- Kunci dedup `is_latest` warisan (`scene_id, band_name, product_tier, dataset_id`) menjadi `(COALESCE(scene_id,0), COALESCE(nasa_scene_id,0), band_name, product_tier, dataset_id)`; jebakan DataLab §3.1/§3.2b tetap dijaga oleh `band_name` FUSION_RAW/FUSION_PROCESSED dan placeholder `NASA_AUX_FUSION_*` **diganti** baris NULL-NULL dengan `feature_date` di `fusion_products`.
-- `DeletionManager` tidak lagi perlu membersihkan baris `NASA_AUX_*`.
+- Kunci dedup `is_latest` produk satu sumber menjadi `(COALESCE(scene_id,0), COALESCE(nasa_scene_id,0), band_name, product_tier, dataset_id)`. Produk FUSION (NULL-NULL) didedup per **`file_path`** — kunci di atas akan menyamakan stack semua tanggal; nama berkas fusion sudah memuat tanggal + strategi + level. Placeholder `NASA_AUX_FUSION_*` diganti `fusion_products.s1_scene_id` NULL pada hari tanpa S1.
+- `DeletionManager` tidak lagi membersihkan `NASA_AUX_*`; sebagai gantinya ia menghapus langsung produk MODIS/GPM/FUSION milik dataset (dulu terhapus lewat cascade placeholder) dan job FUSION tanpa jangkar milik dataset itu. Granule `nasa_scenes` dipakai bersama dan tidak dihapus.
 - Tes regresi `tests/test_per_satellite_config.py` warisan wajib tetap lulus.
 
 ---
@@ -198,7 +198,7 @@ Data hidromet per tanggal UTC dipetakan ke periode WIB berdasarkan `obs_date`. L
 | 5 | Kejadian bencana periode ini + hujan H-0..H-2 | `v_kejadian_dan_hujan` |
 | 6 | Evaluasi alert (bulanan saja, kumulatif sejak awal arsip): hit / miss / false alarm | `v_evaluasi_alert` |
 | 7 | Vegetasi & genangan: NDVI dan % FLOOD MODIS per kecamatan, indikator kekeringan `RAIN_30D` | `region_observations` |
-| 8 | Ringkasan Live: scene S1 dalam periode, luas air baru/surut | `live_scenes.metrics` |
+| 8 | Ringkasan Live: scene S1 dalam periode, luas air baru/surut | `live_scene_metrics` |
 | 9 | Catatan keterbatasan (resolusi GPM 10 km, awan MODIS, revisit S1) | statis |
 
 ### 6.3 Isi Laporan Kesehatan Data (DATA_ENGINEER)
@@ -327,7 +327,7 @@ Orbit-U tidak menggantikan basis data lama, sehingga tahap ini berupa muatan awa
 Konfigurasi runtime tetap lewat `.env` [WARIS] (`DB_*`, `COPERNICUS_*`, `NASA_EARTHDATA_TOKEN`, `MAX_ACTIVE_JOBS`, batas koneksi, dll.), ditambah:
 
 ```bash
-DB_NAME=orbit_u_monitor
+DB_NAME=themonitor
 DB_APP_USER=monitor_app
 DB_ETL_USER=monitor_etl
 JWT_SECRET=<acak 32+ byte>
@@ -353,9 +353,11 @@ Konfigurasi yang boleh diubah ADMIN tanpa restart disimpan di DB: `alert_rules`,
 | `etl/module8_gpm_download.py` | [UBAH] | Jendela `30d` |
 | `etl/module6_analytics.py` | [UBAH] | Ambang dari `quality_thresholds`; tulis `quality_alerts` |
 | `etl/live_interpret.py`, `live_preview.py`, `live_cycle.py` | [UBAH] | Kalimat Indonesia, preview ke-9, retensi 1–60 |
-| `etl/dataset_merge.py`, `refusion.py`, `reference_layers.py`, `land_mask.py`, `water_occurrence.py`, `geo_utils.geocode_search` | [HAPUS] | |
+| `etl/dataset_merge.py`, `refusion.py`, `reference_layers.py`, `land_mask.py`, `water_occurrence.py`, `geo_utils.geocode_search` | [HAPUS] | Pembaca frame S1 `refusion.scene_results_for_date` masih dipakai orchestrator, jadi dipindah ke `module5_orchestrator` |
 | `etl/folder_manager.py` | [UBAH] | Hapus `masks/`, tambah `data/reports/` |
-| `etl/database_client.py`, `module7_modis_download.py`, `module8_gpm_download.py`, `module9_fusion.py`, `deletion_manager.py` | [UBAH] | Registrasi produk via `nasa_scene_id`; hapus placeholder `NASA_AUX_*` (M30) |
+| `etl/database_client.py`, `metadata_manager.py`, `module9_fusion.py`, `deletion_manager.py`, `dataset_manager.py` | [UBAH] | Registrasi produk via `nasa_scene_id`; hapus placeholder `NASA_AUX_*` (M30). module7/8 tidak perlu diubah |
+| `etl/tier_names.py` | [UBAH] | Helper SQL hanya mengeluarkan nama tier D14 |
+| `database/apply_schema.py` | [BARU] | Penerap ketiga berkas skema (pengganti `run_migration.py`) |
 | `etl/live_metrics.py`, `live_forecast.py` | [UBAH] | Tulis/baca `live_scene_metrics` (M31) |
 | `benchmark/` | [BARU] | `load_pg.py`, `load_mysql.py`, `queries/{pg,mysql}/q1–q5.sql`, `features/f1–f3`, `run.py` → `results/` (M29) |
 | `tools/data_dictionary.py` | [BARU] | Kamus data + ERD Mermaid dari katalog DB (M34) |
@@ -375,7 +377,8 @@ Konfigurasi yang boleh diubah ADMIN tanpa restart disimpan di DB: `alert_rules`,
 | `tests/test_alert_engine.py` | ambang, idempotensi, severity ganda |
 | `tests/test_water_change.py` | klasifikasi 4 kelas pada raster sintetis |
 | `tests/test_reports.py` | kedua template menghasilkan PDF valid untuk periode kosong dan berisi (pypdf) |
-| `tests/test_schema_comments.py` | semua kolom punya `COMMENT ON` |
+| `tests/test_schema_comments.py` | semua tabel, kolom, dan VIEW punya `COMMENT ON`; generator kamus data mencakup semua tabel |
+| `tests/test_live_scene_metrics.py` | metrik Live tersimpan 1NF dan tersusun ulang tanpa kehilangan (M31) |
 | `tests/recovery/kill_and_resume.sh` | matikan proses saat job hidromet/dataset/laporan → jalankan ulang → tidak ada duplikat |
 | `tests/recovery/backup_restore.sh` | `pg_dump` → DB kosong → `pg_restore` → hitung baris sama |
 | Warisan DataLab | `tests/test_per_satellite_config.py`, `test_pipeline_branching.py`, `test_report_generation.py` tetap lulus |

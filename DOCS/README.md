@@ -104,7 +104,7 @@ Label yang dipakai di keempat dokumen:
 | Reference layers (`masks/`, `reference_land_polygons`, JRC) | Tidak menjawab rumusan masalah |
 | Wilayah buatan pengguna + geocoding Nominatim | AOI berasal dari kecamatan resmi COD-AB |
 | Dataset LIVE lama (`dataset_kind='LIVE'`, `live_dataset_sources`, `/api/live` lama) | Sudah legacy di DataLab |
-| `refusion.py`, `cleanup` tier machine-wide | Alat perawatan riset; tidak dibutuhkan operasional |
+| `refusion.py` (kecuali pembaca frame S1, dipindah ke orchestrator), `cleanup` tier machine-wide | Alat perawatan riset; tidak dibutuhkan operasional |
 | TimescaleDB, `dataset_versions`, `api_access_logs`, `processing_rules`, Docker | Diganti tabel Monitor atau tidak dipakai |
 | Landing page berbahasa Inggris | Diganti Beranda Publik berbahasa Indonesia |
 
@@ -184,6 +184,14 @@ Keputusan rancangan awal (D1–D24) yang masih berlaku dirangkum; keputusan baru
 | M34 | Skema final satu berkas `monitor_schema.sql` (bukan rantai 26 migrasi DataLab); setiap tabel & kolom punya `COMMENT ON`; kamus data dan ERD fisik dibangkitkan dari katalog DB | Rancangan database selalu sama dengan DB nyata |
 | M35 | Artefak uji di repo: pytest fitur baru, skrip matriks GRANT, skrip recoverability; tag prototipe `v0.1` (iterasi GMLS) dan `v1.0` | Bukti tahap prototyping dan testing yang bisa diulang |
 | M36 | Impor BNPB DIBI **opsional**; `disaster_events` diisi dari catatan GMLS + input Analyst | Syarat ≥100 record transaksi sudah dipenuhi tabel lain; DIBI hanya memperkuat evaluasi alert |
+| M37 | `product_tier_enum` hanya nama D14; nama BRONZE/SILVER/GOLD/FUSION hanya diterima sebagai input | Skema dibangun dari nol; literal lama di klausa SQL akan gagal |
+| M38 | M30 diperluas ke `processing_jobs` (jangkar scene **atau** granule **atau** tanpa jangkar untuk FUSION); FUSION didedup per berkas; `DeletionManager` menghapus produk MODIS/GPM/FUSION dataset | Tanpa placeholder, job & produk aux butuh jangkar baru |
+| M39 | Deskriptor teks metrik Live disimpan di `live_scenes.source_status[sumber].meta` | Bukan metrik numerik dan tidak dikueri |
+| M40 | Ambang QA hanya dari `quality_thresholds`; ambang per dataset di wizard dihapus | Satu sumber kebenaran, diubah ADMIN |
+| M41 | `alert_rules.threshold_value` boleh NULL selama aturan nonaktif | Ambang longsor belum tersedia |
+| M42 | Rentang `spectral_bands` = batas fisik (rekor dunia), bukan nilai lazim | Trigger rentang hanya menolak data rusak |
+| M43 | Prakiraan Live maksimal 4 langkah walau retensi sampai 60 | Ekstrapolasi SES/Holt jauh ke depan tidak bermakna |
+| M44 | Nama DB default `themonitor`; database uji dibangun dari ketiga berkas SQL | Keputusan pemilik; skema selalu teruji |
 
 ---
 
@@ -216,11 +224,12 @@ python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
 # 2. Basis data (skema Monitor menggantikan schema.sql + migrations DataLab)
-createdb orbit_u_monitor
-psql orbit_u_monitor -c "CREATE EXTENSION postgis; CREATE EXTENSION pgcrypto;"
-psql orbit_u_monitor -f database/monitor_schema.sql     # DDL + index + VIEW
-psql orbit_u_monitor -f database/monitor_security.sql   # role, GRANT, trigger audit
-psql orbit_u_monitor -f database/monitor_seed.sql       # master data
+createdb themonitor
+psql themonitor -c "CREATE EXTENSION postgis; CREATE EXTENSION pgcrypto;"
+psql themonitor -f database/monitor_schema.sql     # DDL + index + VIEW
+psql themonitor -f database/monitor_security.sql   # role, GRANT, trigger audit
+psql themonitor -f database/monitor_seed.sql       # master data
+# (PowerShell: python database/apply_schema.py)
 
 # 3. .env (salin .env.example, isi DB_*, COPERNICUS_*, NASA_EARTHDATA_TOKEN, JWT_SECRET)
 cp .env.example .env
@@ -238,7 +247,7 @@ python scripts/backfill_hydromet.py --start 2023-01-01 --end 2025-12-31
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
-Nama DB `sentinel1_flood` warisan DataLab **diganti** menjadi `orbit_u_monitor` di `.env.example`, `etl/config.py`, dan `database_client.from_env()`.
+Nama DB `sentinel1_flood` warisan DataLab **diganti** menjadi `themonitor` di `.env.example`, `etl/config.py`, dan `database_client.from_env()`.
 
 ---
 
