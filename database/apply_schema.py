@@ -21,10 +21,15 @@ Pakai:
 Berkas skema mengasumsikan database kosong; skrip ini berhenti di berkas
 pertama yang gagal. tests/conftest.py memakai apply_files() yang sama untuk
 membangun database uji.
+
+Setelah ketiga berkas, sandi role login monitor_app dan monitor_etl diisi dari
+MONITOR_APP_PASSWORD / MONITOR_ETL_PASSWORD di .env (monitor_security.sql
+sengaja tidak memuat sandi; IMPLEMENTATION_NOTES Tahap 2, S3).
 """
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -72,6 +77,38 @@ def apply_files(dbapi_connection, files: tuple[str, ...] = SCHEMA_FILES, echo=pr
         dbapi_connection.autocommit = previous
 
 
+LOGIN_ROLE_PASSWORD_ENV: dict[str, str] = {
+    "monitor_app": "MONITOR_APP_PASSWORD",
+    "monitor_etl": "MONITOR_ETL_PASSWORD",
+}
+
+
+def set_role_passwords(dbapi_connection, echo=print) -> list[str]:
+    """ALTER ROLE ... PASSWORD untuk role login yang sandinya ada di env.
+
+    Mengembalikan nama role yang dilewati karena env-nya kosong. Sandi
+    dikirim sebagai literal yang di-quote server (format %L), tidak pernah
+    dicetak.
+    """
+    skipped = []
+    previous = dbapi_connection.autocommit
+    dbapi_connection.autocommit = True
+    try:
+        with dbapi_connection.cursor() as cur:
+            for role, env in LOGIN_ROLE_PASSWORD_ENV.items():
+                password = os.getenv(env)
+                if not password:
+                    skipped.append(role)
+                    echo(f"[WARN] {env} kosong: sandi {role} tidak diubah")
+                    continue
+                cur.execute("SELECT format('ALTER ROLE %%I PASSWORD %%L', %s, %s)", (role, password))
+                cur.execute(cur.fetchone()[0])
+                echo(f"[DONE] password {role}")
+    finally:
+        dbapi_connection.autocommit = previous
+    return skipped
+
+
 def main(argv: list[str]) -> int:
     sys.path.insert(0, str(SCHEMA_DIR.parent))
     from sqlalchemy import create_engine, text
@@ -95,6 +132,7 @@ def main(argv: list[str]) -> int:
     raw = engine.raw_connection()
     try:
         apply_files(raw.driver_connection)
+        set_role_passwords(raw.driver_connection)
     except Exception as exc:
         print(f"[FAIL] {exc}")
         return 1

@@ -90,7 +90,7 @@ def db_client():
     Builds the schema from database/monitor_*.sql on setup, empties the
     schema on teardown.
     """
-    from database.apply_schema import apply_files
+    from database.apply_schema import apply_files, set_role_passwords
     from etl.database_client import DatabaseClient
 
     _guard_not_production(TEST_DB_URL)
@@ -106,6 +106,10 @@ def db_client():
         raw = client._engine.raw_connection()
         try:
             apply_files(raw.driver_connection, echo=lambda _msg: None)
+            # Role bersifat global untuk cluster: sandinya sama dengan yang
+            # dipakai database utama (.env), jadi ini tidak mengubah apa pun
+            # bagi aplikasi yang sedang berjalan.
+            set_role_passwords(raw.driver_connection, echo=lambda _msg: None)
         finally:
             raw.close()
     except Exception as exc:  # pragma: no cover - hanya jalur pesan error
