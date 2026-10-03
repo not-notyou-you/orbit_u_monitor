@@ -66,15 +66,15 @@ TEST_DB_URL = _resolve_test_db_url()
 def _guard_not_production(url: str) -> None:
     """Cegah test menghapus database produksi.
 
-    Fixture db_client menjalankan Base.metadata.drop_all() saat teardown, jadi
-    kalau URL uji tidak sengaja menunjuk database utama, seluruh tabel produksi
-    ikut terhapus. Lebih baik gagal keras di awal.
+    Fixture db_client menjalankan DROP SCHEMA public CASCADE saat setup dan
+    teardown, jadi kalau URL uji tidak sengaja menunjuk database utama, seluruh
+    tabel produksi ikut terhapus. Lebih baik gagal keras di awal.
     """
     main_url = os.getenv("DATABASE_URL")
     if main_url and url.rstrip("/") == main_url.rstrip("/"):
         raise RuntimeError(
             "Test database URL sama dengan DATABASE_URL produksi. "
-            "Test melakukan drop_all() saat teardown — batalkan. "
+            "Test menjalankan DROP SCHEMA public CASCADE — batalkan. "
             "Set TEST_DATABASE_URL ke database terpisah."
         )
     if not url.rpartition("/")[2].partition("?")[0].endswith("_test"):
@@ -87,24 +87,27 @@ def _guard_not_production(url: str) -> None:
 def db_client():
     """
     Session-scoped DatabaseClient connected to the test database.
-    Creates all tables on setup, drops them on teardown.
+    Builds the schema from database/monitor_*.sql on setup, empties the
+    schema on teardown.
     """
-    from sqlalchemy import text
-    from etl.database_client import DatabaseClient, Base
+    from database.apply_schema import apply_files
+    from etl.database_client import DatabaseClient
 
     _guard_not_production(TEST_DB_URL)
     client = DatabaseClient(TEST_DB_URL, pool_size=2, max_overflow=2)
 
-    # Tabel memakai kolom PostGIS dan server_default uuid_generate_v4(), jadi
-    # kedua ekstensinya harus ada sebelum create_all. Di database uji yang baru
-    # dibuat ekstensi ini belum tentu terpasang. uuid-ossp ikut di sini, bukan
-    # cuma postgis: banyak tabel (satellite_scenes, datasets, ...) memakai
-    # DEFAULT uuid_generate_v4(), dan tanpa ekstensinya create_all gagal di
-    # CREATE TABLE pertama -- bukan di tes yang butuh UUID.
+    # Database uji dibangun dari ketiga berkas skema yang sama dengan produksi
+    # (DATABASE.md §6, IMPLEMENTATION_NOTES K11), bukan dari ORM create_all:
+    # dengan begitu setiap run tes juga membuktikan monitor_schema.sql,
+    # monitor_security.sql, dan monitor_seed.sql jalan di database kosong,
+    # dan constraint/FK/seed master yang dilihat tes identik dengan produksi.
     try:
-        with client.session() as sess:
-            sess.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
-            sess.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+        _reset_schema(client)
+        raw = client._engine.raw_connection()
+        try:
+            apply_files(raw.driver_connection, echo=lambda _msg: None)
+        finally:
+            raw.close()
     except Exception as exc:  # pragma: no cover - hanya jalur pesan error
         pytest.exit(
             f"Tidak bisa menyiapkan database uji {TEST_DB_URL!r}: {exc}\n"
@@ -112,33 +115,21 @@ def db_client():
             '  psql -U postgres -c "CREATE DATABASE orbit_u_monitor_test"',
             returncode=1,
         )
-
-    client.create_tables()
-    # create_tables() only runs SQLAlchemy DDL (Base.metadata.create_all) — it
-    # doesn't run schema.sql's raw seed INSERTs, so processing_stages (needed
-    # by MetadataManager.insert_processing_job's FK lookup) starts empty on a
-    # fresh test DB. Seed the same stage rows schema.sql seeds in production.
-    # Keep this list in sync with database/schema.sql — drift here is what let
-    # the missing GOLD_EXPORT lineage mapping reach production untested.
-    with client.session() as sess:
-        sess.execute(text("""
-            INSERT INTO processing_stages (stage_name, stage_code, stage_order, description, timeout_minutes, retry_count, retry_delay_sec, is_mandatory, is_active)
-            VALUES
-                ('DOWNLOAD',          'DL',  1, 'Sentinel-1 scene discovery and download from Copernicus Hub', 120, 3, 60, TRUE, TRUE),
-                ('CROP',              'CR',  2, 'Spatial subsetting to Region of Interest bounding box',       30,  2, 30, TRUE, TRUE),
-                ('LEE_FILTER',        'LF',  3, 'SAR speckle reduction using Lee adaptive filter',            45,  2, 30, TRUE, TRUE),
-                ('COG_EXPORT',        'CE',  4, 'Cloud-Optimized GeoTIFF normalization and export',           30,  2, 30, TRUE, TRUE),
-                ('ORCHESTRATE',       'OR',  5, 'Pipeline orchestration, checkpointing, and retry management', 10,  1, 10, TRUE, TRUE),
-                ('QUALITY_ANALYTICS', 'QA',  6, 'Quality metrics computation and visualization',              30,  2, 30, TRUE, TRUE),
-                ('FUSION',            'FS',  7, 'Multi-modal HDF5 feature stack fusion (Sentinel-1 + MODIS + GPM) for GOLD tier', 60, 2, 30, TRUE, TRUE),
-                ('GOLD_EXPORT',       'GE',  8, 'Per-source Cloud-Optimized GeoTIFF export untuk tier GOLD',  45,  2, 30, TRUE, TRUE),
-                ('PREVIEW',           'PV',  9, 'Render PNG preview (grayscale + colored) dari tier GOLD, sebelum FUSION', 15, 1, 15, FALSE, TRUE)
-            ON CONFLICT (stage_name) DO NOTHING
-        """))
     yield client
-    # Teardown: drop all tables after full test session
-    Base.metadata.drop_all(client._engine)
+    # Teardown: kosongkan skema setelah seluruh sesi tes.
+    _reset_schema(client)
     client.dispose()
+
+
+def _reset_schema(client) -> None:
+    """DROP SCHEMA public CASCADE + CREATE: database uji kembali kosong
+    (termasuk ekstensi PostGIS, yang dipasang ulang oleh monitor_schema.sql)."""
+    from sqlalchemy import text
+
+    with client._engine.connect() as conn:
+        conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
+        conn.commit()
 
 
 @pytest.fixture(scope="function")
@@ -232,7 +223,7 @@ def sample_dataset(db_client, sample_region) -> int:
             bbox_wkt="POLYGON((106.4 -6.7, 107.2 -6.7, 107.2 -5.9, 106.4 -5.9, 106.4 -6.7))",
             date_start=datetime(2024, 1, 1, tzinfo=timezone.utc).date(),
             date_end=datetime(2024, 1, 31, tzinfo=timezone.utc).date(),
-            required_tiers=["RAW", "GOLD"],
+            required_tiers=["RAW", "COG"],
             dataset_kind="STANDARD",
             status="DRAFT",
         )

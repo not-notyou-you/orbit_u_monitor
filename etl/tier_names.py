@@ -27,8 +27,14 @@ yang identik di sana, dan memberi tiga nama berbeda akan mengarang perbedaan
 yang tidak ada — kesalahan cermin dari yang sedang diperbaiki.
 
 Karena rank 2 bercabang, `TIER_ORDER` sebagai list datar tidak lagi memadai:
-`rank()` yang menggantikannya. Nama lama tetap DIBACA (baris data_products
-sebelum migrasi tidak diubah), tapi tidak pernah ditulis lagi.
+`rank()` yang menggantikannya.
+
+Monitor (DATABASE.md §6, M34): product_tier_enum hanya berisi nama D14 --
+skema dibangun dari nol, tidak ada baris pra-D14 yang perlu dibaca. Nama lama
+masih DITERIMA sebagai input (API/CLI lama, `canonical_tier`, `rank`), tetapi
+helper yang hasilnya masuk ke klausa SQL (`tiers_at_rank`, `equivalent_tiers`,
+`tiers_up_to_rank`) hanya mengembalikan nama D14: literal enum yang tidak ada
+di tipe PostgreSQL membuat kueri gagal (IMPLEMENTATION_NOTES K1).
 
 Modul ini sengaja tidak mengimpor apa pun dari modul ETL lain — dia dipakai
 API, orchestrator, dan skrip perawatan.
@@ -53,8 +59,8 @@ RANK: dict[str, int] = {
     FUSED: 4,
 }
 
-# Kosakata pra-D14. Tidak pernah ditulis lagi; tetap dibaca karena baris
-# data_products lama tidak dimigrasi.
+# Kosakata pra-D14. Hanya diterima sebagai input; tidak pernah ditulis dan
+# tidak pernah dikirim ke SQL.
 LEGACY_RANK: dict[str, int] = {
     "RAW": 0, "BRONZE": 1, "SILVER": 2, "GOLD": 3, "FUSION": 4,
 }
@@ -123,19 +129,13 @@ def canonical_tier(tier: str, source: str | None = None) -> str:
     raise ValueError(f"Unknown tier: {tier!r}")
 
 
-def tiers_at_rank(r: int, *, include_legacy: bool = True) -> tuple[str, ...]:
-    """Semua nama yang menempati rank ini, untuk klausa SQL `IN (...)`.
+def tiers_at_rank(r: int) -> tuple[str, ...]:
+    """Semua nama D14 yang menempati rank ini, untuk klausa SQL `IN (...)`.
 
-    tiers_at_rank(3) -> ("COG", "GOLD")
-    tiers_at_rank(2) -> ("DESPECKLED", "INDICES", "ACCUMULATED", "SILVER")
-
-    Ini pengganti langsung tiap `product_tier == ProductTierEnum.GOLD`: baris
-    lama dan baru menempati rank yang sama dan harus sama-sama terjaring.
+    tiers_at_rank(3) -> ("COG",)
+    tiers_at_rank(2) -> ("DESPECKLED", "INDICES", "ACCUMULATED")
     """
-    out = [t for t, rr in RANK.items() if rr == r]
-    if include_legacy:
-        out += [t for t, rr in LEGACY_RANK.items() if rr == r and t not in RANK]
-    return tuple(out)
+    return tuple(t for t, rr in RANK.items() if rr == r)
 
 
 def sort_key(tier: str) -> tuple[int, str]:
@@ -145,26 +145,26 @@ def sort_key(tier: str) -> tuple[int, str]:
 
 
 def equivalent_tiers(tier: str) -> tuple[str, ...]:
-    """Semua nama yang menunjuk artefak yang sama, untuk filter baca `IN (...)`.
+    """Nama D14 yang menunjuk artefak yang sama, untuk filter baca `IN (...)`.
 
-    Nama D14 selalu di depan; alias warisan ikut supaya baris pra-migrasi
-    tetap terjaring. Berbeda dari tiers_at_rank: INDICES tidak menjaring
-    DESPECKLED (beda artefak, cuma satu rank).
+    Input boleh nama lama; keluaran selalu nama D14. Berbeda dari
+    tiers_at_rank: INDICES tidak menjaring DESPECKLED (beda artefak, cuma satu
+    rank). SILVER tidak punya padanan tunggal, jadi menjaring ketiganya.
 
-    equivalent_tiers("COG")     -> ("COG", "GOLD")
-    equivalent_tiers("GOLD")    -> ("COG", "GOLD")
-    equivalent_tiers("INDICES") -> ("INDICES", "SILVER")
-    equivalent_tiers("SILVER")  -> ("DESPECKLED", "INDICES", "ACCUMULATED", "SILVER")
+    equivalent_tiers("COG")     -> ("COG",)
+    equivalent_tiers("GOLD")    -> ("COG",)
+    equivalent_tiers("INDICES") -> ("INDICES",)
+    equivalent_tiers("SILVER")  -> ("DESPECKLED", "INDICES", "ACCUMULATED")
     """
     t = _upper(tier)
     if t == PREVIEW:
         return (PREVIEW,)
     r = rank(t)  # melempar untuk nama tak dikenal
-    if r == 2 and t != "SILVER":
-        return (t, "SILVER")
-    return tiers_at_rank(r)
+    if t == "SILVER":
+        return tiers_at_rank(r)
+    return (LEGACY_TO_NEW.get(t, t),)
 
 
 def tiers_up_to_rank(r: int) -> tuple[str, ...]:
-    """Semua nama (kedua kosakata) dengan rank <= r."""
+    """Semua nama D14 dengan rank <= r."""
     return tuple(t for i in range(r + 1) for t in tiers_at_rank(i))

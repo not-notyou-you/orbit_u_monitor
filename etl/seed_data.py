@@ -325,7 +325,7 @@ def verify_seed(db: DatabaseClient, ids: dict) -> None:
 
         # 2. Fused products (single fused H5 per scene, not per-band)
         fused_count = sess.scalar(
-            text("SELECT COUNT(*) FROM data_products WHERE product_tier IN ('FUSED', 'FUSION') AND is_latest = TRUE")
+            text("SELECT COUNT(*) FROM data_products WHERE product_tier = 'FUSED' AND is_latest = TRUE")
         )
         logger.info("[VERIFY] FUSED latest products: %d", fused_count)
         assert fused_count >= 1, "Expected 1 FUSED product"

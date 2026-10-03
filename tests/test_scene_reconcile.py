@@ -87,7 +87,7 @@ class TestQueryLintasJob:
 
         with db_client.session() as sess:
             job_lama = DatasetJob(dataset_id=sample_dataset, job_type="CREATE", status="COMPLETED")
-            job_baru = DatasetJob(dataset_id=sample_dataset, job_type="RESUME", status="COMPLETED")
+            job_baru = DatasetJob(dataset_id=sample_dataset, job_type="BACKFILL", status="COMPLETED")
             sess.add_all([job_lama, job_baru])
             sess.flush()
             return job_lama.job_id, job_baru.job_id

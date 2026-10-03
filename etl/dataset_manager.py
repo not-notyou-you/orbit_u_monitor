@@ -159,18 +159,22 @@ def _job_timing(dataset_id: int, job: dict) -> dict | None:
 
 
 def _normalize_tiers(tiers: list[str]) -> list[str]:
+    """Validasi + terjemahkan ke nama D14 (datasets.required_tiers hanya
+    menerima nama D14). Nama lama diterima: SILVER, yang bercabang tiga di
+    rank 2, menjadi ketiga nama rank 2-nya."""
     upper = {t.upper() for t in tiers}
     if not upper:
         raise ValueError("tiers must not be empty")
     invalid = set()
+    out: set[str] = set()
     for t in upper:
         try:
-            tn.rank(t)
+            out.update(tn.equivalent_tiers(t))
         except ValueError:
             invalid.add(t)
-    if invalid:
-        raise ValueError(f"Invalid tier: {invalid}. Valid: {tn.ALL_TIERS}")
-    return sorted(upper, key=tn.sort_key)
+    if invalid or tn.PREVIEW in out:
+        raise ValueError(f"Invalid tier: {invalid or {tn.PREVIEW}}. Valid: {tn.ALL_TIERS}")
+    return sorted(out, key=tn.sort_key)
 
 
 def compute_max_tier(required_tiers: list[str]) -> str:

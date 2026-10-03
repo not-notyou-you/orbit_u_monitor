@@ -1,7 +1,7 @@
 # etl/config.py
 """
 Konfigurasi koneksi database dari environment variable (+ .env lewat
-python-dotenv). Dipakai database/run_migration.py.
+python-dotenv). Dipakai database/apply_schema.py.
 
 Author : Julius Marselinus (BRONTO) - NIM 00000111989
 Program: Sistem Informasi - Universitas Multimedia Nusantara

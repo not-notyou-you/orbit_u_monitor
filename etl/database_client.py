@@ -54,15 +54,11 @@ class JobStatusEnum(str, PyEnum):
 
 
 class ProductTierEnum(str, PyEnum):
-    """Nilai `data_products.product_tier`.
+    """Nilai `data_products.product_tier` (kosakata D14).
 
-    Kosakata D14 (dinamai menurut kontrak yang dipenuhi artefaknya) plus
-    kosakata lama yang DIPERTAHANKAN supaya baris pra-migrasi masih bisa
-    dibaca kembali jadi objek. Nama lama tidak pernah ditulis lagi oleh kode
-    baru; lihat etl/tier_names.py untuk pemetaan dan peringkatnya.
-
-    Keduanya tidak bisa jadi alias Python (alias menuntut nilai yang sama),
-    jadi ini anggota biasa yang ditandai warisan lewat komentar.
+    Nama medallion lama (BRONZE/SILVER/GOLD/FUSION) tidak ada lagi di
+    product_tier_enum Monitor (DATABASE.md §6); etl/tier_names.py masih
+    menerimanya sebagai INPUT dan memetakannya ke nama di bawah.
     """
     RAW = "RAW"
     ALIGNED = "ALIGNED"
@@ -71,11 +67,6 @@ class ProductTierEnum(str, PyEnum):
     ACCUMULATED = "ACCUMULATED"
     COG = "COG"
     FUSED = "FUSED"
-    # -- warisan pra-D14, dibaca tapi tidak pernah ditulis --
-    BRONZE = "BRONZE"
-    SILVER = "SILVER"
-    GOLD = "GOLD"
-    FUSION = "FUSION"
 
 
 class ProductSourceEnum(str, PyEnum):
@@ -467,11 +458,14 @@ class RegionOfInterest(Base):
     admin_level = Column(SmallInteger, nullable=False, default=2)
     country_code = Column(String(2), nullable=False, default="ID")
     is_active = Column(Boolean, nullable=False, default=True)
-    # SEEDER = bawaan sistem, USER = ditambah lewat UI, GEOCODE = auto dari Nominatim.
-    # server_default wajib: tabel ini juga dibuat lewat Base.metadata.create_all()
-    # (tes, instalasi baru), dan INSERT SQL mentah yang tidak menyebut kolom ini
-    # akan kena NOT NULL kalau DDL-nya tidak ikut membawa DEFAULT.
-    source = Column(String(20), nullable=False, default="USER", server_default=text("'USER'"))
+    # SEEDER = baris seed, SYSTEM = dibuat sistem/ADMIN dari kecamatan COD-AB.
+    # Wilayah buatan pengguna (USER/GEOCODE) dihapus (DATABASE.md §3.6, M27).
+    source = Column(String(20), nullable=False, default="SYSTEM", server_default=text("'SYSTEM'"))
+    # FK administrative_regions/users/satellite_sources ditegakkan di DB
+    # (monitor_schema.sql); tabel itu belum dipetakan ORM, jadi di sini
+    # kolom biasa supaya urutan flush SQLAlchemy tidak mencari tabelnya.
+    admin_region_id = Column(Integer)
+    is_monitor_aoi = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     # Soft-delete: baris tidak pernah dihapus fisik karena scenes/datasets
     # mereferensikan region_id dengan ON DELETE RESTRICT.
     deleted_at = Column(DateTime(timezone=True))
@@ -495,6 +489,8 @@ class ProcessingStage(Base):
     stage_code = Column(String(20), nullable=False, unique=True)
     stage_order = Column(SmallInteger, nullable=False)
     description = Column(Text)
+    # NULL = tahap lintas sumber.
+    source_code = Column(String(20))  # FK satellite_sources di DB
     timeout_minutes = Column(SmallInteger, nullable=False, default=60)
     retry_count = Column(SmallInteger, nullable=False, default=3)
     retry_delay_sec = Column(SmallInteger, nullable=False, default=30)
@@ -513,7 +509,7 @@ class SatelliteScene(Base):
     __tablename__ = "satellite_scenes"
     scene_id = Column(Integer, primary_key=True, autoincrement=True)
     scene_uuid = Column(UUID(as_uuid=True), nullable=False, unique=True,
-                         server_default=text("uuid_generate_v4()"))
+                         server_default=text("gen_random_uuid()"))
     product_identifier = Column(String(200), nullable=False, unique=True)
     platform = Column(String(20), nullable=False, default="SENTINEL-1")
     instrument_mode = Column(String(10), nullable=False, default="IW")
@@ -538,6 +534,11 @@ class SatelliteScene(Base):
     download_url = Column(Text)
     checksum_md5 = Column(String(32))
     is_available = Column(Boolean, nullable=False, default=True)
+    # Soft delete ADMIN (M24): alasan wajib saat is_valid = false.
+    is_valid = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    invalidated_by = Column(Integer)  # FK users di DB
+    invalidated_at = Column(DateTime(timezone=True))
+    invalid_reason = Column(Text)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
 
@@ -560,7 +561,7 @@ class ProcessingJob(Base):
     )
     job_id = Column(BigInteger, primary_key=True, autoincrement=True)
     job_uuid = Column(UUID(as_uuid=True), nullable=False, unique=True,
-                       server_default=text("uuid_generate_v4()"))
+                       server_default=text("gen_random_uuid()"))
     scene_id = Column(Integer, ForeignKey("satellite_scenes.scene_id",
                                            ondelete="CASCADE"), nullable=False)
     stage_id = Column(Integer, ForeignKey("processing_stages.stage_id",
@@ -611,7 +612,7 @@ class DataProduct(Base):
     )
     product_id = Column(BigInteger, primary_key=True, autoincrement=True)
     product_uuid = Column(UUID(as_uuid=True), nullable=False, unique=True,
-                           server_default=text("uuid_generate_v4()"))
+                           server_default=text("gen_random_uuid()"))
     scene_id = Column(Integer, ForeignKey("satellite_scenes.scene_id",
                                            ondelete="CASCADE"), nullable=False)
     job_id = Column(BigInteger, ForeignKey("processing_jobs.job_id",
@@ -746,10 +747,12 @@ class DataLineage(Base):
 
 
 class AlertEvent(Base):
-    __tablename__ = "alert_events"
+    # Tabel alert_events DataLab diganti nama quality_alerts (DATABASE.md §4.1);
+    # nama alert_events kini milik alert hujan.
+    __tablename__ = "quality_alerts"
     alert_id = Column(BigInteger, primary_key=True, autoincrement=True)
     alert_uuid = Column(UUID(as_uuid=True), nullable=False, unique=True,
-                         server_default=text("uuid_generate_v4()"))
+                         server_default=text("gen_random_uuid()"))
     event_type = Column(Enum(AlertEventTypeEnum, name="alert_event_type_enum"), nullable=False)
     severity = Column(Enum(AlertSeverityEnum, name="alert_severity_enum"),
                        nullable=False, default=AlertSeverityEnum.INFO)
@@ -793,7 +796,7 @@ class Dataset(Base):
     )
     dataset_id = Column(Integer, primary_key=True, autoincrement=True)
     dataset_uuid = Column(UUID(as_uuid=True), nullable=False, unique=True,
-                           server_default=text("uuid_generate_v4()"))
+                           server_default=text("gen_random_uuid()"))
     name = Column(String(255), nullable=False)
     description = Column(Text)
     location_label = Column(String(255))
@@ -831,9 +834,10 @@ class Dataset(Base):
     # ulang seterusnya. Tanpa ini grid diturunkan ulang tiap jalan dari "raster
     # S1 pertama yang filenya ada", dan berpindah begitu ketersediaan berkas
     # berubah -- dataset 26 sampai punya dua grid yang tidak berhimpit.
-    # Lihat database/migrations/024_datasets_fusion_grid.sql.
     fusion_grid = Column(JSONB)
     dataset_kind = Column(String(10), nullable=False, default="STANDARD")
+    # Dataset sistem (HYDROMET_AOI) disembunyikan dari Katalog (PIPELINE.md §3.1).
+    is_system = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     status = Column(String(20), nullable=False, default="DRAFT")
     total_scenes = Column(Integer, nullable=False, default=0)
     completed_scenes = Column(Integer, nullable=False, default=0)
@@ -842,9 +846,10 @@ class Dataset(Base):
     is_deletable = Column(Boolean, nullable=False, default=True)
     # Jalankan tahap PREVIEW (render PNG dari GOLD) untuk dataset ini.
     # Kolom sendiri, bukan key di quality_settings: ini pilihan user yang bisa
-    # di-query, sementara quality_settings isinya ambang mutu data. Lihat
-    # migrasi 016 -- WAJIB dijalankan, kolom ini dipetakan tanpa syarat.
+    # di-query, sementara quality_settings isinya ambang mutu data.
     generate_preview = Column(Boolean, nullable=False, default=True)
+    # Pembuat dataset; NULL untuk dataset sistem.
+    created_by = Column(Integer)  # FK users di DB
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     deleted_at = Column(DateTime(timezone=True))
@@ -876,10 +881,8 @@ class DatasetSourceConfig(Base):
 
     Satu baris per (dataset, sumber). ETL membaca tabel ini untuk menentukan
     sumber mana yang dijalankan dan sampai level apa (DOCS/PIPELINE.md). Constraint
-    di __table_args__ sengaja dicerminkan dari migrasi 017 supaya database uji
-    yang dibuat lewat Base.metadata.create_all() menegakkan aturan yang sama
-    dengan produksi -- tanpa itu, tes tidak akan pernah melihat kegagalan CHECK
-    yang di produksi menjaga integritas.
+    di __table_args__ dicerminkan dari database/monitor_schema.sql (sumber
+    kebenaran skema; database uji juga dibangun dari berkas itu).
     """
 
     __tablename__ = "dataset_source_config"
@@ -945,7 +948,7 @@ class DatasetJob(Base):
     __tablename__ = "dataset_jobs"
     job_id = Column(BigInteger, primary_key=True, autoincrement=True)
     job_uuid = Column(UUID(as_uuid=True), nullable=False, unique=True,
-                       server_default=text("uuid_generate_v4()"))
+                       server_default=text("gen_random_uuid()"))
     dataset_id = Column(Integer, ForeignKey("datasets.dataset_id", ondelete="CASCADE"), nullable=False)
     job_type = Column(String(20), nullable=False, default="CREATE")
     status = Column(String(20), nullable=False, default="QUEUED")
@@ -1026,7 +1029,7 @@ class ProcessingLog(Base):
     __tablename__ = "processing_logs"
     log_id = Column(BigInteger, primary_key=True, autoincrement=True)
     log_uuid = Column(UUID(as_uuid=True), nullable=False, unique=True,
-                       server_default=text("uuid_generate_v4()"))
+                       server_default=text("gen_random_uuid()"))
     dataset_id = Column(Integer, ForeignKey("datasets.dataset_id", ondelete="CASCADE"), nullable=False)
     scene_id = Column(String(255), nullable=False)
     module = Column(String(50), nullable=False)
@@ -1048,7 +1051,7 @@ class LiveArea(Base):
 
     __tablename__ = "live_areas"
     __table_args__ = (
-        CheckConstraint("retention BETWEEN 1 AND 12", name="chk_live_area_retention"),
+        CheckConstraint("retention BETWEEN 1 AND 60", name="chk_live_area_retention"),
     )
     area_id = Column(Integer, primary_key=True, autoincrement=True)
     dataset_id = Column(Integer, ForeignKey("datasets.dataset_id", ondelete="SET NULL"))
@@ -1063,6 +1066,7 @@ class LiveArea(Base):
     last_checked_at = Column(DateTime(timezone=True))
     forecast = Column(JSONB, nullable=False, default={})
     forecast_updated_at = Column(DateTime(timezone=True))
+    updated_by = Column(Integer)  # FK users di DB
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     deleted_at = Column(DateTime(timezone=True))
@@ -1131,6 +1135,12 @@ class NasaScene(Base):
     raw_file_path = Column(Text)
     download_url = Column(Text)
     is_available = Column(Boolean, nullable=False, default=True)
+    # GPM IMERG run F/L/E (M6); NULL untuk MODIS.
+    run_type = Column(String(5))
+    is_valid = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    invalidated_by = Column(Integer)  # FK users di DB
+    invalidated_at = Column(DateTime(timezone=True))
+    invalid_reason = Column(Text)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
 
     region = relationship("RegionOfInterest")
@@ -1211,10 +1221,6 @@ class DatabaseClient:
         except Exception as exc:
             logger.error("Health check failed: %s", exc)
             return {"connected": False, "error": str(exc)}
-
-    def create_tables(self) -> None:
-        Base.metadata.create_all(self._engine)
-        logger.info("All ORM tables created (or already exist)")
 
     # -----------------------------------------------------------------------
     # Konfigurasi per-satelit (dataset_source_config)

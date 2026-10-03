@@ -1,0 +1,30 @@
+-- =============================================================================
+-- database/monitor_security.sql — Orbit-U: The Monitor
+-- =============================================================================
+-- Keamanan fisik basis data (DATABASE.md §8, RM4). Dijalankan setelah
+-- monitor_schema.sql dan sebelum monitor_seed.sql.
+--
+-- TAHAP 1: kerangka kosong. Isi berkas ini dikerjakan di Tahap 2 (auth/role):
+--
+--   §8.1  Role PostgreSQL
+--         monitor_app (LOGIN NOINHERIT), monitor_etl (LOGIN),
+--         monitor_public -> monitor_user -> monitor_analyst / monitor_data_engineer
+--         -> monitor_admin; GRANT kelima role ke monitor_app (hanya SET ROLE);
+--         REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC.
+--
+--   §8.2  Fungsi SECURITY DEFINER auth_get_user(username) milik monitor_admin.
+--
+--   §8.3  Matriks GRANT per tabel/VIEW per role (termasuk
+--         GRANT UPDATE (acknowledged_by, acknowledged_at, ack_note) ON alert_events).
+--
+--   §8.4  Row-Level Security: generated_reports (rp_audience) dan
+--         api_tokens (tok_owner).
+--
+--   §8.5  Fungsi audit_row() + trigger AFTER INSERT/UPDATE/DELETE pada users,
+--         api_tokens, alert_rules, alert_events, disaster_events,
+--         quality_thresholds, disaster_types, administrative_regions,
+--         app_settings, live_areas, satellite_scenes, nasa_scenes, datasets.
+--
+-- Berkas ini sengaja dapat dijalankan dengan psql -v ON_ERROR_STOP=1 walau
+-- belum berisi pernyataan apa pun.
+-- =============================================================================

@@ -49,6 +49,7 @@ class TestSchemaCreation:
         "data_products",
         "quality_metrics",
         "data_lineage",
+        "quality_alerts",
         "alert_events",
     ]
 
@@ -123,9 +124,11 @@ class TestSchemaCreation:
     # Listed in stage_order, which is registration order and NOT execution
     # order -- FUSION is 7 but runs after GOLD_EXPORT (8) and PREVIEW (9).
     # Execution order lives in etl/dataset_manager.py:STAGE_TIER_INDEX.
+    # Seed monitor_seed.sql: 9 tahap warisan + 4 tahap Monitor (DATABASE.md §3.7).
     EXPECTED_STAGES = [
         "DOWNLOAD", "CROP", "LEE_FILTER", "COG_EXPORT",
         "ORCHESTRATE", "QUALITY_ANALYTICS", "FUSION", "GOLD_EXPORT", "PREVIEW",
+        "HYDROMET_AGGREGATE", "ALERT_CHECK", "WATER_CHANGE", "REPORT_BUILD",
     ]
 
     def test_processing_stages_seeded(self, db_client):

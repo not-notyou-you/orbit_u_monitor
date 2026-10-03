@@ -233,7 +233,7 @@ class TestAlertAutoTrigger:
         # Count alerts before
         with db_client.session() as sess:
             before = sess.scalar(text(
-                "SELECT COUNT(*) FROM alert_events WHERE scene_id = :sid AND event_type = 'QUALITY_WARNING'",
+                "SELECT COUNT(*) FROM quality_alerts WHERE scene_id = :sid AND event_type = 'QUALITY_WARNING'",
             ), {"sid": sample_scene})
 
         job_id  = meta.insert_processing_job(sample_scene, "QUALITY_ANALYTICS")
@@ -252,7 +252,7 @@ class TestAlertAutoTrigger:
 
         with db_client.session() as sess:
             after = sess.scalar(text(
-                "SELECT COUNT(*) FROM alert_events WHERE scene_id = :sid AND event_type = 'QUALITY_WARNING'",
+                "SELECT COUNT(*) FROM quality_alerts WHERE scene_id = :sid AND event_type = 'QUALITY_WARNING'",
             ), {"sid": sample_scene})
 
         assert after > before, "Expected a QUALITY_WARNING alert to be auto-created on FAIL"
