@@ -28,7 +28,7 @@ except ImportError:
 class DatabaseConfig:
     host:         str = field(default_factory=lambda: os.getenv("DB_HOST",     "localhost"))
     port:         int = field(default_factory=lambda: int(os.getenv("DB_PORT", "5432")))
-    name:         str = field(default_factory=lambda: os.getenv("DB_NAME",     "orbit_u_monitor"))
+    name:         str = field(default_factory=lambda: os.getenv("DB_NAME",     "themonitor"))
     user:         str = field(default_factory=lambda: os.getenv("DB_USER",     "postgres"))
     password:     str = field(default_factory=lambda: os.getenv("DB_PASSWORD", ""))
     pool_size:    int = field(default_factory=lambda: int(os.getenv("DB_POOL_SIZE",    "5")))

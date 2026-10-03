@@ -7,9 +7,9 @@
 -- schema.sql + 26 migrasi DataLab.
 --
 -- Urutan penerapan:
---     psql -v ON_ERROR_STOP=1 -d orbit_u_monitor -f database/monitor_schema.sql
---     psql -v ON_ERROR_STOP=1 -d orbit_u_monitor -f database/monitor_security.sql
---     psql -v ON_ERROR_STOP=1 -d orbit_u_monitor -f database/monitor_seed.sql
+--     psql -v ON_ERROR_STOP=1 -d themonitor -f database/monitor_schema.sql
+--     psql -v ON_ERROR_STOP=1 -d themonitor -f database/monitor_security.sql
+--     psql -v ON_ERROR_STOP=1 -d themonitor -f database/monitor_seed.sql
 -- atau: python database/apply_schema.py
 --
 -- Berkas ini TIDAK idempoten: ia mengasumsikan database kosong. Nilai enum
@@ -561,7 +561,7 @@ COMMENT ON COLUMN datasets.fusion_strategy         IS 'FK -> fusion_strategies.s
 COMMENT ON COLUMN datasets.preview_options         IS 'Varian PNG tahap PREVIEW: GRAYSCALE | COLORED | COMPOSITE. Array kosong = tanpa varian (M32).';
 COMMENT ON COLUMN datasets.fusion_output_only      IS 'true = hapus artefak per-satelit setelah stack fusion tanggal itu ditulis.';
 COMMENT ON COLUMN datasets.s1_match_tolerance_days IS 'FULL_COVERAGE: jarak hari maksimum meminjam scene S1 (0-14).';
-COMMENT ON COLUMN datasets.quality_settings        IS 'Pengaturan kualitas (JSONB, M32), mis. {"min_quality_score": 60, "orbit_direction": "ASCENDING"}.';
+COMMENT ON COLUMN datasets.quality_settings        IS 'Pengaturan kualitas (JSONB, M32), mis. {"min_cloud_cover": 20, "orbit_direction": "ASCENDING"}. Ambang skor kualitas TIDAK di sini: quality_thresholds (K15).';
 COMMENT ON COLUMN datasets.fusion_grid             IS 'Grid fusion yang dipaku: {transform, width, height, crs, source_product_id, pinned_at}. NULL = belum pernah fusi.';
 COMMENT ON COLUMN datasets.dataset_kind            IS 'STANDARD (Katalog / sistem) | LIVE_AREA (satu Live Area). LIVE lama dihapus.';
 COMMENT ON COLUMN datasets.is_system               IS 'true = dataset sistem (HYDROMET_AOI) yang disembunyikan dari Katalog (PIPELINE.md §3.1).';

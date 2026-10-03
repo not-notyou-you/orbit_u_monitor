@@ -346,13 +346,14 @@ class TestQualityThresholdsTable:
         assert classify_quality(65.0, t) == "WARNING"
         assert classify_quality(70.0, t) == "PASS"
 
-    def test_dataset_override_wins_but_keeps_warn_band(self):
-        from etl.module6_analytics import QualityThreshold, threshold_for
+    def test_threshold_comes_only_from_table(self):
+        """K15: tidak ada ambang per dataset; band tanpa baris aktif memakai
+        cadangan yang dicatat ke log."""
+        from etl.module6_analytics import FALLBACK_FAIL_BELOW, QualityThreshold, threshold_for
 
         table = {"VV": QualityThreshold(fail_below=60.0, warn_below=70.0)}
-        assert threshold_for(table, "VV").fail_below == 60.0
-        got = threshold_for(table, "vv", override_fail_below=45.0)
-        assert got.fail_below == 45.0 and got.warn_below == 70.0
+        assert threshold_for(table, "vv") == table["VV"]
+        assert threshold_for(table, "HH").fail_below == FALLBACK_FAIL_BELOW
 
     def test_changing_the_table_changes_the_threshold(self, db_client):
         """Uji adaptability: ambang berubah lewat data, tanpa ubah kode."""

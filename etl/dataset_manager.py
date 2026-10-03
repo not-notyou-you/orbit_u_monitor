@@ -1023,7 +1023,6 @@ class DatasetManager:
             "date_start": dataset["date_start"],
             "date_end": dataset["date_end"],
             "mode": dataset.get("dataset_kind"),
-            "quality_threshold": quality_settings.get("min_quality_score"),
             "required_tiers": dataset["required_tiers"],
             "sources": sorted(breakdown["sources"]),
             "status": dataset["status"],

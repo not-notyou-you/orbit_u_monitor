@@ -32,17 +32,26 @@ INSERT INTO satellite_sources (source_code, source_name, provider, sensor_type, 
 INSERT INTO spectral_bands (source_id, band_code, band_name, unit, valid_min, valid_max, aggregation)
 SELECT s.source_id, b.band_code, b.band_name, b.unit, b.valid_min, b.valid_max, b.aggregation
 FROM (VALUES
-    ('SENTINEL1', 'VV',           'Backscatter VV',               'dB',    -50,  20,   'MEAN'),
-    ('SENTINEL1', 'VH',           'Backscatter VH',               'dB',    -50,  20,   'MEAN'),
+    -- Rentang = batas FISIK, bukan batas "wajar": tujuannya menolak nilai
+    -- rusak (satuan salah, NoData bocor), bukan kejadian ekstrem yang sah
+    -- (IMPLEMENTATION_NOTES K16).
+    -- S1 GRD sigma0: lantai derau IW ~ -30..-35 dB; > +30 dB hanya pantulan
+    -- sudut (bangunan) -- di luar itu hampir pasti salah satuan.
+    ('SENTINEL1', 'VV',           'Backscatter VV',               'dB',    -60,  30,   'MEAN'),
+    ('SENTINEL1', 'VH',           'Backscatter VH',               'dB',    -60,  30,   'MEAN'),
     ('SENTINEL1', 'WATER_PCT',    'Persen air (VH < ambang)',     '%',     0,    100,  'FRACTION'),
     ('SENTINEL1', 'WATER_CHANGE', 'Perubahan luas air',           'km2',   0,    NULL, 'MEAN'),
     ('MODIS',     'FLOOD',        'Genangan MODIS (MCDWD)',       '%',     0,    100,  'FRACTION'),
     ('MODIS',     'NDVI',         'Indeks vegetasi (NDVI)',       'index', -1,   1,    'MEAN'),
     ('MODIS',     'NDWI',         'Indeks air (NDWI)',            'index', -1,   1,    'MEAN'),
-    ('GPM',       'RAIN_24H',     'Hujan 24 jam',                 'mm',    0,    1000, 'MEAN'),
-    ('GPM',       'RAIN_72H',     'Hujan 72 jam',                 'mm',    0,    2000, 'MEAN'),
-    ('GPM',       'RAIN_7D',      'Hujan 7 hari',                 'mm',    0,    3000, 'MEAN'),
-    ('GPM',       'RAIN_30D',     'Hujan 30 hari',                'mm',    0,    6000, 'MEAN')
+    -- Hujan: dibulatkan ke atas dari rekor dunia WMO (24 jam 1825 mm, Foc-Foc
+    -- 1966; 72 jam ~3930 mm, Cratere Commerson 2007; 8 hari ~5400 mm; bulan
+    -- ~9300 mm, Cherrapunji 1861). Rerata GPM ~10 km per kecamatan tidak
+    -- akan pernah mendekatinya, jadi ambang ini tidak menolak hujan sah.
+    ('GPM',       'RAIN_24H',     'Hujan 24 jam',                 'mm',    0,    2000,  'MEAN'),
+    ('GPM',       'RAIN_72H',     'Hujan 72 jam',                 'mm',    0,    4000,  'MEAN'),
+    ('GPM',       'RAIN_7D',      'Hujan 7 hari',                 'mm',    0,    6000,  'MEAN'),
+    ('GPM',       'RAIN_30D',     'Hujan 30 hari',                'mm',    0,    10000, 'MEAN')
 ) AS b(source_code, band_code, band_name, unit, valid_min, valid_max, aggregation)
 JOIN satellite_sources s ON s.source_code = b.source_code;
 
@@ -66,8 +75,8 @@ INSERT INTO processing_stages (stage_name, stage_code, stage_order, description,
 INSERT INTO quality_thresholds (band_id, metric_name, warn_below, fail_below, reference)
 SELECT b.band_id, t.metric_name, t.warn_below, t.fail_below, t.reference
 FROM (VALUES
-    ('VV',       'quality_score',  NULL::numeric, 60::numeric, 'Konstanta DataLab module6 (min_quality_score 60)'),
-    ('VH',       'quality_score',  NULL,          60,          'Konstanta DataLab module6 (min_quality_score 60)'),
+    ('VV',       'quality_score',  NULL::numeric, 60::numeric, 'Konstanta DataLab module6 (skor < 60 = FAIL)'),
+    ('VH',       'quality_score',  NULL,          60,          'Konstanta DataLab module6 (skor < 60 = FAIL)'),
     ('FLOOD',    'valid_fraction', 0.5,           0.1,         'DATABASE.md §3.8'),
     ('NDVI',     'valid_fraction', 0.5,           0.1,         'DATABASE.md §3.8'),
     ('NDWI',     'valid_fraction', 0.5,           0.1,         'DATABASE.md §3.8'),

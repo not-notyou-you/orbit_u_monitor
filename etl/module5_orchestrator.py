@@ -128,9 +128,6 @@ class _JobContext:
     bbox_tuple: tuple[float, float, float, float]
     required_tiers: list[str]
     skip_stages: set[str]
-    # quality_settings.min_quality_score yang dinyatakan eksplisit; None =
-    # pakai fail_below per band dari quality_thresholds.
-    min_quality_score: float | None
     base_dir: Path
     # Rencana per-satelit dataset ini (etl/processing_plan.py). Sumber yang
     # tidak ada di sini tidak diproses sama sekali, dan level tiap sumber
@@ -425,7 +422,7 @@ def _run_s1_chain(
         # Ambang dari quality_thresholds (DATABASE.md §3.8), bukan konstanta.
         thresholds = load_quality_thresholds(jc.db)
         for band, path, product_id in (("VV", lee_vv, silver_vv_id), ("VH", lee_vh, silver_vh_id)):
-            thr = threshold_for(thresholds, band, jc.min_quality_score)
+            thr = threshold_for(thresholds, band)
             m = compute_band_metrics(path, band, min_quality_score=thr.fail_below)
             m.quality_flag = classify_quality(m.quality_score, thr)
             band_metrics[band] = asdict(m)
@@ -1843,8 +1840,6 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
     region_id = dataset["region_id"]
     bbox_wkt = dataset["bbox_wkt"]
     quality_settings = dataset["quality_settings"] or {}
-    explicit_min_quality = quality_settings.get("min_quality_score")
-    min_quality_score = float(explicit_min_quality) if explicit_min_quality is not None else None
     min_cloud_cover = quality_settings.get("min_cloud_cover")
     orbit_direction = quality_settings.get("orbit_direction")
     fusion_strategy = dataset.get("fusion_strategy")
@@ -1910,7 +1905,6 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
         job_id=job_id, dataset_id=dataset_id, dataset_name=dataset_name, region_id=region_id,
         bbox_wkt=bbox_wkt, bbox_tuple=bbox_tuple,
         required_tiers=required_tiers, skip_stages=skip_stages,
-        min_quality_score=min_quality_score,
         base_dir=base_dir, pause_event=pause_event, cancel_event=cancel_event,
         plan=plan, fusion_strategy=fusion_strategy,
         # Diisi setelah discovery: rencananya butuh tanggal scene S1 yang nyata.

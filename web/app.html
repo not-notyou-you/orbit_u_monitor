@@ -140,10 +140,6 @@
                     <input type="number" id="fMinCloud" min="0" max="100" step="1">
                   </div>
                   <div class="field">
-                    <label for="fMinQuality">Minimum quality score (0–100)</label>
-                    <input type="number" id="fMinQuality" min="0" max="100" step="1">
-                  </div>
-                  <div class="field">
                     <label for="fResolution">Resolution (m)</label>
                     <input type="number" id="fResolution" min="1" step="1">
                   </div>
@@ -301,7 +297,7 @@
     </div>
     <div class="field">
       <label for="lmRetention">Scenes to keep (1&ndash;12)</label>
-      <input type="number" id="lmRetention" min="1" max="12" value="6">
+      <input type="number" id="lmRetention" min="1" max="60" value="6">
       <p class="lm-modal-hint">One scene = one Sentinel-1 pass (every ~6&ndash;12 days). Older scenes are deleted automatically.</p>
     </div>
     <div class="modal-actions">

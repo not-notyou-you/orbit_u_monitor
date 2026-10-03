@@ -8,8 +8,9 @@ Deret sangat pendek (1-12 scene), tanpa training:
     >= 4 titik Holt (level + tren) dengan tren teredam (phi) supaya 4 titik
                tidak diekstrapolasi jadi garis lurus tak terbatas
 
-Parameter smoothing TETAP (bukan dioptimasi): dengan <= 12 titik, optimasi
-alpha/beta hanya menghafal derau. Jumlah langkah = ceil(n/3) (tabel 5.1).
+Parameter smoothing TETAP (bukan dioptimasi): dengan deret sependek ini,
+optimasi alpha/beta hanya menghafal derau. Jumlah langkah = ceil(n/3)
+(tabel 5.1), maksimal MAX_FORECAST_STEPS.
 
 Pita ketidakpastian (80%): z * sigma * sqrt(h) * inflasi, di mana sigma =
 RMSE galat satu-langkah (in-sample) dan inflasi = 1 + 2/n (deret pendek =>
@@ -59,8 +60,15 @@ SERIES: dict[str, dict] = {
 }
 
 
+# Horizon maksimum (langkah). ceil(n/3) dari tabel 5.1 dirancang untuk
+# retensi <= 12 (maks. 4 langkah); dengan retensi sampai 60 (M11) rumus itu
+# akan meramal ~20 lintasan (~8 bulan) ke depan -- tidak bermakna untuk
+# SES/Holt. Dibatasi ke maksimum lama.
+MAX_FORECAST_STEPS = 4
+
+
 def forecast_steps(n: int) -> int:
-    return math.ceil(n / 3) if n > 0 else 0
+    return min(MAX_FORECAST_STEPS, math.ceil(n / 3)) if n > 0 else 0
 
 
 def _get(d, path):

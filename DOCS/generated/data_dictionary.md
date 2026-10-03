@@ -1,6 +1,6 @@
 # Kamus Data — Orbit-U: The Monitor
 
-> Dibangkitkan otomatis oleh `tools/data_dictionary.py` dari katalog PostgreSQL (database `monitor_schema_check`, 2026-10-03 01:54 UTC). Jangan disunting manual; ubah `database/monitor_schema.sql` (termasuk `COMMENT ON`) lalu bangkitkan ulang.
+> Dibangkitkan otomatis oleh `tools/data_dictionary.py` dari katalog PostgreSQL (database `monitor_schema_check`, 2026-10-03 02:16 UTC). Jangan disunting manual; ubah `database/monitor_schema.sql` (termasuk `COMMENT ON`) lalu bangkitkan ulang.
 
 Jumlah: **38 tabel**, **12 VIEW**.
 
@@ -373,7 +373,7 @@ Dataset historis (Katalog, DATA_ENGINEER), dataset Live Area, dan dataset sistem
 | `preview_options` | `text[]` | NOT NULL | `ARRAY['GRAYSCALE'::text, 'COLORED'::text, 'COMPOSITE'::text]` |  | Varian PNG tahap PREVIEW: GRAYSCALE \| COLORED \| COMPOSITE. Array kosong = tanpa varian (M32). |
 | `fusion_output_only` | `boolean` | NOT NULL | `false` |  | true = hapus artefak per-satelit setelah stack fusion tanggal itu ditulis. |
 | `s1_match_tolerance_days` | `smallint` | NOT NULL | `2` |  | FULL_COVERAGE: jarak hari maksimum meminjam scene S1 (0-14). |
-| `quality_settings` | `jsonb` | NOT NULL | `'{}'::jsonb` |  | Pengaturan kualitas (JSONB, M32), mis. {"min_quality_score": 60, "orbit_direction": "ASCENDING"}. |
+| `quality_settings` | `jsonb` | NOT NULL | `'{}'::jsonb` |  | Pengaturan kualitas (JSONB, M32), mis. {"min_cloud_cover": 20, "orbit_direction": "ASCENDING"}. Ambang skor kualitas TIDAK di sini: quality_thresholds (K15). |
 | `fusion_grid` | `jsonb` | NULL |  |  | Grid fusion yang dipaku: {transform, width, height, crs, source_product_id, pinned_at}. NULL = belum pernah fusi. |
 | `dataset_kind` | `character varying(10)` | NOT NULL | `'STANDARD'::character varying` |  | STANDARD (Katalog / sistem) \| LIVE_AREA (satu Live Area). LIVE lama dihapus. |
 | `is_system` | `boolean` | NOT NULL | `false` |  | true = dataset sistem (HYDROMET_AOI) yang disembunyikan dari Katalog (PIPELINE.md Â§3.1). |

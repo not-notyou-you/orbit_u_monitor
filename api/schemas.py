@@ -177,7 +177,6 @@ class HealthResponse(BaseModel):
 
 class DatasetQualitySettings(BaseModel):
     min_cloud_cover: float | None = None
-    min_quality_score: float | None = None
     resolution_m: int | None = None
     # Satu arah orbit S1 saja; None = keduanya. Dibaca orkestrator setelah discovery.
     orbit_direction: str | None = Field(None, pattern="^(ASCENDING|DESCENDING)$")
@@ -570,10 +569,10 @@ class RegionListResponse(BaseModel):
 class LiveAreaCreateRequest(BaseModel):
     region_id: int
     name: str | None = Field(default=None, max_length=200)
-    retention: int = Field(default=6, ge=1, le=12)
+    retention: int = Field(default=6, ge=1, le=60)
 
 
 class LiveAreaUpdateRequest(BaseModel):
     name: str | None = Field(default=None, max_length=200)
-    retention: int | None = Field(default=None, ge=1, le=12)
+    retention: int | None = Field(default=None, ge=1, le=60)
     enabled: bool | None = None

@@ -47,20 +47,15 @@ def load_quality_thresholds(db, metric_name: str = "quality_score") -> dict[str,
     }
 
 
-def threshold_for(thresholds: dict[str, QualityThreshold], band: str,
-                  override_fail_below: float | None = None) -> QualityThreshold:
-    """Ambang yang berlaku untuk satu band.
-
-    `override_fail_below` = datasets.quality_settings.min_quality_score yang
-    dinyatakan eksplisit di wizard; bila ada, ia menggantikan fail_below
-    tabel untuk dataset itu (warn_below tabel tetap dipakai)."""
+def threshold_for(thresholds: dict[str, QualityThreshold], band: str) -> QualityThreshold:
+    """Ambang yang berlaku untuk satu band. Satu-satunya sumber adalah
+    quality_thresholds (diubah ADMIN); ambang per dataset tidak ada lagi
+    (IMPLEMENTATION_NOTES K15)."""
     base = thresholds.get(band.upper())
     if base is None:
         logger.warning("[M6] quality_thresholds tanpa baris aktif untuk band=%s; "
                        "memakai cadangan fail_below=%.1f", band, FALLBACK_FAIL_BELOW)
         base = QualityThreshold(fail_below=FALLBACK_FAIL_BELOW)
-    if override_fail_below is not None:
-        return QualityThreshold(fail_below=float(override_fail_below), warn_below=base.warn_below)
     return base
 
 

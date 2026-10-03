@@ -86,12 +86,12 @@ def test_other_dataset_root_untouched(live_root):
     assert keep.exists()
 
 
-@pytest.mark.parametrize("n,expected", [(1, 1), (3, 1), (4, 2), (6, 2), (7, 3), (9, 3), (10, 4), (12, 4)])
+@pytest.mark.parametrize("n,expected", [(1, 1), (3, 1), (4, 2), (6, 2), (7, 3), (9, 3), (10, 4), (12, 4), (30, 4), (60, 4)])
 def test_forecast_steps_table(n, expected):
     assert lm.forecast_steps(n) == expected
 
 
-@pytest.mark.parametrize("bad", [0, 13, "x", None])
+@pytest.mark.parametrize("bad", [0, 61, "x", None])
 def test_retention_bounds(bad):
     with pytest.raises(ValueError):
         lm._check_retention(bad)

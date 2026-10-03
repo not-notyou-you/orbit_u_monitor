@@ -1224,7 +1224,7 @@ class DatabaseClient:
     def from_env(cls) -> "DatabaseClient":
         host = os.getenv("DB_HOST", "localhost")
         port = os.getenv("DB_PORT", "5432")
-        name = os.getenv("DB_NAME", "orbit_u_monitor")
+        name = os.getenv("DB_NAME", "themonitor")
         user = os.getenv("DB_USER", "postgres")
         password = os.getenv("DB_PASSWORD", "")
         pool = int(os.getenv("DB_POOL_SIZE", "5"))

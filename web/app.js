@@ -990,10 +990,8 @@ $id('createForm').addEventListener('submit', async (e) => {
   }
   const qs = {};
   const cloud = $id('fMinCloud').value;
-  const qual = $id('fMinQuality').value;
   const resolution = $id('fResolution').value;
   if (cloud !== '') qs.min_cloud_cover = Number(cloud);
-  if (qual !== '') qs.min_quality_score = Number(qual);
   if (resolution !== '') qs.resolution_m = Number(resolution);
   const orbit = $id('fOrbitDirection').value;
   if (orbit) qs.orbit_direction = orbit;
@@ -1765,7 +1763,7 @@ function renderLmMeta() {
   const box = document.getElementById('lmAreaMeta');
   const a = lmArea();
   if (!a) { box.innerHTML = ''; return; }
-  const opts = Array.from({ length: 12 }, (_, i) => i + 1)
+  const opts = Array.from({ length: 60 }, (_, i) => i + 1)
     .map(n => '<option value="' + n + '"' + (n === a.retention ? ' selected' : '') + '>' + n + '</option>').join('');
   box.innerHTML =
     '<span class="lm-pill ' + (a.status === 'ERROR' ? 'lv-high' : a.running ? 'lv-warn' : 'lv-ok') + '">' +
@@ -2054,7 +2052,7 @@ document.getElementById('lmAddCancel').addEventListener('click', () => document.
 document.getElementById('lmAddConfirm').addEventListener('click', async () => {
   const btn = document.getElementById('lmAddConfirm');
   const retention = parseInt(document.getElementById('lmRetention').value, 10);
-  if (!(retention >= 1 && retention <= 12)) { showToast('Scene count must be 1–12', 'error'); return; }
+  if (!(retention >= 1 && retention <= 60)) { showToast('Scene count must be 1–60', 'error'); return; }
   btn.disabled = true;
   try {
     const a = await api('/api/live/areas', { method: 'POST', body: JSON.stringify({

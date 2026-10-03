@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 # storage dan kuota API NASA/Copernicus.
 MAX_AREAS = 5
 MIN_RETENTION = 1
-MAX_RETENTION = 12
+MAX_RETENTION = 60  # M11: batas atas retensi (app_settings.live.retention_max)
 DEFAULT_RETENTION = 6
 
 LIVE_SOURCES = {"SENTINEL1": ["PROCESSED"], "MODIS": ["PROCESSED"], "GPM": ["PROCESSED"]}
@@ -71,7 +71,7 @@ LIVE_FUSION_STRATEGY = "CO_OCCURRENCE"
 # jarang dilewati.
 S1_REVISIT_DAYS = 12
 BACKFILL_MARGIN_DAYS = 14
-MAX_LOOKBACK_DAYS = 200
+MAX_LOOKBACK_DAYS = 730  # PIPELINE.md §4: min(730, retention x 12 + 14)
 
 LIVE_DIRNAME = "live"
 
@@ -122,8 +122,11 @@ def _now() -> datetime:
 
 
 def forecast_steps(n_scenes: int) -> int:
-    """Jumlah scene yang diramal (LIVE_MONITORING.md 5.1): ceil(n/3)."""
-    return max(1, math.ceil(n_scenes / 3)) if n_scenes > 0 else 0
+    """Jumlah scene yang diramal: ceil(n/3), maksimal 4 (lihat
+    live_forecast.MAX_FORECAST_STEPS)."""
+    from etl.live_forecast import MAX_FORECAST_STEPS
+
+    return min(MAX_FORECAST_STEPS, max(1, math.ceil(n_scenes / 3))) if n_scenes > 0 else 0
 
 
 # ---------------------------------------------------------------------------

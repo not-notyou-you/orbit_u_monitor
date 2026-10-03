@@ -10,9 +10,9 @@ dengan pipeline (etl.config -> load_dotenv), jadi kredensialnya dijamin sama
 dengan yang dipakai ETL dan API.
 
 Setara dengan:
-    psql -v ON_ERROR_STOP=1 -d orbit_u_monitor -f database/monitor_schema.sql
-    psql -v ON_ERROR_STOP=1 -d orbit_u_monitor -f database/monitor_security.sql
-    psql -v ON_ERROR_STOP=1 -d orbit_u_monitor -f database/monitor_seed.sql
+    psql -v ON_ERROR_STOP=1 -d themonitor -f database/monitor_schema.sql
+    psql -v ON_ERROR_STOP=1 -d themonitor -f database/monitor_security.sql
+    psql -v ON_ERROR_STOP=1 -d themonitor -f database/monitor_seed.sql
 
 Pakai:
     python database/apply_schema.py           # terapkan ketiga berkas
