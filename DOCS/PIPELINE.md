@@ -137,7 +137,7 @@ Dijalankan saat finalisasi scene, setelah metrik, bila scene sebelumnya (yang be
 | Darat tetap | darat → darat | transparan (latar VH abu) |
 | Tidak ada data | NoData di salah satu tanggal | pola kotak-kotak |
 
-4. Peringatan kualitas: orbit relatif diambil dari metadata katalog (`satellite_scenes.relative_orbit`), cadangannya rumus nama produk (`(abs − offset) mod 175 + 1`; S1A 73, S1B 27, S1C 172 sampai 23-06-2026, S1D 42; S1C sejak 24-06-2026 hanya dari metadata). Bila orbit relatif kedua scene berbeda, PNG diberi label "orbit berbeda — perubahan bisa karena geometri pencitraan", karena backscatter dari sudut datang berbeda tidak sepenuhnya sebanding.
+4. Peringatan kualitas (kategori kalimat dibatasi paling tinggi `alert` bila orbit berbeda): orbit relatif diambil dari metadata katalog (`satellite_scenes.relative_orbit`), cadangannya rumus nama produk (`(abs − offset) mod 175 + 1`; S1A 73, S1B 27, S1C 172 sampai 23-06-2026, S1D 42; S1C sejak 24-06-2026 hanya dari metadata). Bila orbit relatif kedua scene berbeda, PNG diberi label "orbit berbeda — perubahan bisa karena geometri pencitraan", karena backscatter dari sudut datang berbeda tidak sepenuhnya sebanding.
 5. Metrik disimpan di `live_scene_metrics` (band `WATER_CHANGE`; `new_km2`, `receded_km2`, `persistent_km2`, `valid_km2` (luas teramati di kedua tanggal; penyebut kategori kalimat), dengan `ref_live_scene_id` = scene pembanding; flag orbit sama/berbeda di `metric_name = 'same_orbit'` bernilai 1/0); luas = jumlah piksel × luas piksel geodesik.
 6. Scene pertama area tidak punya pembanding → tidak ada baris `WATER_CHANGE`, tile menampilkan "belum ada scene pembanding".
 

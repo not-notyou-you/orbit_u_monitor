@@ -364,7 +364,7 @@ def load_metrics(sess, live_scene_ids) -> dict[int, dict]:
 
 def sentence(wc: dict | None) -> dict:
     """Kalimat Bahasa Indonesia untuk tile perubahan air (format live_interpret)."""
-    from etl.live_interpret import NA, THRESHOLDS, _delta_category, _sentence, fmt
+    from etl.live_interpret import GENANGAN, NA, THRESHOLDS, WASPADA, _delta_category, _sentence, fmt
 
     what = "perubahan air radar (VH)"
     if not wc:
@@ -380,4 +380,9 @@ def sentence(wc: dict | None) -> dict:
     valid = wc.get("valid_km2") or 0.0
     net_pct = (new - rec) / valid * 100 if valid > 0 else None
     cat = _delta_category(net_pct, THRESHOLDS["s1_vh_warn_delta_pct"], THRESHOLDS["s1_vh_flood_delta_pct"])
+    # Lintas orbit: backscatter dari sudut datang berbeda tidak sepenuhnya
+    # sebanding, jadi paling tinggi "alert" -- tidak pernah alarm genangan
+    # (keputusan pemilik proyek, IMPLEMENTATION_NOTES T3-29).
+    if wc.get("same_orbit") == 0 and cat == GENANGAN:
+        cat = WASPADA
     return _sentence(what, cat, because)

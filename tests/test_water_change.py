@@ -209,3 +209,18 @@ class TestSwathEdge:
         assert np.isnan(out[:, 12:15]).all() and np.isfinite(out[:, 11]).all()
         assert np.isfinite(out[0, 0]) and np.isfinite(out[19, 5])      # bingkai crop tidak terkikis
         assert wc.mask_swath_edges(db, tf, CRS.from_epsg(4326), buffer_m=0) is db
+
+
+class TestCrossOrbitCategory:
+    BASE = {"new_km2": 10.0, "receded_km2": 0.0, "persistent_km2": 5.0, "valid_km2": 100.0,
+            "ref_date": "2026-09-22"}          # +10 poin persen -> genangan bila orbit sama
+
+    def test_same_orbit_can_flag_flooding(self):
+        assert wc.sentence({**self.BASE, "same_orbit": 1.0})["category"] == "flood-indicated"
+
+    def test_cross_orbit_is_capped_at_alert(self):
+        s = wc.sentence({**self.BASE, "same_orbit": 0.0})
+        assert s["category"] == "alert" and "orbit berbeda" in s["text"]
+
+    def test_unknown_orbit_is_not_capped(self):
+        assert wc.sentence(dict(self.BASE))["category"] == "flood-indicated"
