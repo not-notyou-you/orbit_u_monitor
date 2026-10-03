@@ -614,71 +614,14 @@ class RegionItem(BaseModel):
     description: str | None
     bbox: list[float]          # [min_lon, min_lat, max_lon, max_lat]
     area_km2: float | None
-    source: str = "SEEDER"     # SEEDER | USER | GEOCODE
+    source: str = "SYSTEM"     # SEEDER | SYSTEM
     created_at: datetime | None = None
-    # Lokasi bawaan sistem tidak boleh dihapus dari UI; front-end memakai flag ini
-    # untuk menyembunyikan tombol hapus, tapi API tetap yang menegakkan aturannya.
-    deletable: bool = True
 
 
 class RegionListResponse(BaseModel):
     items: list[RegionItem]
     total: int = 0
 
-
-class RegionCreateRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
-    min_lon: float
-    min_lat: float
-    max_lon: float
-    max_lat: float
-    description: str | None = None
-    region_code: str | None = Field(default=None, max_length=20)
-
-    @field_validator("name")
-    @classmethod
-    def _strip_name(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("Location name must not be empty")
-        return v
-
-    @model_validator(mode="after")
-    def _validate_bbox(self) -> "RegionCreateRequest":
-        # Aturan bbox dipinjam dari etl.geo_utils supaya API, UI, dan pipeline
-        # memakai definisi "bbox sah" yang sama persis.
-        from etl.geo_utils import validate_bbox
-
-        self.min_lon, self.min_lat, self.max_lon, self.max_lat = validate_bbox(
-            self.min_lon, self.min_lat, self.max_lon, self.max_lat
-        )
-        return self
-
-
-class RegionUpdateRequest(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=100)
-    description: str | None = None
-
-    @model_validator(mode="after")
-    def _at_least_one(self) -> "RegionUpdateRequest":
-        if self.name is None and self.description is None:
-            raise ValueError("No changes: provide name or description")
-        if self.name is not None:
-            self.name = self.name.strip()
-            if not self.name:
-                raise ValueError("Location name must not be empty")
-        return self
-
-
-class GeocodeItem(BaseModel):
-    name: str
-    display_name: str
-    bbox: list[float]
-    type: str | None = None
-
-
-class GeocodeSearchResponse(BaseModel):
-    items: list[GeocodeItem]
 
 # --- Live Monitoring (LIVE_MONITORING.md) -----------------------------------
 

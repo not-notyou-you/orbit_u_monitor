@@ -1,26 +1,20 @@
 # api/routes/regions.py
+"""Daftar ROI sistem untuk wizard dataset dan Live Area.
+
+Hanya baca. ROI dibuat oleh sistem/ADMIN dari kecamatan COD-AB (DATABASE.md
+§3.6, M27); endpoint tulis dan geocoding milik DataLab sudah dihapus.
+"""
 from __future__ import annotations
 
 import logging
-import re
-from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from geoalchemy2.shape import to_shape
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import func, or_, select
 
-from api.schemas import (
-    GeocodeItem,
-    GeocodeSearchResponse,
-    OkResponse,
-    RegionCreateRequest,
-    RegionItem,
-    RegionListResponse,
-    RegionUpdateRequest,
-)
+from api.schemas import RegionItem, RegionListResponse
 from api.deps import get_db
 from etl.database_client import DatabaseClient, RegionOfInterest
-from etl.geo_utils import bbox_to_wkt, geocode_search
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -38,31 +32,7 @@ def _to_item(r: RegionOfInterest) -> RegionItem:
         area_km2=float(r.area_km2) if r.area_km2 is not None else None,
         source=source,
         created_at=r.created_at,
-        deletable=source != "SEEDER",
     )
-
-
-def _derive_region_code(sess, name: str, explicit: str | None) -> str:
-    """Bikin region_code unik. Pengguna cuma mengetik nama; kode dipakai internal."""
-    if explicit:
-        base = re.sub(r"[^A-Z0-9_]", "", explicit.strip().upper())[:20]
-        if not base:
-            raise HTTPException(400, "region_code may only contain letters, digits, and underscores")
-        if sess.scalar(select(RegionOfInterest.region_id).where(RegionOfInterest.region_code == base)):
-            raise HTTPException(409, f"Region code {base} is already in use")
-        return base
-
-    # Sisakan ruang untuk sufiks angka supaya tetap muat di VARCHAR(20).
-    base = re.sub(r"[^A-Z0-9]+", "_", name.strip().upper()).strip("_")[:16] or "LOC"
-    candidate = base
-    for suffix in range(1, 1000):
-        taken = sess.scalar(
-            select(RegionOfInterest.region_id).where(RegionOfInterest.region_code == candidate)
-        )
-        if not taken:
-            return candidate
-        candidate = f"{base}_{suffix}"
-    raise HTTPException(409, "Could not create a unique region code, please rename the location")
 
 
 @router.get("", response_model=RegionListResponse, summary="List locations")
@@ -92,126 +62,3 @@ async def list_regions(
         ).all()
         items = [_to_item(r) for r in rows]
     return RegionListResponse(items=items, total=total)
-
-
-@router.get("/geocode", response_model=GeocodeSearchResponse, summary="Search locations via OpenStreetMap")
-async def search_geocode(
-    q: str = Query(..., min_length=2, description="Location name to search for"),
-    limit: int = Query(5, ge=1, le=20),
-    country: str = Query("id", description="ISO-2 country code, leave empty for global"),
-) -> GeocodeSearchResponse:
-    try:
-        results = geocode_search(q, limit=limit, country_codes=country.strip())
-    except RuntimeError as exc:
-        raise HTTPException(502, str(exc))
-    except Exception as exc:
-        logger.exception("[REGIONS] geocoding gagal untuk q=%r", q)
-        raise HTTPException(502, f"The location search service could not be reached: {exc}")
-    return GeocodeSearchResponse(items=[GeocodeItem(**r) for r in results])
-
-
-@router.post("", response_model=RegionItem, status_code=201, summary="Add a location")
-async def create_region(
-    req: RegionCreateRequest,
-    db: DatabaseClient = Depends(get_db),
-) -> RegionItem:
-    # req sudah lolos validate_bbox lewat validator Pydantic.
-    bbox_wkt = bbox_to_wkt(req.min_lon, req.min_lat, req.max_lon, req.max_lat)
-    with db.session() as sess:
-        duplicate = sess.scalar(
-            select(RegionOfInterest).where(
-                func.lower(RegionOfInterest.name) == req.name.lower(),
-                RegionOfInterest.deleted_at.is_(None),
-            )
-        )
-        if duplicate:
-            raise HTTPException(409, f"A location named {req.name} already exists")
-
-        region_code = _derive_region_code(sess, req.name, req.region_code)
-        # Luas dihitung PostGIS (geography = meter sungguhan), bukan aproksimasi derajat.
-        area_km2 = sess.scalar(
-            text("SELECT ST_Area(ST_GeomFromText(:wkt, 4326)::geography) / 1e6")
-            .bindparams(wkt=bbox_wkt)
-        )
-        region = RegionOfInterest(
-            region_code=region_code,
-            name=req.name,
-            description=(req.description or "").strip() or None,
-            bbox=f"SRID=4326;{bbox_wkt}",
-            area_km2=round(float(area_km2), 4) if area_km2 is not None else None,
-            admin_level=3,
-            country_code="ID",
-            is_active=True,
-            source="USER",
-        )
-        sess.add(region)
-        sess.flush()
-        sess.refresh(region)
-        item = _to_item(region)
-    logger.info("[REGIONS] lokasi baru id=%d code=%s name=%s", item.region_id, item.region_code, item.name)
-    return item
-
-
-@router.patch("/{region_id}", response_model=RegionItem, summary="Update a location")
-async def update_region(
-    region_id: int,
-    req: RegionUpdateRequest,
-    db: DatabaseClient = Depends(get_db),
-) -> RegionItem:
-    with db.session() as sess:
-        region = sess.get(RegionOfInterest, region_id)
-        if region is None or region.deleted_at is not None:
-            raise HTTPException(404, f"Location {region_id} not found")
-        if (region.source or "SEEDER") == "SEEDER":
-            raise HTTPException(403, "Built-in system locations cannot be modified")
-        if req.name is not None and req.name.lower() != region.name.lower():
-            clash = sess.scalar(
-                select(RegionOfInterest.region_id).where(
-                    func.lower(RegionOfInterest.name) == req.name.lower(),
-                    RegionOfInterest.deleted_at.is_(None),
-                    RegionOfInterest.region_id != region_id,
-                )
-            )
-            if clash:
-                raise HTTPException(409, f"A location named {req.name} already exists")
-        if req.name is not None:
-            region.name = req.name
-        if req.description is not None:
-            region.description = req.description.strip() or None
-        sess.flush()
-        sess.refresh(region)
-        item = _to_item(region)
-    return item
-
-
-@router.delete("/{region_id}", response_model=OkResponse, summary="Delete a location (soft delete)")
-async def delete_region(region_id: int, db: DatabaseClient = Depends(get_db)) -> OkResponse:
-    with db.session() as sess:
-        region = sess.get(RegionOfInterest, region_id)
-        if region is None:
-            raise HTTPException(404, f"Location {region_id} not found")
-        if region.deleted_at is not None:
-            return OkResponse(message=f"Location {region.name} was already deleted")
-        if (region.source or "SEEDER") == "SEEDER":
-            raise HTTPException(403, "Built-in system locations cannot be deleted")
-        # Soft-delete: baris tetap ada supaya dataset/scene lama yang menunjuk
-        # region_id ini tetap bisa dibuka (FK-nya ON DELETE RESTRICT).
-        region.is_active = False
-        region.deleted_at = datetime.now(timezone.utc)
-        name = region.name
-    logger.info("[REGIONS] soft-delete lokasi id=%d name=%s", region_id, name)
-    return OkResponse(message=f"Location {name} deleted")
-
-
-@router.post("/{region_id}/restore", response_model=RegionItem, summary="Restore a deleted location")
-async def restore_region(region_id: int, db: DatabaseClient = Depends(get_db)) -> RegionItem:
-    with db.session() as sess:
-        region = sess.get(RegionOfInterest, region_id)
-        if region is None:
-            raise HTTPException(404, f"Location {region_id} not found")
-        region.is_active = True
-        region.deleted_at = None
-        sess.flush()
-        sess.refresh(region)
-        item = _to_item(region)
-    return item

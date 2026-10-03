@@ -322,17 +322,7 @@ details.advanced summary { cursor: pointer; font-size: 13px; color: var(--text-d
 details.advanced .field-row-3 { margin-top: 14px; }
 
 
-/* ---- Panel "Pilih Lokasi": tombol tambah, pencarian, daftar lokasi ---- */
-.btn-add-loc {
-  width: 100%;
-  margin-bottom: 10px;
-  background: rgba(0,240,255,0.10);
-  color: var(--cyan);
-  border: 1px dashed rgba(0,240,255,0.45);
-  padding: 9px 12px;
-  font-size: 12px;
-}
-.btn-add-loc:hover { background: rgba(0,240,255,0.18); box-shadow: 0 0 18px rgba(0,240,255,0.25); }
+/* ---- Panel "Pilih Lokasi": pencarian, daftar lokasi ---- */
 .btn-icon { display: inline-flex; width: 14px; height: 14px; }
 .btn-icon svg { width: 100%; height: 100%; }
 
@@ -389,48 +379,9 @@ details.advanced .field-row-3 { margin-top: 14px; }
   border: 1px solid rgba(255,255,255,0.16);
   color: rgba(231,236,245,0.72);
 }
-.src-badge.src-user { color: var(--cyan); border-color: rgba(0,240,255,0.4); }
-.src-badge.src-geocode { color: var(--amber); border-color: rgba(240,166,60,0.4); }
-
-.region-del {
-  flex-shrink: 0;
-  width: 26px; height: 26px; padding: 5px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: transparent; border: 1px solid transparent; border-radius: 6px;
-  color: var(--coral); opacity: 0.6; cursor: pointer;
-  transition: opacity 0.15s, background 0.15s;
-}
-.region-del svg { width: 100%; height: 100%; }
-.region-card:hover .region-del { opacity: 0.9; }
-.region-del:hover { opacity: 1; background: rgba(239,100,97,0.16); border-color: rgba(239,100,97,0.4); }
-/* Perangkat sentuh tidak punya hover, jadi ikonnya harus jelas sejak awal. */
-@media (hover: none) { .region-del { opacity: 0.9; } }
-
-/* Animasi halus saat lokasi ditambahkan / dihapus */
-@keyframes loc-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
-.region-card.just-added { animation: loc-in 0.28s ease-out; box-shadow: 0 0 22px rgba(0,240,255,0.45); }
-.region-card.removing { opacity: 0; transform: translateX(14px); }
-
-/* ---- Modal tambah lokasi ---- */
-.modal-wide { width: 440px; }
-.modal-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
-.modal-tab {
-  flex: 1;
-  background: transparent;
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
-  color: var(--text-dim);
-  padding: 8px 10px;
-  font-size: 12px; font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-.modal-tab:hover { background: rgba(0,240,255,0.08); }
-.modal-tab.active { background: rgba(0,240,255,0.18); color: var(--cyan); border-color: rgba(0,240,255,0.5); }
-.loctab-panel.hidden { display: none; }
 .mini-label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
 
-#geoSearchInput, .modal .field input {
+.modal .field input {
   width: 100%;
   background: var(--glass-bg-alt);
   border: 1px solid var(--glass-border);
@@ -440,38 +391,9 @@ details.advanced .field-row-3 { margin-top: 14px; }
   font-size: 13px;
   font-family: inherit;
 }
-#geoSearchInput:focus, .modal .field input:focus { outline: none; border-color: rgba(0,240,255,0.55); }
+.modal .field input:focus { outline: none; border-color: rgba(0,240,255,0.55); }
 .modal .field { margin-bottom: 12px; }
 .modal .field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
-.coord-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
-
-.geo-results { margin-top: 10px; max-height: 240px; overflow-y: auto; }
-.geo-hint { font-size: 12px; color: var(--text-dim); margin: 10px 0; text-align: center; }
-.geo-hint.error { color: var(--coral); }
-.geo-item {
-  width: 100%;
-  display: flex; align-items: flex-start; gap: 9px;
-  text-align: left;
-  background: var(--glass-bg-alt);
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  padding: 9px 11px;
-  margin-bottom: 7px;
-  color: var(--text);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-.geo-item:hover { background: rgba(0,240,255,0.12); border-color: rgba(0,240,255,0.45); }
-.geo-item-icon { flex-shrink: 0; width: 15px; height: 15px; margin-top: 2px; color: var(--cyan); }
-.geo-item-icon svg { width: 100%; height: 100%; display: block; }
-.geo-item-text { min-width: 0; }
-.geo-item-name { display: block; font-size: 13px; font-weight: 600; }
-.geo-item-sub {
-  display: block; font-size: 12px; color: var(--text-dim); margin-top: 2px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.geo-item-bbox { display: block; font-family: var(--font-mono); font-size: 11.5px; color: rgba(0,240,255,0.7); margin-top: 3px; }
-
 .modal-error {
   font-size: 12px; color: var(--coral);
   background: rgba(239,100,97,0.12);
@@ -483,10 +405,6 @@ details.advanced .field-row-3 { margin-top: 14px; }
 .modal-error.hidden { display: none; }
 .modal-note { font-size: 12px !important; opacity: 0.75; }
 
-@media (max-width: 520px) {
-  .modal-wide { width: 100%; }
-  .coord-grid { grid-template-columns: 1fr; }
-}
 
 /* ---- Map is the whole app's background now: floating UI anchored to the viewport, no boxed frame ---- */
 .map-ui { pointer-events: none; }

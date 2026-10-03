@@ -69,9 +69,6 @@
              yang menggulung, sehingga bingkai tetap membingkai panel, bukan kontennya. -->
         <div class="panel-scroll">
           <p class="section-title">Choose Location</p>
-          <button type="button" class="btn btn-add-loc" id="addLocationBtn">
-            <span class="btn-icon" id="addLocationIcon"></span>Add Location
-          </button>
           <div class="loc-search">
             <span class="loc-search-icon" id="locSearchIcon"></span>
             <input type="search" id="locSearch" autocomplete="off" placeholder="Search saved locations...">
@@ -266,66 +263,6 @@
 
 </main>
 
-<div class="modal-overlay hidden" id="addLocationModal">
-  <div class="modal modal-wide">
-    <h3>Add New Location</h3>
-    <div class="modal-tabs" role="tablist">
-      <button type="button" class="modal-tab active" data-loctab="search" role="tab">Search by Name</button>
-      <button type="button" class="modal-tab" data-loctab="manual" role="tab">Manual Coordinates</button>
-    </div>
-
-    <!-- Bagian A: cari nama lewat OpenStreetMap. Memilih hasil akan mengisi
-         bagian koordinat, jadi pengguna selalu sempat memeriksa bbox sebelum simpan. -->
-    <div class="loctab-panel" id="loctabSearch">
-      <label class="mini-label" for="geoSearchInput">Search location name (OpenStreetMap)</label>
-      <input type="search" id="geoSearchInput" autocomplete="off" placeholder="e.g. Lampung, Semarang, Cikarang">
-      <div class="geo-results" id="geoResults">
-        <p class="geo-hint">Type at least 2 letters, then pick a result.</p>
-      </div>
-    </div>
-
-    <!-- Bagian B: input koordinat manual, sekaligus tahap konfirmasi hasil pencarian. -->
-    <div class="loctab-panel hidden" id="loctabManual">
-      <div class="field">
-        <label for="alName">Location name</label>
-        <input type="text" id="alName" placeholder="e.g. North Cikarang" maxlength="100">
-      </div>
-      <div class="field">
-        <label for="alPaste">Paste bounding box (optional)</label>
-        <input type="text" id="alPaste" placeholder="min_lon, min_lat, max_lon, max_lat">
-      </div>
-      <div class="coord-grid">
-        <div class="field"><label for="alMinLon">Min longitude</label><input type="number" id="alMinLon" step="any" placeholder="106.78"></div>
-        <div class="field"><label for="alMinLat">Min latitude</label><input type="number" id="alMinLat" step="any" placeholder="-6.22"></div>
-        <div class="field"><label for="alMaxLon">Max longitude</label><input type="number" id="alMaxLon" step="any" placeholder="106.87"></div>
-        <div class="field"><label for="alMaxLat">Max latitude</label><input type="number" id="alMaxLat" step="any" placeholder="-6.07"></div>
-      </div>
-      <div class="field">
-        <label for="alDesc">Description (optional)</label>
-        <input type="text" id="alDesc" placeholder="Short note about this area">
-      </div>
-    </div>
-
-    <p class="modal-error hidden" id="alError"></p>
-    <div class="modal-actions">
-      <button type="button" class="btn btn-ghost" id="alCancel">Cancel</button>
-      <button type="button" class="btn btn-primary" id="alSave">Save Location</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay hidden" id="deleteLocationModal">
-  <div class="modal">
-    <h3>Delete this location?</h3>
-    <p id="deleteLocationText">The location will be removed from the list.</p>
-    <p class="modal-note">Datasets already created with this location remain accessible.</p>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" id="deleteLocationCancel">Cancel</button>
-      <button class="btn btn-danger" id="deleteLocationConfirm">Yes, Delete</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-overlay hidden" id="deleteModal">
   <div class="modal">
     <h3>Delete this dataset?</h3>
@@ -357,7 +294,6 @@
     <div class="field">
       <label for="lmRegion">Location</label>
       <select id="lmRegion"></select>
-      <button type="button" class="lm-link" id="lmNewLocation">Location not listed? Add a new one</button>
     </div>
     <div class="field">
       <label for="lmName">Area name (optional)</label>

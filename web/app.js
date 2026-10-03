@@ -47,8 +47,6 @@ const state = {
   // antar-polling sama seperti openScenes/openStructure.
   collapsedCards: new Set(),
   openMenus: new Set(),
-  // Panel "Gabungkan Dataset": accordion tunggal (bukan per-baris), karena
-  // barisnya berbagi satu konteks (tanggal siap digabung hari ini).
   // Galeri preview per dataset: payload /api/datasets/{id}/preview, plus
   // tanggal dan jenis yang sedang dipilih (bertahan saat panel digambar ulang
   // oleh polling).
@@ -56,7 +54,6 @@ const state = {
   // Lokasi: daftar dari /api/regions, filter pencarian, dan pilihan yang dipakai
   // "Buat Dataset". selectedRegionId adalah satu-satunya sumber kebenaran lokasi.
   regions: [], selectedRegionId: null, locationQuery: '',
-  geoResults: [], pendingDeleteRegionId: null,
 };
 
 async function api(path, options) {
@@ -375,7 +372,7 @@ function fmtBBox(bbox) {
          bbox[3].toFixed(3) + ', ' + bbox[2].toFixed(3);
 }
 
-const SOURCE_LABEL = { SEEDER: 'system', USER: 'custom', GEOCODE: 'from search' };
+const SOURCE_LABEL = { SEEDER: 'system', SYSTEM: 'system' };
 
 // Filter lokal supaya ketikan langsung terasa (tanpa menunggu jaringan). Query
 // yang sama juga dikirim ke server setelah debounce, untuk menjaring lokasi yang
@@ -394,7 +391,7 @@ function renderRegionCards() {
     grid.innerHTML = '<div class="empty-small">' +
       (state.locationQuery.trim()
         ? 'No locations match "' + escapeHTML(state.locationQuery.trim()) + '"'
-        : 'No locations yet. Add one with the button above.') +
+        : 'No locations yet. Regions are set up by an administrator.') +
       '</div>';
     return;
   }
@@ -411,27 +408,14 @@ function renderRegionCards() {
           '</span>' +
         '</div>' +
       '</div>' +
-      (r.deletable
-        ? '<button type="button" class="region-del" data-del-id="' + r.region_id + '"' +
-          ' title="Delete location" aria-label="Delete ' + escapeHTML(r.name) + '">' + ICONS.trash + '</button>'
-        : '') +
     '</div>'
   ).join('');
 
   grid.querySelectorAll('.region-card').forEach(card => {
     const id = Number(card.dataset.regionId);
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('.region-del')) return;
-      selectRegion(id);
-    });
+    card.addEventListener('click', () => selectRegion(id));
     card.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectRegion(id); }
-    });
-  });
-  grid.querySelectorAll('.region-del').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openDeleteLocationModal(Number(btn.dataset.delId));
     });
   });
 }
@@ -452,8 +436,7 @@ function clearRegionSelection() {
   updateWizardRegion();
 }
 
-async function loadRegions(options) {
-  const opts = options || {};
+async function loadRegions() {
   const grid = document.getElementById('regionGrid');
   try {
     const q = state.locationQuery.trim();
@@ -463,13 +446,6 @@ async function loadRegions(options) {
     // Lokasi terpilih bisa hilang dari hasil filter; itu tidak membatalkan pilihan,
     // hanya menyembunyikan kartunya sampai filter dikosongkan lagi.
     renderRegionCards();
-    if (opts.highlightId) {
-      const card = grid.querySelector('[data-region-id="' + opts.highlightId + '"]');
-      if (card) {
-        card.classList.add('just-added');
-        card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      }
-    }
   } catch (e) {
     grid.innerHTML = '<div class="empty-small">Failed to load locations</div>';
   }
@@ -483,204 +459,6 @@ document.getElementById('locSearch').addEventListener('input', (e) => {
   loadRegionsDebounced();   // menyusul, mencakup lokasi di luar 200 baris pertama
 });
 
-// ---------------------------------------------------------------------------
-// Modal: tambah lokasi
-// ---------------------------------------------------------------------------
-const addLocModal = document.getElementById('addLocationModal');
-
-function setLocTab(name) {
-  document.querySelectorAll('.modal-tab').forEach(t =>
-    t.classList.toggle('active', t.dataset.loctab === name));
-  document.getElementById('loctabSearch').classList.toggle('hidden', name !== 'search');
-  document.getElementById('loctabManual').classList.toggle('hidden', name !== 'manual');
-}
-
-function setAddLocError(msg) {
-  const el = document.getElementById('alError');
-  el.textContent = msg || '';
-  el.classList.toggle('hidden', !msg);
-}
-
-function openAddLocationModal() {
-  ['alName', 'alPaste', 'alMinLon', 'alMinLat', 'alMaxLon', 'alMaxLat', 'alDesc', 'geoSearchInput']
-    .forEach(id => { document.getElementById(id).value = ''; });
-  document.getElementById('geoResults').innerHTML =
-    '<p class="geo-hint">Type at least 2 letters, then pick a result.</p>';
-  setAddLocError('');
-  setLocTab('search');
-  addLocModal.classList.remove('hidden');
-  setTimeout(() => document.getElementById('geoSearchInput').focus(), 30);
-}
-
-function closeAddLocationModal() { addLocModal.classList.add('hidden'); }
-
-document.getElementById('addLocationBtn').addEventListener('click', openAddLocationModal);
-document.getElementById('alCancel').addEventListener('click', closeAddLocationModal);
-addLocModal.addEventListener('click', (e) => { if (e.target === addLocModal) closeAddLocationModal(); });
-document.querySelectorAll('.modal-tab').forEach(t =>
-  t.addEventListener('click', () => setLocTab(t.dataset.loctab)));
-
-// Bagian A: pencarian nama lewat proxy /api/regions/geocode (Nominatim).
-// Debounce 400 ms karena Nominatim membatasi 1 request/detik per klien.
-const runGeoSearch = debounce(async (query) => {
-  const box = document.getElementById('geoResults');
-  if (query.length < 2) {
-    box.innerHTML = '<p class="geo-hint">Type at least 2 letters, then pick a result.</p>';
-    return;
-  }
-  box.innerHTML = '<p class="geo-hint">Searching...</p>';
-  try {
-    const result = await api('/api/regions/geocode?q=' + encodeURIComponent(query));
-    state.geoResults = result.items;
-    if (!result.items.length) {
-      box.innerHTML = '<p class="geo-hint">No results for "' + escapeHTML(query) + '"</p>';
-      return;
-    }
-    box.innerHTML = result.items.map((it, i) =>
-      '<button type="button" class="geo-item" data-geo-index="' + i + '">' +
-        '<span class="geo-item-icon">' + ICONS.pin + '</span>' +
-        '<span class="geo-item-text">' +
-          '<span class="geo-item-name">' + escapeHTML(it.name) + '</span>' +
-          '<span class="geo-item-sub">' + escapeHTML(it.display_name) + '</span>' +
-          '<span class="geo-item-bbox">' + fmtBBox(it.bbox) + '</span>' +
-        '</span>' +
-      '</button>'
-    ).join('');
-    box.querySelectorAll('.geo-item').forEach(btn => {
-      btn.addEventListener('click', () => useGeoResult(state.geoResults[Number(btn.dataset.geoIndex)]));
-    });
-  } catch (err) {
-    box.innerHTML = '<p class="geo-hint error">' + escapeHTML(err.message) + '</p>';
-  }
-}, 400);
-
-document.getElementById('geoSearchInput').addEventListener('input', (e) => {
-  runGeoSearch(e.target.value.trim());
-});
-
-// Hasil pencarian tidak langsung disimpan: isi form koordinat lalu pindah ke tab
-// manual, supaya pengguna melihat bbox persisnya sebelum menekan Simpan.
-function useGeoResult(item) {
-  if (!item) return;
-  document.getElementById('alName').value = item.name;
-  document.getElementById('alMinLon').value = item.bbox[0];
-  document.getElementById('alMinLat').value = item.bbox[1];
-  document.getElementById('alMaxLon').value = item.bbox[2];
-  document.getElementById('alMaxLat').value = item.bbox[3];
-  document.getElementById('alDesc').value = item.display_name;
-  setAddLocError('');
-  setLocTab('manual');
-}
-
-// Tempel "min_lon, min_lat, max_lon, max_lat" (urutan bbox GDAL/GeoJSON).
-document.getElementById('alPaste').addEventListener('input', (e) => {
-  const nums = (e.target.value.match(/-?\d+(\.\d+)?/g) || []).map(Number);
-  if (nums.length !== 4) return;
-  document.getElementById('alMinLon').value = nums[0];
-  document.getElementById('alMinLat').value = nums[1];
-  document.getElementById('alMaxLon').value = nums[2];
-  document.getElementById('alMaxLat').value = nums[3];
-  setAddLocError('');
-});
-
-// Validasi di sini hanya untuk umpan balik cepat; API tetap yang menentukan,
-// aturannya ada di etl/geo_utils.validate_bbox.
-function readAddLocationForm() {
-  const num = (id) => {
-    const raw = document.getElementById(id).value.trim();
-    return raw === '' ? NaN : Number(raw);
-  };
-  const name = document.getElementById('alName').value.trim();
-  const b = { min_lon: num('alMinLon'), min_lat: num('alMinLat'), max_lon: num('alMaxLon'), max_lat: num('alMaxLat') };
-  if (!name) return { error: 'Location name is required' };
-  if ([b.min_lon, b.min_lat, b.max_lon, b.max_lat].some(v => !isFinite(v))) {
-    return { error: 'All four coordinates must be numbers' };
-  }
-  if (b.min_lon < -180 || b.max_lon > 180) return { error: 'Longitude must be between -180 and 180' };
-  if (b.min_lat < -90 || b.max_lat > 90) return { error: 'Latitude must be between -90 and 90' };
-  if (b.min_lon >= b.max_lon) return { error: 'Min longitude must be less than max longitude' };
-  if (b.min_lat >= b.max_lat) return { error: 'Min latitude must be less than max latitude' };
-  return { body: Object.assign({ name: name, description: document.getElementById('alDesc').value.trim() || null }, b) };
-}
-
-document.getElementById('alSave').addEventListener('click', async () => {
-  const parsed = readAddLocationForm();
-  if (parsed.error) { setAddLocError(parsed.error); setLocTab('manual'); return; }
-  const btn = document.getElementById('alSave');
-  btn.disabled = true; btn.textContent = 'Saving...';
-  try {
-    const created = await api('/api/regions', { method: 'POST', body: JSON.stringify(parsed.body) });
-    closeAddLocationModal();
-    // Kosongkan filter supaya lokasi yang baru dibuat pasti terlihat.
-    state.locationQuery = '';
-    document.getElementById('locSearch').value = '';
-    await loadRegions({ highlightId: created.region_id });
-    selectRegion(created.region_id);
-    showToast('Location "' + created.name + '" added', 'success');
-    // Dibuka dari form Tambah Daerah Live: kembali ke form itu dengan lokasi
-    // baru terpilih.
-    if (state.lmReopenAdd) { state.lmReopenAdd = false; openLmAddModal(created.region_id); }
-  } catch (err) {
-    setAddLocError(err.message);
-    setLocTab('manual');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Save Location';
-  }
-});
-
-// ---------------------------------------------------------------------------
-// Modal: hapus lokasi (soft-delete)
-// ---------------------------------------------------------------------------
-const delLocModal = document.getElementById('deleteLocationModal');
-
-function openDeleteLocationModal(id) {
-  const region = state.regions.find(r => r.region_id === id);
-  if (!region) return;
-  state.pendingDeleteRegionId = id;
-  document.getElementById('deleteLocationText').innerHTML =
-    'Location <strong>' + escapeHTML(region.name) + '</strong> will be removed from the list.';
-  delLocModal.classList.remove('hidden');
-}
-
-function closeDeleteLocationModal() {
-  state.pendingDeleteRegionId = null;
-  delLocModal.classList.add('hidden');
-}
-
-document.getElementById('deleteLocationCancel').addEventListener('click', closeDeleteLocationModal);
-delLocModal.addEventListener('click', (e) => { if (e.target === delLocModal) closeDeleteLocationModal(); });
-
-document.getElementById('deleteLocationConfirm').addEventListener('click', async () => {
-  const id = state.pendingDeleteRegionId;
-  if (!id) return;
-  const btn = document.getElementById('deleteLocationConfirm');
-  btn.disabled = true; btn.textContent = 'Deleting...';
-  try {
-    const result = await api('/api/regions/' + id, { method: 'DELETE' });
-    closeDeleteLocationModal();
-    const card = document.querySelector('.region-card[data-region-id="' + id + '"]');
-    if (card) {
-      card.classList.add('removing');
-      await new Promise(r => setTimeout(r, 180));
-    }
-    if (state.selectedRegionId === id) clearRegionSelection();
-    await loadRegions();
-    showToast(result.message, 'success');
-  } catch (err) {
-    showToast(err.message, 'error');
-    closeDeleteLocationModal();
-  } finally {
-    btn.disabled = false; btn.textContent = 'Yes, Delete';
-  }
-});
-
-document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
-  if (!addLocModal.classList.contains('hidden')) closeAddLocationModal();
-  if (!delLocModal.classList.contains('hidden')) closeDeleteLocationModal();
-});
-
-document.getElementById('addLocationIcon').innerHTML = ICONS.plus;
 document.getElementById('locSearchIcon').innerHTML = ICONS.search;
 document.getElementById('cloneConfigIcon').innerHTML = ICONS.gear;
 loadRegions();
@@ -2273,11 +2051,6 @@ document.getElementById('lmAddBtn').addEventListener('click', async () => {
   openLmAddModal();
 });
 document.getElementById('lmAddCancel').addEventListener('click', () => document.getElementById('lmAddModal').classList.add('hidden'));
-document.getElementById('lmNewLocation').addEventListener('click', () => {
-  document.getElementById('lmAddModal').classList.add('hidden');
-  state.lmReopenAdd = true;
-  openAddLocationModal();
-});
 document.getElementById('lmAddConfirm').addEventListener('click', async () => {
   const btn = document.getElementById('lmAddConfirm');
   const retention = parseInt(document.getElementById('lmRetention').value, 10);

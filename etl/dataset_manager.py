@@ -231,8 +231,8 @@ class DatasetManager:
         """
         if sources is None and not tiers:
             raise ValueError("Provide sources (per-satellite configuration) or tiers")
-        # region_id = lokasi dipilih dari tabel (jalur UI). location = nama bebas
-        # (pemanggil lama/CLI), di-resolve lewat nama lalu geocoding.
+        # region_id = lokasi dipilih dari tabel (jalur UI). location = nama/kode
+        # ROI yang sudah ada (pemanggil CLI/tes); tidak ada geocoding.
         if region_id is not None:
             bbox_wkt, region_id, location_label = resolve_region_id(self._db, region_id)
         elif location and location.strip():

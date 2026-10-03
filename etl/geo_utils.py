@@ -1,8 +1,8 @@
 # etl/geo_utils.py
 """
-Utilitas bbox WGS84 yang dipakai bersama oleh API (validasi request lokasi) dan
-ETL (resolusi lokasi + geocoding). Aturan validasi tinggal di satu tempat ini
-supaya UI, API, dan pipeline tidak pernah berbeda pendapat soal bbox yang sah.
+Utilitas bbox WGS84 (validasi dan konversi). Aturan validasi tinggal di satu
+tempat ini supaya UI, API, dan pipeline tidak pernah berbeda pendapat soal
+bbox yang sah. Geocoding Nominatim DataLab sudah dihapus (README §5).
 """
 
 from __future__ import annotations
@@ -79,66 +79,3 @@ def parse_bbox_string(raw: str) -> tuple[float, float, float, float]:
             "The bbox format must be 4 numbers: min_lon, min_lat, max_lon, max_lat"
         )
     return validate_bbox(*[float(n) for n in numbers])
-
-
-# ---------------------------------------------------------------------------
-# Geocoding
-# ---------------------------------------------------------------------------
-# Geocoding sengaja tinggal di layer ETL, bukan di route API: dataset_manager
-# (lewat location_resolver) dan endpoint pencarian lokasi memakai fungsi yang
-# sama, sehingga penggantian provider cukup dilakukan di berkas ini.
-NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-USER_AGENT = "the-orbit-u-flood-pipeline/1.0"
-GEOCODE_TIMEOUT_SEC = 15
-
-
-def geocode_search(query: str, limit: int = 5, country_codes: str = "id") -> list[dict]:
-    """Cari lokasi lewat Nominatim, kembalikan kandidat dengan bbox siap pakai.
-
-    Setiap item: ``{name, display_name, bbox, bbox_wkt, type}`` dengan ``bbox``
-    dalam urutan ``[min_lon, min_lat, max_lon, max_lat]``.
-
-    Kandidat dengan bbox yang tidak lolos :func:`validate_bbox` (mis. seluruh
-    negara, atau satu titik alamat) dibuang dari hasil, bukan bikin error —
-    supaya pengguna tetap melihat kandidat lain yang bisa dipakai.
-    """
-    import requests
-
-    query = (query or "").strip()
-    if not query:
-        return []
-
-    params = {
-        "q": query,
-        "format": "json",
-        "limit": max(1, min(int(limit), 20)),
-        "polygon_geojson": 0,
-    }
-    if country_codes:
-        params["countrycodes"] = country_codes
-
-    resp = requests.get(
-        NOMINATIM_URL,
-        params=params,
-        headers={"User-Agent": USER_AGENT},
-        timeout=GEOCODE_TIMEOUT_SEC,
-    )
-    if resp.status_code != 200:
-        raise RuntimeError(f"Geocoding failed ({resp.status_code}) for location: {query}")
-
-    results: list[dict] = []
-    for item in resp.json():
-        try:
-            south, north, west, east = [float(x) for x in item["boundingbox"]]
-            bbox = validate_bbox(west, south, east, north)
-        except (BBoxError, KeyError, TypeError, ValueError):
-            continue
-        display = item.get("display_name", query)
-        results.append({
-            "name": display.split(",")[0].strip() or query,
-            "display_name": display,
-            "bbox": list(bbox),
-            "bbox_wkt": bbox_to_wkt(*bbox),
-            "type": item.get("type"),
-        })
-    return results
