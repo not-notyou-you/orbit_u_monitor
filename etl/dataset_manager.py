@@ -422,13 +422,6 @@ class DatasetManager:
             ).all()
         return sorted({dt.strftime("%Y%m%d") for dt in rows})
 
-    def get_live_dataset(self) -> dict | None:
-        with self._db.session() as sess:
-            dataset = sess.scalar(select(Dataset).where(Dataset.dataset_kind == "LIVE"))
-            if dataset is None:
-                return None
-            return self._dataset_to_dict(dataset, detail=True)
-
     def get_progress(self, dataset_id: int) -> dict | None:
         with self._db.session() as sess:
             dataset = sess.get(Dataset, dataset_id)
@@ -609,69 +602,11 @@ class DatasetManager:
                            "ratio": ratio(fused, expected_fused)})
         return layers
 
-    def toggle_live(self, enabled: bool) -> dict:
-        live = self.get_live_dataset()
-        if live is None:
-            raise ValueError("Live dataset does not exist yet")
-        dataset_id = live["dataset_id"]
-        with self._db.session() as sess:
-            dataset = sess.get(Dataset, dataset_id)
-            if dataset:
-                dataset.live_enabled = enabled
-        logger.info("[DATASET] live dataset_id=%d enabled=%s", dataset_id, enabled)
-        return {"enabled": enabled}
-
-    def clear_live_dataset(self) -> dict:
-        live = self.get_live_dataset()
-        if live is None:
-            raise ValueError("Live dataset does not exist yet")
-        dataset_id = live["dataset_id"]
-
-        from etl.deletion_manager import DeletionManager
-        file_result = DeletionManager(self._db, dataset_id, live["name"]).clear_files_only()
-
-        with self._db.session() as sess:
-            sess.query(DataProduct).filter(DataProduct.dataset_id == dataset_id).delete(synchronize_session=False)
-            sess.query(DatasetJob).filter(DatasetJob.dataset_id == dataset_id).delete(synchronize_session=False)
-            dataset = sess.get(Dataset, dataset_id)
-            if dataset:
-                dataset.total_scenes = 0
-                dataset.completed_scenes = 0
-                dataset.failed_scenes = 0
-                dataset.total_size_bytes = 0
-                dataset.status = "DRAFT"
-
-        logger.info("[DATASET] live dataset_id=%d dikosongkan", dataset_id)
-        return {"cleared": True, **file_result}
-
-    def trigger_live_backfill(self, date_start: date, date_end: date) -> dict:
-        live = self.get_live_dataset()
-        if live is None:
-            raise ValueError("Live dataset does not exist yet")
-        dataset_id = live["dataset_id"]
-        with self._db.session() as sess:
-            job = DatasetJob(
-                dataset_id=dataset_id,
-                job_type="BACKFILL",
-                status="QUEUED",
-                date_range_start=date_start,
-                date_range_end=date_end,
-            )
-            sess.add(job)
-            sess.flush()
-            job_id = job.job_id
-        self._spawn_job_runner(job_id)
-        logger.info("[DATASET] live backfill job_id=%d dataset_id=%d range=%s..%s",
-                    job_id, dataset_id, date_start, date_end)
-        return {"job_id": job_id, "status": "QUEUED"}
-
     def pause_dataset(self, dataset_id: int, reason: str = "user_requested") -> dict:
         with self._db.session() as sess:
             dataset = sess.get(Dataset, dataset_id)
             if dataset is None:
                 raise ValueError(f"dataset_id={dataset_id} not found")
-            if dataset.dataset_kind == "LIVE":
-                raise ValueError("A live dataset cannot be paused; use the enable/disable toggle")
             job = sess.scalar(
                 select(DatasetJob)
                 .where(DatasetJob.dataset_id == dataset_id)
@@ -697,8 +632,6 @@ class DatasetManager:
             dataset = sess.get(Dataset, dataset_id)
             if dataset is None:
                 raise ValueError(f"dataset_id={dataset_id} not found")
-            if dataset.dataset_kind == "LIVE":
-                raise ValueError("A live dataset does not use resume; use the enable/disable toggle")
             job = sess.scalar(
                 select(DatasetJob)
                 .where(DatasetJob.dataset_id == dataset_id)
@@ -758,7 +691,6 @@ class DatasetManager:
                 if (
                     dataset is None
                     or dataset.deleted_at is not None
-                    or dataset.dataset_kind == "LIVE"
                     # Job Daerah Live dilanjutkan LiveMonitor.recover(): selain
                     # run_dataset_job, siklusnya masih perlu metrik/preview.
                     or dataset.dataset_kind == "LIVE_AREA"
@@ -783,8 +715,6 @@ class DatasetManager:
             dataset = sess.get(Dataset, dataset_id)
             if dataset is None:
                 raise ValueError(f"dataset_id={dataset_id} not found")
-            if dataset.dataset_kind == "LIVE":
-                raise ValueError("A live dataset does not use retry; use the enable/disable toggle")
             job = sess.scalar(
                 select(DatasetJob)
                 .where(DatasetJob.dataset_id == dataset_id)
@@ -809,8 +739,6 @@ class DatasetManager:
             dataset = sess.get(Dataset, dataset_id)
             if dataset is None:
                 raise ValueError(f"dataset_id={dataset_id} not found")
-            if dataset.dataset_kind == "LIVE":
-                raise ValueError("A live dataset cannot be cancelled; use the enable/disable toggle")
             job = sess.scalar(
                 select(DatasetJob)
                 .where(DatasetJob.dataset_id == dataset_id)
@@ -1273,7 +1201,6 @@ class DatasetManager:
             # untuk membedakan "preview sengaja dimatikan" dari "preview belum
             # sempat dibuat", dan daftar kartu tidak mengambil detail.
             "generate_preview": d.generate_preview,
-            "live_enabled": d.live_enabled,
             # Ikut di `base`: kartu dataset (Tab 2) menampilkan satelit,
             # level pemrosesan, dan strategi fusi, dan kartu itu dirender
             # dari listing tanpa menarik detail per dataset. Dimuat lewat
@@ -1304,7 +1231,6 @@ class DatasetManager:
                 "bbox_wkt": d.bbox_wkt,
                 "region_id": d.region_id,
                 "quality_settings": d.quality_settings or {},
-                "live_last_checked_at": d.live_last_checked_at,
                 "deleted_at": d.deleted_at,
                 # Konfigurasi per-satelit + strategi fusi ikut di detail karena
                 # orchestrator memutuskan cabang pipeline dari keduanya

@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception:
         logger.exception(
             "[API] LiveScheduler gagal dimulai (cek instalasi rasterio/apscheduler). "
-            "API tetap jalan, tapi live dataset tidak akan auto-check harian."
+            "API tetap jalan, tapi Daerah Live tidak akan dicek terjadwal."
         )
         _live_scheduler = None
 

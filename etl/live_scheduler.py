@@ -30,9 +30,8 @@ class LiveScheduler:
             name="Live Monitoring Check",
             replace_existing=True,
         )
-        # Dataset LIVE tunggal versi lama sudah digantikan Daerah Live; cek
-        # hariannya (run_daily_check) dihapus. Endpoint lama /api/live/backfill
-        # memanggil DatasetManager.trigger_live_backfill langsung.
+        # Dataset LIVE tunggal versi lama (dan endpoint /api/live lamanya)
+        # sudah dihapus; Daerah Live adalah satu-satunya jalur Live.
         self._scheduler.start()
         logger.info("[LIVE] scheduler dimulai, cek Daerah Live jam %s %s",
                     _AREA_CHECK_HOURS, _TIMEZONE)

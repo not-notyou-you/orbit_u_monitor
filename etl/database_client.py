@@ -129,7 +129,6 @@ class HttpMethodEnum(str, PyEnum):
 
 class DatasetKindEnum(str, PyEnum):
     STANDARD = "STANDARD"
-    LIVE = "LIVE"
     # Satu Daerah Live (migrasi 025). Diproses pipeline biasa; aturan
     # bisnisnya (retensi, forecast) ada di live_areas.
     LIVE_AREA = "LIVE_AREA"
@@ -187,12 +186,6 @@ class CleanupOperationStatusEnum(str, PyEnum):
     FAILED = "FAILED"
 
 
-class LiveSourceNameEnum(str, PyEnum):
-    SENTINEL1 = "SENTINEL1"
-    MODIS = "MODIS"
-    GPM = "GPM"
-
-
 class ProcessingLevelEnum(str, PyEnum):
     """Level pemrosesan yang diminta user untuk SATU sumber.
 
@@ -222,8 +215,7 @@ class DatasetSourceNameEnum(str, PyEnum):
     """Sumber yang bisa dikonfigurasi per dataset.
 
     Terpisah dari ProductSourceEnum (yang punya FUSION -- hasil, bukan
-    sumber yang bisa dipilih) dan dari LiveSourceNameEnum (sakelar ingest
-    live global, tabel lain). Nilainya sengaja dijaga sama dengan CHECK
+    sumber yang bisa dipilih). Nilainya sengaja dijaga sama dengan CHECK
     chk_source_config_source_name di migrasi 017."""
     SENTINEL1 = "SENTINEL1"
     MODIS = "MODIS"
@@ -950,8 +942,6 @@ class Dataset(Base):
     # di-query, sementara quality_settings isinya ambang mutu data. Lihat
     # migrasi 016 -- WAJIB dijalankan, kolom ini dipetakan tanpa syarat.
     generate_preview = Column(Boolean, nullable=False, default=True)
-    live_enabled = Column(Boolean, nullable=False, default=False)
-    live_last_checked_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     deleted_at = Column(DateTime(timezone=True))
@@ -1146,22 +1136,6 @@ class ProcessingLog(Base):
     def __repr__(self) -> str:
         return (f"<ProcessingLog id={self.log_id} dataset={self.dataset_id} scene={self.scene_id} "
                 f"stage={self.stage} status={self.status}>")
-
-
-class LiveDatasetSource(Base):
-    __tablename__ = "live_dataset_sources"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    source_name = Column(String(20), nullable=False, unique=True)
-    enabled = Column(Boolean, nullable=False, default=True)
-    last_check = Column(DateTime(timezone=True))
-    last_ingest = Column(DateTime(timezone=True))
-    next_check = Column(DateTime(timezone=True))
-    source_config = Column(JSONB, nullable=False, default={})
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
-
-    def __repr__(self) -> str:
-        return f"<LiveDatasetSource id={self.id} source={self.source_name} enabled={self.enabled}>"
 
 
 class LiveArea(Base):

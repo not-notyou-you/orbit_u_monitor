@@ -322,7 +322,6 @@ class DatasetItem(BaseModel):
     total_size_bytes: int
     is_deletable: bool
     generate_preview: bool
-    live_enabled: bool
     # Konfigurasi per-satelit ikut di listing, bukan cuma di detail: kartu
     # dataset (Tab 2) menampilkan satelit + level pemrosesan + strategi fusi
     # (DOCS/DECISIONS.md, "Changed: Dataset Cards"), dan kartu itu
@@ -361,7 +360,6 @@ class DatasetDetail(DatasetItem):
     bbox_wkt: str
     region_id: int | None
     quality_settings: dict[str, Any]
-    live_last_checked_at: datetime | None
     deleted_at: datetime | None
 
 
@@ -471,64 +469,6 @@ class DeletionProgressResponse(BaseModel):
     deleted_count: int
     freed_bytes: int
     progress_percent: int
-
-
-class LiveSourceItem(BaseModel):
-    source_name: str
-    enabled: bool
-    last_check: datetime | None
-    last_ingest: datetime | None
-    next_check: datetime | None
-    model_config = {"from_attributes": True}
-
-
-class LiveStatusResponse(BaseModel):
-    dataset_id: int
-    enabled: bool
-    status: str
-    required_tiers: list[str]
-    bbox_wkt: str
-    total_size_bytes: int
-    last_checked_at: datetime | None
-    sources: list[LiveSourceItem]
-
-
-class LiveToggleRequest(BaseModel):
-    enabled: bool
-
-
-class LiveToggleResponse(BaseModel):
-    enabled: bool
-
-
-class LiveClearResponse(BaseModel):
-    status: str
-    freed_bytes: int
-    deleted_count: int
-
-
-class LiveBackfillRequest(BaseModel):
-    date_start: date
-    date_end: date
-
-    @model_validator(mode="after")
-    def _validate_date_range(self) -> "LiveBackfillRequest":
-        if self.date_end < self.date_start:
-            raise ValueError("date_end must be >= date_start")
-        return self
-
-
-class LiveBackfillResponse(BaseModel):
-    status: str
-    job_id: int
-    date_range: str
-
-
-class LiveSceneItem(BaseModel):
-    product_id: int
-    scene_date: datetime
-    tier: str
-    size_mb: float
 
 
 class SourceStorageItem(BaseModel):
