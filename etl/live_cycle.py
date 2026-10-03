@@ -509,7 +509,9 @@ def water_change_stage(mon: LiveMonitor, area_id: int, scene_date: date, files: 
                     scene_date=scene_date)
             return None
         wc = wcm.compute(cur_vh, prev_vh, threshold)
-        same = wcm.same_orbit(cur_products, prev_products)
+        with mon._db.session() as sess:
+            orbits = wcm.orbit_metadata(sess, cur_products + prev_products)
+        same = wcm.same_orbit(cur_products, prev_products, orbits)
         legend = wcm.render_png(wc, files.preview_dir(scene_date) / f"{wcm.PREVIEW_KEY}.png",
                                 orbit_differs=same is False)
     finally:

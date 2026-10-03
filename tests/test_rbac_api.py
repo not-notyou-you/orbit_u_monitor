@@ -110,7 +110,7 @@ EXPECTED: dict[tuple[str, str], tuple] = {
     ("POST", "/api/live/areas/{area_id}/scenes/{scene_date}/retry"): (A,),
     # wilayah (§4.4)
     ("GET", "/api/regions"): (U,),
-    ("GET", "/api/regions/kecamatan"): (U,),
+    ("GET", "/api/rois"): (U,),
     # publik (§4.2, Tahap 3)
     ("GET", "/api/public/live"): (P,),
     ("GET", "/api/public/live/{area_id}/preview/{key}.png"): (P,),
@@ -145,15 +145,20 @@ EXPECTED: dict[tuple[str, str], tuple] = {
     ("PATCH", "/api/admin/regions/{region_id}"): (A,),
     ("POST", "/api/admin/rois"): (A,),
     ("POST", "/api/admin/ingest"): (A,),
+    # ekspor/impor Excel (Tahap 3): role per jenis data dicek di route (ENTITY_FORBIDDEN)
+    ("GET", "/api/excel"): (U,),
+    ("GET", "/api/excel/{entity}.xlsx"): (U, DL),
+    ("GET", "/api/excel/{entity}/template.xlsx"): (U,),
+    ("POST", "/api/excel/{entity}/import"): (U,),
 }
 
 PATH_VALUES = {
     "scene_date": "2026-01-01", "key": "vv", "tier": "raw", "scene": "20260101",
-    "level": "processed", "kind": "grayscale", "filename": "x.png",
+    "level": "processed", "kind": "grayscale", "filename": "x.png", "entity": "alerts",
 }
 # 403 yang sah walau role cukup: aturan bisnis, bukan role.
 BUSINESS_403 = {"NOT_DATASET_OWNER", "SCENE_OUT_OF_RANGE", "CANNOT_MODIFY_SELF", "REPORT_AUDIENCE",
-                "DATE_OUT_OF_RANGE", "SCENE_NOT_PUBLIC"}
+                "DATE_OUT_OF_RANGE", "SCENE_NOT_PUBLIC", "ENTITY_FORBIDDEN"}
 ROLE_DENIAL_CODES = {"NOT_AUTHENTICATED", "ROLE_FORBIDDEN", "DB_PERMISSION_DENIED"}
 
 

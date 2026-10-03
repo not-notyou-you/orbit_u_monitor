@@ -16,6 +16,8 @@ pyproj==3.7.0
 # Pure-Python; geometrinya dirapikan PostGIS (ST_MakeValid), jadi tidak
 # perlu GDAL/OGR (wheel rasterio tidak menyertakan driver vektor).
 pyshp==2.3.1
+# openpyxl: ekspor/impor Excel generik (etl/excel_io.py, /api/excel).
+openpyxl==3.1.5
 h5py==3.12.1
 # pyhdf: baca granule MODIS HDF4-EOS (etl/module7_modis_download.py). Wheel
 # rasterio dari pip tidak menyertakan driver HDF4 GDAL.

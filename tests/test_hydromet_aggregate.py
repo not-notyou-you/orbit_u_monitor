@@ -169,3 +169,23 @@ class TestRegionsFromShapefile:
         assert len(feats) == 28
         assert {"Bayah", "Panggarangan", "Cihara", "Malingping"} <= names
         assert all(f.pcode.startswith("ID3602") and f.parent_pcode == "ID3602" for f in feats)
+
+    def test_load_real_lebak_into_db(self, db_client):
+        """28 kecamatan + kabupaten masuk dengan geometri valid; AOI tidak disentuh."""
+        from etl import regions as rg
+        d = rg.DEFAULT_COD_AB_DIR
+        if not (d / "idn_admin3.shp").exists():
+            pytest.skip("COD-AB shapefile not present in data/external/cod-ab-idn")
+        feats = rg.read_cod_ab(d / "idn_admin2.shp", 2) + rg.read_cod_ab(d / "idn_admin3.shp", 3)
+        with db_client.session() as sess:
+            rg.upsert_regions(sess, feats)
+            row = sess.execute(text("""
+                SELECT count(*) FILTER (WHERE admin_level = 3) AS kec, count(*) FILTER (WHERE admin_level = 2) AS kab,
+                       bool_and(ST_IsValid(geom)) AS valid, bool_or(in_aoi) AS any_aoi,
+                       sum(area_km2) FILTER (WHERE admin_level = 3) AS kec_km2
+                FROM administrative_regions WHERE pcode LIKE 'ID3602%'""")).one()
+            ids = rg.resolve_kecamatan(sess, ["Banjarsari", "Wanasalam", "Cijaku", "Malingping", "Cihara",
+                                              "Cigemblong", "Panggarangan", "Bayah", "Cibeber", "Cilograng"])
+        assert (row.kec, row.kab, row.valid, row.any_aoi) == (28, 1, True, False)
+        assert 3000 < float(row.kec_km2) < 3700      # Kab. Lebak ±3.426 km²
+        assert len(ids) == 10

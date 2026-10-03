@@ -23,7 +23,7 @@ from api.activity import ActivityLogMiddleware
 from api.deps import get_db, require_role, set_clients
 from api.security import jwt_secret
 from api.routes import (
-    admin, admin_monitor, alerts, auth, datasets, disasters, health, hydromet, lineage, live, pipeline,
+    admin, admin_monitor, alerts, auth, datasets, excel, disasters, health, hydromet, lineage, live, pipeline,
     products, public, quality, regions, report, reports, scenes, storage,
 )
 
@@ -153,6 +153,7 @@ app.include_router(datasets.router, prefix="/api/datasets", tags=["Datasets"], d
 app.include_router(report.router, prefix="/api/datasets", tags=["Report"], dependencies=_role("DATA_ENGINEER"))
 app.include_router(live.router, prefix="/api/live", tags=["Live"], dependencies=_role("USER"))
 app.include_router(regions.router, prefix="/api/regions", tags=["Regions"], dependencies=_role("USER"))
+app.include_router(regions.rois_router, prefix="/api/rois", tags=["Regions"], dependencies=_role("USER"))
 # Tahap 3: monitoring (INTERFACE.md §4.4–4.6, §4.9).
 app.include_router(admin_monitor.router, prefix="/api/admin", tags=["Admin"], dependencies=_role("ADMIN"))
 app.include_router(hydromet.router, prefix="/api/hydromet", tags=["Hydromet"], dependencies=_role("USER"))
@@ -162,6 +163,7 @@ app.include_router(disasters.router, prefix="/api/disasters", tags=["Disasters"]
 app.include_router(disasters.types_router, prefix="/api/disaster-types", tags=["Disasters"],
                    dependencies=_role("USER"))
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"], dependencies=_role("USER"))
+app.include_router(excel.router, prefix="/api/excel", tags=["Excel"], dependencies=_role("USER"))
 
 
 def route_min_roles(route) -> list[tuple[str, bool]]:

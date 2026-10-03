@@ -247,7 +247,7 @@ cp .env.example .env
 # 4. Wilayah COD-AB adm2 + adm3 (Kabupaten Lebak, ID3602) → administrative_regions,
 #    lalu kecamatan AOI GMLS → ROI AOI, dataset sistem HYDROMET_AOI, Live Area default.
 #    Shapefile default: data/external/cod-ab-idn/idn_admin{2,3}.shp
-python scripts/load_regions.py --aoi "Bayah,Panggarangan,..."
+python scripts/load_regions.py --aoi "Banjarsari,Wanasalam,Cijaku,Malingping,Cihara,Cigemblong,Panggarangan,Bayah,Cibeber,Cilograng"
 
 # 5. Admin pertama
 python scripts/create_admin.py --username admin

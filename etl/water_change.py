@@ -27,6 +27,7 @@ import logging
 import math
 import re
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from pathlib import Path
 
 import numpy as np
@@ -50,29 +51,71 @@ LABELS = {PERSISTENT: "Air tetap", NEW: "Air baru", RECEDED: "Air surut", LAND: 
           NODATA: "Tidak ada data"}
 ORBIT_WARNING = "orbit berbeda — perubahan bisa karena geometri pencitraan"
 
-# Orbit relatif Sentinel-1 dari orbit absolut (ESA: siklus 175 orbit).
-# S1C/S1D belum punya offset yang terverifikasi -> None (tidak dibandingkan).
-_ORBIT_OFFSET = {"S1A": 73, "S1B": 27}
-_PRODUCT_RE = re.compile(r"^(S1[A-D])_\w+?_\d{8}T\d{6}_\d{8}T\d{6}_(\d{6})_")
+# Orbit relatif Sentinel-1 = (orbit absolut − offset) mod 175 + 1 (siklus 175
+# orbit / 12 hari). Sumber utama tetap metadata katalog CDSE (relativeOrbit,
+# disimpan di satellite_scenes.relative_orbit); rumus ini cadangan bila
+# metadata tidak ada. Offset per misi, berlaku sejak tanggal akuisisi:
+#   S1A 73, S1B 27       product specification ESA
+#   S1C 172              forum STEP ESA (S1C relative orbit number formula)
+#   S1D 42               forum STEP ESA, menunggu product specification
+# Sejak 24-06-2026 ESA mengubah pemetaan absolut -> relatif S1C (rekonfigurasi
+# konstelasi, N. Miranda, Sentinel-1 Mission Manager) tanpa menerbitkan konstanta
+# baru, jadi akuisisi S1C setelah tanggal itu HANYA memakai metadata (None bila
+# tidak ada, bukan tebakan).
+_ORBIT_OFFSETS: dict[str, list[tuple[date, int | None]]] = {
+    "S1A": [(date(2014, 4, 3), 73)],
+    "S1B": [(date(2016, 4, 25), 27)],
+    "S1C": [(date(2024, 12, 5), 172), (date(2026, 6, 24), None)],
+    "S1D": [(date(2025, 11, 4), 42)],
+}
+_PRODUCT_RE = re.compile(r"^(S1[A-D])_\w+?_(\d{8})T\d{6}_\d{8}T\d{6}_(\d{6})_")
 
 
-def relative_orbit(product_id: str | None) -> int | None:
-    """Orbit relatif dari nama produk S1 (…_{orbit absolut 6 digit}_…)."""
+def relative_orbit(product_id: str | None, metadata: dict[str, int] | None = None) -> int | None:
+    """Orbit relatif satu produk S1: metadata katalog bila ada (``metadata``:
+    {product_identifier: relative_orbit}), jika tidak dari nama produk
+    (…_{tanggal}T…_{orbit absolut 6 digit}_…)."""
     if not product_id:
         return None
-    m = _PRODUCT_RE.match(Path(product_id).name)
-    if not m or m.group(1) not in _ORBIT_OFFSET:
+    name = Path(product_id).name
+    if metadata:
+        for key, rel in metadata.items():
+            if rel is not None and (key == name or key.startswith(name) or name.startswith(key)):
+                return int(rel)
+    m = _PRODUCT_RE.match(name)
+    if not m or m.group(1) not in _ORBIT_OFFSETS:
         return None
-    return (int(m.group(2)) - _ORBIT_OFFSET[m.group(1)]) % 175 + 1
+    acquired = datetime.strptime(m.group(2), "%Y%m%d").date()
+    offset = None
+    for since, value in _ORBIT_OFFSETS[m.group(1)]:
+        if acquired >= since:
+            offset = value
+    if offset is None:
+        return None
+    return (int(m.group(3)) - offset) % 175 + 1
 
 
-def same_orbit(cur_products, prev_products) -> bool | None:
+def same_orbit(cur_products, prev_products, metadata: dict[str, int] | None = None) -> bool | None:
     """True/False bila orbit relatif kedua scene diketahui; None bila tidak."""
-    a = {o for p in cur_products or [] if (o := relative_orbit(p)) is not None}
-    b = {o for p in prev_products or [] if (o := relative_orbit(p)) is not None}
+    a = {o for p in cur_products or [] if (o := relative_orbit(p, metadata)) is not None}
+    b = {o for p in prev_products or [] if (o := relative_orbit(p, metadata)) is not None}
     if not a or not b:
         return None
     return bool(a & b)
+
+
+def orbit_metadata(sess, product_ids) -> dict[str, int]:
+    """{product_identifier: relative_orbit} dari satellite_scenes (metadata CDSE)."""
+    from sqlalchemy import text
+    names = [Path(p).name for p in product_ids or [] if p]
+    if not names:
+        return {}
+    rows = sess.execute(text("""
+        SELECT product_identifier, relative_orbit FROM satellite_scenes
+        WHERE relative_orbit IS NOT NULL
+          AND EXISTS (SELECT 1 FROM unnest(CAST(:names AS text[])) n WHERE product_identifier LIKE n || '%')
+    """), {"names": names}).all()
+    return {r.product_identifier: int(r.relative_orbit) for r in rows}
 
 
 @dataclass

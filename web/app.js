@@ -51,7 +51,7 @@ const state = {
   // tanggal dan jenis yang sedang dipilih (bertahan saat panel digambar ulang
   // oleh polling).
   previews: {}, previewScene: {}, previewKind: {}, previewLevel: {}, previewClosed: {},
-  // Lokasi: daftar dari /api/regions, filter pencarian, dan pilihan yang dipakai
+  // Lokasi: daftar dari /api/rois, filter pencarian, dan pilihan yang dipakai
   // "Buat Dataset". selectedRegionId adalah satu-satunya sumber kebenaran lokasi.
   regions: [], selectedRegionId: null, locationQuery: '',
 };
@@ -492,7 +492,7 @@ async function loadRegions() {
   const grid = document.getElementById('regionGrid');
   try {
     const q = state.locationQuery.trim();
-    const result = await api('/api/regions' + (q ? '?q=' + encodeURIComponent(q) : ''));
+    const result = await api('/api/rois' + (q ? '?q=' + encodeURIComponent(q) : ''));
     state.regions = result.items;
     updateWizardRegion();
     // Lokasi terpilih bisa hilang dari hasil filter; itu tidak membatalkan pilihan,

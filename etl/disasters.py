@@ -182,25 +182,25 @@ def _is_duplicate(sess, data: dict) -> bool:
          "descr": data["description"]}))
 
 
-def import_csv(sess, path: Path, recorded_by: int, dry_run: bool = False) -> dict:
-    """Impor seluruh berkas dalam satu transaksi pemanggil: satu baris salah ->
-    tidak ada yang ditulis (laporan error per nomor baris)."""
-    with open(path, newline="", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        header = {h.strip().lower() for h in (reader.fieldnames or [])}
-        unknown = header - set(CSV_COLUMNS)
-        if not set(REQUIRED) <= header:
-            raise ValueError("CSV header must contain: " + ", ".join(REQUIRED))
-        if unknown:
-            raise ValueError("unknown CSV column(s): " + ", ".join(sorted(unknown)))
-        parsed, errors = [], []
-        for n, row in enumerate(reader, start=2):
-            try:
-                parsed.append((n, parse_row(sess, row)))
-            except ValueError as exc:
-                errors.append(f"line {n}: {exc}")
+def import_rows(sess, header: list[str], rows: list[tuple[int, dict]], recorded_by: int,
+                dry_run: bool = False) -> dict:
+    """Impor baris (nomor baris, {kolom: nilai}) dari CSV atau Excel, dalam
+    transaksi pemanggil. Ada baris salah -> tidak ada yang ditulis oleh
+    pemanggil (laporan error per nomor baris)."""
+    cols = {h.strip().lower() for h in header if h}
+    if not set(REQUIRED) <= cols:
+        raise ValueError("header must contain: " + ", ".join(REQUIRED))
+    unknown = cols - set(CSV_COLUMNS)
+    if unknown:
+        raise ValueError("unknown column(s): " + ", ".join(sorted(unknown)))
+    parsed, errors = [], []
+    for n, row in rows:
+        try:
+            parsed.append((n, parse_row(sess, row)))
+        except ValueError as exc:
+            errors.append(f"line {n}: {exc}")
     if errors:
-        return {"inserted": 0, "duplicates": 0, "errors": errors}
+        return {"inserted": 0, "updated": 0, "duplicates": 0, "errors": errors}
     inserted = duplicates = 0
     for n, data in parsed:
         if _is_duplicate(sess, data):
@@ -213,4 +213,13 @@ def import_csv(sess, path: Path, recorded_by: int, dry_run: bool = False) -> dic
                 errors.append(f"line {n}: {exc}")
                 continue
         inserted += 1
-    return {"inserted": inserted, "duplicates": duplicates, "errors": errors}
+    return {"inserted": inserted, "updated": 0, "duplicates": duplicates, "errors": errors}
+
+
+def import_csv(sess, path: Path, recorded_by: int, dry_run: bool = False) -> dict:
+    """Impor berkas CSV (scripts/import_disasters.py); lihat import_rows."""
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        header = list(reader.fieldnames or [])
+        rows = list(enumerate(reader, start=2))
+    return import_rows(sess, header, rows, recorded_by, dry_run)

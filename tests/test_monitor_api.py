@@ -64,7 +64,7 @@ class TestHydromet:
             assert sess.scalar(text("SELECT count(*) FROM user_activity_logs WHERE action = 'EXPORT_CSV'")) >= 1
 
     def test_kecamatan_geojson(self, make_client, synthetic_aoi):
-        fc = make_client("USER").get("/api/regions/kecamatan").json()
+        fc = make_client("USER").get("/api/regions").json()
         assert fc["type"] == "FeatureCollection"
         props = {f["properties"]["pcode"] for f in fc["features"]}
         assert {"TST001", "TST002", "TST003"} <= props

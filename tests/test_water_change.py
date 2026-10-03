@@ -89,7 +89,10 @@ class TestOrbit:
     @pytest.mark.parametrize("pid,expected", [
         ("S1A_IW_GRDH_1SDV_20240110T224512_20240110T224537_052036_064A8B_1A2B", (52036 - 73) % 175 + 1),
         ("S1B_IW_GRDH_1SDV_20210110T224512_20210110T224537_025000_02F9AA_ABCD", (25000 - 27) % 175 + 1),
-        ("S1C_IW_GRDH_1SDV_20250110T224512_20250110T224537_001000_000001_ABCD", None),
+        ("S1C_IW_GRDH_1SDV_20250110T224512_20250110T224537_001000_000001_ABCD", (1000 - 172) % 175 + 1),
+        # S1C setelah rekonfigurasi 24-06-2026: tanpa metadata -> tidak ditebak.
+        ("S1C_IW_GRDH_1SDV_20260801T224512_20260801T224537_009000_000001_ABCD", None),
+        ("S1D_IW_GRDH_1SDV_20260110T224512_20260110T224537_003000_000001_ABCD", (3000 - 42) % 175 + 1),
         ("garbage", None), (None, None)])
     def test_relative_orbit(self, pid, expected):
         assert wc.relative_orbit(pid) == expected
@@ -101,6 +104,13 @@ class TestOrbit:
         assert wc.same_orbit([a], [b]) is True
         assert wc.same_orbit([a], [c]) is False
         assert wc.same_orbit([a], ["unknown"]) is None
+
+    def test_metadata_wins_over_formula(self):
+        late = "S1C_IW_GRDH_1SDV_20260801T224512_20260801T224537_009000_000001_ABCD"
+        assert wc.relative_orbit(late, {late + "_COG": 98}) == 98
+        a = "S1A_IW_GRDH_1SDV_20240110T224512_20240110T224537_052036_064A8B_1A2B"
+        assert wc.relative_orbit(a, {a: 5}) == 5            # metadata katalog didahulukan
+        assert wc.same_orbit([late], [late], {late: 98}) is True
 
 
 class TestPngAndMetrics:

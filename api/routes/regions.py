@@ -1,5 +1,9 @@
 # api/routes/regions.py
-"""Daftar ROI sistem untuk wizard dataset dan Live Area.
+"""Wilayah (INTERFACE.md §4.4).
+
+``GET /regions``  kecamatan AOI GMLS + GeoJSON (``ST_SimplifyPreserveTopology``).
+``GET /rois``     daftar ROI sistem untuk wizard dataset dan Live Area (dulu
+                  ``GET /regions``; dipindah Tahap 3, IMPLEMENTATION_NOTES T3-5).
 
 Hanya baca. ROI dibuat oleh sistem/ADMIN dari kecamatan COD-AB (DATABASE.md
 §3.6, M27); endpoint tulis dan geocoding milik DataLab sudah dihapus.
@@ -19,7 +23,8 @@ from api.deps import get_db, get_session
 from etl.database_client import DatabaseClient, RegionOfInterest
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter()        # /api/regions
+rois_router = APIRouter()   # /api/rois
 
 
 def _to_item(r: RegionOfInterest) -> RegionItem:
@@ -37,7 +42,7 @@ def _to_item(r: RegionOfInterest) -> RegionItem:
     )
 
 
-@router.get("", response_model=RegionListResponse, summary="List locations")
+@rois_router.get("", response_model=RegionListResponse, summary="List system ROIs (dataset wizard, Live Area)")
 async def list_regions(
     db: DatabaseClient = Depends(get_db),
     q: str | None = Query(None, description="Filter by location name/code (case-insensitive)"),
@@ -66,15 +71,14 @@ async def list_regions(
     return RegionListResponse(items=items, total=total)
 
 
-@router.get("/kecamatan", summary="Kecamatan (AOI by default) as simplified GeoJSON")
+@router.get("", summary="Kecamatan of the GMLS AOI as simplified GeoJSON")
 def kecamatan_geojson(
     sess: Session = Depends(get_session),
     all_lebak: bool = Query(False, alias="all", description="All kecamatan of Kabupaten Lebak, not only the AOI"),
     tolerance: float = Query(0.0005, ge=0, le=0.01, description="ST_SimplifyPreserveTopology tolerance (degrees)"),
 ) -> dict:
-    """INTERFACE §4.4 `/regions`: poligon kecamatan disederhanakan
-    ST_SimplifyPreserveTopology. Daftar ROI di `GET /regions` tetap untuk
-    wizard dataset dan Live Area (IMPLEMENTATION_NOTES Tahap 3)."""
+    """Poligon kecamatan disederhanakan ST_SimplifyPreserveTopology;
+    ``?all=true`` = semua kecamatan Kabupaten Lebak."""
     rows = sess.execute(text(f"""
         SELECT region_id, pcode, region_name, in_aoi, area_km2,
                ST_AsGeoJSON(ST_SimplifyPreserveTopology(geom, :tol), 6) AS gj
