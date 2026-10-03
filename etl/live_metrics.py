@@ -2,10 +2,17 @@
 """Metrik ringkas satu scene Daerah Live, dihitung dari COG PROCESSED.
 
 Satu fungsi publik, scene_inputs() + compute_metrics(). Hasilnya angka-angka
-kecil (rata-rata, persen) yang disimpan di live_scenes.metrics dan dipakai
-untuk kalimat kondisi (etl/live_interpret.py), grafik, dan forecast. Karena
-itu harus tetap bisa dihitung ulang dari log walau berkasnya sudah dihapus
--- yang disimpan adalah angkanya, bukan pointer ke raster.
+kecil (rata-rata, persen) yang dipakai untuk kalimat kondisi
+(etl/live_interpret.py), grafik, dan forecast. Karena itu harus tetap ada
+walau berkasnya sudah dihapus retensi -- yang disimpan adalah angkanya, bukan
+pointer ke raster.
+
+Penyimpanan (M31): angka ditulis sebagai baris live_scene_metrics (satu baris
+per band x metrik, save_scene_metrics); deskriptor teks (run IMERG, periode
+komposit, tanggal observasi) ikut di live_scenes.source_status[sumber].meta.
+load_scene_metrics menyusun ulang dict yang sama persis bentuknya dengan
+compute_metrics(), sehingga live_interpret, live_forecast, dan kartu Live
+tidak perlu tahu tabelnya.
 
 Nilai dihitung dari raster ASLI (bukan dari PNG preview). Satu pengecualian:
 raster Sentinel-1 dibaca turun ke sisi terpanjang S1_METRIC_MAX_SIDE (rata-rata
@@ -249,3 +256,143 @@ def source_status(inputs: dict, metrics: dict) -> dict:
     g_missing = [w for w in GPM_WINDOWS if w not in (inputs.get("gpm") or {})]
     st["gpm"] = {"status": "FAILED" if g_missing else "OK", "missing": g_missing}
     return st
+
+
+# ---------------------------------------------------------------------------
+# Penyimpanan 1NF (M31): dict compute_metrics() <-> baris live_scene_metrics
+# ---------------------------------------------------------------------------
+
+# (sumber, entri, field dict) -> (band_code, metric_name). entri None = dict
+# sumbernya langsung (Sentinel-1 tidak bersarang per band).
+METRIC_ROWS: tuple[tuple[str, str | None, str, str, str], ...] = (
+    ("sentinel1", None, "vv_mean_db", "VV", "mean"),
+    ("sentinel1", None, "vh_mean_db", "VH", "mean"),
+    ("sentinel1", None, "vh_water_pct", "VH", "pct_below_threshold"),
+    ("sentinel1", None, "vh_water_threshold_db", "VH", "threshold_db"),
+    ("sentinel1", None, "frames", "VH", "frames"),
+    ("sentinel1", None, "valid_pixels", "VH", "valid_pixels"),
+    *(("modis", "flood", f, "FLOOD", f)
+      for f in ("valid_pct", "cloud_pct", "flood_pct", "recurring_pct", "water_pct")),
+    *(("modis", "ndvi", f, "NDVI", f)
+      for f in ("valid_pct", "cloud_pct", "mean", "age_days_median", "lookback_days")),
+    *(("modis", "ndwi", f, "NDWI", f)
+      for f in ("valid_pct", "cloud_pct", "mean", "age_days_median", "lookback_days", "water_pct")),
+    *(("gpm", f"rain_{w}", f, f"RAIN_{w.upper()}", metric)
+      for w in GPM_WINDOWS for f, metric in (("mean_mm", "mean"), ("max_mm", "max"))),
+)
+_ROW_BY_KEY = {(band, metric): (src, entry, field) for src, entry, field, band, metric in METRIC_ROWS}
+_INT_FIELDS = frozenset({"frames", "valid_pixels", "lookback_days"})
+# Deskriptor teks: tidak dikueri, jadi ikut source_status[sumber].meta (K6).
+META_FIELDS: dict[str, tuple[str, ...]] = {
+    "modis": ("observation_date", "composite_period"),
+    "gpm": ("imerg_runs", "window_start", "window_end"),
+}
+
+
+def metric_rows(metrics: dict, scene_date: date) -> tuple[list[tuple], dict]:
+    """Pecah dict compute_metrics() menjadi ([(band_code, metric_name, value,
+    source_date)], meta). Field yang ada tapi bernilai None tetap jadi baris
+    (value NULL) supaya entri sumbernya tersusun ulang apa adanya."""
+    rows: list[tuple] = []
+    for src, entry_key, field, band, metric in METRIC_ROWS:
+        container = metrics.get(src)
+        entry = container if entry_key is None else (container or {}).get(entry_key)
+        if not entry or field not in entry:
+            continue
+        matched = entry.get("matched_date") if entry_key is not None else None
+        source_date = date.fromisoformat(matched) if matched else (
+            scene_date if entry_key is None else None)
+        rows.append((band, metric, entry[field], source_date))
+    meta: dict = {}
+    for src, fields in META_FIELDS.items():
+        for entry_key, entry in (metrics.get(src) or {}).items():
+            kept = {f: entry[f] for f in fields if f in entry}
+            if kept:
+                meta.setdefault(src, {})[entry_key] = kept
+    return rows, meta
+
+
+def metrics_from_rows(rows, meta: dict | None, scene_date: date | None) -> dict:
+    """Kebalikan metric_rows(): susun ulang dict berbentuk compute_metrics()
+    dari baris (band_code, metric_name, value, source_date) + meta. Baris yang
+    tidak dikenal peta ini (mis. WATER_CHANGE) dilewati."""
+    out: dict = {"sentinel1": None, "modis": {}, "gpm": {}}
+    for band, metric, value, source_date in rows:
+        key = _ROW_BY_KEY.get((band, metric))
+        if key is None:
+            continue
+        src, entry_key, field = key
+        if value is not None:
+            value = int(value) if field in _INT_FIELDS else float(value)
+        if entry_key is None:
+            out[src] = out[src] or {}
+            out[src][field] = value
+            continue
+        entry = out[src].setdefault(entry_key, {})
+        entry[field] = value
+        if source_date is not None:
+            entry["matched_date"] = source_date.isoformat()
+    for src, entries in (meta or {}).items():
+        target = out.get(src)
+        for entry_key, fields in (entries or {}).items():
+            if isinstance(target, dict) and isinstance(target.get(entry_key), dict):
+                target[entry_key].update(fields)
+    if scene_date is not None:
+        iso = scene_date.isoformat()
+        for src in ("modis", "gpm"):
+            for entry in out[src].values():
+                entry["nearest"] = entry.get("matched_date") != iso
+    return out
+
+
+def save_scene_metrics(sess, live_scene_id: int, scene_date: date, metrics: dict) -> dict:
+    """Ganti seluruh baris live_scene_metrics satu scene dengan isi `metrics`
+    (dalam session pemanggil). Mengembalikan meta deskriptor untuk ditaruh
+    di source_status[sumber].meta."""
+    from sqlalchemy import delete, select
+
+    from etl.database_client import LiveSceneMetric, SpectralBand
+
+    rows, meta = metric_rows(metrics, scene_date)
+    band_ids = dict(sess.execute(select(SpectralBand.band_code, SpectralBand.band_id)).all())
+    sess.execute(delete(LiveSceneMetric).where(
+        LiveSceneMetric.live_scene_id == live_scene_id,
+        LiveSceneMetric.metric_name.in_({metric for *_, metric in METRIC_ROWS}),
+        LiveSceneMetric.band_id.in_([band_ids[b] for b in {r[3] for r in METRIC_ROWS}]),
+    ))
+    sess.add_all(
+        LiveSceneMetric(live_scene_id=live_scene_id, band_id=band_ids[band],
+                        metric_name=metric, value=value, source_date=source_date)
+        for band, metric, value, source_date in rows
+    )
+    sess.flush()
+    return meta
+
+
+def load_scene_metrics(sess, scenes) -> dict[int, dict]:
+    """{live_scene_id: dict berbentuk compute_metrics()} untuk baris
+    LiveScene yang diberikan (dalam session pemanggil)."""
+    from sqlalchemy import select
+
+    from etl.database_client import LiveSceneMetric, SpectralBand
+
+    scenes = list(scenes)
+    by_id: dict[int, list] = {s.live_scene_id: [] for s in scenes}
+    if by_id:
+        for sid, band, metric, value, source_date in sess.execute(
+            select(LiveSceneMetric.live_scene_id, SpectralBand.band_code,
+                   LiveSceneMetric.metric_name, LiveSceneMetric.value,
+                   LiveSceneMetric.source_date)
+            .join(SpectralBand, SpectralBand.band_id == LiveSceneMetric.band_id)
+            .where(LiveSceneMetric.live_scene_id.in_(list(by_id)))
+        ):
+            by_id[sid].append((band, metric, value, source_date))
+    return {
+        s.live_scene_id: metrics_from_rows(
+            by_id[s.live_scene_id],
+            {src: (v or {}).get("meta") or {} for src, v in (s.source_status or {}).items()
+             if isinstance(v, dict)},
+            s.scene_date,
+        )
+        for s in scenes
+    }

@@ -351,7 +351,7 @@ def _ingest(mon: LiveMonitor, area_id: int, dataset_id: int, dates: list[date]) 
                 LiveScene.area_id == area_id, LiveScene.scene_date == d))
             if row is None:
                 row = LiveScene(area_id=area_id, dataset_id=dataset_id, scene_date=d,
-                                source_status={}, metrics={}, interpretations={},
+                                source_status={}, interpretations={},
                                 area_status={}, previews={}, deleted_files=[])
                 sess.add(row)
             row.status = "PROCESSING"
@@ -433,7 +433,11 @@ def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
             LiveScene.area_id == area_id, LiveScene.scene_date == scene_date))
         if row is not None:
             row.status = scene_status
-            row.metrics = _jsonable(metrics)
+            # M31: angka ke live_scene_metrics, deskriptor teks ke
+            # source_status[sumber].meta (K6).
+            meta = lmx.save_scene_metrics(sess, row.live_scene_id, scene_date, _jsonable(metrics))
+            for src, entries in meta.items():
+                status.setdefault(src, {})["meta"] = entries
             row.source_status = _jsonable(status)
             row.previews = _jsonable(previews)
             row.s1_product_ids = [
@@ -485,17 +489,20 @@ def reinterpret_all(mon: LiveMonitor, area_id: int) -> None:
     """Tulis ulang kalimat kondisi semua scene tersimpan, urut tanggal, dengan
     scene tersimpan sebelumnya sebagai pembanding."""
     from etl.live_interpret import area_status, interpret_scene
+    from etl.live_metrics import load_scene_metrics
 
     with mon._db.session() as sess:
         rows = sess.scalars(select(LiveScene).where(
             LiveScene.area_id == area_id, LiveScene.deleted_at.is_(None),
             LiveScene.status.in_(("READY", "PARTIAL"))).order_by(LiveScene.scene_date)).all()
+        metrics = load_scene_metrics(sess, rows)
         prev = None
         for r in rows:
-            interp = interpret_scene(r.metrics or {}, prev, r.source_status or {})
+            current = metrics[r.live_scene_id]
+            interp = interpret_scene(current, prev, r.source_status or {})
             r.interpretations = _jsonable(interp)
             r.area_status = _jsonable(area_status(interp))
-            prev = r.metrics or {}
+            prev = current
 
 
 # ---------------------------------------------------------------------------
@@ -504,12 +511,14 @@ def reinterpret_all(mon: LiveMonitor, area_id: int) -> None:
 
 def refresh_forecast(mon: LiveMonitor, area_id: int) -> None:
     from etl.live_forecast import build_area_forecast
+    from etl.live_metrics import load_scene_metrics
 
     with mon._db.session() as sess:
         rows = sess.scalars(select(LiveScene).where(
             LiveScene.area_id == area_id, LiveScene.deleted_at.is_(None),
             LiveScene.status.in_(("READY", "PARTIAL"))).order_by(LiveScene.scene_date)).all()
-        series = [(r.scene_date, r.metrics or {}) for r in rows]
+        metrics = load_scene_metrics(sess, rows)
+        series = [(r.scene_date, metrics[r.live_scene_id]) for r in rows]
     fc = build_area_forecast(series)
     _set_area(mon, area_id, forecast=_jsonable(fc), forecast_updated_at=_now())
     mon.log(area_id, "FORECAST", "OK",

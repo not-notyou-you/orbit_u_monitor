@@ -36,7 +36,8 @@ Z80 = 1.2816
 DEFAULT_INTERVAL_DAYS = 12
 
 # Deret yang digrafikkan: satu per satelit (4.4). key -> cara mengambil nilai
-# dari live_scenes.metrics.
+# dari dict metrik scene (live_metrics.load_scene_metrics, dari tabel
+# live_scene_metrics -- M31).
 SERIES: dict[str, dict] = {
     "sentinel1": {
         "label": "Mean VH", "unit": "dB",

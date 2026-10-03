@@ -1098,8 +1098,9 @@ class LiveScene(Base):
     scene_date = Column(Date, nullable=False)
     s1_product_ids = Column(ARRAY(Text), nullable=False, default=list)
     status = Column(String(20), nullable=False, default="PROCESSING")
+    # Metrik numerik scene ada di live_scene_metrics (M31); deskriptor teksnya
+    # di source_status[sumber]["meta"] (IMPLEMENTATION_NOTES K6).
     source_status = Column(JSONB, nullable=False, default={})
-    metrics = Column(JSONB, nullable=False, default={})
     interpretations = Column(JSONB, nullable=False, default={})
     area_status = Column(JSONB, nullable=False, default={})
     previews = Column(JSONB, nullable=False, default={})
@@ -1112,6 +1113,46 @@ class LiveScene(Base):
 
     def __repr__(self) -> str:
         return f"<LiveScene area={self.area_id} date={self.scene_date} status={self.status}>"
+
+
+class SpectralBand(Base):
+    """Master band (DATABASE.md §3.4). Dipetakan untuk menerjemahkan
+    band_code <-> band_id; tabel diisi monitor_seed.sql."""
+
+    __tablename__ = "spectral_bands"
+    band_id = Column(SmallInteger, primary_key=True, autoincrement=True)
+    source_id = Column(SmallInteger, nullable=False)  # FK satellite_sources di DB
+    band_code = Column(String(20), nullable=False, unique=True)
+    band_name = Column(String(100), nullable=False)
+    unit = Column(String(20))
+    valid_min = Column(Numeric)
+    valid_max = Column(Numeric)
+    aggregation = Column(String(20), nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<SpectralBand id={self.band_id} code={self.band_code}>"
+
+
+class LiveSceneMetric(Base):
+    """Satu metrik numerik satu scene Live: band x metrik (M31, 1NF).
+    Menggantikan kolom JSONB live_scenes.metrics."""
+
+    __tablename__ = "live_scene_metrics"
+    __table_args__ = (
+        UniqueConstraint("live_scene_id", "band_id", "metric_name", name="uq_live_scene_metric"),
+    )
+    metric_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    live_scene_id = Column(BigInteger, ForeignKey("live_scenes.live_scene_id", ondelete="CASCADE"),
+                           nullable=False)
+    band_id = Column(SmallInteger, ForeignKey("spectral_bands.band_id"), nullable=False)
+    metric_name = Column(String(30), nullable=False)
+    value = Column(Numeric(12, 4))
+    source_date = Column(Date)
+    ref_live_scene_id = Column(BigInteger, ForeignKey("live_scenes.live_scene_id", ondelete="SET NULL"))
+
+    def __repr__(self) -> str:
+        return (f"<LiveSceneMetric scene={self.live_scene_id} band={self.band_id} "
+                f"{self.metric_name}={self.value}>")
 
 
 class LiveEvent(Base):

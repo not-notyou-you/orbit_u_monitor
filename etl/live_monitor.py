@@ -546,13 +546,15 @@ class LiveMonitor:
                 sel = next((r for r in rows if r.scene_date == scene_date), rows[0])
             scene = None
             if sel is not None:
+                from etl.live_metrics import load_scene_metrics
+
                 dk = sel.scene_date.isoformat()
                 items = ((sel.previews or {}).get("items") or {})
                 scene = {
                     "date": dk,
                     "status": sel.status,
                     "source_status": sel.source_status or {},
-                    "metrics": sel.metrics or {},
+                    "metrics": load_scene_metrics(sess, [sel])[sel.live_scene_id],
                     "interpretations": sel.interpretations or {},
                     "area_status": sel.area_status or {},
                     "previews": {
@@ -625,9 +627,12 @@ class LiveMonitor:
 
     def scene_log(self, area_id: int) -> list[dict]:
         """Seluruh scene termasuk yang sudah dihapus (audit, 6.1)."""
+        from etl.live_metrics import load_scene_metrics
+
         with self._db.session() as sess:
             rows = sess.scalars(select(LiveScene).where(LiveScene.area_id == area_id)
                                 .order_by(LiveScene.scene_date.desc())).all()
+            metrics = load_scene_metrics(sess, rows)
             return [{
                 "date": r.scene_date.isoformat(), "status": r.status,
                 "created_at": r.created_at, "deleted_at": r.deleted_at,
@@ -635,7 +640,7 @@ class LiveMonitor:
                 "deleted_files": len(r.deleted_files or []),
                 "freed_bytes": int(r.freed_bytes or 0),
                 "source_status": r.source_status or {},
-                "metrics": r.metrics or {},
+                "metrics": metrics[r.live_scene_id],
                 "area_status": r.area_status or {},
                 "interpretations": {k: v.get("text") for k, v in (r.interpretations or {}).items()},
             } for r in rows]

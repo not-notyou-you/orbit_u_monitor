@@ -1100,7 +1100,6 @@ CREATE TABLE live_scenes (
     s1_product_ids  TEXT[]       NOT NULL DEFAULT ARRAY[]::TEXT[],
     status          VARCHAR(20)  NOT NULL DEFAULT 'PROCESSING',
     source_status   JSONB        NOT NULL DEFAULT '{}',
-    metrics         JSONB        NOT NULL DEFAULT '{}',
     interpretations JSONB        NOT NULL DEFAULT '{}',
     area_status     JSONB        NOT NULL DEFAULT '{}',
     previews        JSONB        NOT NULL DEFAULT '{}',
@@ -1121,8 +1120,7 @@ COMMENT ON COLUMN live_scenes.dataset_id      IS 'datasets.dataset_id (tanpa FK)
 COMMENT ON COLUMN live_scenes.scene_date      IS 'Tanggal akuisisi S1 (hari UTC).';
 COMMENT ON COLUMN live_scenes.s1_product_ids  IS 'Identifier produk S1 yang membentuk scene (TEXT[] <= 3 frame, M32).';
 COMMENT ON COLUMN live_scenes.status          IS 'PROCESSING | READY | PARTIAL (sumber pendukung gagal) | FAILED | DELETED.';
-COMMENT ON COLUMN live_scenes.source_status   IS 'Status per sumber untuk tampilan (JSONB, tidak dikueri).';
-COMMENT ON COLUMN live_scenes.metrics         IS 'Metrik scene (JSONB warisan); dipindah ke live_scene_metrics (M31).';
+COMMENT ON COLUMN live_scenes.source_status   IS 'Status per sumber untuk tampilan (JSONB, tidak dikueri), termasuk deskriptor teks metrik di [sumber].meta (run IMERG, periode komposit). Angka metrik ada di live_scene_metrics (M31).';
 COMMENT ON COLUMN live_scenes.interpretations IS 'Kalimat kondisi per variabel (JSONB tampilan).';
 COMMENT ON COLUMN live_scenes.area_status     IS 'Status area ringkas {level, label, sentence} (JSONB tampilan).';
 COMMENT ON COLUMN live_scenes.previews        IS 'Manifest preview PNG per kunci (JSONB tampilan).';
