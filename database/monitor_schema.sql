@@ -722,7 +722,8 @@ COMMENT ON COLUMN cleanup_operations.completed_at   IS 'Waktu selesai.';
 CREATE TABLE processing_jobs (
     job_id            BIGSERIAL       PRIMARY KEY,
     job_uuid          UUID            NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    scene_id          INTEGER         NOT NULL REFERENCES satellite_scenes (scene_id) ON DELETE CASCADE,
+    scene_id          INTEGER         REFERENCES satellite_scenes (scene_id) ON DELETE CASCADE,
+    nasa_scene_id     BIGINT          REFERENCES nasa_scenes (nasa_scene_id) ON DELETE CASCADE,
     stage_id          INTEGER         NOT NULL REFERENCES processing_stages (stage_id) ON DELETE RESTRICT,
     attempt_number    SMALLINT        NOT NULL DEFAULT 1,
     status            job_status_enum NOT NULL DEFAULT 'QUEUED',
@@ -741,16 +742,23 @@ CREATE TABLE processing_jobs (
     parameters_json   JSONB           NOT NULL DEFAULT '{}',
     created_at        TIMESTAMPTZ     NOT NULL DEFAULT now(),
     updated_at        TIMESTAMPTZ     NOT NULL DEFAULT now(),
-    CONSTRAINT uq_job_scene_stage_attempt UNIQUE (scene_id, stage_id, attempt_number)
+    CONSTRAINT uq_job_scene_stage_attempt UNIQUE (scene_id, stage_id, attempt_number),
+    -- M30/K2: job menempel pada scene S1 ATAU granule NASA, atau tidak pada
+    -- keduanya (FUSION, tahap lintas sumber) -- tidak pernah pada keduanya.
+    CONSTRAINT chk_pjobs_single_anchor CHECK (scene_id IS NULL OR nasa_scene_id IS NULL)
 );
+CREATE UNIQUE INDEX uq_job_nasa_stage_attempt ON processing_jobs (nasa_scene_id, stage_id, attempt_number)
+    WHERE nasa_scene_id IS NOT NULL;
+CREATE INDEX idx_pjobs_scene_id   ON processing_jobs (scene_id) WHERE scene_id IS NOT NULL;
 CREATE INDEX idx_pjobs_stage_id   ON processing_jobs (stage_id);
 CREATE INDEX idx_pjobs_status     ON processing_jobs (status, queued_at DESC);
 CREATE INDEX idx_pjobs_queued_at  ON processing_jobs (queued_at DESC);
 CREATE INDEX idx_pjobs_params_gin ON processing_jobs USING GIN (parameters_json);
-COMMENT ON TABLE  processing_jobs IS 'Eksekusi satu tahap pipeline untuk satu scene (scene x tahap x percobaan).';
+COMMENT ON TABLE  processing_jobs IS 'Eksekusi satu tahap pipeline (scene/granule x tahap x percobaan). Jangkar: scene S1, granule NASA, atau tidak keduanya untuk FUSION (M30).';
 COMMENT ON COLUMN processing_jobs.job_id            IS 'PK surrogate.';
 COMMENT ON COLUMN processing_jobs.job_uuid          IS 'UUID stabil untuk referensi eksternal.';
-COMMENT ON COLUMN processing_jobs.scene_id          IS 'FK -> satellite_scenes: scene yang diproses.';
+COMMENT ON COLUMN processing_jobs.scene_id          IS 'FK -> satellite_scenes: scene S1 yang diproses. NULL untuk job MODIS/GPM/FUSION.';
+COMMENT ON COLUMN processing_jobs.nasa_scene_id     IS 'FK -> nasa_scenes: granule MODIS/GPM yang diproses. NULL untuk job S1/FUSION (M30).';
 COMMENT ON COLUMN processing_jobs.stage_id          IS 'FK -> processing_stages.';
 COMMENT ON COLUMN processing_jobs.attempt_number    IS 'Percobaan ke berapa untuk (scene, tahap).';
 COMMENT ON COLUMN processing_jobs.status            IS 'QUEUED | RUNNING | SUCCESS | FAILED | CANCELLED.';
@@ -802,7 +810,8 @@ COMMENT ON COLUMN processing_logs.created_at IS 'Waktu kejadian.';
 CREATE TABLE data_products (
     product_id       BIGSERIAL             PRIMARY KEY,
     product_uuid     UUID                  NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    scene_id         INTEGER               NOT NULL REFERENCES satellite_scenes (scene_id) ON DELETE CASCADE,
+    scene_id         INTEGER               REFERENCES satellite_scenes (scene_id) ON DELETE CASCADE,
+    nasa_scene_id    BIGINT                REFERENCES nasa_scenes (nasa_scene_id) ON DELETE CASCADE,
     job_id           BIGINT                NOT NULL REFERENCES processing_jobs (job_id) ON DELETE RESTRICT,
     dataset_id       INTEGER               REFERENCES datasets (dataset_id) ON DELETE CASCADE,
     product_tier     product_tier_enum     NOT NULL,
@@ -827,9 +836,16 @@ CREATE TABLE data_products (
     is_latest        BOOLEAN               NOT NULL DEFAULT true,
     created_at       TIMESTAMPTZ           NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ           NOT NULL DEFAULT now(),
-    CONSTRAINT chk_dprods_processing_level CHECK (processing_level IS NULL OR processing_level IN ('RAW', 'PROCESSED'))
+    CONSTRAINT chk_dprods_processing_level CHECK (processing_level IS NULL OR processing_level IN ('RAW', 'PROCESSED')),
+    -- M30: tepat satu sumber asal untuk produk satu sumber; FUSION tanpa
+    -- keduanya (asal-usulnya di fusion_products + data_lineage).
+    CONSTRAINT chk_dprods_single_origin CHECK (
+           (source = 'SENTINEL1'       AND scene_id IS NOT NULL AND nasa_scene_id IS NULL)
+        OR (source IN ('MODIS', 'GPM') AND scene_id IS NULL     AND nasa_scene_id IS NOT NULL)
+        OR (source = 'FUSION'          AND scene_id IS NULL     AND nasa_scene_id IS NULL))
 );
 CREATE INDEX idx_dprods_scene_id            ON data_products (scene_id);
+CREATE INDEX idx_dprods_nasa_scene_id       ON data_products (nasa_scene_id) WHERE nasa_scene_id IS NOT NULL;
 CREATE INDEX idx_dprods_job_id              ON data_products (job_id);
 CREATE INDEX idx_dprods_hash                ON data_products (data_hash_sha256);
 CREATE INDEX idx_dprods_latest              ON data_products (is_latest, product_tier) WHERE is_latest;
@@ -842,7 +858,8 @@ CREATE INDEX idx_dprods_scene_band_tier     ON data_products (scene_id, band_nam
 COMMENT ON TABLE  data_products IS 'Registri setiap berkas keluaran pipeline (COG, TIFF, HDF5) dengan checksum SHA-256.';
 COMMENT ON COLUMN data_products.product_id       IS 'PK surrogate.';
 COMMENT ON COLUMN data_products.product_uuid     IS 'UUID stabil untuk referensi eksternal.';
-COMMENT ON COLUMN data_products.scene_id         IS 'FK -> satellite_scenes: scene asal produk.';
+COMMENT ON COLUMN data_products.scene_id         IS 'FK -> satellite_scenes: scene S1 asal. Terisi hanya untuk source SENTINEL1 (chk_dprods_single_origin).';
+COMMENT ON COLUMN data_products.nasa_scene_id    IS 'FK -> nasa_scenes: granule MODIS/GPM asal. Terisi hanya untuk source MODIS/GPM; FUSION keduanya NULL (M30).';
 COMMENT ON COLUMN data_products.job_id           IS 'FK -> processing_jobs: eksekusi tahap yang menulis berkas ini.';
 COMMENT ON COLUMN data_products.dataset_id       IS 'FK -> datasets: dataset pemilik berkas.';
 COMMENT ON COLUMN data_products.product_tier     IS 'Posisi di lineage (D14): RAW | ALIGNED | DESPECKLED | INDICES | ACCUMULATED | COG | FUSED.';
@@ -863,7 +880,7 @@ COMMENT ON COLUMN data_products.cols             IS 'Jumlah kolom piksel.';
 COMMENT ON COLUMN data_products.band_count       IS 'Jumlah band dalam berkas.';
 COMMENT ON COLUMN data_products.storage_location IS 'Lokasi penyimpanan, selalu LOCAL di Monitor.';
 COMMENT ON COLUMN data_products.is_valid         IS 'false = berkas dinyatakan tidak sah/dihapus.';
-COMMENT ON COLUMN data_products.is_latest        IS 'true = versi terbaru untuk kunci dedup (sumber, band, tier, dataset).';
+COMMENT ON COLUMN data_products.is_latest        IS 'true = versi terbaru untuk kunci dedup (COALESCE(scene_id,0), COALESCE(nasa_scene_id,0), band, tier, dataset); FUSION didedup per file_path (K3).';
 COMMENT ON COLUMN data_products.created_at       IS 'Waktu baris dibuat.';
 COMMENT ON COLUMN data_products.updated_at       IS 'Waktu baris terakhir diubah (trigger).';
 

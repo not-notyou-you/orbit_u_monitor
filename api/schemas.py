@@ -50,7 +50,9 @@ class SceneListResponse(BaseModel):
 class ProductItem(BaseModel):
     product_id: int
     product_uuid: str
-    scene_id: int
+    # M30: S1 -> scene_id, MODIS/GPM -> nasa_scene_id, FUSION -> keduanya None.
+    scene_id: int | None
+    nasa_scene_id: int | None = None
     job_id: int
     dataset_id: int | None = None
     product_tier: str

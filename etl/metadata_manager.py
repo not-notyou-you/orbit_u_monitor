@@ -76,11 +76,30 @@ class MetadataManager:
 
     def insert_processing_job(
         self,
-        scene_id: int,
+        scene_id: int | None,
         stage_name: str,
         attempt_number: int = 1,
         parameters: dict | None = None,
+        *,
+        nasa_scene_id: int | None = None,
     ) -> int:
+        """Daftarkan satu eksekusi tahap.
+
+        Jangkar job (M30): `scene_id` untuk tahap S1, `nasa_scene_id` untuk
+        tahap MODIS/GPM, atau keduanya None untuk tahap lintas sumber
+        (FUSION). Job berjangkar didedup per (jangkar, tahap, percobaan) --
+        pemanggil yang mendaftar ulang mendapat job yang sama. Job tanpa
+        jangkar tidak punya kunci alami, jadi setiap panggilan membuat baris
+        baru.
+        """
+        if scene_id is not None and nasa_scene_id is not None:
+            raise ValueError("A processing job is anchored to scene_id OR nasa_scene_id, not both")
+        if scene_id is not None:
+            anchor = ("scene", ProcessingJob.scene_id, scene_id)
+        elif nasa_scene_id is not None:
+            anchor = ("nasa_scene", ProcessingJob.nasa_scene_id, nasa_scene_id)
+        else:
+            anchor = None
         with self._db.session() as sess:
             stage = sess.scalar(
                 select(ProcessingStage).where(ProcessingStage.stage_name == stage_name)
@@ -88,22 +107,25 @@ class MetadataManager:
             if not stage:
                 raise ValueError(f"Unknown stage_name: '{stage_name}'. Check processing_stages table.")
 
-            existing_job_id = sess.scalar(
-                select(ProcessingJob.job_id).where(
-                    ProcessingJob.scene_id == scene_id,
-                    ProcessingJob.stage_id == stage.stage_id,
-                    ProcessingJob.attempt_number == attempt_number,
+            if anchor is not None:
+                label, column, value = anchor
+                existing_job_id = sess.scalar(
+                    select(ProcessingJob.job_id).where(
+                        column == value,
+                        ProcessingJob.stage_id == stage.stage_id,
+                        ProcessingJob.attempt_number == attempt_number,
+                    )
                 )
-            )
-            if existing_job_id:
-                logger.warning(
-                    "[JOB] Duplicate job skipped: scene=%d stage=%s attempt=%d (job_id=%d)",
-                    scene_id, stage_name, attempt_number, existing_job_id,
-                )
-                return existing_job_id
+                if existing_job_id:
+                    logger.warning(
+                        "[JOB] Duplicate job skipped: %s=%d stage=%s attempt=%d (job_id=%d)",
+                        label, value, stage_name, attempt_number, existing_job_id,
+                    )
+                    return existing_job_id
 
             job = ProcessingJob(
                 scene_id=scene_id,
+                nasa_scene_id=nasa_scene_id,
                 stage_id=stage.stage_id,
                 attempt_number=attempt_number,
                 status=JobStatusEnum.QUEUED,
@@ -114,8 +136,8 @@ class MetadataManager:
             sess.flush()
             job_id = job.job_id
 
-        logger.info("[JOB] Created job_id=%d scene=%d stage=%s attempt=%d",
-                    job_id, scene_id, stage_name, attempt_number)
+        logger.info("[JOB] Created job_id=%d scene=%s nasa_scene=%s stage=%s attempt=%d",
+                    job_id, scene_id, nasa_scene_id, stage_name, attempt_number)
         return job_id
 
     def start_job(self, job_id: int) -> None:
@@ -243,7 +265,7 @@ class MetadataManager:
 
     def insert_data_product(
         self,
-        scene_id: int,
+        scene_id: int | None,
         job_id: int,
         product_tier: str,
         source: str,
@@ -264,8 +286,18 @@ class MetadataManager:
         dataset_id: int | None = None,
         processing_level: str | None = None,
         supersede_same_path: bool = False,
+        nasa_scene_id: int | None = None,
     ) -> int:
         """Daftarkan satu file keluaran ke `data_products`.
+
+        Asal produk (M30, chk_dprods_single_origin): SENTINEL1 mengisi
+        `scene_id`, MODIS/GPM mengisi `nasa_scene_id` (granule asal), FUSION
+        tidak mengisi keduanya -- asal-usulnya ada di fusion_products dan
+        data_lineage. Kunci dedup is_latest produk satu sumber adalah
+        (scene_id, nasa_scene_id, band_name, tier, dataset_id). Produk FUSION
+        tidak punya jangkar scene, jadi kunci itu akan menyamakan stack semua
+        tanggal; identitasnya adalah berkasnya, sehingga FUSION selalu didedup
+        lewat `supersede_same_path` (IMPLEMENTATION_NOTES K3).
 
         `processing_level` ("RAW" | "PROCESSED") adalah level di
         dataset_source_config yang memproduksi artefak ini — beda dari
@@ -298,17 +330,24 @@ class MetadataManager:
         # Nama warisan tidak pernah ditulis lagi (D14): dipetakan ke nama baru
         # di sini, satu-satunya jalur tulis data_products.
         product_tier = tn.canonical_tier(product_tier, source)
+        anchored = scene_id is not None or nasa_scene_id is not None
+        if not anchored:
+            supersede_same_path = True
 
         with self._db.session() as sess:
-            sess.query(DataProduct).filter(
-                and_(
-                    DataProduct.scene_id == scene_id,
-                    DataProduct.band_name == band_name,
-                    DataProduct.product_tier.in_(tn.equivalent_tiers(product_tier)),
-                    DataProduct.dataset_id == dataset_id,
-                    DataProduct.is_latest == True,
-                )
-            ).update({"is_latest": False})
+            if anchored:
+                sess.query(DataProduct).filter(
+                    and_(
+                        DataProduct.scene_id.is_(None) if scene_id is None
+                        else DataProduct.scene_id == scene_id,
+                        DataProduct.nasa_scene_id.is_(None) if nasa_scene_id is None
+                        else DataProduct.nasa_scene_id == nasa_scene_id,
+                        DataProduct.band_name == band_name,
+                        DataProduct.product_tier.in_(tn.equivalent_tiers(product_tier)),
+                        DataProduct.dataset_id == dataset_id,
+                        DataProduct.is_latest == True,
+                    )
+                ).update({"is_latest": False})
 
             if supersede_same_path:
                 sess.query(DataProduct).filter(
@@ -321,6 +360,7 @@ class MetadataManager:
 
             product = DataProduct(
                 scene_id=scene_id,
+                nasa_scene_id=nasa_scene_id,
                 job_id=job_id,
                 dataset_id=dataset_id,
                 product_tier=ProductTierEnum(product_tier),
@@ -347,8 +387,8 @@ class MetadataManager:
             sess.flush()
             product_id = product.product_id
 
-        logger.info("[PRODUCT] Registered product_id=%d scene=%d band=%s tier=%s level=%s source=%s dataset=%s file=%s",
-                    product_id, scene_id, band_name, product_tier, processing_level,
+        logger.info("[PRODUCT] Registered product_id=%d scene=%s nasa_scene=%s band=%s tier=%s level=%s source=%s dataset=%s file=%s",
+                    product_id, scene_id, nasa_scene_id, band_name, product_tier, processing_level,
                     source, dataset_id, file_name)
         return product_id
 
@@ -359,8 +399,8 @@ class MetadataManager:
         Dipakai cleanup tier parsial. mark_products_invalid() di bawah
         mencocokkan lewat scene_id, yang tidak cukup untuk produk aux
         MODIS/GPM: file-nya ditulis saat memproses satu scene Sentinel-1,
-        tapi barisnya menempel ke SatelliteScene placeholder per-tanggal
-        (module9_fusion._resolve_aux_scene), bukan ke scene S1 itu."""
+        tapi barisnya menempel ke granule nasa_scenes asalnya (M30), bukan ke
+        scene S1 itu."""
         if not paths:
             return 0
         with self._db.session() as sess:

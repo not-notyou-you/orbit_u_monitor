@@ -562,8 +562,12 @@ class ProcessingJob(Base):
     job_id = Column(BigInteger, primary_key=True, autoincrement=True)
     job_uuid = Column(UUID(as_uuid=True), nullable=False, unique=True,
                        server_default=text("gen_random_uuid()"))
+    # M30: jangkar job adalah scene S1 ATAU granule NASA, atau tidak keduanya
+    # (FUSION). chk_pjobs_single_anchor di monitor_schema.sql.
     scene_id = Column(Integer, ForeignKey("satellite_scenes.scene_id",
-                                           ondelete="CASCADE"), nullable=False)
+                                           ondelete="CASCADE"))
+    nasa_scene_id = Column(BigInteger, ForeignKey("nasa_scenes.nasa_scene_id",
+                                                  ondelete="CASCADE"))
     stage_id = Column(Integer, ForeignKey("processing_stages.stage_id",
                                            ondelete="RESTRICT"), nullable=False)
     attempt_number = Column(SmallInteger, nullable=False, default=1)
@@ -613,8 +617,12 @@ class DataProduct(Base):
     product_id = Column(BigInteger, primary_key=True, autoincrement=True)
     product_uuid = Column(UUID(as_uuid=True), nullable=False, unique=True,
                            server_default=text("gen_random_uuid()"))
+    # M30: S1 -> scene_id, MODIS/GPM -> nasa_scene_id, FUSION -> keduanya NULL
+    # (chk_dprods_single_origin di monitor_schema.sql).
     scene_id = Column(Integer, ForeignKey("satellite_scenes.scene_id",
-                                           ondelete="CASCADE"), nullable=False)
+                                           ondelete="CASCADE"))
+    nasa_scene_id = Column(BigInteger, ForeignKey("nasa_scenes.nasa_scene_id",
+                                                  ondelete="CASCADE"))
     job_id = Column(BigInteger, ForeignKey("processing_jobs.job_id",
                                             ondelete="RESTRICT"), nullable=False)
     dataset_id = Column(Integer, ForeignKey("datasets.dataset_id", ondelete="CASCADE"))

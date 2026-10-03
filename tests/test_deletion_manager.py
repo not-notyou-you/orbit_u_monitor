@@ -2,11 +2,13 @@
 """
 Tests untuk penghapusan dataset (etl/deletion_manager.py dan
 DatasetManager._spawn_deletion_runner): file yang ditulis job yang telat
-berhenti dan scene placeholder NASA_AUX tidak boleh tertinggal yatim.
+berhenti, dan produk MODIS/GPM/FUSION dataset itu tidak boleh tertinggal
+yatim (M30: tanpa scene placeholder NASA_AUX_*).
 """
 
 from __future__ import annotations
 
+import hashlib
 import threading
 import time
 from datetime import datetime, timezone
@@ -15,7 +17,7 @@ import pytest
 
 from etl import dataset_manager as dsm
 from etl import folder_manager as fm
-from etl.database_client import Dataset, SatelliteScene
+from etl.database_client import DataProduct, Dataset, NasaScene
 from etl.deletion_manager import DeletionManager
 
 BBOX_WKT = "POLYGON((106.4 -6.7, 107.2 -6.7, 107.2 -5.9, 106.4 -5.9, 106.4 -6.7))"
@@ -31,18 +33,6 @@ def data_root(tmp_path, monkeypatch):
 def _dataset_name(db_client, dataset_id):
     with db_client.session() as sess:
         return sess.get(Dataset, dataset_id).name
-
-
-def _aux_scene(meta, region_id, pid):
-    return meta.insert_satellite_scene(
-        product_identifier=pid,
-        acquisition_datetime=datetime(2024, 1, 15, tzinfo=timezone.utc),
-        region_id=region_id,
-        bbox_wkt=BBOX_WKT,
-        orbit_direction="ASCENDING",
-        resolution_m=250,
-        instrument_mode="AUX",
-    )
 
 
 def test_delete_all_sweeps_files_written_after_manifest(
@@ -77,30 +67,48 @@ def test_delete_all_sweeps_files_written_after_manifest(
         assert sess.get(Dataset, sample_dataset) is None
 
 
-def test_delete_all_removes_only_own_aux_placeholders(
+def _aux_product(meta, dataset_id, nasa_scene_id, tag):
+    """Produk MODIS/GPM berjangkar granule (M30) milik `dataset_id`."""
+    job_id = meta.insert_processing_job(None, "DOWNLOAD", nasa_scene_id=nasa_scene_id)
+    return meta.insert_data_product(
+        scene_id=None, nasa_scene_id=nasa_scene_id, job_id=job_id, dataset_id=dataset_id,
+        product_tier="INDICES", source="MODIS", product_type="MODIS_NDVI",
+        band_name="NDVI", file_path=f"/tmp/del_{tag}.tif", file_name=f"del_{tag}.tif",
+        file_size_mb=1.0, data_hash_sha256=hashlib.sha256(tag.encode()).hexdigest(),
+    )
+
+
+def test_delete_all_removes_own_aux_products_keeps_shared_granule(
     db_client, meta, sample_dataset, sample_region, data_root
 ):
-    """Placeholder NASA_AUX dataset ini dihapus; milik dataset lain yang id-nya
-    cocok dengan pola LIKE '_{id}_' (mis. 1{id}) tetap ada."""
+    """M30: produk MODIS/GPM dataset ini ikut terhapus bersama datasetnya;
+    granule nasa_scenes (dipakai bersama antar dataset) dan produk dataset
+    lain pada granule yang sama tetap ada. Menggantikan tes placeholder
+    NASA_AUX_* yang sudah tidak ada."""
     name = _dataset_name(db_client, sample_dataset)
-    stamp = datetime.now().strftime("%H%M%S%f")[:8]
-    own = [
-        _aux_scene(meta, sample_region, f"NASA_AUX_MODIS_{sample_dataset}_{stamp}"),
-        _aux_scene(meta, sample_region, f"NASA_AUX_GPM_{sample_dataset}_{stamp}"),
-    ]
-    other_pid = f"NASA_AUX_MODIS_1{sample_dataset}_{stamp}"
-    other = _aux_scene(meta, sample_region, other_pid)
+    stamp = datetime.now().strftime("%H%M%S%f")
+    nasa_id = meta.insert_nasa_scene(
+        source="MODIS", tile_id="MOSAIC", product_short_name=f"MOD09A1_{stamp}"[:50],
+        acquisition_date=datetime(2024, 1, 15).date(), region_id=sample_region,
+    )
+    with db_client.session() as sess:
+        other = Dataset(
+            name=f"OTHER_{stamp}", region_id=sample_region,
+            bbox=f"SRID=4326;{BBOX_WKT}", bbox_wkt=BBOX_WKT,
+            date_start=datetime(2024, 1, 1).date(), date_end=datetime(2024, 1, 31).date(),
+            required_tiers=["COG"], dataset_kind="STANDARD", status="DRAFT",
+        )
+        sess.add(other)
+        sess.flush()
+        other_id = other.dataset_id
+    own = _aux_product(meta, sample_dataset, nasa_id, f"own_{stamp}")
+    kept = _aux_product(meta, other_id, nasa_id, f"kept_{stamp}")
 
-    try:
-        DeletionManager(db_client, sample_dataset, name).delete_all()
-        with db_client.session() as sess:
-            assert all(sess.get(SatelliteScene, sid) is None for sid in own)
-            assert sess.get(SatelliteScene, other) is not None
-    finally:
-        with db_client.session() as sess:
-            leftover = sess.get(SatelliteScene, other)
-            if leftover is not None:
-                sess.delete(leftover)
+    DeletionManager(db_client, sample_dataset, name).delete_all()
+    with db_client.session() as sess:
+        assert sess.get(DataProduct, own) is None
+        assert sess.get(DataProduct, kept) is not None
+        assert sess.get(NasaScene, nasa_id) is not None
 
 
 def test_wait_thread_exit_waits_for_job_thread():

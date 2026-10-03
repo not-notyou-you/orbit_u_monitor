@@ -33,6 +33,7 @@ def _product_to_schema(p: DataProduct) -> ProductItem:
         product_id       = p.product_id,
         product_uuid     = str(p.product_uuid),
         scene_id         = p.scene_id,
+        nasa_scene_id    = p.nasa_scene_id,
         job_id           = p.job_id,
         product_tier     = p.product_tier.value,
         source           = p.source,

@@ -11,6 +11,8 @@ from etl.database_client import (
     DatabaseClient,
     DataProduct,
     DatasetJob,
+    FusionProduct,
+    NasaScene,
     SatelliteScene,
     SceneJobState,
     SOURCE_NAME_ORDER,
@@ -416,15 +418,30 @@ class DatasetManager:
         """Semua tanggal akuisisi (YYYYMMDD) scene yang punya data_products
         untuk dataset ini — dipakai untuk ringkasan metadata.json, karena
         layout on-disk (tier-first) tidak lagi punya folder tanggal di
-        level teratas untuk dijelajahi langsung."""
+        level teratas untuk dijelajahi langsung.
+
+        Tiga asal tanggal (M30): scene S1 produk, granule nasa_scenes produk
+        MODIS/GPM, dan feature_date stack fusion (hari tanpa S1 tidak punya
+        scene). Dulu ketiganya terjaring lewat scene placeholder NASA_AUX_*."""
         with self._db.session() as sess:
-            rows = sess.scalars(
+            s1 = sess.scalars(
                 select(SatelliteScene.acquisition_datetime)
                 .join(DataProduct, DataProduct.scene_id == SatelliteScene.scene_id)
                 .where(DataProduct.dataset_id == dataset_id)
                 .distinct()
             ).all()
-        return sorted({dt.strftime("%Y%m%d") for dt in rows})
+            aux = sess.scalars(
+                select(NasaScene.acquisition_date)
+                .join(DataProduct, DataProduct.nasa_scene_id == NasaScene.nasa_scene_id)
+                .where(DataProduct.dataset_id == dataset_id)
+                .distinct()
+            ).all()
+            fused = sess.scalars(
+                select(FusionProduct.feature_date)
+                .where(FusionProduct.dataset_id == dataset_id)
+                .distinct()
+            ).all()
+        return sorted({d.strftime("%Y%m%d") for d in (*s1, *aux, *fused)})
 
     def get_progress(self, dataset_id: int) -> dict | None:
         with self._db.session() as sess:

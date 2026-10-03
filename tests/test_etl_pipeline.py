@@ -13,6 +13,7 @@ Run:
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime
 
 import pytest
 from etl import tier_names as tn
@@ -45,7 +46,10 @@ class TestEndToEndFlow:
         assert ids["vh_metric_id"] > 0
 
     def test_pipeline_all_jobs_succeed(self, db_client, sample_region):
-        """After full pipeline run, all 5 jobs must have status=SUCCESS."""
+        """After full pipeline run, all 5 jobs must have status=SUCCESS.
+
+        M30: 4 job berjangkar scene S1 (DOWNLOAD, CROP, LEE_FILTER,
+        QUALITY_ANALYTICS) + 1 job FUSION tanpa jangkar scene."""
         from etl.seed_data import seed
 
         ids = seed(db_client)
@@ -61,8 +65,8 @@ class TestEndToEndFlow:
         with db_client.session() as sess:
             success = sess.scalar(text("""
                 SELECT COUNT(*) FROM processing_jobs
-                WHERE scene_id = :sid AND status = 'SUCCESS'
-            """), {"sid": scene_id})
+                WHERE (scene_id = :sid OR job_id = :fj) AND status = 'SUCCESS'
+            """), {"sid": scene_id, "fj": ids["fusion_job_id"]})
         assert success == 5, f"Expected 5 successful stages, got {success}"
 
     def test_pipeline_product_tiers(self, db_client, sample_region):
@@ -84,13 +88,15 @@ class TestEndToEndFlow:
                     f"Missing {tier} product for band={band}"
                 )
 
-        # Stack fusion tinggal di tier FUSED sendiri; COG berisi
-        # produk analysis-ready per-source (migrasi 013).
-        fusion_products = meta.get_products_by_scene(
-            ids["scene_id"], tier="FUSED", latest_only=True
-        )
-        assert len(fusion_products) == 1, "FUSED should have exactly 1 fused product, not per-band"
-        assert fusion_products[0]["band_name"] == "FUSION"
+        # Stack fusion tinggal di tier FUSED sendiri dan, sejak M30, tidak
+        # menempel ke scene S1: tidak ada produk FUSED di bawah scene ini,
+        # dan satu-satunya stack dibaca lewat product_id-nya.
+        assert meta.get_products_by_scene(ids["scene_id"], tier="FUSED") == []
+        from etl.database_client import DataProduct
+        with db_client.session() as sess:
+            fused = sess.get(DataProduct, ids["gold_fusion_id"])
+        assert fused.band_name == "FUSION" and fused.is_latest
+        assert fused.scene_id is None and fused.nasa_scene_id is None
 
 
 # ---------------------------------------------------------------------------
@@ -115,21 +121,27 @@ class TestMetadataTracking:
         assert stage_names == set(stages)
 
     def test_product_linked_to_job(self, db_client, meta, sample_scene):
-        """Data products must be linked to the producing job."""
-        job_id = meta.insert_processing_job(sample_scene, "FUSION")
+        """Data products must be linked to the producing job.
+
+        M30: produk & job FUSION tidak berjangkar scene, jadi dibaca lewat
+        product_id, bukan get_products_by_scene."""
+        from etl.database_client import DataProduct
+
+        job_id = meta.insert_processing_job(None, "FUSION")
         meta.start_job(job_id)
 
         prod_id = meta.insert_data_product(
-            scene_id=sample_scene, job_id=job_id,
+            scene_id=None, job_id=job_id,
             product_tier="FUSED", source="FUSION", product_type="FUSION_H5",
             band_name="FUSION", file_path="/tmp/test_fusion.h5", file_name="test_fusion.h5",
             file_size_mb=40.0, data_hash_sha256=fake_hash("TRACK_FUSION"), file_format="HDF5",
         )
 
-        products = meta.get_products_by_scene(sample_scene, tier="FUSED")
-        fusion = next((p for p in products if p["band_name"] == "FUSION"), None)
+        with db_client.session() as sess:
+            fusion = sess.get(DataProduct, prod_id)
         assert fusion is not None
-        assert fusion["job_id"] == job_id
+        assert fusion.job_id == job_id
+        assert fusion.scene_id is None and fusion.nasa_scene_id is None
 
     def test_quality_linked_to_product(self, db_client, meta, sample_scene):
         """Quality metrics must reference both scene and product."""
@@ -153,22 +165,25 @@ class TestMetadataTracking:
         assert vh["quality_score"] == 78.5
 
     def test_is_latest_flag_update(self, db_client, meta, sample_scene):
-        """Inserting a new product for same scene/band/tier marks old one as not latest."""
-        job_id = meta.insert_processing_job(sample_scene, "FUSION")
+        """Inserting a new product for same scene/band/tier marks old one as not latest.
+
+        Memakai produk S1: sejak M30 produk FUSION tidak berjangkar scene dan
+        didedup per berkas (lihat test_fusion_is_latest_follows_file_path)."""
+        job_id = meta.insert_processing_job(sample_scene, "GOLD_EXPORT")
 
         # First product
         pid1 = meta.insert_data_product(
             scene_id=sample_scene, job_id=job_id,
-            product_tier="FUSED", source="FUSION", product_type="FUSION_H5",
-            band_name="FUSION", file_path="/tmp/f1.h5", file_name="f1.h5",
-            file_size_mb=40.0, data_hash_sha256=fake_hash("LATEST_V1"), file_format="HDF5",
+            product_tier="COG", source="SENTINEL1", product_type="S1_COG",
+            band_name="VV_LATEST", file_path="/tmp/l1.tif", file_name="l1.tif",
+            file_size_mb=40.0, data_hash_sha256=fake_hash("LATEST_V1"),
         )
-        # Second product (same tier+band → should mark pid1 as not latest)
+        # Second product (same scene+tier+band → should mark pid1 as not latest)
         pid2 = meta.insert_data_product(
             scene_id=sample_scene, job_id=job_id,
-            product_tier="FUSED", source="FUSION", product_type="FUSION_H5",
-            band_name="FUSION", file_path="/tmp/f2.h5", file_name="f2.h5",
-            file_size_mb=39.0, data_hash_sha256=fake_hash("LATEST_V2"), file_format="HDF5",
+            product_tier="COG", source="SENTINEL1", product_type="S1_COG",
+            band_name="VV_LATEST", file_path="/tmp/l2.tif", file_name="l2.tif",
+            file_size_mb=39.0, data_hash_sha256=fake_hash("LATEST_V2"),
         )
 
         from etl.database_client import DataProduct
@@ -177,6 +192,30 @@ class TestMetadataTracking:
             p2 = sess.get(DataProduct, pid2)
         assert p1.is_latest is False, "Old product should be marked not latest"
         assert p2.is_latest is True,  "New product should be latest"
+
+    def test_fusion_is_latest_follows_file_path(self, db_client, meta):
+        """K3: dua stack FUSION berkas berbeda (tanggal berbeda) sama-sama
+        latest; mendaftarkan ulang berkas yang sama menandai yang lama usang."""
+        from etl.database_client import DataProduct
+
+        job_id = meta.insert_processing_job(None, "FUSION")
+
+        def fused(path, label):
+            return meta.insert_data_product(
+                scene_id=None, job_id=job_id,
+                product_tier="FUSED", source="FUSION", product_type="FUSION_H5",
+                band_name="FUSION_PROCESSED", file_path=path, file_name=path.rsplit("/", 1)[-1],
+                file_size_mb=40.0, data_hash_sha256=fake_hash(label), file_format="HDF5",
+            )
+
+        day1 = fused("/tmp/fusion_20240101.h5", "K3_D1")
+        day2 = fused("/tmp/fusion_20240102.h5", "K3_D2")
+        day1_again = fused("/tmp/fusion_20240101.h5", "K3_D1B")
+
+        with db_client.session() as sess:
+            assert sess.get(DataProduct, day2).is_latest is True
+            assert sess.get(DataProduct, day1).is_latest is False
+            assert sess.get(DataProduct, day1_again).is_latest is True
 
 
 # ---------------------------------------------------------------------------
@@ -277,7 +316,7 @@ class TestLineageTracking:
         }
         assert not unresolved, f"transform types with no processing_stages row: {unresolved}"
 
-    def test_silver_to_gold_export_lineage_is_writable(self, db_client, lineage, meta, sample_scene):
+    def test_silver_to_gold_export_lineage_is_writable(self, db_client, lineage, meta, sample_scene, sample_region):
         """The exact write that failed the GOLD stage in production: a
         SILVER -> GOLD link tagged GOLD_EXPORT, for each of the three sources
         the GOLD tier now holds (Sentinel-1, MODIS, GPM)."""
@@ -294,19 +333,29 @@ class TestLineageTracking:
                 )
             )
 
+        # M30: MODIS/GPM menempel pada granule nasa_scenes, bukan scene S1.
+        def anchor(source):
+            if source == "SENTINEL1":
+                return {"scene_id": sample_scene}
+            return {"scene_id": None, "nasa_scene_id": meta.insert_nasa_scene(
+                source=source, tile_id="T", product_short_name=f"GE_{source}",
+                acquisition_date=datetime(2024, 1, 15).date(), region_id=sample_region,
+            )}
+
         for source, product_type, band in (
             ("SENTINEL1", "LEE_FILTERED", "VV"),
             ("MODIS",     "MODIS_SILVER", "NDVI"),
             ("GPM",       "GPM_SILVER",   "PRECIP"),
         ):
+            origin = anchor(source)
             silver_id = meta.insert_data_product(
-                scene_id=sample_scene, job_id=lee_job,
+                **origin, job_id=lee_job,
                 product_tier=tn.RANK2_BY_SOURCE[source], source=source, product_type=product_type, band_name=band,
                 file_path=f"/tmp/silver_{source}.tif", file_name=f"silver_{source}.tif",
                 file_size_mb=48.0, data_hash_sha256=fake_hash(f"GE_SILVER_{source}"),
             )
             gold_id = meta.insert_data_product(
-                scene_id=sample_scene, job_id=gold_job,
+                **origin, job_id=gold_job,
                 product_tier="COG", source=source, product_type="COG", band_name=band,
                 file_path=f"/tmp/gold_{source}.tif", file_name=f"gold_{source}.tif",
                 file_size_mb=32.0, data_hash_sha256=fake_hash(f"GE_GOLD_{source}"),
@@ -326,7 +375,7 @@ class TestLineageTracking:
         dl_job     = meta.insert_processing_job(sample_scene, "DOWNLOAD")
         crop_job   = meta.insert_processing_job(sample_scene, "CROP")
         lee_job    = meta.insert_processing_job(sample_scene, "LEE_FILTER")
-        fusion_job = meta.insert_processing_job(sample_scene, "FUSION")
+        fusion_job = meta.insert_processing_job(None, "FUSION")
 
         raw_id = meta.insert_data_product(
             scene_id=sample_scene, job_id=dl_job,
@@ -347,7 +396,7 @@ class TestLineageTracking:
             file_size_mb=45.0, data_hash_sha256=fake_hash("LIN_SILVER"),
         )
         gold_id = meta.insert_data_product(
-            scene_id=sample_scene, job_id=fusion_job,
+            scene_id=None, job_id=fusion_job,
             product_tier="FUSED", source="FUSION",   product_type="FUSION_H5", band_name="FUSION",
             file_path="/tmp/gold.h5", file_name="gold.h5",
             file_size_mb=41.0, data_hash_sha256=fake_hash("LIN_GOLD"), file_format="HDF5",

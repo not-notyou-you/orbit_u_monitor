@@ -11,7 +11,7 @@ from etl.database_client import (
     DataProduct,
     Dataset,
     DatabaseClient,
-    SatelliteScene,
+    ProcessingJob,
 )
 
 logger = logging.getLogger(__name__)
@@ -257,29 +257,38 @@ class DeletionManager:
                 return
             if not dataset.is_deletable:
                 raise RuntimeError(f"dataset_id={self._dataset_id} must not be deleted (is_deletable=False)")
+            removed = self._delete_non_s1_products(sess)
             sess.delete(dataset)
-            removed = self._delete_aux_placeholder_scenes(sess)
         if removed:
             logger.info(
-                "[DELETE] dataset_id=%d: %d scene placeholder NASA_AUX dihapus",
+                "[DELETE] dataset_id=%d: %d produk MODIS/GPM/FUSION dihapus",
                 self._dataset_id, removed,
             )
 
-    def _delete_aux_placeholder_scenes(self, sess) -> int:
-        """Scene placeholder MODIS/GPM (module9_fusion._resolve_aux_scene,
-        pid `NASA_AUX_{SOURCE}_{dataset_id}_{YYYYMMDD}`) milik dataset ini.
+    def _delete_non_s1_products(self, sess) -> int:
+        """Produk MODIS/GPM/FUSION milik dataset ini, beserta job FUSION-nya.
 
-        Scene S1 sungguhan dipakai bersama antar dataset dan tidak disentuh;
-        placeholder ini sebaliknya eksklusif per dataset, dan tanpa dihapus
-        ia tertinggal selamanya tanpa dataset (40 baris untuk jakarta_part2).
-        Dicocokkan dengan regex, bukan LIKE: '_' di LIKE adalah wildcard,
-        sehingga pola dataset 5 akan ikut menangkap placeholder dataset 15."""
-        pattern = rf"^NASA_AUX_[A-Z0-9]+_{self._dataset_id}_[0-9]{{8}}$"
-        scenes = sess.scalars(
-            select(SatelliteScene).where(
-                SatelliteScene.product_identifier.regexp_match(pattern)
+        Sebelum M30 baris-baris ini menempel pada scene placeholder
+        NASA_AUX_* per dataset dan ikut terhapus lewat cascade scene itu. Kini
+        produk MODIS/GPM menempel pada granule nasa_scenes yang dipakai
+        bersama antar dataset, dan produk FUSION tidak menempel pada scene
+        mana pun -- jadi dihapus langsung di sini. Produk S1 (pada scene S1
+        sungguhan yang juga dipakai bersama) diperlakukan seperti dulu. Job
+        MODIS/GPM berjangkar pada granule bersama dan tidak disentuh; job
+        FUSION tanpa jangkar milik dataset ini (parameters_json.dataset_id)
+        ikut dihapus setelah produknya."""
+        products = sess.scalars(
+            select(DataProduct).where(
+                DataProduct.dataset_id == self._dataset_id,
+                DataProduct.source != "SENTINEL1",
             )
         ).all()
-        for scene in scenes:
-            sess.delete(scene)
-        return len(scenes)
+        for product in products:
+            sess.delete(product)
+        sess.flush()
+        sess.query(ProcessingJob).filter(
+            ProcessingJob.scene_id.is_(None),
+            ProcessingJob.nasa_scene_id.is_(None),
+            ProcessingJob.parameters_json["dataset_id"].astext == str(self._dataset_id),
+        ).delete(synchronize_session=False)
+        return len(products)

@@ -58,7 +58,6 @@ from etl import WARP_THREADS
 from rasterio.crs import CRS
 from rasterio.enums import Resampling
 from rasterio.warp import reproject
-from shapely.geometry import box
 from sqlalchemy import select, update
 
 from etl import folder_manager as fm
@@ -743,42 +742,20 @@ def _empty_produced() -> dict[str, list[str]]:
     return {tn.ALIGNED: [], tn.INDICES: [], tn.ACCUMULATED: [], tn.COG: []}
 
 
-def _resolve_aux_scene(
-    db: DatabaseClient,
-    dataset_id: int,
-    region_id: int,
-    bbox_wkt: str,
-    source: str,
-    target_date: date_type,
-) -> int:
-    """Placeholder SatelliteScene untuk menempelkan data_products MODIS/GPM
-    (yang tidak terikat ke satu scene Sentinel-1 mana pun) ke scene_id valid.
+def _modis_granule(entry: dict, output_date: date_type) -> tuple[str, date_type]:
+    """(product_short_name, acquisition_date) granule asal satu band MODIS.
 
-    Satu placeholder per source per tanggal, bukan satu per dataset. Dedup
-    di MetadataManager.insert_data_product berjalan atas
-    (scene_id, band_name, product_tier, dataset_id): kalau semua tanggal
-    berbagi satu scene_id, mendaftarkan MODIS FLOOD tanggal ke-2 akan
-    menandai FLOOD tanggal ke-1 `is_latest=False` walaupun keduanya masih
-    valid dan dipakai fusion hari masing-masing."""
-    meta = MetadataManager(db)
-    date_key = target_date.strftime("%Y%m%d")
-    pid = f"NASA_AUX_{source.upper()}_{dataset_id}_{date_key}"
-    existing = meta.get_scene_by_pid(pid)
-    if existing:
-        return existing["scene_id"]
-    return meta.insert_satellite_scene(
-        product_identifier=pid,
-        acquisition_datetime=datetime.combine(
-            target_date, datetime.min.time(), tzinfo=timezone.utc
-        ),
-        region_id=region_id,
-        bbox_wkt=bbox_wkt,
-        orbit_direction="ASCENDING",
-        polarization_vv=False,
-        polarization_vh=False,
-        resolution_m=250,
-        instrument_mode="AUX",
-    )
+    FLOOD datang dari MCDWD harian -> granule tanggal output. NDVI/NDWI adalah
+    komposit "observasi clear terakhir" dari beberapa periode MOD09A1 (atau
+    MOD09GA NRT); granule asalnya adalah periode TERAKHIR yang dipakai
+    (PIPELINE.md §5.1). Berkas yang dipakai ulang dari disk tidak membawa
+    daftar periode, jadi jatuh ke tanggal output.
+    """
+    product = str(entry.get("product") or "").split(",")[0].strip()
+    short_name = product or MODIS_PRODUCT_SHORT_NAME
+    periods = [p for p in (entry.get("periods_used") or []) if p]
+    acquisition = date_type.fromisoformat(max(periods)[:10]) if periods else output_date
+    return short_name, acquisition
 
 
 def _aux_plan(db: DatabaseClient, dataset_id: int, source_name: str) -> SourcePlan | None:
@@ -801,45 +778,49 @@ def _register_aux_products(
     nasa_tile_id: str,
     nasa_product_short_name: str,
     acquisition_date: date_type,
-    aux_scene_id: int,
     band_paths: dict[str, str],
     product_type: str,
     tier: str = tn.INDICES,
     processing_level: str = PROCESSED,
-) -> tuple[dict[str, int], int]:
+) -> tuple[dict[str, int], dict[str, int]]:
     """Daftarkan band satu source/tanggal sebagai data_products di `tier`.
 
     `tier`/`processing_level` datang dari SourcePlan.targets(): band level RAW
-    mendarat di BRONZE dan ditandai processing_level='RAW', band jalur penuh
-    di SILVER dan ditandai 'PROCESSED' (DOCS/PIPELINE.md). Sebelum model
-    per-satelit keduanya selalu SILVER/PROCESSED, karena cuma ada satu jalur.
+    mendarat di ALIGNED dan ditandai processing_level='RAW', band jalur penuh
+    di rank 2 dan ditandai 'PROCESSED' (DOCS/PIPELINE.md).
 
-    Mengembalikan ({band: product_id}, job_id) — product_id dipakai
-    _promote_aux_to_gold untuk mencatat lineage SILVER -> GOLD."""
+    Produk menempel pada baris nasa_scenes granule asalnya (M30), bukan lagi
+    pada SatelliteScene placeholder NASA_AUX_*; job DOWNLOAD-nya juga
+    berjangkar pada granule itu.
+
+    Mengembalikan ({band: product_id}, {band: nasa_scene_id}) — keduanya
+    dipakai _promote_aux_to_gold untuk lineage rank 2 -> COG dan untuk
+    menempelkan COG ke granule yang sama."""
     meta = MetadataManager(db)
     lineage = LineageTracker(db)
 
-    job_id = meta.insert_processing_job(
-        aux_scene_id, "DOWNLOAD", parameters={"dataset_id": dataset_id, "source": source.upper()}
-    )
-    # Job ini dulu cuma dibuat, tidak pernah dijalankan/ditutup: setiap
-    # registrasi aux meninggalkan satu baris processing_jobs QUEUED selamanya
-    # (puluhan per dataset FULL_COVERAGE/HYBRID).
-    meta.start_job(job_id)
     product_ids: dict[str, int] = {}
-    try:
-        for band, path in band_paths.items():
-            if not Path(path).exists():
-                continue
-            if _product_exists(db, dataset_id, path):
-                continue
-            meta.insert_nasa_scene(
-                source=nasa_source, tile_id=nasa_tile_id,
-                product_short_name=nasa_product_short_name,
-                acquisition_date=acquisition_date, region_id=region_id, raw_file_path=path,
-            )
+    nasa_ids: dict[str, int] = {}
+    for band, path in band_paths.items():
+        if not Path(path).exists():
+            continue
+        nasa_scene_id = meta.insert_nasa_scene(
+            source=nasa_source, tile_id=nasa_tile_id,
+            product_short_name=nasa_product_short_name,
+            acquisition_date=acquisition_date, region_id=region_id, raw_file_path=path,
+        )
+        nasa_ids[band] = nasa_scene_id
+        if _product_exists(db, dataset_id, path):
+            continue
+        job_id = meta.insert_processing_job(
+            None, "DOWNLOAD", nasa_scene_id=nasa_scene_id,
+            parameters={"dataset_id": dataset_id, "source": source.upper()},
+        )
+        meta.start_job(job_id)
+        try:
             product_ids[band] = meta.insert_data_product(
-                scene_id=aux_scene_id, job_id=job_id, dataset_id=dataset_id,
+                scene_id=None, nasa_scene_id=nasa_scene_id,
+                job_id=job_id, dataset_id=dataset_id,
                 product_tier=tier, source=fm.db_source(source),
                 product_type=product_type, band_name=band,
                 file_path=path, file_name=Path(path).name,
@@ -847,15 +828,15 @@ def _register_aux_products(
                 data_hash_sha256=lineage.compute_sha256(path),
                 processing_level=processing_level,
             )
-    except Exception as exc:
-        meta.complete_job(
-            job_id, status=JobStatusEnum.FAILED,
-            error_code=type(exc).__name__, error_message=str(exc)[:2000],
-        )
-        raise
-    meta.complete_job(job_id)
+        except Exception as exc:
+            meta.complete_job(
+                job_id, status=JobStatusEnum.FAILED,
+                error_code=type(exc).__name__, error_message=str(exc)[:2000],
+            )
+            raise
+        meta.complete_job(job_id)
 
-    return product_ids, job_id
+    return product_ids, nasa_ids
 
 
 def _promote_aux_to_gold(
@@ -865,12 +846,13 @@ def _promote_aux_to_gold(
     dataset_name: str,
     source: str,
     date_key: str,
-    aux_scene_id: int,
+    nasa_scene_ids: dict[str, int],
     silver_paths: dict[str, str],
     silver_product_ids: dict[str, int],
 ) -> dict[str, str]:
-    """Ekspor band SILVER MODIS/GPM satu tanggal ke COG di tier GOLD dan
-    catat produknya + lineage-nya."""
+    """Ekspor band rank 2 MODIS/GPM satu tanggal ke COG dan catat produknya
+    + lineage-nya. COG menempel pada granule nasa_scenes yang sama dengan
+    band asalnya (M30)."""
     meta = MetadataManager(db)
     lineage = LineageTracker(db)
 
@@ -880,17 +862,27 @@ def _promote_aux_to_gold(
     if not gold_paths:
         return {}
 
-    gold_job_id = meta.insert_processing_job(
-        aux_scene_id, "GOLD_EXPORT",
-        parameters={"dataset_id": dataset_id, "source": source.upper(), "date": date_key},
-    )
-    meta.start_job(gold_job_id)
-    try:
-        for band, path in gold_paths.items():
-            if _product_exists(db, dataset_id, path):
-                continue
+    for band, path in gold_paths.items():
+        if _product_exists(db, dataset_id, path):
+            continue
+        nasa_scene_id = nasa_scene_ids.get(band)
+        if nasa_scene_id is None:
+            # Tanpa granule asal produk ini melanggar chk_dprods_single_origin;
+            # band rank 2 yang tidak terdaftar memang tidak bisa dipromosikan.
+            logger.warning(
+                "[M9] COG %s %s tanggal %s dilewati: granule asal tidak terdaftar",
+                source, band, date_key,
+            )
+            continue
+        gold_job_id = meta.insert_processing_job(
+            None, "GOLD_EXPORT", nasa_scene_id=nasa_scene_id,
+            parameters={"dataset_id": dataset_id, "source": source.upper(), "date": date_key},
+        )
+        meta.start_job(gold_job_id)
+        try:
             gold_product_id = meta.insert_data_product(
-                scene_id=aux_scene_id, job_id=gold_job_id, dataset_id=dataset_id,
+                scene_id=None, nasa_scene_id=nasa_scene_id,
+                job_id=gold_job_id, dataset_id=dataset_id,
                 product_tier=tn.COG, source=fm.db_source(source),
                 product_type=m4.gold_product_type(source), band_name=band,
                 file_path=path, file_name=Path(path).name,
@@ -906,13 +898,13 @@ def _promote_aux_to_gold(
                     silver_product_ids[band], gold_product_id, "GOLD_EXPORT", gold_job_id,
                     {"source": source, "date": date_key},
                 )
-    except Exception as exc:
-        meta.complete_job(
-            gold_job_id, status=JobStatusEnum.FAILED,
-            error_code=type(exc).__name__, error_message=str(exc)[:2000],
-        )
-        raise
-    meta.complete_job(gold_job_id)
+        except Exception as exc:
+            meta.complete_job(
+                gold_job_id, status=JobStatusEnum.FAILED,
+                error_code=type(exc).__name__, error_message=str(exc)[:2000],
+            )
+            raise
+        meta.complete_job(gold_job_id)
     return gold_paths
 
 
@@ -948,7 +940,6 @@ def ensure_modis_inputs_for_date(
         )
         return produced
 
-    bbox_wkt = box(*aoi_bbox).wkt
     target_dt = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
 
     try:
@@ -965,19 +956,17 @@ def ensure_modis_inputs_for_date(
     for output in modis_meta["outputs"]:
         output_date = date_type.fromisoformat(output["date"])
         date_key = output_date.strftime("%Y%m%d")
-        aux_scene_id = _resolve_aux_scene(
-            db, dataset_id, region_id, bbox_wkt, "MODIS", output_date
-        )
         # product_type dibedakan per band supaya FLOOD/NDVI/NDWI tetap bisa
         # dipisahkan tanpa mengandalkan nama file.
         for band, entry in output["bands"].items():
+            short_name, granule_date = _modis_granule(entry, output_date)
             for tier, target in entry["targets"].items():
                 path = target["path"]
-                product_ids, _ = _register_aux_products(
+                product_ids, nasa_ids = _register_aux_products(
                     db, dataset_id=dataset_id, region_id=region_id,
                     source="modis", nasa_source=MODIS_SOURCE, nasa_tile_id=MODIS_TILE_ID,
-                    nasa_product_short_name=MODIS_PRODUCT_SHORT_NAME,
-                    acquisition_date=output_date, aux_scene_id=aux_scene_id,
+                    nasa_product_short_name=short_name,
+                    acquisition_date=granule_date,
                     band_paths={band: path},
                     product_type=MODIS_PRODUCT_TYPES[band],
                     tier=tier, processing_level=target["processing_level"],
@@ -987,7 +976,7 @@ def ensure_modis_inputs_for_date(
                     continue
                 gold_paths = _promote_aux_to_gold(
                     db, dataset_id=dataset_id, dataset_name=dataset_name, source="modis",
-                    date_key=date_key, aux_scene_id=aux_scene_id,
+                    date_key=date_key, nasa_scene_ids=nasa_ids,
                     silver_paths={band: path}, silver_product_ids=product_ids,
                 )
                 produced[tn.COG].extend(gold_paths.values())
@@ -1027,7 +1016,6 @@ def ensure_gpm_inputs_for_date(
         )
         return produced
 
-    bbox_wkt = box(*aoi_bbox).wkt
     target_dt = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
     date_key = target_date.strftime("%Y%m%d")
 
@@ -1042,8 +1030,6 @@ def ensure_gpm_inputs_for_date(
         )
         return produced
 
-    aux_scene_id = _resolve_aux_scene(db, dataset_id, region_id, bbox_wkt, "GPM", target_date)
-
     # Dikelompokkan per tier: satu job registrasi per tier, bukan per window.
     by_tier: dict[str, dict[str, dict[str, str]]] = {}
     for window_name, output in gpm_meta["windows"].items():
@@ -1053,11 +1039,11 @@ def ensure_gpm_inputs_for_date(
     for tier, bands in by_tier.items():
         band_paths = {band: target["path"] for band, target in bands.items()}
         level = next(iter(bands.values()))["processing_level"]
-        product_ids, _ = _register_aux_products(
+        product_ids, nasa_ids = _register_aux_products(
             db, dataset_id=dataset_id, region_id=region_id,
             source="gpm", nasa_source=GPM_SOURCE, nasa_tile_id=GPM_TILE_ID,
             nasa_product_short_name=GPM_PRODUCT_SHORT_NAME,
-            acquisition_date=target_date, aux_scene_id=aux_scene_id,
+            acquisition_date=target_date,
             band_paths=band_paths, product_type=GPM_PRODUCT_TYPE,
             tier=tier, processing_level=level,
         )
@@ -1066,7 +1052,7 @@ def ensure_gpm_inputs_for_date(
             continue
         gold_paths = _promote_aux_to_gold(
             db, dataset_id=dataset_id, dataset_name=dataset_name, source="gpm",
-            date_key=date_key, aux_scene_id=aux_scene_id,
+            date_key=date_key, nasa_scene_ids=nasa_ids,
             silver_paths=band_paths, silver_product_ids=product_ids,
         )
         produced[tn.COG].extend(gold_paths.values())
@@ -1715,8 +1701,8 @@ def _build_fusion_stack_for_level(
         # error daripada menduplikasi alur perakitan untuk kasus tanpa-S1.
         if region_id is None:
             raise RuntimeError(
-                "require_s1=False needs a region_id to create the placeholder "
-                "scene to which the fusion data_products are attached"
+                "require_s1=False needs a region_id for the fusion_products row "
+                "of a day without a Sentinel-1 scene"
             )
         logger.info(
             "[M9] tanggal=%s tanpa scene S1 (strategi=%s): stack ditulis dengan "
@@ -1734,9 +1720,9 @@ def _build_fusion_stack_for_level(
             "vv_product_id": None,
             "vh_product_id": None,
             "region_id": region_id,
-            "scene_id": _resolve_aux_scene(
-                db, dataset_id, region_id, box(*aoi_bbox).wkt, "FUSION", s1_date
-            ),
+            # Hari tanpa S1: fusion_products.s1_scene_id NULL (M30), bukan
+            # placeholder NASA_AUX_FUSION_*.
+            "scene_id": None,
             "acquisition_datetime": datetime.combine(
                 s1_date, datetime.min.time(), tzinfo=timezone.utc
             ),
@@ -1992,20 +1978,11 @@ def _build_fusion_stack_for_level(
 
     days_since_s1 = max((abs((d - s1_date).days) for d in found_dates), default=0)
 
-    # Hari yang MEMINJAM scene S1 (FULL_COVERAGE, offset >= 1) tidak boleh
-    # menempelkan data_products-nya ke scene S1 itu. Dedup is_latest di
-    # insert_data_product berjalan atas (scene_id, band_name, tier, dataset_id),
-    # jadi lima hari yang meminjam satu scene saling menandai usang dan hanya
-    # hari terakhir yang tersisa di listing API -- termasuk stack same-day-nya
-    # sendiri (dataset try2: 4 dari 5 stack hilang). Placeholder per tanggal,
-    # sama dengan hari tanpa-S1. s1_scene_id di fusion_products tetap scene
-    # yang benar-benar dipakai.
-    product_scene_id = (
-        s1["scene_id"] if s1_offset_days in (0, None)
-        else _resolve_aux_scene(
-            db, dataset_id, s1["region_id"], box(*aoi_bbox).wkt, "FUSION", s1_date
-        )
-    )
+    # Produk FUSION tidak menempel ke scene mana pun (M30): asal-usulnya ada
+    # di fusion_products (s1_scene_id/modis_scene_id/gpm_scene_id) dan
+    # data_lineage. Dedup is_latest-nya lewat file_path (K3) -- dulu lewat
+    # placeholder NASA_AUX_FUSION_* per tanggal, karena hari yang meminjam
+    # satu scene S1 saling menandai usang (dataset try2: 4 dari 5 stack hilang).
 
     with db.session() as sess:
         # dataset_id ikut kunci (migrasi 021). Tanpa itu dua dataset atas AOI
@@ -2069,7 +2046,7 @@ def _build_fusion_stack_for_level(
     )
 
     fusion_job_id = meta.insert_processing_job(
-        product_scene_id, "FUSION",
+        None, "FUSION",
         parameters={
             "dataset_id": dataset_id, "s1_date": s1_date.isoformat(),
             "processing_level": run_level, "source_levels": source_levels,
@@ -2078,27 +2055,21 @@ def _build_fusion_stack_for_level(
     meta.start_job(fusion_job_id)
     try:
         fusion_product_id = meta.insert_data_product(
-            scene_id=product_scene_id, job_id=fusion_job_id, dataset_id=dataset_id,
+            scene_id=None, job_id=fusion_job_id, dataset_id=dataset_id,
             product_tier=tn.FUSED, source=fm.FUSION_DB_SOURCE,
             product_type="FUSION_H5",
-            # band_name membawa level-nya, bukan cuma "FUSION": dedup is_latest di
-            # insert_data_product berjalan atas (scene_id, band_name, tier,
-            # dataset_id), jadi dua stack tanggal yang sama dengan band_name yang
-            # sama akan membuat stack RAW menandai dirinya sendiri usang begitu
-            # stack PROCESSED didaftarkan — dan hilang dari semua listing API.
+            # band_name membawa level-nya, bukan cuma "FUSION": stack RAW dan
+            # PROCESSED tanggal yang sama tetap dua produk yang berbeda.
             band_name=f"FUSION_{run_level}",
             file_path=str(h5_path), file_name=h5_path.name,
             file_size_mb=round(h5_path.stat().st_size / (1024 ** 2), 3),
             data_hash_sha256=checksum,
             file_format="HDF5", rows=height, cols=width,
             processing_level=run_level,
-            # Identitas stack fusion adalah BERKASNYA, bukan scene primary-nya.
-            # Nama berkas cuma memuat tanggal, sementara produknya didaftarkan
-            # atas nama anggota pertama tanggal itu — dan anggota pertama bisa
-            # berganti antar jalan kalau job terputus lalu dilanjutkan dengan
-            # himpunan scene yang berbeda. Tanpa ini, jalan kedua menimpa
-            # berkasnya tapi baris jalan pertama tetap hidup mengklaim ukuran
-            # yang sudah tidak ada (dataset 26, fusion_20251201).
+            # Identitas stack fusion adalah BERKASNYA: jalan kedua yang menimpa
+            # berkas yang sama harus menandai baris jalan pertama usang
+            # (dataset 26, fusion_20251201). Untuk produk tanpa jangkar scene
+            # insert_data_product memaksa ini juga (K3).
             supersede_same_path=True,
         )
         # Induk lineage: produk S1 scene utama, DITAMBAH produk frame lain

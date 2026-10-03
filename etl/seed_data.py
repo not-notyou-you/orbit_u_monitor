@@ -270,14 +270,15 @@ def seed(db: DatabaseClient) -> dict:
     #    the only GOLD deliverable. Combines both SILVER bands, so lineage
     #    records both VV and VH as parents of the one fusion product.
     # ------------------------------------------------------------------
+    # M30: produk & job FUSION tidak menempel ke scene mana pun.
     fusion_job_id = meta.insert_processing_job(
-        scene_id, "FUSION",
+        None, "FUSION",
         parameters={"s1_date": ACQUISITION_DT.date().isoformat()}
     )
     meta.start_job(fusion_job_id)
 
     gold_fusion_id = meta.insert_data_product(
-        scene_id=scene_id, job_id=fusion_job_id,
+        scene_id=None, job_id=fusion_job_id,
         product_tier=ProductTierEnum.FUSED, source="FUSION", product_type="FUSION_H5",
         band_name="FUSION",
         file_path="/processed/gold/1/fusion_20240115.h5",

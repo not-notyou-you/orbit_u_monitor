@@ -96,15 +96,39 @@ def test_product_tier_enum_matches_tier_names():
     ("SILVER", "MODIS", "INDICES"),
     ("GOLD", "GPM", "COG"),
 ])
-def test_insert_never_stores_legacy_name(meta, sample_scene, legacy, source, expected):
-    job_id = meta.insert_processing_job(sample_scene, "CROP")
+def test_insert_never_stores_legacy_name(db_client, meta, sample_scene, sample_region,
+                                         legacy, source, expected):
+    from datetime import date
+
+    from sqlalchemy import select
+
+    from etl.database_client import DataProduct
+
+    # M30: produk MODIS/GPM menempel pada granule nasa_scenes, S1 pada scene.
+    if source == "SENTINEL1":
+        origin = {"scene_id": sample_scene}
+        job_id = meta.insert_processing_job(sample_scene, "CROP")
+    else:
+        nasa_id = meta.insert_nasa_scene(
+            source=source, tile_id="T", product_short_name=f"TN_{legacy}",
+            acquisition_date=date(2024, 1, 15), region_id=sample_region,
+        )
+        origin = {"scene_id": None, "nasa_scene_id": nasa_id}
+        job_id = meta.insert_processing_job(None, "CROP", nasa_scene_id=nasa_id)
     pid = meta.insert_data_product(
-        scene_id=sample_scene, job_id=job_id,
+        **origin, job_id=job_id,
         product_tier=legacy, source=source, product_type="T", band_name=f"B_{legacy}",
         file_path=f"/tmp/tn_{legacy}.tif", file_name=f"tn_{legacy}.tif", file_size_mb=1.0,
         data_hash_sha256=hashlib.sha256(legacy.encode()).hexdigest(),
     )
-    new = [p for p in meta.get_products_by_scene(sample_scene, tier=expected) if p["product_id"] == pid]
-    assert new and new[0]["product_tier"] == expected
+
+    def find(tier):
+        with db_client.session() as sess:
+            return sess.scalars(select(DataProduct.product_tier).where(
+                DataProduct.product_id == pid,
+                DataProduct.product_tier.in_(tn.equivalent_tiers(tier)),
+            )).all()
+
+    assert [getattr(t, "value", t) for t in find(expected)] == [expected]
     # Nama lama tetap bisa dipakai untuk mencari, dan menemukan baris yang sama.
-    assert any(p["product_id"] == pid for p in meta.get_products_by_scene(sample_scene, tier=legacy))
+    assert find(legacy)
