@@ -25,7 +25,9 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- TIPE ENUM (warisan, tanpa nilai legacy)
 -- -----------------------------------------------------------------------------
 CREATE TYPE orbit_direction_enum  AS ENUM ('ASCENDING', 'DESCENDING');
-CREATE TYPE job_status_enum       AS ENUM ('QUEUED', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED');
+-- WAITING_UPSTREAM: granule hulu belum terbit (PIPELINE §8); SKIPPED_LOCKED:
+-- run scheduler dilewati karena advisory lock dipegang worker lain (§7).
+CREATE TYPE job_status_enum       AS ENUM ('QUEUED', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED', 'WAITING_UPSTREAM', 'SKIPPED_LOCKED');
 -- Kosakata tier D14: dinamai menurut kontrak artefak, bukan medallion.
 CREATE TYPE product_tier_enum     AS ENUM ('RAW', 'ALIGNED', 'DESPECKLED', 'INDICES', 'ACCUMULATED', 'COG', 'FUSED');
 CREATE TYPE storage_location_enum AS ENUM ('LOCAL', 'S3', 'GCS', 'AZURE_BLOB');
@@ -33,7 +35,7 @@ CREATE TYPE alert_severity_enum   AS ENUM ('INFO', 'WARNING', 'CRITICAL');
 CREATE TYPE alert_event_type_enum AS ENUM ('DATA_ARRIVAL', 'QUALITY_WARNING', 'PIPELINE_ERROR', 'THRESHOLD_BREACH', 'SYSTEM_ALERT');
 
 COMMENT ON TYPE orbit_direction_enum  IS 'Arah lintasan orbit Sentinel-1.';
-COMMENT ON TYPE job_status_enum       IS 'Status eksekusi satu baris processing_jobs.';
+COMMENT ON TYPE job_status_enum       IS 'Status eksekusi satu baris processing_jobs (+ WAITING_UPSTREAM, SKIPPED_LOCKED untuk job hidromet dan scheduler).';
 COMMENT ON TYPE product_tier_enum     IS 'Tier lineage D14: RAW (format vendor) -> ALIGNED (EPSG:4326 + crop AOI) -> DESPECKLED|INDICES|ACCUMULATED (nilai tambah per sumber) -> COG (analysis-ready) -> FUSED (HDF5 multi-sensor).';
 COMMENT ON TYPE storage_location_enum IS 'Lokasi penyimpanan berkas produk. Monitor hanya memakai LOCAL.';
 COMMENT ON TYPE alert_severity_enum   IS 'Tingkat keparahan quality_alerts.';
@@ -625,7 +627,7 @@ CREATE TABLE dataset_jobs (
     CONSTRAINT chk_dataset_job_type CHECK (job_type IN ('CREATE', 'BACKFILL', 'LIVE_INGEST', 'HYDROMET_DAILY')),
     CONSTRAINT chk_dataset_job_status CHECK (status IN (
         'QUEUED', 'PREPARING', 'DOWNLOADING', 'PROCESSING', 'PAUSED',
-        'CLEANUP', 'COMPLETED', 'FAILED', 'CANCELLED'))
+        'CLEANUP', 'COMPLETED', 'FAILED', 'CANCELLED', 'WAITING_UPSTREAM'))
 );
 CREATE INDEX idx_dataset_jobs_dataset ON dataset_jobs (dataset_id, created_at DESC);
 CREATE INDEX idx_dataset_jobs_status  ON dataset_jobs (status);
@@ -634,7 +636,7 @@ COMMENT ON COLUMN dataset_jobs.job_id           IS 'PK surrogate.';
 COMMENT ON COLUMN dataset_jobs.job_uuid         IS 'UUID stabil untuk referensi eksternal.';
 COMMENT ON COLUMN dataset_jobs.dataset_id       IS 'FK -> datasets.';
 COMMENT ON COLUMN dataset_jobs.job_type         IS 'CREATE | BACKFILL | LIVE_INGEST (siklus Live Area) | HYDROMET_DAILY (job A).';
-COMMENT ON COLUMN dataset_jobs.status           IS 'QUEUED, PREPARING, DOWNLOADING, PROCESSING, PAUSED, CLEANUP, COMPLETED, FAILED, CANCELLED.';
+COMMENT ON COLUMN dataset_jobs.status           IS 'QUEUED, PREPARING, DOWNLOADING, PROCESSING, PAUSED, CLEANUP, COMPLETED, FAILED, CANCELLED, WAITING_UPSTREAM (hidromet: granule GPM hari itu belum terbit, dicoba lagi maks. 3 hari).';
 COMMENT ON COLUMN dataset_jobs.paused_at        IS 'Waktu job dijeda.';
 COMMENT ON COLUMN dataset_jobs.paused_by        IS 'Penjeda: user | system.';
 COMMENT ON COLUMN dataset_jobs.pause_reason     IS 'Alasan jeda.';
@@ -761,7 +763,7 @@ COMMENT ON COLUMN processing_jobs.scene_id          IS 'FK -> satellite_scenes: 
 COMMENT ON COLUMN processing_jobs.nasa_scene_id     IS 'FK -> nasa_scenes: granule MODIS/GPM yang diproses. NULL untuk job S1/FUSION (M30).';
 COMMENT ON COLUMN processing_jobs.stage_id          IS 'FK -> processing_stages.';
 COMMENT ON COLUMN processing_jobs.attempt_number    IS 'Percobaan ke berapa untuk (scene, tahap).';
-COMMENT ON COLUMN processing_jobs.status            IS 'QUEUED | RUNNING | SUCCESS | FAILED | CANCELLED.';
+COMMENT ON COLUMN processing_jobs.status            IS 'QUEUED | RUNNING | SUCCESS | FAILED | CANCELLED | WAITING_UPSTREAM (granule hulu belum terbit) | SKIPPED_LOCKED (run scheduler dilewati: advisory lock dipegang worker lain).';
 COMMENT ON COLUMN processing_jobs.queued_at         IS 'Waktu masuk antrean.';
 COMMENT ON COLUMN processing_jobs.started_at        IS 'Waktu mulai.';
 COMMENT ON COLUMN processing_jobs.completed_at      IS 'Waktu selesai.';

@@ -348,3 +348,64 @@ def api_client(make_client):
     kini membutuhkan login, dan dengan ADMIN tes itu sekaligus berjalan di
     bawah SET LOCAL ROLE monitor_admin."""
     return make_client("ADMIN")
+
+
+# ---------------------------------------------------------------------------
+# Tahap 3: kecamatan sintetis untuk tes hidromet/alert/laporan
+# ---------------------------------------------------------------------------
+# Grid uji GPM-like: origin (106.0, -6.5), sel 0.1 derajat, 4x4.
+#   TST001  box(106.075,-6.6, 106.175,-6.5)   1/4 sel (0,0) + 3/4 sel (0,1)
+#   TST002  box(106.2,  -6.7, 106.3,  -6.6)   tepat sel (1,2)
+#   TST003  box(106.05, -6.75,106.15, -6.65)  seperempat dari 4 sel (1..2, 0..1)
+SYNTH_GRID = {"x0": 106.0, "y0": -6.5, "res": 0.1, "shape": (4, 4)}
+SYNTH_KECAMATAN = {
+    "TST001": (106.075, -6.6, 106.175, -6.5),
+    "TST002": (106.2, -6.7, 106.3, -6.6),
+    "TST003": (106.05, -6.75, 106.15, -6.65),
+}
+
+
+@pytest.fixture(scope="session")
+def synthetic_aoi(db_client):
+    """Kabupaten TST00 + 3 kecamatan in_aoi + ROI AOI + dataset HYDROMET_AOI.
+    {pcode: region_id} + 'roi_id' + 'dataset_id'. Dibersihkan di akhir sesi."""
+    from shapely.geometry import box
+    from sqlalchemy import text
+
+    from etl import regions as rg
+
+    feats = [rg.RegionFeature("TST00", "Kabupaten Uji", 2, None, box(105.9, -7.0, 106.5, -6.4).wkb_hex)]
+    feats += [rg.RegionFeature(p, f"Kecamatan {p[-1]}", 3, "TST00", box(*b).wkb_hex)
+              for p, b in SYNTH_KECAMATAN.items()]
+    with db_client.session() as sess:
+        rg.upsert_regions(sess, feats, source_dataset="uji sintetis")
+        ids = rg.resolve_kecamatan(sess, list(SYNTH_KECAMATAN))
+        rg.set_aoi(sess, ids)
+        roi_id = rg.rebuild_monitor_aoi(sess)
+        out = dict(sess.execute(text("SELECT pcode, region_id FROM administrative_regions WHERE pcode LIKE 'TST%'")).all())
+        out["roi_id"] = roi_id
+        out["dataset_id"] = rg.hydromet_dataset(sess)["dataset_id"]
+    yield out
+    with db_client.session() as sess:
+        sess.execute(text("DELETE FROM alert_events"))
+        sess.execute(text("DELETE FROM disaster_events"))
+        sess.execute(text("DELETE FROM region_observations"))
+        sess.execute(text("UPDATE administrative_regions SET in_aoi = false"))
+
+
+def write_synthetic_raster(path, values, *, nodata=-9999.9, dtype="float32", grid=None, tags=None):
+    """GeoTIFF EPSG:4326 pada SYNTH_GRID (atau `grid`) dengan isi `values`."""
+    import numpy as np
+    import rasterio
+    from rasterio.transform import from_origin
+
+    g = grid or SYNTH_GRID
+    arr = np.asarray(values, dtype=dtype)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with rasterio.open(path, "w", driver="GTiff", height=arr.shape[0], width=arr.shape[1], count=1,
+                       dtype=dtype, crs="EPSG:4326", transform=from_origin(g["x0"], g["y0"], g["res"], g["res"]),
+                       nodata=nodata) as dst:
+        dst.write(arr, 1)
+        if tags:
+            dst.update_tags(**tags)
+    return path

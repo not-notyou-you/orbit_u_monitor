@@ -267,6 +267,13 @@ class LiveMonitor:
         else:
             hook(fn)
 
+    def _check_retention(self, value) -> int:
+        """1..app_settings.live.retention_max (dibatasi CHECK DB 60)."""
+        from etl.settings import get_setting
+        with self._db.session() as sess:
+            upper = int(get_setting(sess, "live.retention_max", MAX_RETENTION))
+        return _check_retention(value, min(upper, MAX_RETENTION))
+
     # --- log --------------------------------------------------------------
 
     def log(self, area_id: int, step: str, status: str, message: str,
@@ -285,17 +292,21 @@ class LiveMonitor:
     # --- manajemen daerah -------------------------------------------------
 
     def create_area(self, region_id: int, name: str | None = None,
-                    retention: int = DEFAULT_RETENTION, start: bool = True) -> dict:
+                    retention: int | None = None, start: bool = True) -> dict:
         from etl.location_resolver import resolve_region_id
+        from etl.settings import get_setting
 
-        retention = _check_retention(retention)
         with self._db.session() as sess:
             active = sess.scalar(
                 select(func.count())
                 .select_from(LiveArea).where(LiveArea.deleted_at.is_(None))
             )
-        if active >= MAX_AREAS:
-            raise ValueError(f"Maximum of {MAX_AREAS} Live Areas reached. Delete one first.")
+            max_areas = int(get_setting(sess, "live.max_areas", MAX_AREAS))
+            if retention is None:
+                retention = get_setting(sess, "live.retention_default", DEFAULT_RETENTION)
+        retention = self._check_retention(retention)
+        if active >= max_areas:
+            raise ValueError(f"Maximum of {max_areas} Live Areas reached. Delete one first.")
 
         bbox_wkt, region_id, label = resolve_region_id(self._db, region_id)
         name = (name or "").strip() or label
@@ -364,7 +375,7 @@ class LiveMonitor:
             if enabled is not None:
                 a.enabled = bool(enabled)
             if retention is not None:
-                retention = _check_retention(retention)
+                retention = self._check_retention(retention)
                 grew = retention > a.retention
                 old = a.retention
                 a.retention = retention
@@ -859,13 +870,13 @@ class LiveMonitor:
         }
 
 
-def _check_retention(value) -> int:
+def _check_retention(value, upper: int = MAX_RETENTION) -> int:
     try:
         n = int(value)
     except (TypeError, ValueError):
-        raise ValueError("Retention must be a whole number from 1 to 12")
-    if not MIN_RETENTION <= n <= MAX_RETENTION:
-        raise ValueError(f"Retention must be {MIN_RETENTION}-{MAX_RETENTION} scenes")
+        raise ValueError(f"Retention must be a whole number from {MIN_RETENTION} to {upper}")
+    if not MIN_RETENTION <= n <= upper:
+        raise ValueError(f"Retention must be {MIN_RETENTION}-{upper} scenes")
     return n
 
 

@@ -993,6 +993,9 @@ def ensure_gpm_inputs_for_date(
     target_date: date_type,
     plog: PipelineLogger | None = None,
     plan: SourcePlan | None = None,
+    windows: tuple[str, ...] | None = None,
+    rebuild_non_final: bool = False,
+    raise_errors: bool = False,
 ) -> dict[str, list[str]]:
     """Siapkan input GPM untuk satu tanggal sesuai level yang dikonfigurasi.
 
@@ -1001,7 +1004,12 @@ def ensure_gpm_inputs_for_date(
     PROCESSED: window 24h/72h/7d -> silver/ lalu COG GOLD.
 
     `plan` boleh None; kalau begitu konfigurasinya dibaca dari
-    dataset_source_config. Lihat ensure_aux_inputs_for_date untuk kontraknya."""
+    dataset_source_config. Lihat ensure_aux_inputs_for_date untuk kontraknya.
+
+    Job Hidromet (PIPELINE §3) memakai tiga argumen tambahan: `windows`
+    (24h/72h/7d/30d), `rebuild_non_final` (pembaruan Late -> Final), dan
+    `raise_errors` (supaya GranuleNotPublished bisa menjadi WAITING_UPSTREAM
+    alih-alih tertelan sebagai "tidak ada input")."""
     from etl.module8_gpm_download import (
         GPM_PRODUCT_TYPE,
         band_name as gpm_band_name,
@@ -1022,9 +1030,12 @@ def ensure_gpm_inputs_for_date(
     try:
         _, gpm_meta = download_gpm_scene(
             dataset_id, dataset_name, target_dt, aoi_bbox, plog=plog,
-            processing_levels=plan.levels,
+            processing_levels=plan.levels, windows=windows,
+            rebuild_non_final=rebuild_non_final,
         )
     except Exception:
+        if raise_errors:
+            raise
         logger.exception(
             "[M9] gagal siapkan input GPM dataset=%s tanggal=%s", dataset_id, target_date
         )

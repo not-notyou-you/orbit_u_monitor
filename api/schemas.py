@@ -589,7 +589,8 @@ class RegionListResponse(BaseModel):
 class LiveAreaCreateRequest(BaseModel):
     region_id: int
     name: str | None = Field(default=None, max_length=200)
-    retention: int = Field(default=6, ge=1, le=60)
+    # None = app_settings.live.retention_default
+    retention: int | None = Field(default=None, ge=1, le=60)
 
 
 class LiveAreaUpdateRequest(BaseModel):

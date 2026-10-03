@@ -748,6 +748,9 @@ class DatasetManager:
                     # Job Daerah Live dilanjutkan LiveMonitor.recover(): selain
                     # run_dataset_job, siklusnya masih perlu metrik/preview.
                     or dataset.dataset_kind == "LIVE_AREA"
+                    # Dataset sistem HYDROMET_AOI: tanggal yang terputus
+                    # diulang job hidromet/backfill sendiri (resume-aware).
+                    or dataset.is_system
                     or dataset.status == "DELETING"
                 ):
                     continue

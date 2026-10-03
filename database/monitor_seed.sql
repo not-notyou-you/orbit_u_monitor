@@ -130,6 +130,13 @@ INSERT INTO app_settings (setting_key, setting_value, description) VALUES
     ('live.retention_max',    '60',             'Batas atas retensi scene per Live Area (M11).'),
     ('report.timezone',       '"Asia/Jakarta"', 'Zona waktu periode laporan (WIB).'),
     ('water.vh_threshold_db', '-20',            'Ambang air VH (dB) untuk peta perubahan air dan kalimat Live.'),
-    ('dataset.max_days',      '366',            'Rentang tanggal maksimum satu dataset (hari).');
+    ('dataset.max_days',      '366',            'Rentang tanggal maksimum satu dataset (hari).'),
+    -- Tahap 3 (IMPLEMENTATION_NOTES "Tahap 3"): angka yang PIPELINE.md sebut
+    -- sebagai default/batas operasional, dipindah dari konstanta kode.
+    ('live.retention_default',          '6',               'Retensi scene default Live Area baru (1..live.retention_max).'),
+    ('live.default_area_name',          '"Lebak Selatan"', 'Nama Live Area default yang dibuat dari ROI AOI GMLS (PIPELINE §4).'),
+    ('hydromet.min_valid_fraction',     '0.1',             'Di bawah fraksi piksel valid ini nilai zonal kecamatan = NULL (PIPELINE §3.3).'),
+    ('hydromet.waiting_max_days',       '3',               'Berapa hari tanggal hidromet boleh WAITING_UPSTREAM sebelum FAILED (PIPELINE §8).'),
+    ('report.wait_hydromet_minutes',    '60',              'Lama job laporan menunggu advisory lock hidromet sebelum tetap jalan (PIPELINE §6.1).');
 
 COMMIT;

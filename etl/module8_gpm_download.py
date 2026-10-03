@@ -44,6 +44,7 @@ import numpy as np
 import rasterio
 
 from etl import download_guard as dg
+from etl.atomic_write import atomic_path
 from etl import folder_manager as fm
 from etl.pipeline_logger import PipelineLogger
 from etl.processing_plan import GPM as GPM_SOURCE_NAME
@@ -111,7 +112,11 @@ WINDOWS = {
     "24h": 1,
     "72h": 3,
     "7d": 7,
+    # Hanya diminta job Hidromet (PIPELINE §3.2, indikator kekeringan
+    # RAIN_30D); dataset Katalog/Live tetap 24h/72h/7d lewat SourcePlan.
+    "30d": 30,
 }
+HYDROMET_WINDOWS = ("24h", "72h", "7d", "30d")
 
 
 def _auth_headers() -> dict:
@@ -164,6 +169,12 @@ def _md5(path: Path, chunk: int = 8 * 1024 * 1024) -> str:
     with _md5_cache_lock:
         _md5_cache[key] = digest
     return digest
+
+
+class GranuleNotPublished(RuntimeError):
+    """Tidak ada run IMERG (F/L/E) yang sudah menerbitkan granule tanggal itu.
+    Job Hidromet mencatatnya sebagai WAITING_UPSTREAM, bukan FAILED
+    (PIPELINE §8)."""
 
 
 class _GranuleNotFound(Exception):
@@ -532,7 +543,7 @@ def _fetch_daily_precip(
             data, transform, crs = _read_daily_precip(nc4_path)
         return data, transform, crs, checksum, run
 
-    raise RuntimeError(
+    raise GranuleNotPublished(
         f"no IMERG product ({'/'.join(IMERG_RUN_ORDER)}) for date "
         f"{date.date().isoformat()}: " + "; ".join(not_found_reasons)
     )
@@ -637,8 +648,10 @@ def _crop_to_aoi(
     dest = crop_image[0].astype("float32")
     dst_height, dst_width = dest.shape
 
-    with rasterio.open(
-        output_path, "w", driver="GTiff", height=dst_height, width=dst_width,
+    # atomic_path: berkas akumulasi dipercaya lewat exists() oleh run
+    # berikutnya, jadi tidak boleh ada versi separuh jadi di path final.
+    with atomic_path(output_path) as tmp, rasterio.open(
+        tmp, "w", driver="GTiff", height=dst_height, width=dst_width,
         count=1, dtype="float32", crs=crop_crs, transform=crop_transform,
         nodata=DEFAULT_NODATA, compress="deflate", predictor=3,
         tiled=True, blockxsize=512, blockysize=512,
@@ -670,6 +683,15 @@ def _window_tags(date: datetime, window_name: str, num_days: int, runs: list[str
         "IMERG_RUNS": ",".join(runs),
         "UNITS": "mm",
     }
+
+
+def file_runs(path: Path) -> list[str]:
+    """Run IMERG yang dipakai berkas akumulasi (tag IMERG_RUNS)."""
+    try:
+        with rasterio.open(path) as src:
+            return [r for r in (src.tags().get("IMERG_RUNS") or "").split(",") if r]
+    except Exception:
+        return []
 
 
 def _is_current_format(path: Path) -> bool:
@@ -709,6 +731,8 @@ def download_gpm_scene(
     aoi_bbox: tuple[float, float, float, float] = JABODETABEK_BBOX,
     plog: PipelineLogger | None = None,
     processing_levels=(PROCESSED,),
+    windows: tuple[str, ...] | None = None,
+    rebuild_non_final: bool = False,
 ) -> tuple[list[str], dict]:
     """
     Build 24h/72h/7-day rainfall accumulation GeoTIFFs for `date` from NASA
@@ -746,6 +770,11 @@ def download_gpm_scene(
     )
     window_targets = plan.targets()
     wanted_windows = plan.gpm_windows()
+    if windows is not None:
+        # Window tambahan (30d) memakai target tier yang sama dengan 7d.
+        base = window_targets[wanted_windows[-1]]
+        window_targets = {w: window_targets.get(w, base) for w in windows}
+        wanted_windows = tuple(windows)
     logger.info(
         "[M8] dataset_id=%s level=%s window=%s granule_hari=%d",
         dataset_id, list(plan.levels), list(wanted_windows), plan.gpm_days(),
@@ -791,6 +820,12 @@ def download_gpm_scene(
             entry["targets"] = written
             return entry
 
+        if out_path.exists() and rebuild_non_final and any(r != "F" for r in file_runs(out_path)):
+            # Pembaruan Late -> Final (PIPELINE §3.4): bangun ulang; F dicoba
+            # lebih dulu oleh _fetch_daily_precip.
+            logger.info("[M8] run non-Final %s, bangun ulang: %s", file_runs(out_path), out_path.name)
+            for _tier, _level, stale in targets:
+                stale.unlink(missing_ok=True)
         if out_path.exists() and not _is_current_format(out_path):
             # Berkas dari versi sebelum snap grid 0.1 derajat (kolom nodata
             # ekstra) dan tanpa tag jendela waktu: bangun ulang, jangan pakai.
@@ -830,7 +865,8 @@ def download_gpm_scene(
                     "error_type": type(exc).__name__, "error_message": str(exc),
                 },
             )
-            failed_windows.append({"window": window_name, "reason": str(exc)})
+            failed_windows.append({"window": window_name, "reason": str(exc),
+                                   "not_published": isinstance(exc, GranuleNotPublished)})
             continue
 
         runs_used = {entry["run"] for entry in source_checksums.values()}
@@ -850,6 +886,10 @@ def download_gpm_scene(
         )
 
     if not window_outputs:
+        if failed_windows and all(w.get("not_published") for w in failed_windows):
+            raise GranuleNotPublished(
+                f"GPM granule not yet published for {date.date().isoformat()} ({failed_windows})"
+            )
         raise RuntimeError(
             f"all GPM products failed for dataset_id={dataset_id} date={date.date().isoformat()} "
             f"({failed_windows})"

@@ -52,6 +52,8 @@ class JobStatusEnum(str, PyEnum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+    WAITING_UPSTREAM = "WAITING_UPSTREAM"
+    SKIPPED_LOCKED = "SKIPPED_LOCKED"
 
 
 class ProductTierEnum(str, PyEnum):
@@ -141,6 +143,8 @@ class DatasetJobStatusEnum(str, PyEnum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+    WAITING_UPSTREAM = "WAITING_UPSTREAM"
+    SKIPPED_LOCKED = "SKIPPED_LOCKED"
 
 
 class SceneJobStageStatusEnum(str, PyEnum):
