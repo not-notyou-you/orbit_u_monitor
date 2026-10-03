@@ -56,16 +56,66 @@ const state = {
   regions: [], selectedRegionId: null, locationQuery: '',
 };
 
+// Pesan Indonesia untuk kode error API (INTERFACE.md §5). Kode yang tidak
+// terdaftar jatuh ke `detail` (Inggris) seperti sebelumnya.
+const ERROR_MESSAGES = {
+  ROLE_FORBIDDEN: 'Peran akun Anda tidak berhak melakukan aksi ini.',
+  DB_PERMISSION_DENIED: 'Basis data menolak aksi ini untuk peran akun Anda.',
+  NOT_DATASET_OWNER: 'Hanya pembuat dataset atau Admin yang boleh menghapusnya.',
+  SCENE_OUT_OF_RANGE: 'Scene lebih dari 30 hari hanya dapat dilihat Admin.',
+  CSRF_HEADER_REQUIRED: 'Permintaan ditolak (header keamanan tidak ada). Muat ulang halaman.',
+  RATE_LIMITED: 'Terlalu banyak permintaan. Coba lagi sebentar lagi.',
+};
+
+function goToLogin() {
+  const next = location.pathname + location.hash;
+  location.replace('/masuk?alasan=sesi&next=' + encodeURIComponent(next));
+}
+
 async function api(path, options) {
-  const opts = Object.assign({ headers: { 'Content-Type': 'application/json' } }, options || {});
-  const res = await fetch(path, opts);
+  options = options || {};
+  // X-Requested-With: lapis CSRF untuk endpoint tulis (INTERFACE.md §6).
+  const headers = Object.assign({ 'Content-Type': 'application/json', 'X-Requested-With': 'orbit-u' },
+                                options.headers || {});
+  const res = await fetch(path, Object.assign({}, options, { headers }));
   let data = null;
   try { data = await res.json(); } catch (e) {}
+  if (res.status === 401 && !path.startsWith('/api/auth/login')) {
+    goToLogin();
+    throw new Error('Sesi berakhir');
+  }
   if (!res.ok) {
-    const msg = (data && data.detail) ? data.detail : ('Request failed (' + res.status + ')');
+    const code = data && data.code;
+    const msg = ERROR_MESSAGES[code] || ((data && data.detail) ? data.detail : ('Request failed (' + res.status + ')'));
     throw new Error(msg);
   }
   return data;
+}
+
+// Sesi: /app hanya untuk pengguna yang login. Tab disembunyikan sesuai
+// permissions dari /api/auth/me (kenyamanan UI; API dan DB tetap menegakkan).
+const TAB_PERMISSION = { create: 'datasets.manage', datasets: 'datasets.manage', live: 'live.recent' };
+state.me = null;
+async function loadSession() {
+  const res = await fetch('/api/auth/me');
+  if (res.status === 401) { goToLogin(); return; }
+  if (!res.ok) return;
+  state.me = await res.json();
+  const perms = new Set(state.me.permissions || []);
+  let firstVisible = null;
+  document.querySelectorAll('.tab[data-tab]').forEach(btn => {
+    const allowed = perms.has(TAB_PERMISSION[btn.dataset.tab]);
+    btn.classList.toggle('hidden', !allowed);
+    if (allowed && !firstVisible) firstVisible = btn.dataset.tab;
+  });
+  const userLabel = document.getElementById('userLabel');
+  if (userLabel) userLabel.textContent = state.me.full_name + ' · ' + state.me.role_code;
+  const current = document.querySelector('.tab.active[data-tab]');
+  if (firstVisible && (!current || current.classList.contains('hidden'))) switchTab(firstVisible);
+}
+async function logout() {
+  try { await api('/api/auth/logout', { method: 'POST' }); } catch (e) {}
+  location.replace('/masuk');
 }
 
 function showToast(message, kind) {
@@ -172,6 +222,8 @@ function setStatus(kind, label) {
 }
 checkHealth();
 setInterval(checkHealth, 15000);
+loadSession();
+document.getElementById('logoutBtn').addEventListener('click', logout);
 
 const COLOR_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
 const COLOR_TILE_ATTR = 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, USGS, Intermap, NRCan, METI, OpenStreetMap contributors, GIS User Community';
@@ -2735,7 +2787,8 @@ async function loadTierFiles(id, tier, source) {
 // Deep link dari landing page: /app#datasets atau /app#live membuka tab itu.
 function applyHashTab() {
   const name = location.hash.replace('#', '');
-  if (['create', 'datasets', 'live'].includes(name)) switchTab(name);
+  const btn = document.querySelector('.tab[data-tab="' + name + '"]');
+  if (btn && !btn.classList.contains('hidden')) switchTab(name);
 }
 window.addEventListener('hashchange', applyHashTab);
 applyHashTab();
