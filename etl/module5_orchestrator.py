@@ -36,6 +36,7 @@ import shutil
 import threading
 import time
 import traceback
+from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -1249,6 +1250,169 @@ def _download_one(jc: _JobContext, scene_meta: dict, download_queue: Queue) -> b
     return True
 
 
+# ---------------------------------------------------------------------------
+# Rekonsiliasi frame S1 lintas run (dulu etl/refusion.py)
+# ---------------------------------------------------------------------------
+# Pembaca disk + SceneJobState ini dulu tinggal di etl/refusion.py bersama alat
+# perakit-ulang manual. Alatnya dihapus (README §5), pembacanya tetap dipakai
+# _reconcile_date_members di bawah.
+
+_RECONCILE_LOG = "ORCH"
+
+# Band yang dikenali dari nama berkas COG S1 (`..._calibrated_VV_lee.tif`).
+_BANDS = ("VV", "VH")
+
+
+def _s1_cogs_by_pid(dataset_id: int, dataset_name: str) -> dict[str, dict[str, str]]:
+    """Petakan {product_identifier_prefix: {band: path}} dari raster di disk.
+
+    Nama berkas COG memuat potongan pid, bukan pid utuh
+    (`S1A_IW_GRDH_1SDV_20251204T222544_20_calibrated_VV_lee.tif`), jadi
+    pencocokannya lewat awalan dan bukan kesamaan persis.
+    """
+    from etl import folder_manager as fm
+
+    root = fm.get_dataset_root(dataset_id, dataset_name)
+    proc = root / "sentinel-1" / "PROCESSED"
+    out: dict[str, dict[str, str]] = defaultdict(dict)
+    if not proc.is_dir():
+        return out
+    for path in sorted(proc.glob("*.tif")):
+        for band in _BANDS:
+            if f"_{band}_" in path.name:
+                stem = path.name.split("_calibrated_")[0]
+                out[stem][band] = str(path)
+                break
+    return out
+
+
+def _s1_raw_crops_by_pid(dataset_id: int, dataset_name: str) -> dict[str, dict[str, str]]:
+    """Petakan {product_identifier_prefix: {band: path}} raster S1 tier RAW
+    (crop sebelum Lee filter) di disk -- sumber `fusion_<tanggal>_hybrid_raw.h5`.
+
+    Ditemukan saat memverifikasi perbaikan dataset 35:
+    `_s1_cogs_by_pid` cuma mengindeks `sentinel-1/PROCESSED/`, jadi
+    `scene_results_for_date` cuma pernah mengisi `s1_files_by_level["PROCESSED"]`.
+    Tier RAW-nya diam-diam tetap mengandalkan fallback satu-scene di
+    `module9_fusion._find_s1_products` -- `fusion_20250111_hybrid_processed.h5`
+    pulih ke valid_fraction 0.9996 sesudah perbaikan, tapi
+    `fusion_20250111_hybrid_raw.h5` tetap 0.3578 walau ditulis ulang.
+    """
+    from etl import folder_manager as fm
+
+    root = fm.get_dataset_root(dataset_id, dataset_name)
+    raw_dir = root / "sentinel-1" / "RAW"
+    out: dict[str, dict[str, str]] = defaultdict(dict)
+    if not raw_dir.is_dir():
+        return out
+    for path in sorted(raw_dir.glob("*.tif")):
+        for band in _BANDS:
+            if f"_{band}_" in path.name:
+                stem = path.name.split("_calibrated_")[0]
+                out[stem][band] = str(path)
+                break
+    return out
+
+
+def _match_cogs(pid: str, cogs: dict[str, dict[str, str]]) -> dict[str, str]:
+    for stem, bands in cogs.items():
+        if pid.startswith(stem):
+            return bands
+    return {}
+
+
+def scene_results_for_date(db, job_id: int, jc, date_key: str) -> list:
+    """`_SceneResult` tiap frame S1 tanggal itu, dirakit dari disk + database.
+
+    Query DB lintas SEMUA job milik dataset ini, bukan cuma `job_id` yang
+    diminta. Kalau di-scope ke satu job_id, frame yang tercatat di job lain --
+    retry/resume yang dapat job_id baru, misalnya -- ikut hilang dari daftar
+    walau COG-nya lengkap di disk. Itu persis yang menghasilkan
+    `fusion_20250111_hybrid_processed.h5` cuma memuat satu dari dua frame S1
+    (mosaik dari satu frame -- persis yang etl/s1_mosaic.py cegah). Baris dari `job_id` yang diminta tetap diutamakan kalau pid yang
+    sama tercatat di lebih dari satu job.
+
+    `produced_tiers`/`produced_files` sengaja dikosongkan: keduanya dipakai
+    pipeline untuk memutuskan tier mana yang boleh dihapus saat cleanup, dan
+    rekonsiliasi ini tidak boleh menghapus apa pun.
+    """
+    from sqlalchemy import select
+
+    from etl.database_client import SceneJobState
+
+    cogs = _s1_cogs_by_pid(jc.dataset_id, jc.dataset_name)
+    raw_crops = _s1_raw_crops_by_pid(jc.dataset_id, jc.dataset_name)
+
+    with db.session() as sess:
+        rows = sess.execute(
+            select(
+                SceneJobState.product_identifier,
+                SceneJobState.scene_id,
+                SceneJobState.job_id,
+            )
+            .join(DatasetJob, DatasetJob.job_id == SceneJobState.job_id)
+            .where(DatasetJob.dataset_id == jc.dataset_id)
+        ).all()
+
+    # pid -> (scene_id, job_id); baris dari job_id yang diminta menang kalau
+    # pid yang sama muncul di lebih dari satu job.
+    by_pid: dict[str, tuple[int, int]] = {}
+    for pid, scene_id, row_job_id in rows:
+        if date_key not in pid:
+            continue
+        if pid not in by_pid or row_job_id == job_id:
+            by_pid[pid] = (scene_id, row_job_id)
+
+    out = []
+    matched_stems: set[str] = set()
+    for pid, (scene_id, _row_job_id) in by_pid.items():
+        bands = _match_cogs(pid, cogs)
+        if not bands:
+            logger.warning(
+                "[%s] %s: raster PROCESSED tidak ditemukan, frame dilewati",
+                _RECONCILE_LOG, pid,
+            )
+            continue
+        for stem in cogs:
+            if pid.startswith(stem):
+                matched_stems.add(stem)
+                break
+        s1_files_by_level = {"PROCESSED": bands}
+        raw_bands = _match_cogs(pid, raw_crops)
+        if raw_bands:
+            # Tanpa ini tier RAW (fusion_<tanggal>_hybrid_raw.h5) tidak
+            # pernah dapat frame tambahan apa pun -- lihat docstring
+            # _s1_raw_crops_by_pid.
+            s1_files_by_level["RAW"] = raw_bands
+        out.append(
+            _SceneResult(
+                pid=pid,
+                scene_id=scene_id,
+                acquisition_date=date(
+                    int(date_key[:4]), int(date_key[4:6]), int(date_key[6:8])
+                ),
+                produced_tiers=[],
+                produced_files={},
+                s1_files_by_level=s1_files_by_level,
+            )
+        )
+
+    # COG ada di disk tapi tak satu pun baris SceneJobState (di job manapun
+    # untuk dataset ini) cocok dengannya -- frame ini diam-diam tidak akan
+    # ikut fusion. Ini harus berisik, bukan silent drop.
+    for stem in cogs:
+        if date_key not in stem or stem in matched_stems:
+            continue
+        logger.warning(
+            "[%s] tanggal %s: COG %s ada di disk tapi tidak ada baris "
+            "SceneJobState yang cocok di job manapun -- frame ini TIDAK "
+            "ikut mosaik, hasil fusion tanggal ini kemungkinan terpotong",
+            _RECONCILE_LOG, date_key, stem,
+        )
+
+    return sorted(out, key=lambda m: m.pid)
+
+
 def _reconcile_date_members(
     jc: _JobContext, date_key: str, members: list[_SceneResult]
 ) -> list[_SceneResult]:
@@ -1266,14 +1430,12 @@ def _reconcile_date_members(
     MENIMPA stack lama dengan hanya dirinya sendiri, bukan digabung dengan
     frame A yang sebenarnya masih valid di disk.
 
-    Memakai jalur baca yang sama dengan `etl/refusion.py` (disk COG + DB
-    SceneJobState lintas job), bukan menuruti `pending` di memori, jadi
+    Memakai `scene_results_for_date` (disk COG + DB SceneJobState lintas
+    job), bukan menuruti `pending` di memori, jadi
     hasilnya lengkap tidak peduli di run mana tiap frame terakhir selesai.
     Untuk run normal (tidak ada resume/retry) ini no-op murni: setiap pid
     yang muncul di sini juga sudah ada di `members`.
     """
-    from etl.refusion import scene_results_for_date
-
     try:
         on_disk = scene_results_for_date(jc.db, jc.job_id, jc, date_key)
     except Exception:

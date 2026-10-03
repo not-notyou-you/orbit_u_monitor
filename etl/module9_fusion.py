@@ -1412,7 +1412,7 @@ def audit_dataset_coverage(
     bisa menulis stack dari HANYA SATU dari beberapa frame S1 satu tanggal --
     baik karena antrean live-pipeline habis sebelum semua frame sampai
     (`_pipeline_worker` drain) atau karena query perakitan-ulang cuma melihat
-    satu job_id (lihat `etl/refusion.py`). Grid tetap sama (`_reproject_to_grid`
+    satu job_id (lihat `module5_orchestrator.scene_results_for_date`). Grid tetap sama (`_reproject_to_grid`
     selalu mengalokasikan bentuk penuh), jadi bug ini TIDAK kelihatan dari
     shape berkas -- cuma dari `valid_fraction` yang jauh lebih rendah dari
     tanggal lain di dataset yang sama. 28 dari 44 stack lintas 4 dataset
@@ -1503,7 +1503,7 @@ def _warn_on_coverage_drop(
 
     Sengaja cuma memperingatkan, bukan menggagalkan job: lihat alasannya di
     `_warn_on_grid_drift`, yang sama persis -- operator yang tahu lalu
-    memutuskan tanggal mana yang perlu dirakit ulang (`etl/refusion.py`).
+    memutuskan tanggal mana yang perlu diproses ulang.
     """
     try:
         audit = audit_dataset_coverage(db, dataset_id, dataset_name)

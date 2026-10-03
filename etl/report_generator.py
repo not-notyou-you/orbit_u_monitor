@@ -303,7 +303,7 @@ class ReportGenerator:
                 "title": f"{len(dropped)} fusion stacks with a sentinel1/VV valid_fraction "
                          "far lower and ISOLATED (not a recurring tier)",
                 "detail": ", ".join(f"{e['file']} ({e['valid_fraction']:.3f})" for e in dropped[:8]),
-                "action": "Check etl.refusion.scene_results_for_date for this date -- "
+                "action": "Check module5_orchestrator.scene_results_for_date for this date -- "
                           "the mosaic may have lost an S1 frame that actually exists on disk/DB.",
                 "status": "OPEN",
             })
@@ -2386,7 +2386,7 @@ def _collect_issues(ctx) -> list[dict]:
         if s1_days and missing:
             add("FUSION", "MEDIUM" if len(missing) / len(s1_days) > .1 else "LOW",
                 f"{len(missing)} S1 dates without a fusion stack", ", ".join(str(d) for d in sorted(missing)[:8]),
-                "Run refusion for those dates.", "OPEN")
+                "Rerun the dataset job for those dates.", "OPEN")
         partial = [f for f in st.fusion if f["n_sources"] < 3]
         if partial:
             add("FUSION", "LOW", f"{len(partial)} incomplete stacks", ", ".join(str(f["date"]) for f in partial[:8]),

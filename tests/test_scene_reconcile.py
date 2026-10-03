@@ -1,6 +1,7 @@
-"""Tes pemetaan raster S1 yang dipakai perakitan ulang (etl/refusion.py).
+"""Tes pemetaan raster S1 yang dipakai rekonsiliasi frame lintas run
+(module5_orchestrator.scene_results_for_date, dulu etl/refusion.py).
 
-Bagian inilah yang menentukan perbaikan berjalan tanpa unduhan: kalau raster
+Bagian inilah yang menentukan rekonsiliasi berjalan tanpa unduhan: kalau raster
 PROCESSED di disk gagal dicocokkan dengan product_identifier-nya, frame itu
 lenyap dari mosaik dan stack hasil perbaikan cuma memuat sebagian AOI — persis
 penyakit yang s1_mosaic dibuat untuk menyembuhkan.
@@ -11,7 +12,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from etl.refusion import _match_cogs, _s1_cogs_by_pid, scene_results_for_date
+from etl.module5_orchestrator import (
+    _match_cogs,
+    _s1_cogs_by_pid,
+    scene_results_for_date,
+)
 
 PID_A = "S1A_IW_GRDH_1SDV_20251204T222544_20251204T222609_062171_07C81E_541C.SAFE"
 PID_B = "S1A_IW_GRDH_1SDV_20251204T222609_20251204T222637_062171_07C81E_4B33.SAFE"

@@ -255,7 +255,6 @@ class TestReconcileStragglerFrame:
     def test_frame_from_previous_run_is_merged_back_in(self, stubbed, monkeypatch):
         import queue
 
-        from etl import refusion as rf
 
         jc = _make_jc()
         # Antrean RUN INI cuma membawa frame B (frame A sudah selesai & di-
@@ -263,10 +262,10 @@ class TestReconcileStragglerFrame:
         straggler_only = [_member(PID_B, scene_id=12)]
 
         def fake_scene_results_for_date(db, job_id, jc_arg, date_key):
-            # Disk+DB (etl.refusion) masih ingat frame A dari run sebelumnya.
+            # Disk+DB (scene_results_for_date) masih ingat frame A dari run sebelumnya.
             return [_member(PID_A, scene_id=11)]
 
-        monkeypatch.setattr(rf, "scene_results_for_date", fake_scene_results_for_date)
+        monkeypatch.setattr(m5, "scene_results_for_date", fake_scene_results_for_date)
 
         m5._flush_date(jc, "20240305", straggler_only, queue.Queue())
 
@@ -280,12 +279,11 @@ class TestReconcileStragglerFrame:
         apa pun -- disk+DB melihat persis anggota yang sama."""
         import queue
 
-        from etl import refusion as rf
 
         jc = _make_jc()
         members = [_member(PID_A, scene_id=11), _member(PID_B, scene_id=12)]
         monkeypatch.setattr(
-            rf, "scene_results_for_date",
+            m5, "scene_results_for_date",
             lambda db, job_id, jc_arg, date_key: list(members),
         )
 
@@ -299,7 +297,6 @@ class TestReconcileStragglerFrame:
         tidak boleh menjatuhkan seluruh finalisasi tanggal."""
         import queue
 
-        from etl import refusion as rf
 
         jc = _make_jc()
         members = [_member(PID_A, scene_id=11)]
@@ -307,7 +304,7 @@ class TestReconcileStragglerFrame:
         def boom(*_args, **_kwargs):
             raise RuntimeError("db tidak terjangkau")
 
-        monkeypatch.setattr(rf, "scene_results_for_date", boom)
+        monkeypatch.setattr(m5, "scene_results_for_date", boom)
 
         m5._flush_date(jc, "20240305", members, queue.Queue())
 
