@@ -195,7 +195,7 @@ Laporan muncul setelah periodenya berakhir (M18); tidak ada laporan untuk period
 
 **Base URL:** `/api`. JSON. Autentikasi: cookie `orbit_u_session` (JWT, untuk browser) **atau** header `Authorization: Bearer <token API>` (untuk skrip/sistem lain, M33). Tanggal `YYYY-MM-DD`; tanggal hidromet adalah hari UTC.
 
-Token API: hanya endpoint `GET` (scope `READ`) dan unduhan (scope `READ_DOWNLOAD`); semua aksi tulis menolak token dengan 403 `TOKEN_WRITE_FORBIDDEN`. Rate limit sederhana: 120 request/menit per token (in-process), 429 bila terlampaui.
+Token API: hanya endpoint `GET` (scope `READ`) dan unduhan (scope `READ_DOWNLOAD`); semua aksi tulis menolak token dengan 403 `TOKEN_WRITE_FORBIDDEN`. Unduhan dengan token ber-scope `READ` ditolak 403 `TOKEN_SCOPE_FORBIDDEN`. Rate limit sederhana: 120 request/menit per token (in-process), 429 `RATE_LIMITED` + `Retry-After: 60` bila terlampaui.
 
 Kolom **Role** = role minimum (hierarki: ADMIN ⊃ ANALYST ⊃ USER, ADMIN ⊃ DATA_ENGINEER ⊃ USER).
 
@@ -224,8 +224,8 @@ Kolom **Role** = role minimum (hierarki: ADMIN ⊃ ANALYST ⊃ USER, ADMIN ⊃ D
 | Metode | Endpoint | Role | Kegunaan |
 |---|---|---|---|
 | GET | `/live/areas` | USER | Daftar area [WARIS] |
-| GET | `/live/areas/{id}/card?date=` | USER | Kartu [WARIS]; USER dibatasi 30 hari |
-| GET | `/live/areas/{id}/preview/{date}/{key}.png` | USER | `key` + `s1_water_change` |
+| GET | `/live/areas/{id}/card?date=` | USER | Kartu [WARIS]; selain ADMIN hanya scene ≤ 30 hari + scene terbaru (daftar tanggal disaring; tanggal lain → 403 `SCENE_OUT_OF_RANGE`) |
+| GET | `/live/areas/{id}/preview/{date}/{key}.png` | USER | `key` + `s1_water_change`; batas 30 hari sama dengan kartu |
 | POST | `/live/areas` | ADMIN | Buat area dari `roi_id` |
 | PATCH | `/live/areas/{id}` | ADMIN | `name`, `retention` (1–60), `enabled` |
 | DELETE | `/live/areas/{id}` | ADMIN | [WARIS] |
@@ -274,7 +274,9 @@ Perubahan:
 |---|---|
 | `GET /datasets` | Menyaring dataset sistem; menyertakan `created_by` |
 | `DELETE /datasets/{id}` | Pembuat atau ADMIN |
-| `/scenes` | `?source=S1\|MODIS\|GPM` menggabungkan `satellite_scenes` dan `nasa_scenes` (K12); `?include_invalid=true` untuk ADMIN |
+| `/scenes` | `?source=S1\|MODIS\|GPM` (default `S1`) memilih `satellite_scenes` atau `nasa_scenes` (K12); item MODIS/GPM berbentuk `{nasa_scene_id, source, tile_id, product_short_name, acquisition_date, run_type, is_valid, …}`; `orbit_direction`/`only_gold` hanya untuk S1. Scene `is_valid = false` disembunyikan; `?include_invalid=true` hanya ADMIN (lainnya 403) |
+| `DELETE /datasets/{id}` (lanjutan) | Pembuat lain → 403 `NOT_DATASET_OWNER`. Status `DELETING` diset dengan role pengguna; berkas dan baris dihapus pipeline (`monitor_etl`) setelah commit (DATABASE.md §8.3) |
+| `/storage/summary`, `/storage/files/{tier}` | Membaca disk seluruh mesin → **ADMIN** (nama tier D14) |
 | `/regions` (tulis), `/regions/geocode`, `/merge/*`, `/datasets/{id}/masks`, `/storage/cleanup*`, `/live` lama | **Dihapus** |
 | Semua unduhan | Mencatat `user_activity_logs` |
 
@@ -302,9 +304,10 @@ Perubahan:
 | GET | `/admin/pipeline/status` | Job terakhir per jenis, token, antrean |
 | GET | `/admin/archive/stats`; POST `/admin/archive/verify` | |
 | GET | `/admin/logs/login`, `/admin/logs/download` | `?user_id=&date_from=&date_to=&page=` |
-| GET | `/admin/audit` | `?table=&operation=&user_id=&date_from=` |
+| GET | `/admin/audit` | `?table=&operation=&user_id=&date_from=&date_to=&page=` |
+| GET | `/admin/tokens` | Semua token (`?user_id=&active=`): pemilik, prefix, scope, kedaluwarsa, terakhir dipakai; cabut lewat `DELETE /auth/tokens/{id}` |
 
-Semua di bawah `/admin` memerlukan ADMIN.
+Semua di bawah `/admin` memerlukan ADMIN. Daftar log memakai kontrak `{items, total, limit, offset}`; `page` (mulai 1) setara `offset = (page-1)·limit`. ADMIN tidak dapat menonaktifkan atau menurunkan role akunnya sendiri (409 `CANNOT_MODIFY_SELF`).
 
 ---
 
@@ -360,7 +363,9 @@ Format warisan DataLab dipertahankan agar `app.js` tidak dirombak.
 { "detail": "Alert already acknowledged", "code": "ALERT_ALREADY_ACKED" }
 ```
 
-DataLab hanya mengirim `detail`; Monitor **menambah** `code` (opsional, mesin-baca) agar frontend dapat menampilkan pesan Indonesia dari tabel terjemahan. Klien lama yang hanya membaca `detail` tetap berfungsi.
+DataLab hanya mengirim `detail`; Monitor **menambah** `code` (mesin-baca, selalu ada) agar frontend dapat menampilkan pesan Indonesia dari tabel terjemahan. Klien lama yang hanya membaca `detail` tetap berfungsi.
+
+Kode spesifik: `NOT_AUTHENTICATED`, `SESSION_EXPIRED`, `ACCOUNT_INACTIVE`, `INVALID_CREDENTIALS`, `ACCOUNT_LOCKED`, `ROLE_FORBIDDEN` (lapis API), `DB_PERMISSION_DENIED` (GRANT/RLS PostgreSQL menolak, lapis 3), `CSRF_HEADER_REQUIRED`, `TOKEN_INVALID`, `TOKEN_REVOKED`, `TOKEN_EXPIRED`, `TOKEN_WRITE_FORBIDDEN`, `TOKEN_SCOPE_FORBIDDEN`, `RATE_LIMITED`, `NOT_DATASET_OWNER`, `SCENE_OUT_OF_RANGE`, `PASSWORD_POLICY`, `INVALID_OLD_PASSWORD`, `USERNAME_TAKEN`, `CANNOT_MODIFY_SELF`, `TOKEN_ALREADY_REVOKED`, `INVALID_DATE_RANGE`, `ALERT_ALREADY_ACKED`. Selain itu dipakai kode bawaan per status: `BAD_REQUEST`, `NOT_FOUND`, `CONFLICT`, `VALIDATION_ERROR`, `INTERNAL_ERROR`, …
 
 | HTTP | Makna |
 |---|---|
@@ -380,8 +385,9 @@ DataLab hanya mengirim `detail`; Monitor **menambah** `code` (opsional, mesin-ba
 - Login → verifikasi bcrypt lewat fungsi `auth_get_user()` → JWT `{sub, role, iat, exp}` (HS256, 8 jam) di cookie `HttpOnly; Secure; SameSite=Strict; Path=/`.
 - Tidak ada refresh token; sesi habis → kembali ke `/masuk` dengan pesan.
 - Perubahan role/nonaktif berlaku pada request berikutnya: setiap request membaca ulang `users.is_active` dan `role_id` (satu kueri PK).
-- Endpoint tulis memeriksa header `X-Requested-With: orbit-u` sebagai lapis CSRF sederhana tambahan di atas `SameSite=Strict`.
-- **Token API**: `Bearer trn_<32 byte acak base62>`; server mencari `token_prefix`, membandingkan SHA-256 secara constant-time, memeriksa `revoked_at`, `expires_at`, dan status pemilik, lalu menjalankan request dengan role pemilik (`SET LOCAL ROLE`, `app.user_id`) persis seperti sesi web.
+- Setiap request selain GET/HEAD/OPTIONS yang tidak memakai Bearer (termasuk `/auth/login`) wajib membawa header `X-Requested-With: orbit-u` (403 `CSRF_HEADER_REQUIRED`), sebagai lapis CSRF sederhana tambahan di atas `SameSite=Strict`.
+- Cookie yang rusak/kedaluwarsa diperlakukan sebagai pengunjung tanpa login; endpoint yang butuh login menjawab 401 `SESSION_EXPIRED`. Login gagal tetap mencatat log dan menaikkan penghitung kunci (respons dikembalikan, bukan exception, agar ikut ter-commit). Percobaan kelima yang gagal langsung menjawab 423.
+- **Token API**: `Bearer trn_<32 byte acak base62>`; server mencari `token_prefix`, membandingkan SHA-256 secara constant-time, memeriksa `revoked_at`, `expires_at`, dan status pemilik, lalu menjalankan request dengan role pemilik (`SET LOCAL ROLE`, `app.user_id`) persis seperti sesi web. Pencarian berdasarkan prefix memakai fungsi `auth_get_token()` (DATABASE.md §8.2) karena RLS `api_tokens` menolaknya sebelum pemilik diketahui. Setiap request bertoken dicatat satu baris `user_activity_logs` (`API_REQUEST`, atau `DOWNLOAD_*` untuk unduhan) setelah respons selesai dikirim; `bytes_sent` unduhan adalah byte yang benar-benar terkirim.
 
 ### 6.1 Dokumentasi API untuk developer (hasil akhir "API Developer")
 

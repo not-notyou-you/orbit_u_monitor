@@ -192,6 +192,11 @@ Keputusan rancangan awal (D1–D24) yang masih berlaku dirangkum; keputusan baru
 | M42 | Rentang `spectral_bands` = batas fisik (rekor dunia), bukan nilai lazim | Trigger rentang hanya menolak data rusak |
 | M43 | Prakiraan Live maksimal 4 langkah walau retensi sampai 60 | Ekstrapolasi SES/Holt jauh ke depan tidak bermakna |
 | M44 | Nama DB default `themonitor`; database uji dibangun dari ketiga berkas SQL | Keputusan pemilik; skema selalu teruji |
+| M45 | Hapus fisik dataset dan Live Area dikerjakan pipeline (`monitor_etl`, D pada `datasets`/`data_products`/`processing_jobs`); API hanya memeriksa pembuat/ADMIN dan menandai `DELETING` | Role interaktif tetap tanpa D sesuai matriks §8.3; kerja berkas memang milik pipeline |
+| M46 | Akses `users`/`api_tokens` sebelum role diketahui hanya lewat fungsi SECURITY DEFINER `auth_*`; sandi role LOGIN diisi dari `.env`, tidak ditulis di SQL | Login, cek sesi, token, dan ganti sandi butuh hak yang tidak dimiliki role pemanggil |
+| M47 | Audit trigger mengabaikan perubahan yang hanya menyentuh kolom pembukuan (login, `last_used_at` token, progres pipeline, siklus Live) | Tanpa ini `audit_log` dibanjiri baris otomatis dan perubahan bermakna sulit ditemukan |
+| M48 | Setiap request bertoken dicatat satu baris (`API_REQUEST` atau `DOWNLOAD_*`); `bytes_sent` = byte yang benar-benar terkirim | M33 "setiap pemakaian token tercatat" + log unduhan RM4 |
+| M49 | Scene Live untuk selain ADMIN: ≤ 30 hari + scene terbaru; `/storage/*` ADMIN; `/scenes?source=` default S1 | Melengkapi aturan §3.1 untuk endpoint warisan yang tidak disebut dokumen |
 
 ---
 
@@ -229,9 +234,14 @@ psql themonitor -c "CREATE EXTENSION postgis; CREATE EXTENSION pgcrypto;"
 psql themonitor -f database/monitor_schema.sql     # DDL + index + VIEW
 psql themonitor -f database/monitor_security.sql   # role, GRANT, trigger audit
 psql themonitor -f database/monitor_seed.sql       # master data
-# (PowerShell: python database/apply_schema.py)
+psql themonitor -c "ALTER ROLE monitor_app PASSWORD '...'; ALTER ROLE monitor_etl PASSWORD '...';"
+# (PowerShell: python database/apply_schema.py — menjalankan ketiga berkas
+#  lalu mengisi sandi kedua role dari .env; jadi isi .env dulu, langkah 3)
 
-# 3. .env (salin .env.example, isi DB_*, COPERNICUS_*, NASA_EARTHDATA_TOKEN, JWT_SECRET)
+# 3. .env (salin .env.example, isi DB_* (pemilik skema, hanya untuk setup),
+#    MONITOR_APP_PASSWORD, MONITOR_ETL_PASSWORD, JWT_SECRET (>= 32 karakter),
+#    COPERNICUS_*, NASA_EARTHDATA_TOKEN). API terkoneksi sebagai monitor_app,
+#    scheduler/pipeline sebagai monitor_etl — tidak pernah sebagai superuser.
 cp .env.example .env
 
 # 4. Wilayah COD-AB level 3 (Kabupaten Lebak) → administrative_regions

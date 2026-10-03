@@ -388,7 +388,7 @@ CHECK `value` di antara `spectral_bands.valid_min/max` ditegakkan oleh trigger `
 | `log_id` | BIGSERIAL PK | |
 | `user_id` | INT FK → users | NULL untuk login gagal dengan username tak dikenal / PUBLIC |
 | `username_attempted` | VARCHAR(50) | untuk login gagal |
-| `action` | VARCHAR(30) NOT NULL | `LOGIN_SUCCESS`, `LOGIN_FAILED`, `LOGOUT`, `DOWNLOAD_PRODUCT`, `DOWNLOAD_DATASET`, `DOWNLOAD_FUSION`, `DOWNLOAD_REPORT`, `EXPORT_CSV`, `CREATE_DATASET`, `TRIGGER_INGEST`, … |
+| `action` | VARCHAR(30) NOT NULL | `LOGIN_SUCCESS`, `LOGIN_FAILED`, `LOGOUT`, `DOWNLOAD_PRODUCT`, `DOWNLOAD_DATASET`, `DOWNLOAD_FUSION`, `DOWNLOAD_REPORT`, `EXPORT_CSV`, `API_REQUEST` (request bertoken), `CREATE_DATASET`, `TRIGGER_INGEST`, … |
 | `target_type` | VARCHAR(40) | `data_products`, `datasets`, `generated_reports`, … |
 | `target_id` | BIGINT | |
 | `bytes_sent` | BIGINT | unduhan |
@@ -445,7 +445,7 @@ Baris tetap ada setelah berkas scene dihapus retensi, sehingga grafik dan prakir
 | `revoked_at` | TIMESTAMPTZ | |
 | `created_at` | TIMESTAMPTZ NOT NULL DEFAULT now() | |
 
-Hanya USER ke atas yang dapat membuat token, untuk dirinya sendiri. Token tidak bisa melakukan aksi tulis (acknowledge, CRUD kejadian, buat dataset); aksi tulis tetap lewat sesi web. Setiap pemakaian token tercatat di `user_activity_logs` dengan `detail.auth = 'token'`.
+Hanya USER ke atas yang dapat membuat token, untuk dirinya sendiri. Token tidak bisa melakukan aksi tulis (acknowledge, CRUD kejadian, buat dataset); aksi tulis tetap lewat sesi web. Setiap pemakaian token tercatat di `user_activity_logs`: satu baris per request (`action = 'API_REQUEST'`, `detail = {auth: 'token', token_id, method, path, status}`), atau baris `DOWNLOAD_*` dengan `detail.auth = 'token'` untuk unduhan.
 
 ### 4.3 Estimasi volume (backfill 2023–2025, asumsi 9 kecamatan AOI)
 
@@ -782,69 +782,102 @@ Jendela 0–3 hari adalah parameter yang dibahas di skripsi. Dengan jumlah kejad
 
 ## 8. Keamanan (Physical Design — RM4)
 
+Implementasi: `database/monitor_security.sql`; diuji `tests/security/grant_matrix.sql` (matriks §8.3 sel per sel) dan `tests/test_audit.py`.
+
 ### 8.1 Role PostgreSQL
 
 ```sql
-CREATE ROLE monitor_app   LOGIN PASSWORD :'app_pw' NOINHERIT;  -- dipakai FastAPI
-CREATE ROLE monitor_etl   LOGIN PASSWORD :'etl_pw';             -- dipakai scheduler/pipeline
+-- Role berlaku untuk seluruh cluster: dibuat idempoten (DO ... IF NOT EXISTS),
+-- atributnya ditegakkan ulang dengan ALTER ROLE.
+CREATE ROLE monitor_app   LOGIN NOINHERIT;   -- dipakai FastAPI
+CREATE ROLE monitor_etl   LOGIN;             -- dipakai scheduler/pipeline
 CREATE ROLE monitor_public        NOLOGIN;
-CREATE ROLE monitor_user          NOLOGIN IN ROLE monitor_public;
-CREATE ROLE monitor_analyst       NOLOGIN IN ROLE monitor_user;
-CREATE ROLE monitor_data_engineer NOLOGIN IN ROLE monitor_user;
-CREATE ROLE monitor_admin         NOLOGIN IN ROLE monitor_analyst, monitor_data_engineer;
+CREATE ROLE monitor_user          NOLOGIN;   GRANT monitor_public TO monitor_user;
+CREATE ROLE monitor_analyst       NOLOGIN;   GRANT monitor_user   TO monitor_analyst;
+CREATE ROLE monitor_data_engineer NOLOGIN;   GRANT monitor_user   TO monitor_data_engineer;
+CREATE ROLE monitor_admin         NOLOGIN;   GRANT monitor_analyst, monitor_data_engineer TO monitor_admin;
 
 GRANT monitor_public, monitor_user, monitor_analyst,
       monitor_data_engineer, monitor_admin TO monitor_app;  -- hanya boleh SET ROLE
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+GRANT USAGE ON SCHEMA public TO monitor_public, monitor_etl;  -- eksplisit, bukan default PUBLIC
+GRANT SELECT ON spatial_ref_sys TO PUBLIC;                    -- katalog PostGIS
 ```
 
-`monitor_app` adalah `NOINHERIT`: tanpa `SET ROLE` ia **tidak** punya hak apa pun. Aplikasi tidak pernah terkoneksi sebagai superuser.
+`monitor_app` adalah `NOINHERIT` dan tidak diberi USAGE skema: tanpa `SET ROLE` ia **tidak** punya hak apa pun, bahkan tidak melihat tabel. Aplikasi tidak pernah terkoneksi sebagai superuser; pemilik skema (`DB_USER`) hanya dipakai skrip setup.
+
+Sandi role LOGIN tidak ditulis di SQL. `database/apply_schema.py` (dan `tests/conftest.py`) menjalankan `ALTER ROLE … PASSWORD` dari `MONITOR_APP_PASSWORD` / `MONITOR_ETL_PASSWORD` di `.env`; lewat psql, jalankan dua `ALTER ROLE` itu setelah `monitor_security.sql`.
 
 ### 8.2 Penegakan per request
 
 ```python
-# api/deps.py — dalam satu transaksi per request
+# api/deps.py — satu transaksi per request, koneksi monitor_app
 session.execute(text("SET LOCAL ROLE " + ROLE_TO_DB[current.role_code]))   # nama dari whitelist
 session.execute(text("SELECT set_config('app.user_id', :uid, true)"), {"uid": str(current.user_id or "")})
 ```
 
-`SET LOCAL` dan `set_config(..., true)` berakhir bersama transaksi, sehingga koneksi pool tidak membawa role ke request berikutnya. Login (membaca `password_hash`) dijalankan lewat fungsi `SECURITY DEFINER auth_get_user(username)` milik `monitor_admin`, satu-satunya jalan role non-admin menyentuh hash.
+`SET LOCAL` dan `set_config(..., true)` berakhir bersama transaksi, sehingga koneksi pool tidak membawa role ke request berikutnya. Transaksi diawali sebagai `monitor_public`; setelah pengguna dikenali, role diganti ke role pengguna (keanggotaan dicek terhadap `session_user` = `monitor_app`). Manager warisan yang membuka `db.session()` berkali-kali berjalan di dalam transaksi yang sama (setiap blok = SAVEPOINT).
+
+Kerja latar yang dipicu request (thread job dataset, penghapusan fisik dataset/Live Area, siklus dan retensi Live) memakai koneksi `monitor_etl` dan baru dimulai **setelah** transaksi request di-commit.
+
+Sebelum role pengguna diketahui, request berjalan sebagai `monitor_public`, yang tidak punya hak atas `users`/`api_tokens`. Satu-satunya jalan adalah fungsi `SECURITY DEFINER` milik `monitor_admin` (`SET search_path = public, pg_temp`, EXECUTE dicabut dari PUBLIC):
+
+| Fungsi | Dipakai | Mengembalikan / mengubah |
+|---|---|---|
+| `auth_get_user(username)` | login, ganti sandi | hash bcrypt, role, `is_active`, status kunci |
+| `auth_record_login(user_id, ok)` | login | sukses: reset penghitung + `last_login_at`; gagal: +1, kelima kali `locked_until = now()+15 menit` |
+| `auth_session_user(user_id)` | setiap request | role + `is_active` terkini (tanpa hash) |
+| `auth_get_token(prefix)` | autentikasi Bearer | hash token, scope, kedaluwarsa, pencabutan |
+| `auth_change_own_password(hash)` | ganti sandi (EXECUTE: `monitor_user`) | `password_hash` baris milik `app.user_id` sesi saja; menolak nilai non-bcrypt |
+| `report_audience_db_role(report_type_id)` | policy RLS §8.4 | nama role DB audiens laporan |
 
 ### 8.3 Matriks GRANT
 
+Hak diberikan pada role terendah yang membutuhkannya; kolom di bawah adalah hak **efektif** (termasuk warisan hierarki).
+
 | Objek | public | user | analyst | data_engineer | admin | etl |
 |---|---|---|---|---|---|---|
-| `v_public_live_latest`, `live_areas` (kolom publik) | S | S | S | S | S | — |
-| `v_live_scenes_recent`, `v_hujan_harian_kecamatan`, `v_statistik_hari_ini`, `v_alert_aktif`, master referensi | — | S | S | S | S | S |
+| `v_public_live_latest` | S | S | S | S | S | — |
+| `live_areas` kolom publik (`area_id, name, location_label, status, enabled, last_checked_at, deleted_at`) | S | S | S | S | S | S |
+| `v_live_scenes_recent`, `v_hujan_harian_kecamatan`, `v_statistik_hari_ini`, `v_alert_aktif` | — | S | S | S | S | S |
+| master referensi: `satellite_sources`, `spectral_bands`, `processing_stages`, `fusion_strategies`, `report_types` | — | S | S | S | S | S |
+| `administrative_regions`, `regions_of_interest` | — | S | S | S | SIU | S |
 | `alert_events` | — | S | S + U(ack) | S | SIUD | SI |
 | `disaster_events` | — | — | SIU | — | SIU | — |
 | `v_kejadian_dan_hujan`, `v_evaluasi_alert` | — | — | S | — | S | — |
 | `region_observations` | — | S | S | S | S | SIU |
-| `datasets`, `dataset_*`, `scene_job_state` | — | — | — | SIU | SIUD | SIU |
+| `datasets` | — | — | — | SIU | SIUD | SIUD |
+| `dataset_source_config`, `dataset_jobs`, `scene_job_state` | — | — | — | SIU | SIUD | SIU |
 | `satellite_scenes`, `nasa_scenes` | — | — | — | S | SU (soft delete) | SIU |
-| `data_products`, `data_lineage`, `quality_metrics`, `fusion_products`, `processing_*` | — | — | — | S | S | SIU |
+| `data_products`, `processing_jobs` | — | — | — | S | S | SIUD |
+| `data_lineage`, `quality_metrics`, `quality_alerts`, `fusion_products`, `processing_logs`, `cleanup_operations` | — | — | — | S | S | SIU |
 | `v_ringkasan_kualitas`, `v_kelengkapan_data` | — | — | — | S | S | — |
-| `generated_reports` | — | — | S (ditambah RLS) | S (ditambah RLS) | SIU | SIU |
+| `generated_reports` | — | — | S (+ RLS) | S (+ RLS) | SIU | SIU |
 | `users`, `roles` | — | — | — | — | SIU (tanpa D) | — |
+| `v_users_safe` | — | S | S | S | S | — |
 | `alert_rules`, `quality_thresholds`, `disaster_types`, `app_settings` | — | S | S | S | SIU | S |
 | `live_areas`, `live_scenes`, `live_events`, `live_scene_metrics` | — | S | S | S | SIU | SIU |
 | `api_tokens` | — | SIU (milik sendiri, RLS) | SIU (milik sendiri) | SIU (milik sendiri) | SIU | — |
 | `user_activity_logs` | I | I | I | I | SI | I |
 | `audit_log` | — | — | — | — | S | — (diisi trigger) |
+| `v_log_login`, `v_log_unduhan` | — | — | — | — | S | — |
 
-S = SELECT, I = INSERT, U = UPDATE, D = DELETE. "U(ack)" = `GRANT UPDATE (acknowledged_by, acknowledged_at, ack_note)` saja. Hapus fisik pada data historis tidak diberikan ke role mana pun selain admin, dan UI tetap memakai soft delete.
+S = SELECT, I = INSERT, U = UPDATE, D = DELETE. "U(ack)" = `GRANT UPDATE (acknowledged_by, acknowledged_at, ack_note)` saja. `USAGE` semua sequence diberikan ke `monitor_public` (diwarisi semua role) dan `monitor_etl`; tanpa INSERT pada tabelnya, USAGE tidak memberi hak menulis apa pun. TRUNCATE tidak diberikan ke role aplikasi mana pun.
 
-### 8.4 Row-Level Security untuk laporan
+Hapus fisik data historis tidak diberikan ke role interaktif selain admin, dan UI tetap memakai soft delete. **D untuk `monitor_etl`** pada `datasets`, `data_products`, `processing_jobs` dipakai penghapusan dataset: API memeriksa bahwa pemanggil adalah pembuat dataset atau ADMIN dan menandai `status = 'DELETING'` dengan role pengguna; pipeline (`monitor_etl`) yang menghapus berkas dan barisnya. Tabel anak lain ikut lewat `ON DELETE CASCADE`, yang dijalankan PostgreSQL dengan hak pemilik tabel.
+
+### 8.4 Row-Level Security
 
 ```sql
 ALTER TABLE generated_reports ENABLE ROW LEVEL SECURITY;
 CREATE POLICY rp_audience ON generated_reports FOR SELECT
-  USING (pg_has_role(current_user,
-          (SELECT r.db_role FROM report_types t JOIN roles r ON r.role_id = t.audience_role_id
-           WHERE t.report_type_id = generated_reports.report_type_id), 'MEMBER'));
+  USING (pg_has_role(current_user, report_audience_db_role(report_type_id), 'MEMBER'));
+CREATE POLICY rp_writers ON generated_reports FOR ALL TO monitor_admin, monitor_etl
+  USING (true) WITH CHECK (true);
 ```
 
-ANALYST hanya melihat laporan Hidromet, DATA_ENGINEER hanya Kesehatan Data, ADMIN (anggota keduanya) melihat semua.
+ANALYST hanya melihat laporan Hidromet, DATA_ENGINEER hanya Kesehatan Data, ADMIN (anggota keduanya) melihat semua. Ekspresi policy dievaluasi dengan hak pemanggil, sedangkan `roles` hanya boleh dibaca ADMIN; karena itu nama role audiens diambil lewat fungsi `report_audience_db_role` (§8.2), bukan subkueri langsung. `rp_writers` diperlukan karena RLS yang hanya punya policy SELECT menolak INSERT/UPDATE untuk semua role selain pemilik tabel.
 
 ```sql
 ALTER TABLE api_tokens ENABLE ROW LEVEL SECURITY;
@@ -858,26 +891,48 @@ Hanya dua tabel ini yang memakai RLS.
 ### 8.5 Audit trigger
 
 ```sql
-CREATE FUNCTION audit_row() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE o jsonb; n jsonb; pk text;
+CREATE FUNCTION audit_row() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE o_full jsonb; n_full jsonb; changed text[]; ignored text[] := ARRAY['updated_at'];
 BEGIN
-  o := CASE WHEN TG_OP <> 'INSERT' THEN to_jsonb(OLD) - 'password_hash' - 'token_hash' END;
-  n := CASE WHEN TG_OP <> 'DELETE' THEN to_jsonb(NEW) - 'password_hash' - 'token_hash' END;
-  pk := COALESCE(n, o) ->> TG_ARGV[0];
-  INSERT INTO audit_log(table_name,row_pk,operation,old_data,new_data,changed_columns,app_user_id)
-  VALUES (TG_TABLE_NAME, pk, left(TG_OP,1), o, n,
-          CASE WHEN TG_OP='UPDATE' THEN
-            ARRAY(SELECT k FROM jsonb_each(n) e(k,v) WHERE v IS DISTINCT FROM o->k) END,
-          NULLIF(current_setting('app.user_id', true), '')::int);
+  IF TG_OP <> 'INSERT' THEN o_full := to_jsonb(OLD); END IF;
+  IF TG_OP <> 'DELETE' THEN n_full := to_jsonb(NEW); END IF;
+  IF TG_OP = 'UPDATE' THEN
+    changed := ARRAY(SELECT k FROM jsonb_each(n_full) e(k,v)
+                     WHERE v IS DISTINCT FROM o_full->k AND k <> 'updated_at');
+    IF TG_NARGS > 1 THEN ignored := ignored || TG_ARGV[1:TG_NARGS-1]; END IF;
+    IF changed <@ ignored THEN RETURN NULL; END IF;     -- hanya kolom pembukuan
+  END IF;
+  INSERT INTO audit_log(table_name,row_pk,operation,old_data,new_data,changed_columns,app_user_id,db_user)
+  VALUES (TG_TABLE_NAME, COALESCE(n_full,o_full) ->> TG_ARGV[0], left(TG_OP,1),
+          o_full - 'password_hash' - 'token_hash' - 'geom',
+          n_full - 'password_hash' - 'token_hash' - 'geom',
+          changed,
+          NULLIF(current_setting('app.user_id', true), '')::int,
+          COALESCE(NULLIF(current_setting('role'), 'none'), session_user));
   RETURN NULL;
 END $$;
 ```
 
-Dipasang (`AFTER INSERT OR UPDATE OR DELETE ... FOR EACH ROW`) pada: `users`, `api_tokens` (tanpa `token_hash`), `alert_rules`, `alert_events`, `disaster_events`, `quality_thresholds`, `disaster_types`, `administrative_regions` (kolom `in_aoi`), `app_settings`, `live_areas`, `satellite_scenes` dan `nasa_scenes` (UPDATE `is_valid` saja), `datasets`. Tabel bervolume tinggi hasil pipeline (`data_products`, `processing_logs`, `region_observations`) **tidak** di-audit trigger — lineage dan log pipeline sudah menjadi jejaknya.
+- `TG_ARGV[0]` = kolom PK; `TG_ARGV[1..]` = kolom "pembukuan" yang perubahannya **saja** tidak dicatat.
+- `changed_columns` dihitung dari baris utuh sebelum sensor: perubahan `password_hash` terlihat sebagai nama kolom, nilainya tidak pernah disimpan.
+- `db_user` diambil dari GUC `role` (hasil `SET ROLE`), atau `session_user` bila lewat psql; `current_user` di dalam fungsi SECURITY DEFINER selalu pemilik fungsi.
+
+| Tabel | Operasi | Kolom pembukuan yang diabaikan |
+|---|---|---|
+| `users` | I/U/D | `last_login_at`, `failed_login_count` (perubahan `locked_until` tetap tercatat) |
+| `api_tokens` | I/U/D | `last_used_at` (berubah setiap request bertoken) |
+| `alert_rules`, `alert_events`, `disaster_events`, `quality_thresholds`, `disaster_types`, `app_settings` | I/U/D | — |
+| `administrative_regions` | UPDATE `in_aoi` saja | — |
+| `live_areas` | I/U/D | `status`, `status_message`, `last_checked_at`, `forecast`, `forecast_updated_at` (siklus otomatis) |
+| `satellite_scenes`, `nasa_scenes` | UPDATE `is_valid` saja | — |
+| `datasets` | I/U/D | `total_scenes`, `completed_scenes`, `failed_scenes`, `total_size_bytes` (progres pipeline) |
+
+Tabel bervolume tinggi hasil pipeline (`data_products`, `processing_logs`, `region_observations`) **tidak** di-audit trigger — lineage dan log pipeline sudah menjadi jejaknya. INSERT seed (`monitor_seed.sql` dijalankan setelah berkas keamanan) ikut tercatat dengan `app_user_id` NULL.
 
 ### 8.6 Kebijakan kata sandi dan sesi
 
-bcrypt cost 12; minimal 10 karakter; 5 kali gagal → `locked_until = now() + 15 menit`; JWT HS256 di cookie `HttpOnly; Secure; SameSite=Strict`, kedaluwarsa 8 jam; setiap login sukses/gagal dicatat di `user_activity_logs`.
+bcrypt cost 12; minimal 10 karakter (maks. 72 byte, batas bcrypt); 5 kali gagal → `locked_until = now() + 15 menit`; JWT HS256 di cookie `HttpOnly; Secure; SameSite=Strict`, kedaluwarsa 8 jam; setiap login sukses/gagal dicatat di `user_activity_logs`.
 
 ---
 
