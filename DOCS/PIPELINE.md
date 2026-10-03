@@ -50,12 +50,14 @@ Tidak memakai `run_dataset_job` penuh (yang berjangkar ke scene S1). Memakai fun
 | # | `stage_code` | Keluaran | Catatan |
 |---|---|---|---|
 | 1 | `GPM_DOWNLOAD` | granule IMERG di `_granule_cache/gpm/` | fallback F → L → E [WARIS]; `run_type` dicatat |
-| 2 | `ACCUMULATE_RAIN` | COG 24h/72h/7d/**30d** | [UBAH] tambah jendela 30 hari (unduh 29 hari sebelumnya; granule di-cache) |
+| 2 | `ACCUMULATE_RAIN` | COG 24h/72h/7d/**30d** | [UBAH] tambah jendela 30 hari (unduh 29 hari sebelumnya; granule di-cache). Hanya untuk dataset `HYDROMET_AOI`; dataset Katalog/Live tetap 24h/72h/7d |
 | 3 | `MODIS_DOWNLOAD` + `COMPUTE_NDVI/NDWI` + `EXTRACT_FLOOD` | COG FLOOD/NDVI/NDWI | [WARIS] MCDWD + komposit clear terakhir MOD09A1 |
 | 4 | `HYDROMET_AGGREGATE` | baris `region_observations` | zonal statistics, lihat 3.3 |
 | 5 | `ALERT_CHECK` | baris `alert_events` | lihat 3.5 |
 
 Tanggal target operasi harian = **kemarin (UTC)**, karena IMERG Late untuk hari H baru tersedia ±14 jam setelah hari H berakhir. GPM diproses lebih dulu daripada MODIS karena alert hanya bergantung pada GPM.
+
+Status per tanggal ada di `dataset_jobs` (`job_type = HYDROMET_DAILY`, satu baris per hari UTC; percobaan ulang memakai baris yang sama): `PROCESSING` → `COMPLETED`, `WAITING_UPSTREAM` (granule belum terbit di run F/L/E mana pun; dicoba lagi job harian berikutnya sampai `app_settings.hydromet.waiting_max_days`), atau `FAILED`. Tiap tahap juga dicatat di `processing_jobs` (tanpa jangkar) dengan parameter §3.7. Backfill (`scripts/backfill_hydromet.py`) melewati tanggal `COMPLETED`, jadi aman dihentikan dan dijalankan ulang.
 
 ### 3.3 Zonal statistics (`etl/hydromet_aggregate.py`)
 
@@ -124,6 +126,7 @@ Dijalankan saat finalisasi scene, setelah metrik, bila scene sebelumnya (yang be
 
 1. Baca VH (dB) scene sekarang dan sebelumnya pada grid scene sekarang, diturunkan ke sisi terpanjang 2048 px (rata-rata di ruang linear) [WARIS `live_metrics`].
 2. Mask air: `VH < app_settings.water.vh_threshold_db` (default −20 dB, sama dengan ambang `live_interpret`).
+   Piksel dalam 1 km dari batas NoData masing-masing scene (tepi swath S1, derau batas yang terbaca "air") dikeluarkan sebelum klasifikasi.
 3. Klasifikasi per piksel valid di kedua tanggal:
 
 | Kelas | Kondisi | Warna |
@@ -134,8 +137,8 @@ Dijalankan saat finalisasi scene, setelah metrik, bila scene sebelumnya (yang be
 | Darat tetap | darat → darat | transparan (latar VH abu) |
 | Tidak ada data | NoData di salah satu tanggal | pola kotak-kotak |
 
-4. Peringatan kualitas: bila orbit relatif kedua scene berbeda, PNG diberi label "orbit berbeda — perubahan bisa karena geometri pencitraan", karena backscatter dari sudut datang berbeda tidak sepenuhnya sebanding.
-5. Metrik disimpan di `live_scene_metrics` (band `WATER_CHANGE`; `new_km2`, `receded_km2`, `persistent_km2`, dengan `ref_live_scene_id` = scene pembanding; flag orbit sama/berbeda di `metric_name = 'same_orbit'` bernilai 1/0); luas = jumlah piksel × luas piksel geodesik.
+4. Peringatan kualitas: orbit relatif diambil dari metadata katalog (`satellite_scenes.relative_orbit`), cadangannya rumus nama produk (`(abs − offset) mod 175 + 1`; S1A 73, S1B 27, S1C 172 sampai 23-06-2026, S1D 42; S1C sejak 24-06-2026 hanya dari metadata). Bila orbit relatif kedua scene berbeda, PNG diberi label "orbit berbeda — perubahan bisa karena geometri pencitraan", karena backscatter dari sudut datang berbeda tidak sepenuhnya sebanding.
+5. Metrik disimpan di `live_scene_metrics` (band `WATER_CHANGE`; `new_km2`, `receded_km2`, `persistent_km2`, `valid_km2` (luas teramati di kedua tanggal; penyebut kategori kalimat), dengan `ref_live_scene_id` = scene pembanding; flag orbit sama/berbeda di `metric_name = 'same_orbit'` bernilai 1/0); luas = jumlah piksel × luas piksel geodesik.
 6. Scene pertama area tidak punya pembanding → tidak ada baris `WATER_CHANGE`, tile menampilkan "belum ada scene pembanding".
 
 ### 4.2 Metrik Live ke tabel (M31) [UBAH]
@@ -231,7 +234,7 @@ Data hidromet per tanggal UTC dipetakan ke periode WIB berdasarkan `obs_date`. L
 | Laporan bulanan | tanggal 1, 03:30 / 03:45 | `report` |
 | Backup `pg_dump` | 01:30 | (di luar APScheduler, cron OS) |
 
-**Advisory lock (M22):** setiap job membuka koneksi dan memanggil `pg_try_advisory_lock(hashtext('orbit-u:' || key))`. Bila gagal, worker lain sedang menjalankannya → job dilewati dan dicatat `SKIPPED_LOCKED`. Kunci dilepas otomatis bila proses mati karena koneksinya putus. Ini melengkapi `job_lock` berkas DataLab (yang menjaga per job/area), bukan menggantikannya.
+**Advisory lock (M22):** setiap job membuka koneksi dan memanggil `pg_try_advisory_lock(hashtext('orbit-u:' || key))`. Bila gagal, worker lain sedang menjalankannya → job dilewati dan dicatat sebagai baris `processing_jobs` tahap `ORCHESTRATE` berstatus `SKIPPED_LOCKED` (`parameters_json.scheduler_job`, `.lock`). `scripts/backfill_hydromet.py` dan `POST /admin/ingest` memegang kunci `hydromet` yang sama. Kunci dilepas otomatis bila proses mati karena koneksinya putus. Ini melengkapi `job_lock` berkas DataLab (yang menjaga per job/area), bukan menggantikannya.
 
 ---
 
@@ -297,7 +300,7 @@ Orbit-U tidak menggantikan basis data lama, sehingga tahap ini berupa muatan awa
 |---|---|---|---|
 | 1 | Seed SQL | 12 master + `app_settings` | `monitor_seed.sql` |
 | 2 | Shapefile COD-AB IDN adm2 + adm3 (HDX `cod-ab-idn`) | `administrative_regions` (Kab. Lebak + kecamatannya) | `load_regions.py`: filter `ADM2_PCODE` Lebak, `ST_Multi`, `ST_MakeValid` |
-| 3 | Daftar kecamatan GMLS | `in_aoi = true` | ADMIN via UI atau `load_regions.py --aoi "Bayah,Panggarangan,…"` |
+| 3 | Daftar kecamatan GMLS: 10 kecamatan wilayah Lebak Selatan (Banjarsari, Wanasalam, Cijaku, Malingping, Cihara, Cigemblong, Panggarangan, Bayah, Cibeber, Cilograng; IMPLEMENTATION_NOTES T3-4) | `in_aoi = true` | ADMIN via UI, impor Excel `kecamatan`, atau `load_regions.py --aoi "…"` (shapefile default `data/external/cod-ab-idn/`) |
 | 4 | Turunan | `regions_of_interest` AOI (`is_monitor_aoi`) | otomatis setelah langkah 3 |
 | 5 | Akun | admin pertama | `create_admin.py` |
 | 6 | API satelit 2023-01-01 – 2025-12-31 | `nasa_scenes`, `data_products`, `region_observations`, `alert_events` | `backfill_hydromet.py` (job A per tanggal, berurutan, resume-aware) |
@@ -318,7 +321,7 @@ Orbit-U tidak menggantikan basis data lama, sehingga tahap ini berupa muatan awa
 
 ### Estimasi waktu backfill hidromet
 
-±1.096 hari × (GPM ±5 s + MODIS ±20–40 s, granule di-cache) ≈ 10–15 jam, dijalankan bertahap per bulan agar bisa dipantau dan dilanjutkan.
+Rencana awal: ±1.096 hari × (GPM ±5 s + MODIS ±20–40 s) ≈ 10–15 jam. **Terukur (uji 1–7 Januari 2024, Tahap 3):** tanggal pertama ±10 menit (30 granule GPM untuk jendela 30 hari), tanggal berikutnya ±125–165 s, sekitar 60% di antaranya komposit NDVI/NDWI MOD09A1 (module7 membaca ulang 5 granule per band setiap tanggal), diukur saat mesin juga memproses S1. Perkiraan realistis **±1,5–2 hari** untuk 2023–2025; dijalankan bertahap (mis. per bulan atau per tahun) karena backfill bisa dihentikan dan dilanjutkan.
 
 ---
 
@@ -350,7 +353,11 @@ Konfigurasi yang boleh diubah ADMIN tanpa restart disimpan di DB: `alert_rules`,
 | `etl/water_change.py` | [BARU] | Peta & metrik perubahan air S1 |
 | `etl/report_hydromet.py`, `etl/report_datahealth.py` | [BARU] | Dua template laporan periodik |
 | `etl/scheduler.py` | [UBAH] dari `live_scheduler.py` | Semua cron + advisory lock |
-| `etl/module8_gpm_download.py` | [UBAH] | Jendela `30d` |
+| `etl/advisory_lock.py`, `etl/settings.py`, `etl/regions.py` | [BARU] | Kunci advisory; pembaca `app_settings`; wilayah COD-AB, AOI, ROI, dataset `HYDROMET_AOI` |
+| `etl/report_periodic.py` | [BARU] | Periode WIB, penyimpanan atomik, `generated_reports` (SUPERSEDED/FAILED) |
+| `etl/disasters.py`, `etl/excel_io.py` | [BARU] | Validasi kejadian bersama; ekspor/impor Excel generik (INTERFACE §4.10) |
+| `scripts/load_regions.py`, `scripts/backfill_hydromet.py` | [BARU] | Muatan awal wilayah/AOI; backfill hidromet resume-aware |
+| `etl/module8_gpm_download.py` | [UBAH] | Jendela `30d` (hanya hidromet), `GranuleNotPublished`, bangun ulang non-Final, tulis atomik |
 | `etl/module6_analytics.py` | [UBAH] | Ambang dari `quality_thresholds`; tulis `quality_alerts` |
 | `etl/live_interpret.py`, `live_preview.py`, `live_cycle.py` | [UBAH] | Kalimat Indonesia, preview ke-9, retensi 1–60 |
 | `etl/dataset_merge.py`, `refusion.py`, `reference_layers.py`, `land_mask.py`, `water_occurrence.py`, `geo_utils.geocode_search` | [HAPUS] | Pembaca frame S1 `refusion.scene_results_for_date` masih dipakai orchestrator, jadi dipindah ke `module5_orchestrator` |
@@ -361,7 +368,7 @@ Konfigurasi yang boleh diubah ADMIN tanpa restart disimpan di DB: `alert_rules`,
 | `etl/live_metrics.py`, `live_forecast.py` | [UBAH] | Tulis/baca `live_scene_metrics` (M31) |
 | `benchmark/` | [BARU] | `load_pg.py`, `load_mysql.py`, `queries/{pg,mysql}/q1–q5.sql`, `features/f1–f3`, `run.py` → `results/` (M29) |
 | `tools/data_dictionary.py` | [BARU] | Kamus data + ERD Mermaid dari katalog DB (M34) |
-| `scripts/import_disasters.py` | [BARU] | Impor CSV kejadian (GMLS; DIBI opsional) |
+| `scripts/import_disasters.py` | [BARU] | Impor CSV kejadian (GMLS; DIBI opsional); format sama dengan impor Excel `disasters` |
 
 ---
 

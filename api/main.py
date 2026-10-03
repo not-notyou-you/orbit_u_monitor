@@ -60,8 +60,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Scheduler tunggal (PIPELINE §7): hidromet, Live, laporan, masing-masing
     # di bawah advisory lock PostgreSQL. Bisa dimatikan untuk worker API
-    # tambahan (ENABLE_SCHEDULER=false); advisory lock tetap menjaga bila tidak.
-    if os.getenv("ENABLE_SCHEDULER", "true").lower() in ("1", "true", "yes"):
+    # tambahan (SCHEDULER_ENABLED=false); advisory lock tetap menjaga bila tidak.
+    if os.getenv("SCHEDULER_ENABLED", "true").lower() in ("1", "true", "yes"):
         try:
             from etl.scheduler import Scheduler
             _scheduler = Scheduler(_etl_client)

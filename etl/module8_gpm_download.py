@@ -777,7 +777,7 @@ def download_gpm_scene(
         wanted_windows = tuple(windows)
     logger.info(
         "[M8] dataset_id=%s level=%s window=%s granule_hari=%d",
-        dataset_id, list(plan.levels), list(wanted_windows), plan.gpm_days(),
+        dataset_id, list(plan.levels), list(wanted_windows), max(WINDOWS[w] for w in wanted_windows),
     )
 
     date_key = date.strftime("%Y%m%d")

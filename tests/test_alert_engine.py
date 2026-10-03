@@ -215,3 +215,24 @@ class TestRunDay:
                          fetchers=hj.Fetchers(_fake_gpm(tmp_path, 120.0), _fake_modis(tmp_path)))
         assert res.status == "COMPLETED", res.message
         assert len(res.alerts) == 6
+
+
+class TestGranuleRetention:
+    def test_prune_keeps_45_days(self, db_client, synthetic_aoi, tmp_path):
+        from etl import folder_manager as fm
+        ctx = hj.context(db_client)
+        gpm = fm.get_granule_cache_dir(ctx.dataset_id, ctx.dataset_name, "gpm")
+        modis = fm.get_granule_cache_dir(ctx.dataset_id, ctx.dataset_name, "modis")
+        gpm.mkdir(parents=True, exist_ok=True)
+        modis.mkdir(parents=True, exist_ok=True)
+        old = gpm / "3B-DAY.MS.MRG.3IMERG.20240101-S000000-E235959.V07B.nc4"
+        edge = gpm / "3B-DAY.MS.MRG.3IMERG.20240115-S000000-E235959.V07B.nc4"
+        old_modis = modis / "MOD09A1.A2024001.h28v09.061.2024010000000.hdf"     # 1 Jan
+        keep_modis = modis / "MOD09A1.A2024017.h28v09.061.2024026000000.hdf"    # 17 Jan
+        other = gpm / "notes.txt"
+        for p in (old, edge, old_modis, keep_modis, other):
+            p.write_bytes(b"x" * 10)
+        out = hj.prune_granule_cache(ctx, date(2024, 3, 1))      # cutoff 2024-01-16
+        assert out["removed"] == 3
+        assert not old.exists() and not edge.exists() and not old_modis.exists()
+        assert keep_modis.exists() and other.exists()

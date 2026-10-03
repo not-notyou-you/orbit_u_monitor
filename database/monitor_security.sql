@@ -150,6 +150,10 @@ GRANT SELECT, INSERT, UPDATE ON data_products, data_lineage, quality_metrics,
 -- S1: penghapusan fisik dataset (diputuskan API untuk pembuat/ADMIN)
 -- dikerjakan pipeline. Tabel anak lain ikut lewat ON DELETE CASCADE.
 GRANT DELETE ON datasets, data_products, processing_jobs TO monitor_etl;
+-- Tahap 3 (T3-27): metrik Live ditulis ulang per scene (hapus baris band x
+-- metrik lama lalu sisipkan) oleh live_metrics.save_scene_metrics dan
+-- water_change.save_metrics; tanpa D siklus Live gagal di produksi.
+GRANT DELETE ON live_scene_metrics TO monitor_etl;
 GRANT SELECT, INSERT, UPDATE ON generated_reports TO monitor_etl;
 GRANT SELECT, INSERT, UPDATE ON live_areas, live_scenes, live_events,
                                 live_scene_metrics TO monitor_etl;

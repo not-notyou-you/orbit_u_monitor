@@ -40,7 +40,8 @@ INSERT INTO gm_expected VALUES
     ('live_areas',               '',  'S',   'S',   'S',   'SIU',  'SIU'),
     ('live_scenes',              '',  'S',   'S',   'S',   'SIU',  'SIU'),
     ('live_events',              '',  'S',   'S',   'S',   'SIU',  'SIU'),
-    ('live_scene_metrics',       '',  'S',   'S',   'S',   'SIU',  'SIU'),
+    -- etl D: metrik scene ditulis ulang per finalisasi (Tahap 3, T3-27)
+    ('live_scene_metrics',       '',  'S',   'S',   'S',   'SIU',  'SIUD'),
     ('v_live_scenes_recent',     '',  'S',   'S',   'S',   'S',    'S'),
     ('v_hujan_harian_kecamatan', '',  'S',   'S',   'S',   'S',    'S'),
     ('v_statistik_hari_ini',     '',  'S',   'S',   'S',   'S',    'S'),

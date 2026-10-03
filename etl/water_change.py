@@ -43,6 +43,11 @@ PREVIEW_KEY = "s1_water_change"
 DEFAULT_THRESHOLD_DB = -20.0
 MAX_SIDE = 2048
 PNG_MAX_SIDE = 768
+# Tepi swath S1 (derau pita batas, piksel sangat gelap) terbaca "air" bila
+# tidak dibuang: uji nyata 27-09-2026 memberi pita merah palsu selebar ±1 km
+# di sepanjang batas data. Piksel dalam jarak ini dari NoData di masing-masing
+# scene dikeluarkan (T3-29). Batas bingkai raster (crop AOI) tidak dihitung.
+EDGE_BUFFER_M = 1000.0
 EARTH_RADIUS_KM = 6371.0088
 
 NODATA, LAND, PERSISTENT, NEW, RECEDED = 0, 1, 2, 3, 4
@@ -105,17 +110,24 @@ def same_orbit(cur_products, prev_products, metadata: dict[str, int] | None = No
 
 
 def orbit_metadata(sess, product_ids) -> dict[str, int]:
-    """{product_identifier: relative_orbit} dari satellite_scenes (metadata CDSE)."""
+    """{product_identifier: orbit relatif} untuk produk S1 yang namanya (bisa
+    terpotong, mis. ``live_scenes.s1_product_ids``) cocok dengan
+    ``satellite_scenes``: metadata CDSE bila ada, jika tidak rumus atas nama
+    produk LENGKAP dari tabel itu."""
     from sqlalchemy import text
     names = [Path(p).name for p in product_ids or [] if p]
     if not names:
         return {}
     rows = sess.execute(text("""
         SELECT product_identifier, relative_orbit FROM satellite_scenes
-        WHERE relative_orbit IS NOT NULL
-          AND EXISTS (SELECT 1 FROM unnest(CAST(:names AS text[])) n WHERE product_identifier LIKE n || '%')
+        WHERE EXISTS (SELECT 1 FROM unnest(CAST(:names AS text[])) n WHERE product_identifier LIKE n || '%')
     """), {"names": names}).all()
-    return {r.product_identifier: int(r.relative_orbit) for r in rows}
+    out = {}
+    for r in rows:
+        rel = int(r.relative_orbit) if r.relative_orbit is not None else relative_orbit(r.product_identifier)
+        if rel is not None:
+            out[r.product_identifier] = rel
+    return out
 
 
 @dataclass
@@ -209,13 +221,38 @@ def summarize(classes: np.ndarray, areas: np.ndarray) -> dict:
             "valid_fraction": round(float(valid.mean()) if classes.size else 0.0, 4)}
 
 
+def _pixel_size_m(transform, crs, shape) -> float:
+    a = abs(transform.a)
+    if crs is not None and crs.is_geographic:
+        lat = transform.f + transform.e * shape[0] / 2
+        return a * 111_320.0 * max(math.cos(math.radians(lat)), 1e-6)
+    return a
+
+
+def mask_swath_edges(db: np.ndarray, transform, crs, buffer_m: float = EDGE_BUFFER_M) -> np.ndarray:
+    """Salinan ``db`` dengan piksel dalam ``buffer_m`` dari NoData dijadikan NaN."""
+    if buffer_m <= 0:
+        return db
+    from scipy.ndimage import binary_erosion
+    n = int(math.ceil(buffer_m / _pixel_size_m(transform, crs, db.shape)))
+    valid = np.isfinite(db)
+    if n <= 0 or valid.all() or not valid.any():
+        return db
+    kept = binary_erosion(valid, structure=np.ones((3, 3), bool), iterations=n, border_value=1)
+    out = db.copy()
+    out[~kept] = np.nan
+    return out
+
+
 def compute(cur_vh: Path, prev_vh: Path, threshold_db: float = DEFAULT_THRESHOLD_DB,
-            max_side: int = MAX_SIDE) -> WaterChange:
+            max_side: int = MAX_SIDE, edge_buffer_m: float = EDGE_BUFFER_M) -> WaterChange:
     cur_lin, prev_lin, tf, crs = read_vh_pair(cur_vh, prev_vh, max_side)
-    cur_db, prev_db = to_db(cur_lin), to_db(prev_lin)
+    cur_db = mask_swath_edges(to_db(cur_lin), tf, crs, edge_buffer_m)
+    prev_db = mask_swath_edges(to_db(prev_lin), tf, crs, edge_buffer_m)
     classes = classify(cur_db, prev_db, threshold_db)
     metrics = summarize(classes, pixel_area_km2(tf, crs, classes.shape))
     metrics["threshold_db"] = threshold_db
+    metrics["edge_buffer_m"] = edge_buffer_m
     return WaterChange(classes, cur_db, tf, crs, metrics)
 
 
@@ -223,6 +260,17 @@ def compute(cur_vh: Path, prev_vh: Path, threshold_db: float = DEFAULT_THRESHOLD
 
 def _hex_rgb(h: str) -> tuple[int, int, int]:
     return int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16)
+
+
+def _label_font(size: int):
+    """DejaVu Sans (dibundel matplotlib; punya glyph '—' dan '²'); font
+    bitmap bawaan PIL bila tidak tersedia."""
+    from PIL import ImageFont
+    try:
+        import matplotlib
+        return ImageFont.truetype(str(Path(matplotlib.get_data_path()) / "fonts" / "ttf" / "DejaVuSans.ttf"), size)
+    except Exception:
+        return ImageFont.load_default()
 
 
 def render_png(wc: WaterChange, path: Path, *, orbit_differs: bool = False, max_side: int = PNG_MAX_SIDE) -> dict:
@@ -251,10 +299,13 @@ def render_png(wc: WaterChange, path: Path, *, orbit_differs: bool = False, max_
     img = Image.fromarray(rgb.astype("uint8"), mode="RGB")
     if orbit_differs:
         draw = ImageDraw.Draw(img)
+        font = _label_font(max(11, round(max(img.size) / 50)))
         text = ORBIT_WARNING
-        box = draw.textbbox((0, 0), text)
-        draw.rectangle((4, 4, box[2] + 12, box[3] + 12), fill=(255, 255, 255))
-        draw.text((8, 8), text, fill=(180, 40, 40))
+        if draw.textbbox((8, 8), text, font=font)[2] > img.size[0] - 8:
+            text = text.replace(" — ", " —\n", 1)      # gambar sempit: dua baris
+        box = draw.multiline_textbbox((8, 8), text, font=font)
+        draw.rectangle((4, 4, box[2] + 4, box[3] + 4), fill=(255, 255, 255))
+        draw.multiline_text((8, 8), text, fill=(180, 40, 40), font=font)
     with atomic_path(path) as tmp:
         img.save(tmp, format="PNG")
     return {

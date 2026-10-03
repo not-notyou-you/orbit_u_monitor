@@ -45,6 +45,9 @@ MODIS_BANDS = ("FLOOD", "NDVI", "NDWI")
 # Late -> Final: Final IMERG terbit ±3,5 bulan setelah hari H, jadi tanggal
 # 4–5 bulan terakhir yang masih L/E diperiksa (PIPELINE §3.4).
 FINAL_REFRESH_DAYS = 153
+# Granule mentah dataset sistem disimpan 45 hari (PIPELINE §9): jendela GPM
+# 30 hari + lookback komposit MOD09A1 32 hari (+ periode 8 hari) masih muat.
+GRANULE_RETENTION_DAYS = 45
 
 
 @dataclass
@@ -221,6 +224,34 @@ def _record_gpm_run(db, obs_date: date, run: str | None) -> None:
             {"r": run, "s": GPM_SOURCE, "d": obs_date})
 
 
+def prune_granule_cache(ctx: "Context", obs_date: date, keep_days: int = GRANULE_RETENTION_DAYS) -> dict:
+    """Hapus granule GPM/MODIS mentah di _granule_cache yang tanggalnya lebih
+    tua dari ``obs_date - keep_days``. Produk turunan (COG) tidak disentuh;
+    granule yang dihapus bisa diunduh ulang dari URL resminya."""
+    from etl import folder_manager as fm
+    from etl.live_monitor import _granule_date
+
+    cutoff = obs_date - timedelta(days=keep_days)
+    removed, freed = 0, 0
+    for source in ("gpm", "modis"):
+        cache = fm.get_granule_cache_dir(ctx.dataset_id, ctx.dataset_name, source)
+        if not cache.is_dir():
+            continue
+        for p in cache.iterdir():
+            d = _granule_date(p.name) if p.is_file() else None
+            if d is not None and d < cutoff:
+                try:
+                    size = p.stat().st_size
+                    p.unlink()
+                    removed += 1
+                    freed += size
+                except OSError:
+                    logger.warning("[HYDROMET] gagal menghapus granule lama %s", p)
+    if removed:
+        logger.info("[HYDROMET] cache granule < %s: %d berkas dihapus (%.0f MB)", cutoff, removed, freed / 2 ** 20)
+    return {"removed": removed, "freed_bytes": freed}
+
+
 # Inti -------------------------------------------------------------------------
 
 def run_day(db, obs_date: date, *, rebuild_non_final: bool = False,
@@ -302,6 +333,11 @@ def run_day(db, obs_date: date, *, rebuild_non_final: bool = False,
             logger.exception("[HYDROMET] %s: MODIS gagal (tidak fatal)", obs_date)
             _stage_job(db, "HYDROMET_AGGREGATE", "FAILED", {"source": "MODIS", "date": obs_date,
                                                              "job_id": job_id}, error=str(exc)[:2000])
+
+    try:
+        prune_granule_cache(ctx, obs_date)
+    except Exception:
+        logger.exception("[HYDROMET] pembersihan cache granule gagal (tidak fatal)")
 
     result.status = "COMPLETED"
     result.message = (f"{result.observations} observations, {len(result.alerts)} new alerts, GPM run {gpm_run}"

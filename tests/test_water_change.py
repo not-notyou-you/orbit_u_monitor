@@ -47,7 +47,7 @@ def _cell_area(row: int) -> float:
 
 class TestClassify:
     def test_classes_and_areas(self, tmp_path):
-        res = wc.compute(_vh(tmp_path, "cur", CUR), _vh(tmp_path, "prev", PREV), threshold_db=-20.0)
+        res = wc.compute(_vh(tmp_path, "cur", CUR), _vh(tmp_path, "prev", PREV), threshold_db=-20.0, edge_buffer_m=0)
         expected = np.array([[2, 2, 3, 1],
                              [4, 2, 1, 1],
                              [1, 1, 1, 3],
@@ -60,7 +60,7 @@ class TestClassify:
 
     def test_threshold_is_respected(self, tmp_path):
         # Dengan ambang -30 dB tidak ada piksel air sama sekali.
-        res = wc.compute(_vh(tmp_path, "cur", CUR), _vh(tmp_path, "prev", PREV), threshold_db=-30.0)
+        res = wc.compute(_vh(tmp_path, "cur", CUR), _vh(tmp_path, "prev", PREV), threshold_db=-30.0, edge_buffer_m=0)
         assert res.metrics["new_km2"] == res.metrics["receded_km2"] == res.metrics["persistent_km2"] == 0.0
 
     def test_downsampling_averages_in_linear_space(self, tmp_path):
@@ -72,7 +72,7 @@ class TestClassify:
         arr = np.array([[{"W": WATER, "L": LAND}[c] for c in r] for r in lay], dtype="float32")
         p1 = write_synthetic_raster(tmp_path / "a.tif", arr, nodata=0.0, grid=g)
         p2 = write_synthetic_raster(tmp_path / "b.tif", arr, nodata=0.0, grid=g)
-        res = wc.compute(p1, p2, threshold_db=-16.0, max_side=1)
+        res = wc.compute(p1, p2, threshold_db=-16.0, max_side=1, edge_buffer_m=0)
         expected_db = 10 * math.log10((WATER + LAND) / 2)
         assert res.vh_db[0, 0] == pytest.approx(expected_db, abs=1e-3)
         assert res.classes[0, 0] == wc.LAND
@@ -81,7 +81,7 @@ class TestClassify:
         arr = np.array([[-25, -12], [-12, -12]], dtype="float32")
         g = {"x0": 106.2, "y0": -6.9, "res": 0.01, "shape": (2, 2)}
         p = write_synthetic_raster(tmp_path / "db.tif", arr, nodata=None, grid=g)
-        res = wc.compute(p, p)
+        res = wc.compute(p, p, edge_buffer_m=0)
         assert res.classes[0, 0] == wc.PERSISTENT and res.classes[1, 1] == wc.LAND
 
 
@@ -93,6 +93,8 @@ class TestOrbit:
         # S1C setelah rekonfigurasi 24-06-2026: tanpa metadata -> tidak ditebak.
         ("S1C_IW_GRDH_1SDV_20260801T224512_20260801T224537_009000_000001_ABCD", None),
         ("S1D_IW_GRDH_1SDV_20260110T224512_20260110T224537_003000_000001_ABCD", (3000 - 42) % 175 + 1),
+        # Nilai nyata CDSE (relativeOrbitNumber) untuk produk Live Lebak Selatan, 27-09-2026.
+        ("S1D_IW_GRDH_1SDV_20260927T112236_20260927T112305_004762_008EC4_A3A7.SAFE", 171),
         ("garbage", None), (None, None)])
     def test_relative_orbit(self, pid, expected):
         assert wc.relative_orbit(pid) == expected
@@ -115,7 +117,7 @@ class TestOrbit:
 
 class TestPngAndMetrics:
     def test_png_colors_and_orbit_label(self, tmp_path):
-        res = wc.compute(_vh(tmp_path, "cur", CUR), _vh(tmp_path, "prev", PREV))
+        res = wc.compute(_vh(tmp_path, "cur", CUR), _vh(tmp_path, "prev", PREV), edge_buffer_m=0)
         out = tmp_path / "live" / "s1_water_change.png"
         legend = wc.render_png(res, out, orbit_differs=True, max_side=400)
         img = np.asarray(Image.open(out).convert("RGB"))
@@ -146,3 +148,64 @@ class TestPngAndMetrics:
         assert "orbit berbeda" in s["text"]
         assert s["category"] == "alert"       # (1.5 - 0.25) / 50 = 2.5 poin persen >= 2
         assert wc.sentence(None)["category"] == "unavailable"
+
+
+class TestRunsAsMonitorEtl:
+    """Siklus Live berjalan sebagai monitor_etl: menulis ulang metrik scene
+    (hapus + sisip) harus diizinkan GRANT (T3-27, ditemukan uji nyata)."""
+
+    def test_rewrite_metrics_as_etl(self, etl_db_client, db_client):
+        from etl import live_metrics as lmx
+        with db_client.session() as sess:
+            ids = [sess.scalar(text("""INSERT INTO live_scenes (area_id, scene_date, status)
+                                       VALUES (987655, :d, 'READY') RETURNING live_scene_id"""), {"d": d})
+                   for d in (date(2024, 2, 1), date(2024, 2, 13))]
+        metrics = {"sentinel1": {"vv_mean_db": -11.5, "vh_mean_db": -18.2, "vh_water_pct": 7.5}, "modis": {}, "gpm": {}}
+        try:
+            for _ in range(2):          # kedua kali = menulis ulang (DELETE + INSERT)
+                with etl_db_client.session() as sess:
+                    lmx.save_scene_metrics(sess, ids[1], date(2024, 2, 13), metrics)
+                    wc.save_metrics(sess, ids[1], ids[0], {"new_km2": 1.0, "receded_km2": 0.5,
+                                                           "persistent_km2": 2.0, "valid_km2": 40.0},
+                                    same=True, source_date=date(2024, 2, 1))
+            with etl_db_client.session() as sess:
+                got = wc.load_metrics(sess, ids)
+                n = sess.scalar(text("SELECT count(*) FROM live_scene_metrics WHERE live_scene_id = :s"), {"s": ids[1]})
+            assert got[ids[1]]["new_km2"] == 1.0 and got[ids[1]]["same_orbit"] == 1.0
+            assert n == len(lmx.metric_rows(metrics, date(2024, 2, 13))[0]) + 5
+        finally:
+            with db_client.session() as sess:
+                sess.execute(text("DELETE FROM live_scenes WHERE area_id = 987655"))
+
+
+class TestOrbitMetadataTruncatedIds:
+    def test_truncated_live_ids_resolve_through_satellite_scenes(self, db_client, sample_region):
+        """live_scenes.s1_product_ids menyimpan nama terpotong ('…T112236_20');
+        orbit tetap ditemukan lewat nama lengkap di satellite_scenes."""
+        full = {"S1D_IW_GRDH_1SDV_20260927T112236_20260927T112305_004762_008EC4_A3A7.SAFE": None,
+                "S1D_IW_GRDH_1SDV_20260922T111440_20260922T111505_004689_008C3D_9D0D.SAFE": 98}
+        with db_client.session() as sess:
+            for pid, rel in full.items():
+                sess.execute(text("""INSERT INTO satellite_scenes (product_identifier, acquisition_datetime, bbox,
+                                         region_id, relative_orbit)
+                                     VALUES (:p, now(), ST_GeomFromText('POLYGON((106 -7,106.1 -7,106.1 -6.9,106 -6.9,106 -7))', 4326),
+                                             :r, :rel) ON CONFLICT (product_identifier) DO NOTHING"""),
+                             {"p": pid, "r": sample_region, "rel": rel})
+            cur, prev = ["S1D_IW_GRDH_1SDV_20260927T112236_20"], ["S1D_IW_GRDH_1SDV_20260922T111440_20"]
+            meta = wc.orbit_metadata(sess, cur + prev)
+            sess.execute(text("DELETE FROM satellite_scenes WHERE product_identifier = ANY(:p)"), {"p": list(full)})
+        assert sorted(meta.values()) == [98, 171]          # 171 dari rumus S1D, 98 dari metadata
+        assert wc.same_orbit(cur, prev, meta) is False
+
+
+class TestSwathEdge:
+    def test_pixels_next_to_nodata_are_dropped_but_frame_is_not(self):
+        from rasterio.transform import from_origin
+        from rasterio.crs import CRS
+        db = np.full((20, 20), -12.0)
+        db[:, 15:] = np.nan                       # swath berakhir di kolom 15
+        tf = from_origin(106.0, -6.9, 0.001, 0.001)   # ±110 m per piksel
+        out = wc.mask_swath_edges(db, tf, CRS.from_epsg(4326), buffer_m=300)   # 3 piksel
+        assert np.isnan(out[:, 12:15]).all() and np.isfinite(out[:, 11]).all()
+        assert np.isfinite(out[0, 0]) and np.isfinite(out[19, 5])      # bingkai crop tidak terkikis
+        assert wc.mask_swath_edges(db, tf, CRS.from_epsg(4326), buffer_m=0) is db

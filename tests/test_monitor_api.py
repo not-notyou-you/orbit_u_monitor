@@ -80,7 +80,7 @@ class TestAlerts:
         assert r.status_code == 200 and r.json()["acknowledged_by"] == role_users["ANALYST"]
         assert r.json()["ack_note"] == "dicek lapangan"
         again = make_client("ANALYST").post(f"/api/alerts/{target['alert_id']}/acknowledge", json={})
-        assert again.status_code == 409 and again.json()["code"] == "ALREADY_ACKNOWLEDGED"
+        assert again.status_code == 409 and again.json()["code"] == "ALERT_ALREADY_ACKED"
         assert make_client("ANALYST").post("/api/alerts/999999/acknowledge", json={}).status_code == 404
 
     def test_evaluation(self, make_client):
@@ -305,3 +305,55 @@ class TestSchedulerLock:
             t.start()
             t.join(30)
         assert done["r"]["status"] == "OK" and seen["notes"] == [scheduler.INCOMPLETE_NOTE]
+
+
+class TestAdminOperations:
+    def test_scene_soft_delete_and_reprocess(self, make_client, db_client, synthetic_aoi, monkeypatch):
+        from api.routes import admin_monitor
+        with db_client.session() as sess:
+            nid = sess.scalar(text("""INSERT INTO nasa_scenes (source, tile_id, product_short_name, acquisition_date,
+                                       region_id) VALUES ('GPM', 'GLOBAL', 'GPM_3IMERGDF', '2024-07-01', :r)
+                                       RETURNING nasa_scene_id"""), {"r": synthetic_aoi["roi_id"]})
+        admin = make_client("ADMIN")
+        r = admin.patch(f"/api/admin/scenes/GPM/{nid}", json={"is_valid": False})
+        assert r.status_code == 400 and r.json()["code"] == "REASON_REQUIRED"
+        r = admin.patch(f"/api/admin/scenes/GPM/{nid}", json={"is_valid": False, "reason": "granule rusak"})
+        assert r.status_code == 200 and r.json()["is_valid"] is False and r.json()["invalid_reason"] == "granule rusak"
+        assert admin.patch(f"/api/admin/scenes/MODIS/{nid}", json={"is_valid": True}).status_code == 404
+        assert admin.patch(f"/api/admin/scenes/GPM/{nid}", json={"is_valid": True}).json()["is_valid"] is True
+        calls = []
+        monkeypatch.setattr(admin_monitor, "_reprocess_hydromet", lambda etl, day: calls.append(day))
+        r = admin.post(f"/api/admin/scenes/GPM/{nid}/reprocess")
+        assert r.status_code == 202 and r.json()["date"] == "2024-07-01"
+        assert admin.post("/api/admin/scenes/XX/1/reprocess").json()["code"] == "INVALID_SOURCE"
+        with db_client.session() as sess:
+            sess.execute(text("DELETE FROM nasa_scenes WHERE nasa_scene_id = :i"), {"i": nid})
+
+    def test_thresholds_and_settings(self, make_client, db_client):
+        admin = make_client("ADMIN")
+        items = admin.get("/api/admin/quality-thresholds").json()["items"]
+        vf = next(i for i in items if i["band_code"] == "RAIN_24H" and i["metric_name"] == "valid_fraction")
+        r = admin.put("/api/admin/quality-thresholds", json=[{"threshold_id": vf["threshold_id"], "fail_below": 0.9}])
+        assert r.status_code == 400 and r.json()["code"] == "INVALID_THRESHOLD"     # fail > warn
+        r = admin.put("/api/admin/quality-thresholds", json=[{"threshold_id": vf["threshold_id"], "warn_below": 0.6}])
+        assert r.status_code == 200
+        admin.put("/api/admin/quality-thresholds", json=[{"threshold_id": vf["threshold_id"], "warn_below": 0.5}])
+        keys = {i["setting_key"] for i in admin.get("/api/admin/settings").json()["items"]}
+        assert {"live.retention_default", "hydromet.waiting_max_days"} <= keys
+        bad = admin.put("/api/admin/settings", json={"settings": {"live.retention_max": 99}})
+        assert bad.status_code == 400 and bad.json()["code"] == "INVALID_SETTING"
+        assert admin.put("/api/admin/settings", json={"settings": {"nope": 1}}).status_code == 404
+        ok = admin.put("/api/admin/settings", json={"settings": {"hydromet.waiting_max_days": 4}})
+        assert ok.status_code == 200
+        admin.put("/api/admin/settings", json={"settings": {"hydromet.waiting_max_days": 3}})
+        assert admin.put("/api/admin/settings", json={"settings": {"live.retention_default": 70}}).status_code == 400
+
+    def test_status_and_archive(self, make_client, recent_obs):
+        admin = make_client("ADMIN")
+        st = admin.get("/api/admin/pipeline/status").json()
+        assert {"latest_jobs", "hydromet", "live_areas", "reports", "credentials", "scheduler"} <= set(st)
+        assert isinstance(st["credentials"]["nasa_earthdata_token"], bool)
+        stats = admin.get("/api/admin/archive/stats").json()
+        assert stats["rows"]["region_observations"] > 0
+        v = admin.post("/api/admin/archive/verify", json={"limit": 5}).json()
+        assert v["checked"] == v["ok"] + len(v["missing"]) + len(v["mismatch"])

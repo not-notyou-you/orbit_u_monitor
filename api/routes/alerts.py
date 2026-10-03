@@ -109,7 +109,7 @@ def acknowledge(alert_id: int, req: AcknowledgeRequest, sess: Session = Depends(
     if row is None:
         raise ApiError(404, f"Alert {alert_id} not found", "NOT_FOUND")
     if row.acknowledged_at is not None:
-        raise ApiError(409, "Alert has already been acknowledged", "ALREADY_ACKNOWLEDGED")
+        raise ApiError(409, "Alert has already been acknowledged", "ALERT_ALREADY_ACKED")
     sess.execute(text("""UPDATE alert_events SET acknowledged_by = :u, acknowledged_at = now(), ack_note = :n
                          WHERE alert_id = :a"""),
                  {"u": principal.user_id, "n": (req.note or "").strip() or None, "a": alert_id})

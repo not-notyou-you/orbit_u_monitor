@@ -278,7 +278,7 @@ Seed:
 
 ### `app_settings` (konfigurasi)
 
-`setting_key` VARCHAR(50) PK, `setting_value` JSONB NOT NULL, `description` TEXT, `updated_by` INT FK → users, `updated_at` TIMESTAMPTZ. Kunci: `live.max_areas` (5), `live.retention_max` (60), `report.timezone` (`Asia/Jakarta`), `water.vh_threshold_db` (−20).
+`setting_key` VARCHAR(50) PK, `setting_value` JSONB NOT NULL, `description` TEXT, `updated_by` INT FK → users, `updated_at` TIMESTAMPTZ. Kunci: `live.max_areas` (5), `live.retention_max` (60), `live.retention_default` (6), `live.default_area_name` (`Lebak Selatan`), `report.timezone` (`Asia/Jakarta`), `report.wait_hydromet_minutes` (60), `water.vh_threshold_db` (−20), `dataset.max_days` (366), `hydromet.min_valid_fraction` (0,1), `hydromet.waiting_max_days` (3). ADMIN dapat mengubahnya lewat `/admin/settings` atau impor Excel `app_settings` (kunci baru hanya lewat seed).
 
 ---
 
@@ -290,10 +290,10 @@ Seed:
 |---|---|---|
 | `datasets` | [UBAH] | `+ created_by INT FK → users`; `+ is_system BOOLEAN` (dataset sistem disembunyikan dari Katalog); `required_tiers` hanya nama tier D14; CHECK `dataset_kind IN ('STANDARD','LIVE_AREA')` (LIVE dihapus); `fusion_strategy` FK → fusion_strategies |
 | `dataset_source_config` | [UBAH] | `source_name` FK → satellite_sources.source_code |
-| `dataset_jobs`, `scene_job_state` | [WARIS] | `dataset_jobs.job_type` + nilai `HYDROMET_DAILY` |
+| `dataset_jobs`, `scene_job_state` | [WARIS] | `dataset_jobs.job_type` + nilai `HYDROMET_DAILY` (satu baris per hari UTC, `date_range_start = date_range_end`); `status` + `WAITING_UPSTREAM` (granule GPM belum terbit, dicoba lagi ≤ `hydromet.waiting_max_days`) |
 | `satellite_scenes` | [UBAH] | `+ is_valid BOOLEAN DEFAULT true`, `+ invalidated_by`, `+ invalidated_at`, `+ invalid_reason` (soft delete Admin, M24) |
 | `nasa_scenes` | [UBAH] | `+ run_type VARCHAR(5) CHECK IN ('F','L','E') NULL` (GPM, M6); `+ is_valid` dkk. seperti di atas; `source` FK → satellite_sources.source_code |
-| `processing_jobs` | [UBAH] | Kolom warisan `parameters_json JSONB DEFAULT '{}'` dipakai untuk parameter (versi software, window Lee, run GPM, threshold); **`scene_id` jadi NULLABLE, `+ nasa_scene_id BIGINT FK → nasa_scenes`, CHECK paling banyak satu terisi** — job S1 berjangkar scene, job MODIS/GPM berjangkar granule, job FUSION tanpa jangkar (M30) |
+| `processing_jobs` | [UBAH] | `job_status_enum` + `WAITING_UPSTREAM`, `SKIPPED_LOCKED` (run scheduler dilewati karena advisory lock dipegang worker lain; dicatat pada tahap `ORCHESTRATE`). Kolom warisan `parameters_json JSONB DEFAULT '{}'` dipakai untuk parameter (versi software, window Lee, run GPM, threshold); **`scene_id` jadi NULLABLE, `+ nasa_scene_id BIGINT FK → nasa_scenes`, CHECK paling banyak satu terisi** — job S1 berjangkar scene, job MODIS/GPM berjangkar granule, job FUSION tanpa jangkar (M30) |
 | `processing_logs` | [WARIS] | |
 | `data_products` | [UBAH] | `source` FK → satellite_sources.source_code; **`scene_id` jadi NULLABLE, `+ nasa_scene_id BIGINT FK → nasa_scenes`, CHECK `chk_dprods_single_origin`: SENTINEL1 → `scene_id`, MODIS/GPM → `nasa_scene_id`, FUSION → keduanya NULL (asalnya di `fusion_products` + `data_lineage`)** (M30). Baris palsu `NASA_AUX_*` di `satellite_scenes` tidak dibuat lagi |
 | `data_lineage` | [WARIS] | |
@@ -447,11 +447,11 @@ Baris tetap ada setelah berkas scene dihapus retensi, sehingga grafik dan prakir
 
 Hanya USER ke atas yang dapat membuat token, untuk dirinya sendiri. Token tidak bisa melakukan aksi tulis (acknowledge, CRUD kejadian, buat dataset); aksi tulis tetap lewat sesi web. Setiap pemakaian token tercatat di `user_activity_logs`: satu baris per request (`action = 'API_REQUEST'`, `detail = {auth: 'token', token_id, method, path, status}`), atau baris `DOWNLOAD_*` dengan `detail.auth = 'token'` untuk unduhan.
 
-### 4.3 Estimasi volume (backfill 2023–2025, asumsi 9 kecamatan AOI)
+### 4.3 Estimasi volume (backfill 2023–2025, AOI 10 kecamatan Lebak Selatan)
 
 | Tabel | Perkiraan baris |
 |---|---|
-| `region_observations` | 9 kec × 1.096 hari × (5 band GPM + 3 band MODIS) ≈ **79.000** |
+| `region_observations` | 10 kec × 1.096 hari × (4 band GPM + 3 band MODIS) ≈ **77.000** |
 | `nasa_scenes` | ±1.096 GPM + ±1.096 MCDWD + ±140 MOD09A1 ≈ 2.300 |
 | `alert_events` | puluhan–ratusan (tergantung kalibrasi) |
 | `processing_jobs`, `processing_logs`, `data_products`, `data_lineage` | ribuan–puluhan ribu |
@@ -742,7 +742,8 @@ CREATE TABLE audit_log (
 | `v_ringkasan_kualitas` | `quality_metrics` + `quality_alerts` + valid_fraction per sumber per minggu | DATA_ENGINEER, ADMIN |
 | `v_kelengkapan_data` | Hari dengan/tanpa data per sumber (gap > 10 hari ditandai) | DATA_ENGINEER, ADMIN |
 | `v_users_safe` | `users` tanpa `password_hash`, `failed_login_count`, `locked_until` | ADMIN (UI), semua role untuk join nama |
-| `v_log_login`, `v_log_unduhan` | Filter `user_activity_logs` | ADMIN |
+| `v_log_login`, `v_log_unduhan` | Filter `user_activity_logs` (unduhan: `DOWNLOAD_*`, `EXPORT_CSV`) | ADMIN |
+| `v_unduhan_per_role` | Jumlah dan volume unduhan per tanggal WIB × aksi × role, **tanpa identitas pengguna** | DATA_ENGINEER, ADMIN, etl (Laporan Kesehatan Data §8) |
 
 #### Definisi `v_evaluasi_alert`
 
@@ -844,24 +845,27 @@ Hak diberikan pada role terendah yang membutuhkannya; kolom di bawah adalah hak 
 | master referensi: `satellite_sources`, `spectral_bands`, `processing_stages`, `fusion_strategies`, `report_types` | — | S | S | S | S | S |
 | `administrative_regions`, `regions_of_interest` | — | S | S | S | SIU | S |
 | `alert_events` | — | S | S + U(ack) | S | SIUD | SI |
-| `disaster_events` | — | — | SIU | — | SIU | — |
-| `v_kejadian_dan_hujan`, `v_evaluasi_alert` | — | — | S | — | S | — |
+| `disaster_events` | — | — | SIU | — | SIU | S |
+| `v_kejadian_dan_hujan`, `v_evaluasi_alert` | — | — | S | — | S | S |
 | `region_observations` | — | S | S | S | S | SIU |
 | `datasets` | — | — | — | SIU | SIUD | SIUD |
 | `dataset_source_config`, `dataset_jobs`, `scene_job_state` | — | — | — | SIU | SIUD | SIU |
 | `satellite_scenes`, `nasa_scenes` | — | — | — | S | SU (soft delete) | SIU |
 | `data_products`, `processing_jobs` | — | — | — | S | S | SIUD |
 | `data_lineage`, `quality_metrics`, `quality_alerts`, `fusion_products`, `processing_logs`, `cleanup_operations` | — | — | — | S | S | SIU |
-| `v_ringkasan_kualitas`, `v_kelengkapan_data` | — | — | — | S | S | — |
+| `v_ringkasan_kualitas`, `v_kelengkapan_data`, `v_unduhan_per_role` | — | — | — | S | S | S |
 | `generated_reports` | — | — | S (+ RLS) | S (+ RLS) | SIU | SIU |
 | `users`, `roles` | — | — | — | — | SIU (tanpa D) | — |
 | `v_users_safe` | — | S | S | S | S | — |
 | `alert_rules`, `quality_thresholds`, `disaster_types`, `app_settings` | — | S | S | S | SIU | S |
-| `live_areas`, `live_scenes`, `live_events`, `live_scene_metrics` | — | S | S | S | SIU | SIU |
+| `live_areas`, `live_scenes`, `live_events` | — | S | S | S | SIU | SIU |
+| `live_scene_metrics` | — | S | S | S | SIU | SIUD (metrik scene ditulis ulang per finalisasi) |
 | `api_tokens` | — | SIU (milik sendiri, RLS) | SIU (milik sendiri) | SIU (milik sendiri) | SIU | — |
 | `user_activity_logs` | I | I | I | I | SI | I |
 | `audit_log` | — | — | — | — | S | — (diisi trigger) |
 | `v_log_login`, `v_log_unduhan` | — | — | — | — | S | — |
+
+SELECT `monitor_etl` pada `disaster_events`, `v_kejadian_dan_hujan`, `v_evaluasi_alert`, `v_ringkasan_kualitas`, `v_kelengkapan_data`, `v_unduhan_per_role` dipakai job laporan periodik yang dijalankan scheduler (PIPELINE §6); hanya baca.
 
 S = SELECT, I = INSERT, U = UPDATE, D = DELETE. "U(ack)" = `GRANT UPDATE (acknowledged_by, acknowledged_at, ack_note)` saja. `USAGE` semua sequence diberikan ke `monitor_public` (diwarisi semua role) dan `monitor_etl`; tanpa INSERT pada tabelnya, USAGE tidak memberi hak menulis apa pun. TRUNCATE tidak diberikan ke role aplikasi mana pun.
 

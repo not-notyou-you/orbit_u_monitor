@@ -216,7 +216,7 @@ Kolom **Role** = role minimum (hierarki: ADMIN ⊃ ANALYST ⊃ USER, ADMIN ⊃ D
 | Metode | Endpoint | Role | Kegunaan |
 |---|---|---|---|
 | GET | `/public/live` | PUBLIC | Scene terbaru per Live Area aktif (tanpa forecast, tanpa riwayat) |
-| GET | `/public/live/{area_id}/preview/{key}.png` | PUBLIC | Hanya untuk tanggal scene terbaru; tanggal lain → 403 |
+| GET | `/public/live/{area_id}/preview/{key}.png` | PUBLIC | Preview scene terbaru (`key` termasuk `s1_water_change`); `?date=` selain tanggal terbaru → 403 `SCENE_NOT_PUBLIC` |
 | GET | `/health` | PUBLIC | Status sistem + DB [WARIS] |
 
 ### 4.3 Live [UBAH]
@@ -238,18 +238,19 @@ Kolom **Role** = role minimum (hierarki: ADMIN ⊃ ANALYST ⊃ USER, ADMIN ⊃ D
 | Metode | Endpoint | Role | Kegunaan |
 |---|---|---|---|
 | GET | `/hydromet/today` | USER | `v_statistik_hari_ini` |
-| GET | `/hydromet/observations` | USER | `?region_id=&band=&date_from=&date_to=`; USER maks. 30 hari, ANALYST bebas |
-| GET | `/hydromet/trend` | USER | Deret 30 hari per kecamatan untuk grafik |
-| GET | `/hydromet/observations.csv` | ANALYST | Ekspor CSV (dicatat) |
-| GET | `/regions` | USER | Kecamatan AOI + GeoJSON (disederhanakan `ST_SimplifyPreserveTopology`) |
+| GET | `/hydromet/observations` | USER | `?region_id=&band=&date_from=&date_to=&limit=&offset=`; USER hanya data ≥ hari ini − 30 (selebihnya 403 `DATE_OUT_OF_RANGE`), ANALYST bebas |
+| GET | `/hydromet/trend` | USER | `?band=RAIN_24H&days=30` → `{band, dates[], series[{region_id, pcode, name, values[]}]}`; `days` > 30 hanya ANALYST |
+| GET | `/hydromet/observations.csv` | ANALYST | Ekspor CSV (dicatat `EXPORT_CSV`) |
+| GET | `/regions` | USER | FeatureCollection kecamatan AOI (disederhanakan `ST_SimplifyPreserveTopology`); `?all=true` semua kecamatan Lebak, `?tolerance=` derajat |
+| GET | `/rois` | USER | Daftar ROI sistem (AOI GMLS, kecamatan, gabungan) untuk wizard dataset dan Live Area `?q=` |
 
 ### 4.5 Alert [BARU]
 
 | Metode | Endpoint | Role | Kegunaan |
 |---|---|---|---|
 | GET | `/alerts` | USER | `?status=active\|acknowledged&severity=&date_from=` |
-| POST | `/alerts/{id}/acknowledge` | ANALYST | `{note?}`; 409 bila sudah |
-| GET | `/alerts/evaluation` | ANALYST | Ringkasan `v_evaluasi_alert` |
+| POST | `/alerts/{id}/acknowledge` | ANALYST | `{note?}`; 409 `ALERT_ALREADY_ACKED` bila sudah |
+| GET | `/alerts/evaluation` | ANALYST | `{hit, miss, false_alarm, pod, far}` dari `v_evaluasi_alert` (`?date_from=&date_to=`); `pod`/`far` `null` bila penyebut nol |
 | GET | `/alert-rules` | USER | Daftar aturan |
 | POST / PUT | `/alert-rules`, `/alert-rules/{id}` | ADMIN | Tambah / ubah (tanpa DELETE; nonaktifkan) |
 
@@ -262,7 +263,9 @@ Kolom **Role** = role minimum (hierarki: ADMIN ⊃ ANALYST ⊃ USER, ADMIN ⊃ D
 | POST | `/disasters` | ANALYST | Buat → 201 |
 | PUT | `/disasters/{id}` | ANALYST | Ubah |
 | DELETE | `/disasters/{id}` | ANALYST | Soft delete |
-| GET / POST / PUT | `/disaster-types` | USER (GET) / ADMIN | Master jenis |
+| GET / POST / PUT | `/disaster-types` | USER (GET) / ADMIN | Master jenis (`?include_inactive=true`) |
+
+Validasi kejadian: jenis aktif dari master, wilayah = kecamatan (level 3), deskripsi 10–4000 karakter, `event_end_date ≥ event_date` (400 `INVALID_DISASTER`). Impor massal lewat Excel (§4.10) atau `scripts/import_disasters.py` (CSV).
 
 ### 4.7 Dataset, scene, produk, kualitas, lineage [WARIS]
 
@@ -284,9 +287,9 @@ Perubahan:
 
 | Metode | Endpoint | Role | Kegunaan |
 |---|---|---|---|
-| GET | `/reports` | ANALYST / DATA_ENGINEER | Daftar sesuai audiens (RLS) `?type=&year=` |
+| GET | `/reports` | ANALYST / DATA_ENGINEER | Daftar sesuai audiens (RLS) `?type=&year=&include_superseded=`; role lain → 403 `REPORT_AUDIENCE` |
 | GET | `/reports/{id}/download` | sesuai audiens | PDF; 404 bila bukan audiensnya (tidak membocorkan keberadaan) |
-| POST | `/reports/regenerate` | ADMIN | `{report_code, period_start}` → 202 |
+| POST | `/reports/regenerate` | ADMIN | `{report_code, period_start}` → 202 (Senin / tanggal 1, selain itu 400 `INVALID_PERIOD`); baris lama → `SUPERSEDED`, berkas lama dipertahankan |
 
 ### 4.9 Administrasi [BARU]
 
@@ -295,17 +298,30 @@ Perubahan:
 | GET / POST | `/admin/users` | Daftar (`v_users_safe`) / buat |
 | PATCH | `/admin/users/{id}` | Role, nama, aktif |
 | POST | `/admin/users/{id}/reset-password`, `/unlock` | |
-| PATCH | `/admin/scenes/{source}/{id}` | `{is_valid, reason}` |
-| POST | `/admin/scenes/{source}/{id}/reprocess` | Proses ulang |
-| POST | `/admin/ingest` | `{job: "HYDROMET"\|"LIVE", date_from, date_to, area_id?}` → 202 |
-| PATCH | `/admin/regions/{id}` | `{in_aoi}` |
-| POST | `/admin/rois` | ROI dari daftar `region_id` kecamatan |
-| GET / PUT | `/admin/quality-thresholds`, `/admin/settings` | |
-| GET | `/admin/pipeline/status` | Job terakhir per jenis, token, antrean |
-| GET | `/admin/archive/stats`; POST `/admin/archive/verify` | |
+| PATCH | `/admin/scenes/{source}/{id}` | `source` = S1 \| MODIS \| GPM; `{is_valid, reason}` (alasan wajib bila tidak valid, 400 `REASON_REQUIRED`) |
+| POST | `/admin/scenes/{source}/{id}/reprocess` | 202. GPM/MODIS: Job Hidromet tanggal itu diulang (COG non-Final dibangun ulang); S1: scene Live tanggal itu dicoba ulang, scene dataset Katalog → 409 `NOT_REPROCESSABLE` |
+| POST | `/admin/ingest` | `{job: "HYDROMET"\|"LIVE", date_from, date_to, area_id?}` → 202 (HYDROMET ≤ 366 hari, di bawah kunci `hydromet`) |
+| GET | `/admin/regions` | Kecamatan Lebak + `in_aoi` |
+| PATCH | `/admin/regions/{id}` | `{in_aoi}`; ROI AOI + dataset `HYDROMET_AOI` dibangun ulang; minimal satu kecamatan (409 `AOI_EMPTY`) |
+| POST | `/admin/rois` | `{region_ids[], name, region_code?}` → ROI gabungan (bbox = envelope gabungan) |
+| GET / PUT | `/admin/quality-thresholds` | PUT = daftar `{threshold_id, warn_below?, fail_below?, warn_above?, fail_above?, reference?, is_active?}` |
+| GET / PUT | `/admin/settings` | PUT `{settings: {kunci: nilai}}`, hanya kunci yang ada, divalidasi rentangnya (400 `INVALID_SETTING`) |
+| GET | `/admin/pipeline/status` | Job terakhir per jenis (HYDROMET/LIVE/DATASET), status hidromet (terakhir selesai, WAITING, FAILED), Live Area, laporan terakhir, `SKIPPED_LOCKED` 7 hari, antrean, ada/tidaknya kredensial NASA/Copernicus, jadwal scheduler |
+| GET | `/admin/archive/stats`; POST `/admin/archive/verify` | Ukuran produk per sumber/tier + jumlah baris; verifikasi SHA-256 sampel acak `{limit ≤ 500, source?}` → `{checked, ok, missing[], mismatch[]}` |
 | GET | `/admin/logs/login`, `/admin/logs/download` | `?user_id=&date_from=&date_to=&page=` |
 | GET | `/admin/audit` | `?table=&operation=&user_id=&date_from=&date_to=&page=` |
 | GET | `/admin/tokens` | Semua token (`?user_id=&active=`): pemilik, prefix, scope, kedaluwarsa, terakhir dipakai; cabut lewat `DELETE /auth/tokens/{id}` |
+
+### 4.10 Ekspor/impor Excel [BARU, Tahap 3]
+
+| Metode | Endpoint | Role | Kegunaan |
+|---|---|---|---|
+| GET | `/excel` | USER | Jenis data yang boleh diekspor/diimpor role pemanggil, dengan URL-nya |
+| GET | `/excel/{entity}.xlsx` | sesuai jenis data | Sheet `Data` + `Petunjuk`; `?date_from=&date_to=` bila jenisnya bertanggal; dicatat `DOWNLOAD_XLSX` |
+| GET | `/excel/{entity}/template.xlsx` | role impor | Templat kosong + arti kolom, wajib/tidak, nilai yang diizinkan |
+| POST | `/excel/{entity}/import` | role impor | Body = berkas .xlsx mentah (`Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, ≤ 10 MB); `?dry_run=true`; semua baris atau tidak sama sekali; 422 `IMPORT_ROWS_INVALID` + `errors[]` per nomor baris |
+
+Ekspor (role minimum): `kecamatan`, `alerts`, `alert_rules`, `disaster_types`, `live_scenes` (USER); `observations`, `hujan_harian`, `disasters`, `disaster_rain`, `alert_evaluation` (ANALYST); `datasets`, `s1_scenes`, `nasa_scenes`, `products`, `quality_summary`, `completeness` (DATA_ENGINEER); `downloads`, `audit`, `app_settings` (ADMIN). Impor: `disasters` (ANALYST), `disaster_types`, `alert_rules`, `kecamatan` (status AOI), `app_settings` (ADMIN). Jenis data di luar role → 403 `ENTITY_FORBIDDEN`; impor jenis yang hanya bisa diekspor → 400 `IMPORT_NOT_SUPPORTED`. Ekspor kejadian memakai kolom yang sama dengan impor (bisa diedit lalu diimpor ulang; baris yang sama dilewati sebagai duplikat).
 
 Semua di bawah `/admin` memerlukan ADMIN. Daftar log memakai kontrak `{items, total, limit, offset}`; `page` (mulai 1) setara `offset = (page-1)·limit`. ADMIN tidak dapat menonaktifkan atau menurunkan role akunnya sendiri (409 `CANNOT_MODIFY_SELF`).
 
@@ -365,7 +381,7 @@ Format warisan DataLab dipertahankan agar `app.js` tidak dirombak.
 
 DataLab hanya mengirim `detail`; Monitor **menambah** `code` (mesin-baca, selalu ada) agar frontend dapat menampilkan pesan Indonesia dari tabel terjemahan. Klien lama yang hanya membaca `detail` tetap berfungsi.
 
-Kode spesifik: `NOT_AUTHENTICATED`, `SESSION_EXPIRED`, `ACCOUNT_INACTIVE`, `INVALID_CREDENTIALS`, `ACCOUNT_LOCKED`, `ROLE_FORBIDDEN` (lapis API), `DB_PERMISSION_DENIED` (GRANT/RLS PostgreSQL menolak, lapis 3), `CSRF_HEADER_REQUIRED`, `TOKEN_INVALID`, `TOKEN_REVOKED`, `TOKEN_EXPIRED`, `TOKEN_WRITE_FORBIDDEN`, `TOKEN_SCOPE_FORBIDDEN`, `RATE_LIMITED`, `NOT_DATASET_OWNER`, `SCENE_OUT_OF_RANGE`, `PASSWORD_POLICY`, `INVALID_OLD_PASSWORD`, `USERNAME_TAKEN`, `CANNOT_MODIFY_SELF`, `TOKEN_ALREADY_REVOKED`, `INVALID_DATE_RANGE`, `ALERT_ALREADY_ACKED`. Selain itu dipakai kode bawaan per status: `BAD_REQUEST`, `NOT_FOUND`, `CONFLICT`, `VALIDATION_ERROR`, `INTERNAL_ERROR`, …
+Kode spesifik: `NOT_AUTHENTICATED`, `SESSION_EXPIRED`, `ACCOUNT_INACTIVE`, `INVALID_CREDENTIALS`, `ACCOUNT_LOCKED`, `ROLE_FORBIDDEN` (lapis API), `DB_PERMISSION_DENIED` (GRANT/RLS PostgreSQL menolak, lapis 3), `CSRF_HEADER_REQUIRED`, `TOKEN_INVALID`, `TOKEN_REVOKED`, `TOKEN_EXPIRED`, `TOKEN_WRITE_FORBIDDEN`, `TOKEN_SCOPE_FORBIDDEN`, `RATE_LIMITED`, `NOT_DATASET_OWNER`, `SCENE_OUT_OF_RANGE`, `PASSWORD_POLICY`, `INVALID_OLD_PASSWORD`, `USERNAME_TAKEN`, `CANNOT_MODIFY_SELF`, `TOKEN_ALREADY_REVOKED`, `INVALID_DATE_RANGE`, `ALERT_ALREADY_ACKED`, dan Tahap 3: `DATE_OUT_OF_RANGE`, `SCENE_NOT_PUBLIC`, `THRESHOLD_REQUIRED`, `RULE_CODE_TAKEN`, `TYPE_CODE_TAKEN`, `UNKNOWN_REFERENCE`, `INVALID_DISASTER`, `NOT_KECAMATAN`, `AOI_EMPTY`, `INVALID_ROI`, `HYDROMET_NOT_READY`, `REPORT_AUDIENCE`, `INVALID_PERIOD`, `FILE_MISSING`, `INVALID_SOURCE`, `REASON_REQUIRED`, `NOT_REPROCESSABLE`, `INVALID_THRESHOLD`, `INVALID_SETTING`, `ENTITY_FORBIDDEN`, `IMPORT_NOT_SUPPORTED`, `INVALID_IMPORT_FILE`, `IMPORT_ROWS_INVALID`, `EMPTY_UPLOAD`, `UPLOAD_TOO_LARGE`. Selain itu dipakai kode bawaan per status: `BAD_REQUEST`, `NOT_FOUND`, `CONFLICT`, `VALIDATION_ERROR`, `INTERNAL_ERROR`, …
 
 | HTTP | Makna |
 |---|---|

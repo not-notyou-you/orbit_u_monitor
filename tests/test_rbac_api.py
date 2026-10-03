@@ -145,6 +145,15 @@ EXPECTED: dict[tuple[str, str], tuple] = {
     ("PATCH", "/api/admin/regions/{region_id}"): (A,),
     ("POST", "/api/admin/rois"): (A,),
     ("POST", "/api/admin/ingest"): (A,),
+    ("PATCH", "/api/admin/scenes/{source}/{scene_id}"): (A,),
+    ("POST", "/api/admin/scenes/{source}/{scene_id}/reprocess"): (A,),
+    ("GET", "/api/admin/quality-thresholds"): (A,),
+    ("PUT", "/api/admin/quality-thresholds"): (A,),
+    ("GET", "/api/admin/settings"): (A,),
+    ("PUT", "/api/admin/settings"): (A,),
+    ("GET", "/api/admin/pipeline/status"): (A,),
+    ("GET", "/api/admin/archive/stats"): (A,),
+    ("POST", "/api/admin/archive/verify"): (A,),
     # ekspor/impor Excel (Tahap 3): role per jenis data dicek di route (ENTITY_FORBIDDEN)
     ("GET", "/api/excel"): (U,),
     ("GET", "/api/excel/{entity}.xlsx"): (U, DL),
@@ -154,7 +163,7 @@ EXPECTED: dict[tuple[str, str], tuple] = {
 
 PATH_VALUES = {
     "scene_date": "2026-01-01", "key": "vv", "tier": "raw", "scene": "20260101",
-    "level": "processed", "kind": "grayscale", "filename": "x.png", "entity": "alerts",
+    "level": "processed", "kind": "grayscale", "filename": "x.png", "entity": "alerts", "source": "GPM",
 }
 # 403 yang sah walau role cukup: aturan bisnis, bukan role.
 BUSINESS_403 = {"NOT_DATASET_OWNER", "SCENE_OUT_OF_RANGE", "CANNOT_MODIFY_SELF", "REPORT_AUDIENCE",

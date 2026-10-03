@@ -302,8 +302,12 @@ def discover_scenes(
             "product_identifier": item.get("Name", item.get("Id", "")),
             "acquisition_datetime": acq_dt,
             "orbit_direction": attrs.get("orbitDirection", "ASCENDING").upper(),
-            "orbit_number": attrs.get("absoluteOrbit"),
-            "relative_orbit": attrs.get("relativeOrbit"),
+            # Nama atribut CDSE OData: orbitNumber / relativeOrbitNumber
+            # (nama lama absoluteOrbit / relativeOrbit tidak pernah ada, jadi
+            # kolom orbit selalu NULL; T3-28). Nama lama tetap dibaca sebagai
+            # cadangan.
+            "orbit_number": attrs.get("orbitNumber", attrs.get("absoluteOrbit")),
+            "relative_orbit": attrs.get("relativeOrbitNumber", attrs.get("relativeOrbit")),
             "cloud_cover": attrs.get("cloudCover"),
             "size_mb": item.get("ContentLength", 0) / (1024 ** 2),
             "download_url": f"https://download.dataspace.copernicus.eu/odata/v1/Products({item['Id']})/$value",

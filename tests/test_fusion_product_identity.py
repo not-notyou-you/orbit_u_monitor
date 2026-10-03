@@ -23,7 +23,6 @@ baris pertama, apa pun scene-nya.
 """
 from __future__ import annotations
 
-import os
 import uuid
 
 import pytest
@@ -31,39 +30,23 @@ import pytest
 from etl import tier_names as tn
 
 
-@pytest.fixture
-def meta():
-    url = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
-    if not url:
-        pytest.skip("tanpa DATABASE_URL: tes ini butuh database sungguhan")
-    from etl.database_client import DatabaseClient
-    from etl.metadata_manager import MetadataManager
-
-    return MetadataManager(DatabaseClient(url))
+# Fixture `meta` dari conftest: DATABASE UJI (*_test). Dulu tes ini membuat
+# DatabaseClient sendiri dari TEST_DATABASE_URL *atau DATABASE_URL* -- tanpa
+# TEST_DATABASE_URL ia menulis ke database PRODUKSI, dan hanya "aman" karena
+# database itu kebetulan belum punya scene (tes ter-skip). Ketahuan di Tahap 3
+# setelah uji Live mengisi satellite_scenes produksi (IMPLEMENTATION_NOTES T3-30).
 
 
 @pytest.fixture
-def anchors(meta):
-    """Dataset, job, dan dua scene yang SUDAH ADA.
-
-    dataset_id, job_id, dan scene_id ketiganya berkunci asing, jadi tes tidak
-    bisa mengarang nilainya. Yang dibuat unik justru band_name dan file_path —
-    keduanya masuk ke filter "tandai usang", jadi nilai yang tidak dipakai
-    baris mana pun menjamin tes ini tidak bisa memadamkan produk sungguhan.
-    """
-    from etl.database_client import Dataset, ProcessingJob, SatelliteScene
-
-    with meta._db.session() as sess:
-        ds = sess.query(Dataset.dataset_id).limit(1).scalar()
-        job = sess.query(ProcessingJob.job_id).limit(1).scalar()
-        scenes = [r[0] for r in sess.query(SatelliteScene.scene_id).limit(2).all()]
-    if ds is None or job is None or len(scenes) < 2:
-        pytest.skip("database uji belum punya dataset/job/scene untuk ditumpangi")
+def anchors(meta, sample_dataset):
+    """Dataset uji + job FUSION tanpa jangkar. Produk FUSION tidak menempel
+    pada scene (M30/K2: scene_id dan nasa_scene_id NULL), jadi identitasnya
+    memang hanya berkasnya. band_name/file_path unik per tes."""
+    job = meta.insert_processing_job(None, "FUSION", parameters={"test": "fusion_identity"})
     tag = uuid.uuid4().hex[:8]
     return {
-        "dataset_id": ds,
+        "dataset_id": sample_dataset,
         "job_id": job,
-        "scenes": scenes,
         "band": f"UJI_{tag}",
         "path": f"data/_uji/{tag}/fusion_19990101_processed.h5",
     }
@@ -93,9 +76,9 @@ def _rows(meta, dataset_id, band):
         ]
 
 
-def _insert(meta, a, scene_id, **kw):
+def _insert(meta, a, **kw):
     return meta.insert_data_product(
-        scene_id=scene_id, job_id=a["job_id"], dataset_id=a["dataset_id"],
+        scene_id=None, job_id=a["job_id"], dataset_id=a["dataset_id"],
         product_tier=tn.FUSED, source="FUSION", product_type="FUSION_H5",
         band_name=a["band"], file_path=a["path"],
         file_name="fusion_19990101_processed.h5",
@@ -106,13 +89,10 @@ def _insert(meta, a, scene_id, **kw):
 
 
 class TestSupersedeByPath:
-    def test_same_path_from_another_scene_supersedes(self, meta, anchors):
-        """Inti perbaikannya: scene berbeda, berkas sama -> yang lama padam."""
+    def test_same_path_from_another_run_supersedes(self, meta, anchors):
+        """Inti perbaikannya: dua pendaftaran berkas yang sama -> yang lama padam."""
         try:
-            ids = [
-                _insert(meta, anchors, sc, supersede_same_path=True)
-                for sc in anchors["scenes"]
-            ]
+            ids = [_insert(meta, anchors, supersede_same_path=True) for _ in range(2)]
             latest = [r for r in _rows(meta, anchors["dataset_id"], anchors["band"])
                       if r[2]]
             assert len(latest) == 1, "hanya stack terbaru yang boleh is_latest"
@@ -120,16 +100,16 @@ class TestSupersedeByPath:
         finally:
             _cleanup(meta, anchors["dataset_id"], anchors["band"])
 
-    def test_without_the_flag_the_stale_row_survives(self, meta, anchors):
-        """Bentuk bug-nya sebelum diperbaiki, dikunci sebagai pembanding:
-        tanpa bendera itu kedua baris tetap is_latest, dan yang pertama
-        terus mengklaim isi berkas yang sudah ditimpa."""
+    def test_fusion_dedups_by_path_even_without_the_flag(self, meta, anchors):
+        """Dulu (DataLab) tanpa bendera kedua baris tetap is_latest. Sejak K3
+        produk FUSION (tanpa scene) SELALU didedup per file_path, jadi bentuk
+        bug lama tidak bisa terjadi lagi."""
         try:
-            for sc in anchors["scenes"]:
-                _insert(meta, anchors, sc)
+            for _ in range(2):
+                _insert(meta, anchors)
             latest = [r for r in _rows(meta, anchors["dataset_id"], anchors["band"])
                       if r[2]]
-            assert len(latest) == 2
+            assert len(latest) == 1
         finally:
             _cleanup(meta, anchors["dataset_id"], anchors["band"])
 
@@ -137,9 +117,8 @@ class TestSupersedeByPath:
         """Jalur lama tidak boleh rusak: scene yang sama didaftarkan ulang
         tetap memadamkan barisnya sendiri."""
         try:
-            sc = anchors["scenes"][0]
-            _insert(meta, anchors, sc, supersede_same_path=True)
-            second = _insert(meta, anchors, sc, supersede_same_path=True)
+            _insert(meta, anchors, supersede_same_path=True)
+            second = _insert(meta, anchors, supersede_same_path=True)
             latest = [r for r in _rows(meta, anchors["dataset_id"], anchors["band"])
                       if r[2]]
             assert len(latest) == 1
