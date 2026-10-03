@@ -13,6 +13,65 @@ logger = logging.getLogger(__name__)
 VALID_BACKSCATTER_MIN = -35.0
 VALID_BACKSCATTER_MAX = 5.0
 
+# Ambang skor kualitas tinggal di tabel quality_thresholds (DATABASE.md §3.8),
+# bukan di sini. Nilai ini hanya cadangan bila tabel tidak punya baris aktif
+# untuk band itu, dan pemakaiannya selalu dicatat ke log. Bobot skor 50/30/20
+# di compute_quality_score tetap konstanta: bobot bukan ambang.
+FALLBACK_FAIL_BELOW = 60.0
+
+
+@dataclass(frozen=True)
+class QualityThreshold:
+    """Ambang quality_score satu band dari quality_thresholds."""
+    fail_below: float
+    warn_below: float | None = None
+
+
+def load_quality_thresholds(db, metric_name: str = "quality_score") -> dict[str, QualityThreshold]:
+    """{band_code: QualityThreshold} untuk baris aktif quality_thresholds."""
+    from sqlalchemy import text
+
+    with db.session() as sess:
+        rows = sess.execute(text("""
+            SELECT b.band_code, t.fail_below, t.warn_below
+            FROM   quality_thresholds t
+            JOIN   spectral_bands b ON b.band_id = t.band_id
+            WHERE  t.metric_name = :metric AND t.is_active
+        """), {"metric": metric_name}).all()
+    return {
+        code: QualityThreshold(
+            fail_below=float(fail) if fail is not None else FALLBACK_FAIL_BELOW,
+            warn_below=float(warn) if warn is not None else None,
+        )
+        for code, fail, warn in rows
+    }
+
+
+def threshold_for(thresholds: dict[str, QualityThreshold], band: str,
+                  override_fail_below: float | None = None) -> QualityThreshold:
+    """Ambang yang berlaku untuk satu band.
+
+    `override_fail_below` = datasets.quality_settings.min_quality_score yang
+    dinyatakan eksplisit di wizard; bila ada, ia menggantikan fail_below
+    tabel untuk dataset itu (warn_below tabel tetap dipakai)."""
+    base = thresholds.get(band.upper())
+    if base is None:
+        logger.warning("[M6] quality_thresholds tanpa baris aktif untuk band=%s; "
+                       "memakai cadangan fail_below=%.1f", band, FALLBACK_FAIL_BELOW)
+        base = QualityThreshold(fail_below=FALLBACK_FAIL_BELOW)
+    if override_fail_below is not None:
+        return QualityThreshold(fail_below=float(override_fail_below), warn_below=base.warn_below)
+    return base
+
+
+def classify_quality(score: float, threshold: QualityThreshold) -> str:
+    """PASS | WARNING | FAIL dari skor dan ambang band."""
+    if score < threshold.fail_below:
+        return "FAIL"
+    if threshold.warn_below is not None and score < threshold.warn_below:
+        return "WARNING"
+    return "PASS"
+
 
 @dataclass
 class BandMetrics:
@@ -47,8 +106,13 @@ def compute_band_metrics(
     band_name: str,
     nodata_value: float = -9999.0,
     cloud_threshold: float = 20.0,
-    min_quality_score: float = 60.0,
+    min_quality_score: float = FALLBACK_FAIL_BELOW,
 ) -> BandMetrics:
+    """Statistik + skor kualitas satu band S1.
+
+    `min_quality_score` adalah fail_below band ini; pemanggil pipeline
+    mengambilnya dari quality_thresholds (threshold_for). Flag di sini hanya
+    PASS/FAIL; pita WARNING diterapkan pemanggil lewat classify_quality."""
     with rasterio.open(file_path) as src:
         data = src.read(1).astype(np.float32)
         nodata = src.nodata if src.nodata is not None else nodata_value
@@ -116,9 +180,12 @@ def run(
     from etl.metadata_manager import MetadataManager
 
     meta = MetadataManager(db)
+    thresholds = load_quality_thresholds(db)
     results = []
     for band_name, file_path in gold_products.items():
-        m = compute_band_metrics(file_path, band_name)
+        thr = threshold_for(thresholds, band_name)
+        m = compute_band_metrics(file_path, band_name, min_quality_score=thr.fail_below)
+        m.quality_flag = classify_quality(m.quality_score, thr)
         results.append(m)
         products = meta.get_products_by_scene(scene_id, tier="COG")
         product_id = next((p["product_id"] for p in products if p["band_name"] == band_name), None)

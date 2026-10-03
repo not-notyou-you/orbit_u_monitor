@@ -67,7 +67,12 @@ from etl.module1b_calibrate import run as calibrate_run
 from etl.module2_crop import run as crop_run
 from etl.module3_lee_filter import run as lee_run
 from etl.module4_gold_export import export_scene_to_gold, gold_product_type
-from etl.module6_analytics import compute_band_metrics
+from etl.module6_analytics import (
+    classify_quality,
+    compute_band_metrics,
+    load_quality_thresholds,
+    threshold_for,
+)
 from etl.module9_fusion import (
     create_fusion_stack,
     ensure_aux_inputs_for_date,
@@ -123,7 +128,9 @@ class _JobContext:
     bbox_tuple: tuple[float, float, float, float]
     required_tiers: list[str]
     skip_stages: set[str]
-    min_quality_score: float
+    # quality_settings.min_quality_score yang dinyatakan eksplisit; None =
+    # pakai fail_below per band dari quality_thresholds.
+    min_quality_score: float | None
     base_dir: Path
     # Rencana per-satelit dataset ini (etl/processing_plan.py). Sumber yang
     # tidak ada di sini tidak diproses sama sekali, dan level tiap sumber
@@ -415,8 +422,12 @@ def _run_s1_chain(
         message="Running quality assurance checks",
     ) as st:
         band_metrics: dict[str, dict] = {}
+        # Ambang dari quality_thresholds (DATABASE.md §3.8), bukan konstanta.
+        thresholds = load_quality_thresholds(jc.db)
         for band, path, product_id in (("VV", lee_vv, silver_vv_id), ("VH", lee_vh, silver_vh_id)):
-            m = compute_band_metrics(path, band, min_quality_score=jc.min_quality_score)
+            thr = threshold_for(thresholds, band, jc.min_quality_score)
+            m = compute_band_metrics(path, band, min_quality_score=thr.fail_below)
+            m.quality_flag = classify_quality(m.quality_score, thr)
             band_metrics[band] = asdict(m)
             jc.meta.insert_quality_metrics(
                 scene_id=scene_id, product_id=product_id, band_name=band,
@@ -1832,7 +1843,8 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
     region_id = dataset["region_id"]
     bbox_wkt = dataset["bbox_wkt"]
     quality_settings = dataset["quality_settings"] or {}
-    min_quality_score = float(quality_settings.get("min_quality_score") or 60.0)
+    explicit_min_quality = quality_settings.get("min_quality_score")
+    min_quality_score = float(explicit_min_quality) if explicit_min_quality is not None else None
     min_cloud_cover = quality_settings.get("min_cloud_cover")
     orbit_direction = quality_settings.get("orbit_direction")
     fusion_strategy = dataset.get("fusion_strategy")

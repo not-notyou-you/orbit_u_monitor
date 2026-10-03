@@ -546,7 +546,7 @@ class SatelliteScene(Base):
     jobs = relationship("ProcessingJob", back_populates="scene", cascade="all, delete-orphan")
     products = relationship("DataProduct", back_populates="scene", cascade="all, delete-orphan")
     quality_metrics = relationship("QualityMetric", back_populates="scene", cascade="all, delete-orphan")
-    alert_events = relationship("AlertEvent", back_populates="scene")
+    quality_alerts = relationship("QualityAlert", back_populates="scene")
     scene_job_states = relationship("SceneJobState", back_populates="scene")
 
     def __repr__(self) -> str:
@@ -754,7 +754,7 @@ class DataLineage(Base):
         return f"<DataLineage id={self.lineage_id} {self.parent_product_id}->{self.child_product_id}>"
 
 
-class AlertEvent(Base):
+class QualityAlert(Base):
     # Tabel alert_events DataLab diganti nama quality_alerts (DATABASE.md §4.1);
     # nama alert_events kini milik alert hujan.
     __tablename__ = "quality_alerts"
@@ -780,10 +780,10 @@ class AlertEvent(Base):
     triggered_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
 
-    scene = relationship("SatelliteScene", back_populates="alert_events")
+    scene = relationship("SatelliteScene", back_populates="quality_alerts")
 
     def __repr__(self) -> str:
-        return f"<AlertEvent id={self.alert_id} type={self.event_type} severity={self.severity}>"
+        return f"<QualityAlert id={self.alert_id} type={self.event_type} severity={self.severity}>"
 
 
 class Dataset(Base):

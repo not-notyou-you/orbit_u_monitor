@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from sqlalchemy import and_, func, select
 from etl import tier_names as tn
 from etl.database_client import (
-    AlertEvent,
+    QualityAlert,
     AlertEventTypeEnum,
     AlertSeverityEnum,
     DataProduct,
@@ -475,7 +475,7 @@ class MetadataManager:
                     metric_id, scene_id, band_name, quality_score, quality_flag)
 
         if quality_flag == "FAIL":
-            self.insert_alert_event(
+            self.insert_quality_alert(
                 event_type=AlertEventTypeEnum.QUALITY_WARNING,
                 severity=AlertSeverityEnum.WARNING,
                 title=f"Quality FAIL: scene={scene_id} band={band_name}",
@@ -488,7 +488,7 @@ class MetadataManager:
 
         return metric_id
 
-    def insert_alert_event(
+    def insert_quality_alert(
         self,
         event_type: AlertEventTypeEnum,
         title: str,
@@ -500,7 +500,7 @@ class MetadataManager:
         metadata: dict | None = None,
     ) -> int:
         with self._db.session() as sess:
-            alert = AlertEvent(
+            alert = QualityAlert(
                 event_type=event_type,
                 severity=severity,
                 scene_id=scene_id,

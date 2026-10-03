@@ -65,7 +65,7 @@ def seed(db: DatabaseClient) -> dict:
         data_products       (7 rows — 2×RAW + 2×ALIGNED + 2×DESPECKLED + 1×FUSED)
         quality_metrics     (2 rows — VV + VH, against DESPECKLED products)
         data_lineage        (6 rows — CROP×2, LEE_FILTER×2, FUSION×2 (VV+VH -> 1 fusion product))
-        alert_events        (1 info row)
+        quality_alerts      (1 info row)
 
     Returns:
         dict with all inserted IDs for verification
@@ -296,7 +296,7 @@ def seed(db: DatabaseClient) -> dict:
     logger.info("[SEED] FUSION complete. FUSED: fusion=%d", gold_fusion_id)
 
     # Info alert: data arrived and processed
-    alert_id = meta.insert_alert_event(
+    alert_id = meta.insert_quality_alert(
         event_type=AlertEventTypeEnum.DATA_ARRIVAL,
         title=f"New scene processed: scene_id={scene_id}",
         message=f"Scene {SCENE_PRODUCT_ID} completed full pipeline. QA PASS (VV=82.4, VH=81.1).",

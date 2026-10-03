@@ -324,3 +324,49 @@ class TestBackscatterUnits:
         b = compute_band_metrics(_write_band(tmp_path / "b.tif", rough), "VH")
         assert a.speckle_index < b.speckle_index
         assert a.quality_score > b.quality_score
+
+
+# ---------------------------------------------------------------------------
+# Ambang dari quality_thresholds (DATABASE.md §3.8), bukan konstanta
+# ---------------------------------------------------------------------------
+
+class TestQualityThresholdsTable:
+
+    def test_seeded_s1_threshold_is_60(self, db_client):
+        from etl.module6_analytics import load_quality_thresholds
+
+        thr = load_quality_thresholds(db_client)
+        assert thr["VV"].fail_below == 60.0 and thr["VH"].fail_below == 60.0
+
+    def test_classify_uses_warning_band(self):
+        from etl.module6_analytics import QualityThreshold, classify_quality
+
+        t = QualityThreshold(fail_below=60.0, warn_below=70.0)
+        assert classify_quality(59.9, t) == "FAIL"
+        assert classify_quality(65.0, t) == "WARNING"
+        assert classify_quality(70.0, t) == "PASS"
+
+    def test_dataset_override_wins_but_keeps_warn_band(self):
+        from etl.module6_analytics import QualityThreshold, threshold_for
+
+        table = {"VV": QualityThreshold(fail_below=60.0, warn_below=70.0)}
+        assert threshold_for(table, "VV").fail_below == 60.0
+        got = threshold_for(table, "vv", override_fail_below=45.0)
+        assert got.fail_below == 45.0 and got.warn_below == 70.0
+
+    def test_changing_the_table_changes_the_threshold(self, db_client):
+        """Uji adaptability: ambang berubah lewat data, tanpa ubah kode."""
+        from sqlalchemy import text
+
+        from etl.module6_analytics import load_quality_thresholds
+
+        sql = """UPDATE quality_thresholds SET fail_below = :v
+                 WHERE metric_name = 'quality_score'
+                   AND band_id = (SELECT band_id FROM spectral_bands WHERE band_code = 'VH')"""
+        with db_client.session() as sess:
+            sess.execute(text(sql), {"v": 55})
+        try:
+            assert load_quality_thresholds(db_client)["VH"].fail_below == 55.0
+        finally:
+            with db_client.session() as sess:
+                sess.execute(text(sql), {"v": 60})
