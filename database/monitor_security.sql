@@ -258,14 +258,35 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
 $$;
 COMMENT ON FUNCTION auth_get_token(text) IS 'Autentikasi Bearer: mengambil hash token dari prefix untuk dibandingkan constant-time di aplikasi (INTERFACE.md §6).';
 
+-- Dipakai "ubah kata sandi": USER tidak punya UPDATE pada users (§8.3), jadi
+-- pengguna mengganti hash miliknya sendiri lewat fungsi ini. Baris yang
+-- diubah ditentukan app.user_id sesi, bukan argumen (Tahap 2, T2).
+CREATE FUNCTION auth_change_own_password(p_new_hash text) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE uid int := NULLIF(current_setting('app.user_id', true), '')::int;
+BEGIN
+    IF uid IS NULL THEN
+        RAISE EXCEPTION 'app.user_id is not set' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF p_new_hash !~ '^\$2[aby]\$\d\d\$.{53}$' THEN
+        RAISE EXCEPTION 'password hash must be bcrypt' USING ERRCODE = 'check_violation';
+    END IF;
+    UPDATE users SET password_hash = p_new_hash WHERE user_id = uid AND is_active;
+    RETURN FOUND;
+END $$;
+COMMENT ON FUNCTION auth_change_own_password(text) IS 'Ubah kata sandi sendiri: mengganti password_hash baris users milik app.user_id sesi (hash bcrypt dihitung aplikasi).';
+
 ALTER FUNCTION auth_get_user(text)              OWNER TO monitor_admin;
 ALTER FUNCTION auth_record_login(int, boolean)  OWNER TO monitor_admin;
 ALTER FUNCTION auth_session_user(int)           OWNER TO monitor_admin;
 ALTER FUNCTION auth_get_token(text)             OWNER TO monitor_admin;
+ALTER FUNCTION auth_change_own_password(text)   OWNER TO monitor_admin;
 REVOKE ALL ON FUNCTION auth_get_user(text), auth_record_login(int, boolean),
-                       auth_session_user(int), auth_get_token(text) FROM PUBLIC;
+                       auth_session_user(int), auth_get_token(text),
+                       auth_change_own_password(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION auth_get_user(text), auth_record_login(int, boolean),
                           auth_session_user(int), auth_get_token(text) TO monitor_public;
+GRANT EXECUTE ON FUNCTION auth_change_own_password(text) TO monitor_user;
 
 -- =============================================================================
 -- §8.5 AUDIT TRIGGER

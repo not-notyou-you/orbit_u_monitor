@@ -323,6 +323,8 @@ class DatasetItem(BaseModel):
     total_size_bytes: int
     is_deletable: bool
     generate_preview: bool
+    created_by: int | None = None
+    created_by_name: str | None = None
     # Konfigurasi per-satelit ikut di listing, bukan cuma di detail: kartu
     # dataset (Tab 2) menampilkan satelit + level pemrosesan + strategi fusi
     # (DOCS/DECISIONS.md, "Changed: Dataset Cards"), dan kartu itu
@@ -576,3 +578,114 @@ class LiveAreaUpdateRequest(BaseModel):
     name: str | None = Field(default=None, max_length=200)
     retention: int | None = Field(default=None, ge=1, le=60)
     enabled: bool | None = None
+
+
+# --- Autentikasi & token API (INTERFACE.md §4.1) ----------------------------
+
+USERNAME_PATTERN = r"^[a-z0-9_.]{3,50}$"
+ASSIGNABLE_ROLES = ("USER", "ANALYST", "DATA_ENGINEER", "ADMIN")
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=50)
+    password: str = Field(min_length=1, max_length=200)
+
+
+class MeResponse(BaseModel):
+    user_id: int
+    username: str
+    full_name: str
+    organization: str | None = None
+    role_code: str
+    auth: str
+    permissions: list[str]
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=1, max_length=200)
+
+
+class TokenCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    scope: str = Field(pattern=r"^(READ|READ_DOWNLOAD)$")
+    expires_in_days: int = Field(default=90, ge=1, le=180)
+
+
+class TokenItem(BaseModel):
+    token_id: int
+    user_id: int
+    username: str | None = None
+    name: str
+    prefix: str
+    scope: str
+    expires_at: datetime
+    last_used_at: datetime | None = None
+    revoked_at: datetime | None = None
+    created_at: datetime
+    active: bool
+
+
+class TokenCreateResponse(BaseModel):
+    token_id: int
+    token: str
+    prefix: str
+    scope: str
+    expires_at: datetime
+
+
+class TokenListResponse(BaseModel):
+    items: list[TokenItem]
+    total: int
+    limit: int
+    offset: int
+
+
+# --- Administrasi akun & log (INTERFACE.md §4.9) ----------------------------
+
+class AdminUserItem(BaseModel):
+    user_id: int
+    username: str
+    full_name: str
+    organization: str | None = None
+    role_code: str
+    is_active: bool
+    is_locked: bool
+    locked_until: datetime | None = None
+    last_login_at: datetime | None = None
+    created_by: int | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminUserListResponse(BaseModel):
+    items: list[AdminUserItem]
+    total: int
+    limit: int
+    offset: int
+
+
+class AdminUserCreateRequest(BaseModel):
+    username: str = Field(pattern=USERNAME_PATTERN)
+    full_name: str = Field(min_length=1, max_length=100)
+    organization: str | None = Field(default=None, max_length=100)
+    role_code: str = Field(pattern=r"^(USER|ANALYST|DATA_ENGINEER|ADMIN)$")
+    password: str = Field(min_length=1, max_length=200)
+
+
+class AdminUserUpdateRequest(BaseModel):
+    full_name: str | None = Field(default=None, min_length=1, max_length=100)
+    organization: str | None = Field(default=None, max_length=100)
+    role_code: str | None = Field(default=None, pattern=r"^(USER|ANALYST|DATA_ENGINEER|ADMIN)$")
+    is_active: bool | None = None
+
+
+class AdminResetPasswordRequest(BaseModel):
+    new_password: str = Field(min_length=1, max_length=200)
+
+
+class LogListResponse(BaseModel):
+    items: list[dict[str, Any]]
+    total: int
+    limit: int
+    offset: int

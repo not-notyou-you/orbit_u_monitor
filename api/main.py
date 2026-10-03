@@ -10,30 +10,41 @@ import time
 mimetypes.add_type("image/webp", ".webp")
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
-from fastapi import FastAPI, Request, Response
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import Depends, FastAPI, Request, Response
+from fastapi.openapi.utils import get_openapi
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from etl.database_client import DatabaseClient
+from api import errors
+from api.activity import ActivityLogMiddleware
 # get_db di-re-export supaya `from api.main import get_db` tetap jalan; objeknya
 # sama persis dengan api.deps.get_db, jadi dependency_overrides lewat jalur mana
 # pun mengenai callable yang sama.
-from api.deps import get_db, set_db
-from api.routes import datasets, health, lineage, live, pipeline, products, quality, regions, report, scenes, storage
+from api.deps import get_db, require_role, set_clients
+from api.security import jwt_secret
+from api.routes import (
+    admin, auth, datasets, health, lineage, live, pipeline, products, quality,
+    regions, report, scenes, storage,
+)
 
 logger = logging.getLogger(__name__)
-_db_client: DatabaseClient | None = None
+_app_client: DatabaseClient | None = None
+_etl_client: DatabaseClient | None = None
 _live_scheduler = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    global _db_client, _live_scheduler
-    logger.info("[API] startup: initializing DatabaseClient")
-    _db_client = DatabaseClient.from_env()
-    set_db(_db_client)
-    health_info = _db_client.check_health()
+    global _app_client, _etl_client, _live_scheduler
+    jwt_secret()  # gagal keras di startup bila JWT_SECRET kosong/pendek
+    # Request API: monitor_app (NOINHERIT, SET LOCAL ROLE per request).
+    # Kerja latar (job dataset, Live, penghapusan): monitor_etl.
+    # Tidak ada koneksi superuser dari aplikasi (DATABASE.md §8.1).
+    logger.info("[API] startup: initializing DatabaseClients (monitor_app, monitor_etl)")
+    _app_client = DatabaseClient.from_env("app")
+    _etl_client = DatabaseClient.from_env("etl")
+    set_clients(_app_client, _etl_client)
+    health_info = _app_client.check_health()
     if not health_info.get("connected"):
         logger.error("[API] DB health check FAILED: %s", health_info)
     else:
@@ -41,7 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         if os.getenv("AUTO_RESUME_JOBS", "true").lower() in ("1", "true", "yes"):
             try:
                 from etl.dataset_manager import DatasetManager
-                resumed = DatasetManager(_db_client).recover_interrupted_jobs()
+                resumed = DatasetManager(_etl_client).recover_interrupted_jobs()
                 if resumed:
                     logger.warning("[API] %d job terputus dilanjutkan: %s", len(resumed), resumed)
             except Exception:
@@ -49,7 +60,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     try:
         from etl.live_scheduler import LiveScheduler
-        _live_scheduler = LiveScheduler(_db_client)
+        _live_scheduler = LiveScheduler(_etl_client)
         _live_scheduler.start()
         logger.info("[API] LiveScheduler started")
     except Exception:
@@ -65,33 +76,33 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if _live_scheduler:
         _live_scheduler.shutdown()
 
-    logger.info("[API] shutdown: disposing DatabaseClient")
-    set_db(None)
-    if _db_client:
-        _db_client.dispose()
+    logger.info("[API] shutdown: disposing DatabaseClients")
+    set_clients(None, None)
+    for client in (_app_client, _etl_client):
+        if client:
+            client.dispose()
 
 
 app = FastAPI(
-    title="Sentinel-1 Flood Detection Data Pipeline API",
+    title="Orbit-U: The Monitor API",
     description=(
-        "REST API for querying Sentinel-1 SAR scenes, data products, "
-        "quality metrics, transformation lineage, dataset management, "
-        "and live monitoring for flood detection research."
+        "REST API for hydrometeorological monitoring of South Lebak: Live "
+        "monitoring, dataset catalog, scenes, products, quality metrics, "
+        "lineage, and administration. Authenticate with the `orbit_u_session` "
+        "cookie (web) or `Authorization: Bearer trn_...` (personal API token, "
+        "read-only). Every operation lists its minimum role in `x-min-role`. "
+        'Errors use `{"detail": "...", "code": "..."}`.'
     ),
-    version="1.2.0",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
     lifespan=lifespan,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Tanpa CORS: frontend disajikan dari origin yang sama (INTERFACE.md §1),
+# cookie SameSite=Strict.
+app.add_middleware(ActivityLogMiddleware)
 
 
 @app.middleware("http")
@@ -103,57 +114,101 @@ async def log_requests(request: Request, call_next) -> Response:
     return response
 
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """Ratakan error validasi Pydantic jadi satu kalimat.
-
-    Bentuk bawaan FastAPI (`detail` berisi list of dict) tidak bisa ditampilkan
-    langsung di UI; front-end di web/app.js membaca `detail` sebagai teks.
-    """
-    messages = []
-    for err in exc.errors():
-        msg = str(err.get("msg", "")).removeprefix("Value error, ").strip()
-        loc = [str(p) for p in err.get("loc", []) if p not in ("body", "query", "path")]
-        messages.append(f"{'.'.join(loc)}: {msg}" if loc else msg)
-    detail = " | ".join(dict.fromkeys(m for m in messages if m)) or "Invalid request"
-    return JSONResponse(status_code=422, content={"detail": detail})
-
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.error("Unhandled exception on %s: %s", request.url.path, exc, exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error", "path": str(request.url.path)},
-    )
+errors.install(app)
 
 
 # Info API. Dulu ada di "/", lalu tergeser waktu web UI di-mount di "/" (commit
 # 76bdcc3). Sekarang tinggal di "/api" bersama route lainnya, sedangkan "/"
 # memang milik UI.
-@app.get("/api", include_in_schema=False)
+@app.get("/api", include_in_schema=False, dependencies=[Depends(require_role("PUBLIC"))])
 async def api_info() -> dict:
     return {"message": app.title, "docs": app.docs_url, "version": app.version}
 
 
-app.include_router(health.router, prefix="/api", tags=["Health"])
-app.include_router(scenes.router, prefix="/api/scenes", tags=["Scenes"])
-app.include_router(products.router, prefix="/api/products", tags=["Products"])
-app.include_router(quality.router, prefix="/api/quality", tags=["Quality"])
-app.include_router(lineage.router, prefix="/api/metadata", tags=["Lineage"])
+def _role(min_role: str) -> list:
+    return [Depends(require_role(min_role))]
+
+
+# Role minimum per kelompok (INTERFACE.md §4). Route yang butuh role lebih
+# tinggi, atau unduhan, menambah require_role(...) sendiri.
+app.include_router(health.router, prefix="/api", tags=["Health"], dependencies=_role("PUBLIC"))
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"], dependencies=_role("ADMIN"))
+app.include_router(scenes.router, prefix="/api/scenes", tags=["Scenes"], dependencies=_role("DATA_ENGINEER"))
+app.include_router(products.router, prefix="/api/products", tags=["Products"], dependencies=_role("DATA_ENGINEER"))
+app.include_router(quality.router, prefix="/api/quality", tags=["Quality"], dependencies=_role("DATA_ENGINEER"))
+app.include_router(lineage.router, prefix="/api/metadata", tags=["Lineage"], dependencies=_role("DATA_ENGINEER"))
 # /api/preview/* (thumbnail on-the-fly dari COG) sudah dipensiunkan: galeri
 # membaca PNG tier PREVIEW lewat /api/datasets/{id}/preview, dan dua jalur
 # render dengan stretch/NoData berbeda berarti dua definisi "preview".
-app.include_router(storage.router, prefix="/api/storage", tags=["Storage"])
-app.include_router(pipeline.router, prefix="/api/pipeline", tags=["Pipeline"])
-app.include_router(datasets.router, prefix="/api/datasets", tags=["Datasets"])
-app.include_router(report.router, prefix="/api/datasets", tags=["Report"])
-app.include_router(live.router, prefix="/api/live", tags=["Live"])
-app.include_router(regions.router, prefix="/api/regions", tags=["Regions"])
+# /api/storage/* membaca disk seluruh mesin -> ADMIN (Tahap 2, S5).
+app.include_router(storage.router, prefix="/api/storage", tags=["Storage"], dependencies=_role("ADMIN"))
+app.include_router(pipeline.router, prefix="/api/pipeline", tags=["Pipeline"], dependencies=_role("DATA_ENGINEER"))
+app.include_router(datasets.router, prefix="/api/datasets", tags=["Datasets"], dependencies=_role("DATA_ENGINEER"))
+app.include_router(report.router, prefix="/api/datasets", tags=["Report"], dependencies=_role("DATA_ENGINEER"))
+app.include_router(live.router, prefix="/api/live", tags=["Live"], dependencies=_role("USER"))
+app.include_router(regions.router, prefix="/api/regions", tags=["Regions"], dependencies=_role("USER"))
+
+
+def route_min_roles(route) -> list[tuple[str, bool]]:
+    """(min_role, download) setiap require_role yang menjaga route."""
+    found = []
+    stack = [getattr(route, "dependant", None)]
+    while stack:
+        dep = stack.pop()
+        if dep is None:
+            continue
+        call = getattr(dep, "call", None)
+        if call is not None and hasattr(call, "min_role"):
+            found.append((call.min_role, call.download))
+        stack.extend(dep.dependencies)
+    return found
+
+
+_ROLE_ORDER = ("PUBLIC", "USER", "ANALYST", "DATA_ENGINEER", "ADMIN")
+
+
+def custom_openapi() -> dict:
+    """OpenAPI dengan `x-min-role` per operasi (INTERFACE.md §6.1)."""
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(title=app.title, version=app.version, description=app.description,
+                         routes=app.routes)
+    for route in app.routes:
+        roles = route_min_roles(route)
+        if not roles or not getattr(route, "include_in_schema", False):
+            continue
+        strongest = max((r for r, _ in roles), key=_ROLE_ORDER.index)
+        for method in getattr(route, "methods", ()):
+            op = schema.get("paths", {}).get(route.path_format, {}).get(method.lower())
+            if op is not None:
+                op["x-min-role"] = strongest
+                if any(d for _, d in roles):
+                    op["x-download"] = True
+    schema.setdefault("components", {}).setdefault("securitySchemes", {}).update({
+        "bearerToken": {"type": "http", "scheme": "bearer",
+                        "description": "Personal API token trn_... (GET only)"},
+        "sessionCookie": {"type": "apiKey", "in": "cookie", "name": "orbit_u_session"},
+    })
+    schema["security"] = [{"bearerToken": []}, {"sessionCookie": []}]
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = custom_openapi
+
+
 # "/" milik landing page (web/index.html); aplikasi kerjanya ada di "/app".
+# Halaman HTML tidak membawa data; pemeriksaan login /app dilakukan app.js
+# lewat /api/auth/me (data tetap dijaga API).
 @app.get("/app", include_in_schema=False)
 async def web_app() -> FileResponse:
     return FileResponse("web/app.html")
+
+
+@app.get("/masuk", include_in_schema=False)
+async def web_login() -> FileResponse:
+    return FileResponse("web/masuk.html")
 
 
 app.mount("/", StaticFiles(directory="web", html=True), name="web")

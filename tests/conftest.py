@@ -236,16 +236,115 @@ def sample_dataset(db_client, sample_region) -> int:
         return ds.dataset_id
 
 
-@pytest.fixture(scope="function")
-def api_client(db_client):
-    """
-    FastAPI TestClient with DB dependency override.
-    Allows testing API endpoints without running a real server.
-    """
-    from fastapi.testclient import TestClient
-    from api.main import app, get_db
+# ---------------------------------------------------------------------------
+# API: koneksi monitor_app / monitor_etl dan klien per role (Tahap 2)
+# ---------------------------------------------------------------------------
+# Aplikasi tidak pernah terkoneksi sebagai superuser: tes API memakai role
+# login yang sama dengan produksi pada database uji. Fixture db_client
+# (pemilik skema) tetap dipakai untuk menyiapkan data.
 
-    app.dependency_overrides[get_db] = lambda: db_client
-    client = TestClient(app)
+ROLE_USERNAMES = {
+    "USER": "t_user",
+    "ANALYST": "t_analyst",
+    "DATA_ENGINEER": "t_engineer",
+    "ADMIN": "t_admin",
+}
+TEST_PASSWORD = "test-password-123"
+
+
+def _login_url(username: str, password_env: str) -> str:
+    from sqlalchemy.engine import make_url
+
+    password = os.getenv(password_env)
+    if not password:
+        pytest.exit(f"{password_env} kosong di .env; dibutuhkan tes API (Tahap 2)", returncode=1)
+    return make_url(TEST_DB_URL).set(username=username, password=password).render_as_string(hide_password=False)
+
+
+@pytest.fixture(scope="session")
+def app_db_client(db_client):
+    from etl.database_client import DatabaseClient
+    client = DatabaseClient(_login_url("monitor_app", "MONITOR_APP_PASSWORD"), pool_size=4, max_overflow=4)
     yield client
-    app.dependency_overrides.clear()
+    client.dispose()
+
+
+@pytest.fixture(scope="session")
+def etl_db_client(db_client):
+    from etl.database_client import DatabaseClient
+    client = DatabaseClient(_login_url("monitor_etl", "MONITOR_ETL_PASSWORD"), pool_size=4, max_overflow=4)
+    yield client
+    client.dispose()
+
+
+@pytest.fixture(scope="session")
+def test_password_hash():
+    """Hash bcrypt cost 12 dihitung sekali per sesi (mahal)."""
+    from api.security import hash_password
+    return hash_password(TEST_PASSWORD)
+
+
+def create_test_user(db_client, username: str, role_code: str, password_hash: str,
+                     is_active: bool = True) -> int:
+    from sqlalchemy import text
+    with db_client.session() as sess:
+        return sess.scalar(text("""
+            INSERT INTO users (role_id, username, password_hash, full_name, is_active)
+            SELECT role_id, :u, :h, :n, :a FROM roles WHERE role_code = :r
+            ON CONFLICT (username) DO UPDATE SET role_id = EXCLUDED.role_id, is_active = EXCLUDED.is_active,
+                password_hash = EXCLUDED.password_hash, failed_login_count = 0, locked_until = NULL
+            RETURNING user_id"""),
+            {"u": username, "h": password_hash, "n": username.replace("_", " ").title(),
+             "a": is_active, "r": role_code})
+
+
+@pytest.fixture(scope="session")
+def role_users(db_client, test_password_hash) -> dict[str, int]:
+    """Satu akun per role login: {role_code: user_id}."""
+    return {role: create_test_user(db_client, name, role, test_password_hash)
+            for role, name in ROLE_USERNAMES.items()}
+
+
+@pytest.fixture(scope="function")
+def make_client(app_db_client, etl_db_client, role_users):
+    """Pabrik TestClient: make_client("ANALYST"), make_client(None) (anonim),
+    make_client(token="trn_...") (Bearer). Sesi dibuat langsung sebagai JWT
+    (alur login sendiri diuji tests/test_auth.py) supaya tidak membayar
+    bcrypt di setiap tes."""
+    from fastapi.testclient import TestClient
+
+    from api import deps
+    from api.main import app
+    from api.security import SESSION_COOKIE, create_session_jwt, token_rate_limiter
+
+    deps.set_clients(app_db_client, etl_db_client)
+    token_rate_limiter.reset()
+    clients = []
+
+    def _make(role: str | None = None, *, token: str | None = None, user_id: int | None = None,
+              csrf: bool = True) -> TestClient:
+        # https: cookie sesi ber-flag Secure hanya dikirim lewat https.
+        client = TestClient(app, base_url="https://testserver", raise_server_exceptions=False)
+        if csrf:
+            client.headers["X-Requested-With"] = "orbit-u"
+        if token:
+            client.headers["Authorization"] = f"Bearer {token}"
+        elif role or user_id:
+            uid = user_id if user_id is not None else role_users[role]
+            jwt_token, _ = create_session_jwt(uid, role or "USER")
+            client.cookies.set(SESSION_COOKIE, jwt_token)
+        clients.append(client)
+        return client
+
+    yield _make
+    for c in clients:
+        c.close()
+    deps.set_clients(None, None)
+
+
+@pytest.fixture(scope="function")
+def api_client(make_client):
+    """TestClient sebagai ADMIN. Dipakai tes API Tahap 1: endpoint warisan
+    kini membutuhkan login, dan dengan ADMIN tes itu sekaligus berjalan di
+    bawah SET LOCAL ROLE monitor_admin."""
+    return make_client("ADMIN")

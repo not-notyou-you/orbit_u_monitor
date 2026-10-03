@@ -31,6 +31,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB, UUID
+from sqlalchemy.engine import URL
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
 from sqlalchemy.pool import QueuePool
@@ -1220,17 +1221,34 @@ class DatabaseClient:
         self._register_listeners()
         logger.info("DatabaseClient initialized. Pool size: %d + %d overflow", pool_size, max_overflow)
 
+    # Role login PostgreSQL per pemakai (DATABASE.md §8.1). "owner" = DB_USER
+    # dari .env, hanya untuk skrip setup/perawatan; API memakai "app",
+    # scheduler/pipeline memakai "etl".
+    LOGINS: dict[str, tuple[str, str]] = {
+        "app": ("monitor_app", "MONITOR_APP_PASSWORD"),
+        "etl": ("monitor_etl", "MONITOR_ETL_PASSWORD"),
+    }
+
     @classmethod
-    def from_env(cls) -> "DatabaseClient":
+    def from_env(cls, login: str = "owner") -> "DatabaseClient":
         host = os.getenv("DB_HOST", "localhost")
         port = os.getenv("DB_PORT", "5432")
         name = os.getenv("DB_NAME", "themonitor")
-        user = os.getenv("DB_USER", "postgres")
-        password = os.getenv("DB_PASSWORD", "")
+        if login == "owner":
+            user = os.getenv("DB_USER", "postgres")
+            password = os.getenv("DB_PASSWORD", "")
+        elif login in cls.LOGINS:
+            user, password_env = cls.LOGINS[login]
+            password = os.getenv(password_env, "")
+            if not password:
+                raise RuntimeError(f"{password_env} is not set (needed to connect as {user})")
+        else:
+            raise ValueError(f"unknown login {login!r}")
         pool = int(os.getenv("DB_POOL_SIZE", "5"))
         overflow = int(os.getenv("DB_MAX_OVERFLOW", "10"))
         echo = os.getenv("DB_ECHO", "false").lower() == "true"
-        url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{name}"
+        url = URL.create("postgresql+psycopg2", username=user, password=password,
+                         host=host, port=int(port), database=name)
         return cls(url, pool_size=pool, max_overflow=overflow, echo=echo)
 
     def _register_listeners(self) -> None:
@@ -1439,7 +1457,7 @@ class DatabaseClient:
         )
         return dataset
 
-    def get_last_dataset_config(self) -> dict:
+    def get_last_dataset_config(self, created_by: int | None = None) -> dict:
         """Konfigurasi dataset terakhir yang dibuat, untuk tombol "Pakai Config
         Sebelumnya" (DOCS/DECISIONS.md D13, DOCS/INTERFACE.md GET
         /api/datasets/last-config).
@@ -1459,9 +1477,15 @@ class DatabaseClient:
             route API menerjemahkannya jadi 404.
         """
         with self.session() as sess:
+            stmt = select(Dataset).where(Dataset.deleted_at.is_(None))
+            if created_by is not None:
+                # Per pengguna (INTERFACE.md §2.6): hanya dataset katalog
+                # buatan pengguna ini.
+                stmt = stmt.where(Dataset.created_by == created_by,
+                                  Dataset.dataset_kind == "STANDARD",
+                                  Dataset.is_system.is_(False))
             dataset = sess.scalar(
-                select(Dataset)
-                .where(Dataset.deleted_at.is_(None))
+                stmt
                 # dataset_id sebagai pemecah seri: dua dataset bisa dibuat pada
                 # timestamp yang sama, dan "terakhir" harus deterministik.
                 .order_by(Dataset.created_at.desc(), Dataset.dataset_id.desc())
