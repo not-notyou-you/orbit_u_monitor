@@ -1,11 +1,13 @@
 # api/routes/storage.py
 """
-Storage management API: informasi penggunaan disk dan cleanup per tier.
+Storage API: informasi penggunaan disk per tier (hanya baca).
 
 GET  /api/storage/summary        — ringkasan penggunaan per tier
 GET  /api/storage/files/{tier}   — list file di tier tertentu
-POST /api/storage/cleanup        — hapus file berdasarkan tier atau semua
-POST /api/storage/cleanup/partial — hapus file .part yang tidak lengkap
+
+Cleanup tier lintas mesin (POST /cleanup, /cleanup/partial) warisan DataLab
+sudah dihapus (README §5); berkas hanya dihapus lewat penghapusan dataset dan
+retensi Live.
 
 Author : Julius Marselinus (BRONTO) - NIM 00000111989
 Program: Sistem Informasi - Universitas Multimedia Nusantara
@@ -17,9 +19,8 @@ import logging
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 
 from etl import folder_manager as fm
 
@@ -30,15 +31,7 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
-StorageTier = Literal["raw", "bronze", "silver", "gold", "preview", "fusion", "partial", "all"]
-
-# Tier yang dianggap turunan dan aman dihapus massal lewat tier="all".
-# gold + fusion adalah deliverable akhir, jadi tidak ikut. preview juga tidak
-# ikut walau isinya turunan: PNG-nya cuma bisa dibangun ulang selama gold/
-# masih ada, dan pada dataset yang cuma meminta FUSION gold/ sudah dihapus --
-# jadi menghapus preview di sana berarti menghilangkannya untuk selamanya.
-# Hapus tier ini secara eksplisit dengan tier="preview" kalau memang diinginkan.
-_DERIVED_TIERS: tuple[str, ...] = ("raw", "bronze", "silver")
+StorageTier = Literal["raw", "bronze", "silver", "gold", "preview", "fusion", "partial"]
 
 
 def _dataset_roots() -> list[Path]:
@@ -53,18 +46,12 @@ def _dataset_roots() -> list[Path]:
 def _get_tier_paths() -> dict[str, list[Path]]:
     """Folder per tier di layout dataset-tanggal-tier sekarang, dikumpulkan
     dari seluruh dataset: data/datasets/{id}_{slug}/{tanggal}/{tier}/ untuk
-    tiap tanggal, ditambah _granule_cache/ untuk tier raw.
-
-    Sebelumnya fungsi ini menunjuk `processed/{bronze,silver,gold}` dan
-    `recovered_temp/` -- layout sebelum refactor tier/source, yang sudah
-    tidak pernah ditulis lagi. Akibatnya seluruh router ini melaporkan 0 byte
-    untuk semua tier dan cleanup-nya tidak pernah menghapus apa pun."""
+    tiap tanggal, ditambah _granule_cache/ untuk tier raw."""
     roots = _dataset_roots()
     paths = {
         tier: [d for r in roots for d in fm.tier_dirs_under(r, tier)] for tier in fm.TIERS
     }
     paths["partial"] = [d for tier in fm.TIERS for d in paths[tier]]
-    paths["all"] = [d for tier in _DERIVED_TIERS for d in paths[tier]]
     return paths
 
 
@@ -99,25 +86,6 @@ def _dir_info(path: Path, ext_filter: str | None = None) -> dict:
 
 def _human(mb: float) -> str:
     return f"{mb / 1024:.2f} GB" if mb >= 1024 else f"{mb:.1f} MB"
-
-
-# ---------------------------------------------------------------------------
-# Schemas
-# ---------------------------------------------------------------------------
-
-class CleanupRequest(BaseModel):
-    tier:    StorageTier
-    dry_run: bool = False  # True = hitung saja tanpa hapus
-
-
-class CleanupResponse(BaseModel):
-    tier:          str
-    dry_run:       bool
-    files_deleted: int
-    size_freed_mb: float
-    size_freed_human: str
-    errors:        list[str]
-    message:       str
 
 
 # ---------------------------------------------------------------------------
@@ -243,9 +211,6 @@ async def storage_summary() -> JSONResponse:
     description="List all files in a given tier (raw/bronze/silver/gold).",
 )
 async def list_files(tier: StorageTier) -> JSONResponse:
-    if tier == "all":
-        raise HTTPException(400, "Tier 'all' is only for cleanup, not for listing")
-
     tier_paths = _get_tier_paths()
     paths = tier_paths.get(tier, [])
 
@@ -256,107 +221,3 @@ async def list_files(tier: StorageTier) -> JSONResponse:
         result.append(info)
 
     return JSONResponse(content={"tier": tier, "directories": result})
-
-
-@router.post(
-    "/cleanup",
-    response_model=CleanupResponse,
-    summary="Delete files per tier",
-    description=(
-        "Delete all files in a given tier to free up storage.\n\n"
-        "- **raw**: delete raw ZIPs and TIFs (saves ~800 MB per scene)\n"
-        "- **bronze**: delete cropped output (saves ~50 MB per scene per band)\n"
-        "- **silver**: delete Lee-filter output (saves ~45 MB per scene per band)\n"
-        "- **gold**: ⚠️ delete production-ready COGs (the main data!)\n"
-        "- **partial**: delete .part files (interrupted downloads)\n"
-        "- **all**: delete everything except gold\n\n"
-        "Use `dry_run=true` to see what would be deleted without actually deleting."
-    ),
-)
-async def cleanup_storage(req: CleanupRequest) -> CleanupResponse:
-    tier_paths = _get_tier_paths()
-    errors     = []
-    deleted    = 0
-    freed_mb   = 0.0
-
-    # Tentukan paths yang akan dibersihkan
-    if req.tier == "all":
-        # Hapus tier turunan saja; gold + fusion adalah deliverable akhir dan
-        # terlalu berbahaya dihapus tanpa konfirmasi eksplisit per tier.
-        paths_to_clean = tier_paths["all"]
-        logger.warning(
-            "[CLEANUP] Cleanup ALL (%s) dry_run=%s",
-            "+".join(_DERIVED_TIERS), req.dry_run,
-        )
-    elif req.tier == "partial":
-        paths_to_clean = tier_paths["partial"]
-    else:
-        paths_to_clean = tier_paths.get(req.tier, [])
-
-    for base_path in paths_to_clean:
-        if not base_path.exists():
-            continue
-
-        if req.tier == "partial":
-            # Hanya hapus .part files
-            pattern_iter = list(base_path.rglob("*.part"))
-        else:
-            # Hapus semua file TIF dan ZIP di folder ini
-            pattern_iter = [f for f in base_path.rglob("*") if f.is_file()]
-
-        for f in pattern_iter:
-            try:
-                size_mb = f.stat().st_size / (1024 ** 2)
-                if req.dry_run:
-                    logger.info("[CLEANUP DRY] Would delete: %s (%.1f MB)", f.name, size_mb)
-                else:
-                    f.unlink()
-                    logger.info("[CLEANUP] Deleted: %s (%.1f MB)", f.name, size_mb)
-                deleted  += 1
-                freed_mb += size_mb
-            except Exception as exc:
-                errors.append(f"{f.name}: {exc}")
-                logger.error("[CLEANUP] Error deleting %s: %s", f, exc)
-
-        # Hapus folder kosong (bukan base path itu sendiri)
-        if not req.dry_run and req.tier != "partial":
-            for sub in sorted(base_path.rglob("*"), reverse=True):
-                if sub.is_dir() and sub != base_path:
-                    try:
-                        sub.rmdir()  # hanya hapus jika benar-benar kosong
-                    except OSError:
-                        pass  # tidak kosong, skip
-
-    verb = "Would be deleted" if req.dry_run else "Deleted"
-    msg  = (
-        f"{verb}: {deleted} file(s) ({_human(freed_mb)}) "
-        f"from tier '{req.tier}'"
-        + (" [DRY RUN - nothing was deleted]" if req.dry_run else "")
-        + (f" — {len(errors)} error" if errors else "")
-    )
-
-    logger.info("[CLEANUP] %s", msg)
-
-    return CleanupResponse(
-        tier             = req.tier,
-        dry_run          = req.dry_run,
-        files_deleted    = deleted,
-        size_freed_mb    = round(freed_mb, 2),
-        size_freed_human = _human(freed_mb),
-        errors           = errors,
-        message          = msg,
-    )
-
-
-@router.post(
-    "/cleanup/partial",
-    summary="Delete interrupted download files (.part)",
-    description=(
-        "Delete all `.part` files left over from interrupted downloads. "
-        "These files are unusable but can take up storage. "
-        "**Note:** a download in progress also has a .part file — "
-        "do not run this while the pipeline is actively downloading."
-    ),
-)
-async def cleanup_partial(dry_run: bool = False) -> CleanupResponse:
-    return await cleanup_storage(CleanupRequest(tier="partial", dry_run=dry_run))
