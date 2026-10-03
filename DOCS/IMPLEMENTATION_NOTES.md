@@ -45,3 +45,48 @@ Semua keputusan di bawah disetujui pemilik proyek sebelum dikerjakan
 | K18 | Nama database. | **Diputuskan: `themonitor`** (uji: `themonitor_test`) di kode, `.env.example`, dan dokumen (M44). | Selesai. |
 
 Catatan: satu run tes penuh sempat crash native GDAL (`0xc0000374` di `rasterio.warp.reproject` saat fusion, multi-thread); run ulang lulus 714/714. Intermiten, tidak terkait perubahan Tahap 1.
+
+---
+
+## Tahap 2 — Keamanan & API
+
+Rencana disetujui pemilik proyek sebelum dikerjakan (rekomendasi S1–S7
+diterima apa adanya).
+
+### Keputusan rencana (disetujui)
+
+| # | Temuan | Keputusan |
+|---|---|---|
+| S1 | INTERFACE §4.7 "hapus dataset oleh pembuat" bertentangan dengan §8.3: `data_engineer` tidak punya D pada `datasets`, dan `DeletionManager` juga menghapus baris `data_products`/`processing_jobs`. | API memeriksa pembuat/ADMIN dan menandai `DELETING` di bawah role pengguna. Penghapusan fisik dikerjakan thread pipeline dengan koneksi `monitor_etl` setelah commit. `monitor_etl` mendapat **D** hanya pada `datasets`, `data_products`, `processing_jobs` (tabel anak lain ikut lewat `ON DELETE CASCADE`, yang dijalankan dengan hak pemilik tabel). Hal yang sama berlaku untuk hapus Live Area dan pembersihan tier saat cancel. |
+| S2 | `auth_get_user` saja tidak cukup karena role publik/USER tidak bisa menyentuh `users`/`api_tokens`. | Fungsi SECURITY DEFINER milik `monitor_admin`: `auth_get_user`, `auth_record_login`, `auth_session_user`, `auth_get_token` (EXECUTE: `monitor_public` dan turunannya). |
+| S3 | `:'app_pw'` (variabel psql) tidak bisa dijalankan `apply_files()` (psycopg2). | Role LOGIN dibuat tanpa sandi; `apply_schema.py` dan `tests/conftest.py` menjalankan `ALTER ROLE … PASSWORD` dari `MONITOR_APP_PASSWORD` / `MONITOR_ETL_PASSWORD`. Bagian role ditulis idempoten (role berlaku untuk seluruh cluster). |
+| S4 | Tabel/VIEW yang tidak disebut §8.3. | Master referensi (`satellite_sources`, `spectral_bands`, `administrative_regions`, `regions_of_interest`, `processing_stages`, `fusion_strategies`, `report_types`): S untuk user+ dan etl; ADMIN SIU pada `administrative_regions`/`regions_of_interest`. `quality_alerts` dan `cleanup_operations` mengikuti kelompok `processing_*`. `dataset_source_config` mengikuti `dataset_*`. `v_users_safe`: S untuk user+. `v_log_*`: ADMIN. Matriks lengkap ada di `tests/security/grant_matrix.sql`. |
+| S5 | `/live` (warisan) diatur §4.3, bukan §4.7; `/storage/*` tidak diatur dokumen. | `/live`: baca USER (non-ADMIN hanya scene ≤ 30 hari + scene terbaru), tulis dan log ADMIN. `/storage/*` (disk seluruh mesin): ADMIN. `/public/*` belum dibangun (landing hanya memakai `/api/health`). |
+| S6 | "Setiap pemakaian token tercatat". | Satu baris per request bertoken: `action = 'API_REQUEST'`, `detail = {auth: 'token', token_id, method, path, status}`. Untuk unduhan cukup baris `DOWNLOAD_*` (dengan `detail.auth = 'token'`), tanpa baris kedua. |
+| S7 | Seed berjalan setelah security sehingga INSERT seed masuk `audit_log`. | Dibiarkan (`app_user_id` NULL, `db_user` = pemilik skema). |
+
+### Temuan saat pengerjaan
+
+| # | Temuan | Penanganan | Perlu keputusan? |
+|---|---|---|---|
+| T1 | Policy `rp_audience` (§8.4) men-JOIN `roles`, padahal ANALYST/DATA_ENGINEER tidak punya SELECT pada `roles` (§8.3), sehingga ekspresi policy gagal *permission denied*. | Subkueri diganti fungsi SECURITY DEFINER `report_audience_db_role(report_type_id)` milik `monitor_admin`. Matriks GRANT tetap utuh. | Tidak. |
+| T2 | "Ubah kata sandi" (§4.1) untuk USER, padahal USER tidak punya UPDATE pada `users`. | Fungsi SECURITY DEFINER `auth_change_own_password(hash)` hanya mengubah baris milik `app.user_id` sesi (bukan argumen), dan menolak nilai yang bukan hash bcrypt. | Tidak. |
+| T3 | RLS `generated_reports` dengan policy FOR SELECT saja menolak INSERT/UPDATE untuk semua role selain pemilik, padahal §8.3 memberi SIU ke ADMIN dan etl. | Tambahan policy `rp_writers` FOR ALL untuk `monitor_admin` dan `monitor_etl`. | Tidak. |
+| T4 | Audit trigger pada `users`, `api_tokens`, `datasets`, `live_areas` akan mencatat setiap login (`last_login_at`), setiap request bertoken (`last_used_at`), setiap progres scene, dan setiap siklus Live. | `audit_row()` menerima daftar kolom "pembukuan" (TG_ARGV[1..]) yang tidak dicatat bila **hanya** kolom itu yang berubah: `last_login_at`, `failed_login_count` (users); `last_used_at` (token); penghitung progres (datasets); status/forecast siklus (live_areas). Perubahan `locked_until` (kunci/buka kunci) tetap tercatat. `changed_columns` dihitung sebelum sensor, jadi perubahan `password_hash` terlihat sebagai nama kolom tanpa nilai; `updated_at` tidak dicantumkan. `geom` juga disensor (poligon besar). `administrative_regions` hanya dicatat untuk UPDATE `in_aoi`, scene hanya untuk UPDATE `is_valid` (§8.5). | Tidak. |
+| T5 | `audit_log.db_user DEFAULT current_user` akan selalu berisi pemilik fungsi karena `audit_row` adalah SECURITY DEFINER. | `db_user` diisi dari GUC `role` (hasil `SET ROLE`), atau `session_user` bila tidak ada SET ROLE (psql langsung). | Tidak. |
+| T6 | Skema `public` yang dibuat ulang (`CREATE SCHEMA`, dipakai conftest) tidak memberi USAGE ke PUBLIC. | `GRANT USAGE ON SCHEMA public` eksplisit ke `monitor_public` dan `monitor_etl`. `monitor_app` sengaja tidak diberi: tanpa SET ROLE, tabel pun tidak terlihat. | Tidak. |
+| T7 | Manager warisan membuka `db.session()` berkali-kali dan menyalakan thread job/penghapusan/siklus dari dalam request. Dengan satu transaksi per request, thread (koneksi lain) bisa membaca dataset yang belum di-commit, dan sesi request sudah tertutup saat thread berjalan. | `RequestDatabaseClient` (api/deps.py) menjadikan setiap `session()` SAVEPOINT di dalam transaksi request. `DatasetManager`/`LiveMonitor` mendapat `runner_db` (monitor_etl) dan menunda start thread lewat `call_after_commit`. Di luar API (CLI, scheduler, tes ETL) perilakunya tidak berubah. | Tidak. |
+| T8 | Mengubah retensi Live Area dulu langsung menghapus berkas sebelum respons dikirim. | Baris area diubah di sesi ADMIN; penghapusan kelebihan scene, prakiraan, dan siklus berjalan lewat ETL setelah commit. Respons PATCH dikirim sebelum berkas selesai dihapus. | Tidak. |
+| T9 | `/scenes?source=S1\|MODIS\|GPM` + `include_invalid` (§4.7, K12) belum ada di kode warisan; endpoint ini bagian kelola scene ADMIN (§4.9). | Ditunda ke tahap fitur admin scene. Role DATA_ENGINEER sudah terpasang. | Ya, bila ingin dimajukan ke Tahap 2. |
+| T10 | Exit dependency FastAPI 0.115 berjalan **sebelum** body respons dikirim. | Log unduhan ditulis `ActivityLogMiddleware` setelah body selesai, dalam transaksi pendek terpisah dengan role pemilik request; `bytes_sent` = byte yang benar-benar terkirim, `detail.complete` menandai unduhan yang terputus. | Tidak. |
+| T11 | Kolom `ip_address` bertipe INET; host non-IP (mis. TestClient) membuat INSERT gagal. | Nilai yang bukan IP disimpan NULL. | Tidak. |
+| T12 | `GET /api/storage/summary` selalu 500 (`KeyError: 'bronze'`): respons masih memakai literal tier lama, sedangkan `folder_manager.TIERS` sudah bernama D14. Baru terungkap karena tes RBAC memanggil setiap endpoint. | Respons dan `StorageTier` disusun dari nama tier D14. | Tidak. |
+
+### Detail tambahan (tidak diatur dokumen)
+
+- `api_client` di tes kini login sebagai ADMIN (JWT langsung), sehingga tes API Tahap 1 sekaligus berjalan di bawah `SET LOCAL ROLE monitor_admin` dengan koneksi `monitor_app`.
+- `.env` membutuhkan `MONITOR_APP_PASSWORD`, `MONITOR_ETL_PASSWORD`, `JWT_SECRET` (≥ 32 karakter; aplikasi menolak start tanpanya), dan opsional `COOKIE_SECURE=false` hanya untuk pengembangan lewat http non-localhost.
+- CORS `*` dihapus (satu origin, INTERFACE §1).
+- `GET /api/admin/tokens` ditambahkan untuk tab Token API (§2.8); pencabutan memakai `DELETE /api/auth/tokens/{id}` yang memang mengizinkan ADMIN.
+- Kode error spesifik: `NOT_AUTHENTICATED`, `SESSION_EXPIRED`, `ACCOUNT_INACTIVE`, `INVALID_CREDENTIALS`, `ACCOUNT_LOCKED`, `ROLE_FORBIDDEN`, `DB_PERMISSION_DENIED`, `CSRF_HEADER_REQUIRED`, `TOKEN_INVALID`, `TOKEN_REVOKED`, `TOKEN_EXPIRED`, `TOKEN_WRITE_FORBIDDEN`, `TOKEN_SCOPE_FORBIDDEN`, `RATE_LIMITED`, `NOT_DATASET_OWNER`, `SCENE_OUT_OF_RANGE`, `PASSWORD_POLICY`, `INVALID_OLD_PASSWORD`, `USERNAME_TAKEN`, `CANNOT_MODIFY_SELF`, `TOKEN_ALREADY_REVOKED`, `INVALID_DATE_RANGE`; selebihnya kode bawaan per status (`NOT_FOUND`, `BAD_REQUEST`, `VALIDATION_ERROR`, …).
+- UI: `/masuk` + guard sesi di `/app` (alih ke `/masuk` saat 401), tombol Keluar, dan tab disembunyikan sesuai `permissions` dari `/api/auth/me`. Halaman lain belum diterjemahkan atau diubah.
