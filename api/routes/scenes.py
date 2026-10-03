@@ -1,6 +1,6 @@
 # api/routes/scenes.py
 """
-GET /api/scenes       — list scenes with filters
+GET /api/scenes       — list scenes with filters (?source=S1|MODIS|GPM)
 GET /api/scenes/{id}  — scene detail
 GET /api/scenes/{id}/status — pipeline status per scene
 """
@@ -14,15 +14,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 
 from api.schemas import (
+    NasaSceneListItem,
     PipelineStatusResponse,
     SceneDetail,
     SceneListItem,
     SceneListResponse,
 )
-from api.deps import get_db
+from api.deps import Principal, current_principal, get_db
+from api.errors import ApiError
 from etl.database_client import (
     DataProduct,
     DatabaseClient,
+    NasaScene,
     SatelliteScene,
 )
 from etl.metadata_manager import MetadataManager
@@ -44,6 +47,10 @@ logger  = logging.getLogger(__name__)
 )
 async def list_scenes(
     db:              DatabaseClient = Depends(get_db),
+    principal:       Principal      = Depends(current_principal),
+    source:          str            = Query("S1", pattern="^(S1|MODIS|GPM)$",
+                                            description="S1 = satellite_scenes; MODIS/GPM = nasa_scenes"),
+    include_invalid: bool           = Query(False, description="Include deactivated scenes (ADMIN only)"),
     region_id:       int | None     = Query(None,  description="Filter by region_id"),
     orbit_direction: str | None     = Query(None,  description="ASCENDING or DESCENDING"),
     date_from:       datetime | None = Query(None, description="Acquisition from (UTC ISO)"),
@@ -60,9 +67,23 @@ async def list_scenes(
     - GET /api/scenes?region_id=1&date_from=2024-01-01
     - GET /api/scenes?orbit_direction=ASCENDING&limit=50
     - GET /api/scenes?only_gold=true
+    - GET /api/scenes?source=MODIS&date_from=2025-01-01
+    - GET /api/scenes?include_invalid=true   (ADMIN)
+
+    Scene yang dinonaktifkan ADMIN (is_valid = false, M23/M24) disembunyikan
+    kecuali include_invalid. orbit_direction dan only_gold hanya berlaku
+    untuk S1.
     """
+    if include_invalid and not principal.has_role("ADMIN"):
+        raise ApiError(403, "include_invalid is available to ADMIN only", "ROLE_FORBIDDEN")
+    if source != "S1":
+        return _list_nasa_scenes(db, source, region_id, date_from, date_to,
+                                 include_invalid, limit, offset)
+
     with db.session() as sess:
         stmt = select(SatelliteScene).where(SatelliteScene.is_available == True)
+        if not include_invalid:
+            stmt = stmt.where(SatelliteScene.is_valid == True)
 
         if region_id:
             stmt = stmt.where(SatelliteScene.region_id == region_id)
@@ -104,10 +125,44 @@ async def list_scenes(
                 region_id            = s.region_id,
                 is_available         = s.is_available,
                 created_at           = s.created_at,
+                is_valid             = s.is_valid,
+                invalid_reason       = s.invalid_reason,
             )
             for s in scenes
         ]
 
+    return SceneListResponse(total=total or 0, limit=limit, offset=offset, items=items)
+
+
+def _list_nasa_scenes(db, source, region_id, date_from, date_to, include_invalid,
+                      limit, offset) -> SceneListResponse:
+    """Granule MODIS/GPM dari nasa_scenes (M30) lewat endpoint yang sama
+    (INTERFACE.md §4.7, K12)."""
+    with db.session() as sess:
+        stmt = select(NasaScene).where(NasaScene.source == source,
+                                       NasaScene.is_available == True)
+        if not include_invalid:
+            stmt = stmt.where(NasaScene.is_valid == True)
+        if region_id:
+            stmt = stmt.where(NasaScene.region_id == region_id)
+        if date_from:
+            stmt = stmt.where(NasaScene.acquisition_date >= date_from.date())
+        if date_to:
+            stmt = stmt.where(NasaScene.acquisition_date <= date_to.date())
+        total = sess.scalar(select(func.count()).select_from(stmt.subquery()))
+        rows = sess.scalars(
+            stmt.order_by(NasaScene.acquisition_date.desc(), NasaScene.nasa_scene_id.desc())
+                .limit(limit).offset(offset)
+        ).all()
+        items = [
+            NasaSceneListItem(
+                nasa_scene_id=r.nasa_scene_id, source=r.source, tile_id=r.tile_id,
+                product_short_name=r.product_short_name, acquisition_date=r.acquisition_date,
+                region_id=r.region_id, run_type=r.run_type, is_available=r.is_available,
+                is_valid=r.is_valid, invalid_reason=r.invalid_reason, created_at=r.created_at,
+            )
+            for r in rows
+        ]
     return SceneListResponse(total=total or 0, limit=limit, offset=offset, items=items)
 
 

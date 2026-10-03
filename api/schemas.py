@@ -27,7 +27,25 @@ class SceneListItem(BaseModel):
     region_id: int
     is_available: bool
     created_at: datetime
+    source: str = "S1"
+    is_valid: bool = True
+    invalid_reason: str | None = None
     model_config = {"from_attributes": True}
+
+
+class NasaSceneListItem(BaseModel):
+    """Granule MODIS/GPM (nasa_scenes) di GET /api/scenes?source=MODIS|GPM."""
+    nasa_scene_id: int
+    source: str
+    tile_id: str
+    product_short_name: str
+    acquisition_date: date
+    region_id: int
+    run_type: str | None
+    is_available: bool
+    is_valid: bool
+    invalid_reason: str | None
+    created_at: datetime
 
 
 class SceneDetail(SceneListItem):
@@ -44,7 +62,7 @@ class SceneListResponse(BaseModel):
     total: int
     limit: int
     offset: int
-    items: list[SceneListItem]
+    items: list[SceneListItem | NasaSceneListItem]
 
 
 class ProductItem(BaseModel):
