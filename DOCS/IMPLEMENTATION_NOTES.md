@@ -32,3 +32,14 @@ Semua keputusan di bawah disetujui pemilik proyek sebelum dikerjakan
 - `config/config_locations.json` (lokasi Jabodetabek DataLab, sudah dipindah ke DB sejak migrasi 012) dihapus bersama `config/config.json`.
 - `_refusion_run_46.py` di root dihapus bersama `refusion.py`. Berkas riset lain di root (`_export_s1a_only/`, `_copy_wajo_s1a_by_year.py`, `_s1_coverage_*`, `report/`) tidak disentuh.
 - `database/run_migration.py` diganti `database/apply_schema.py` yang menerapkan ketiga berkas skema memakai kredensial `.env`.
+
+### Temuan saat pengerjaan (setelah rencana disetujui)
+
+| # | Temuan | Penanganan Tahap 1 | Perlu keputusan? |
+|---|---|---|---|
+| K13 | API/UI Live Area masih membatasi retensi 1–12 (`LiveAreaCreateRequest`/`LiveAreaUpdateRequest`, validasi `app.js`), sementara DB kini 1–60 (M11). | DB dan ORM sudah 1–60; API/UI tidak diubah (di luar lingkup "perubahan UI"). | Ya — naikkan ke 1–60 di tahap Live/UI. |
+| K14 | Penghapusan dataset dulu membersihkan produk MODIS/GPM/FUSION lewat cascade scene placeholder. | `DeletionManager` kini menghapus langsung produk non-S1 milik dataset + job FUSION tanpa jangkar; produk S1 diperlakukan seperti dulu (tetap yatim di scene bersama). | Tidak, kecuali produk S1 juga ingin dihapus. |
+| K15 | Ambang QA: DataLab punya `quality_settings.min_quality_score` per dataset (wizard), dokumen meminta ambang dari `quality_thresholds`. | Tabel = default per band (+ pita WARNING dari `warn_below`); nilai eksplisit di dataset tetap menang atas `fail_below`. | Ya bila override per dataset ingin dihapus. |
+| K16 | Dokumen tidak memberi `valid_min/valid_max` `spectral_bands`, agregasi `WATER_CHANGE`, dan `source_code` per tahap. | Diisi nilai wajar di seed (VV/VH −50..20 dB, NDVI/NDWI −1..1, persen 0..100, hujan 0..1000/2000/3000/6000 mm; `WATER_CHANGE` = MEAN, km², ≥ 0). | Ya — konfirmasi rentang hujan sebelum backfill (trigger `trg_obs_range` menolak nilai di luar rentang). |
+| K17 | Constraint tambahan di luar dokumen: FK `nasa_scenes.source` → `satellite_sources`, CHECK `api_tokens` ≤ 180 hari, CHECK domain `quality_flag`, `sensor_type`, `preview_options`, CHECK alasan wajib saat `is_valid = false`. | Ditambahkan karena aturan yang sama sudah tertulis di teks dokumen/kode. | Tidak. |
+| K18 | `.env` lokal (tidak di-commit) memakai database `themonitor`, bukan `orbit_u_monitor`. | Tidak diubah; semua default di repo sudah `orbit_u_monitor`. | Sesuaikan `.env` lokal bila ingin seragam. |
