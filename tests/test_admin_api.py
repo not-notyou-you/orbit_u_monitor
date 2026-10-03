@@ -112,3 +112,14 @@ def test_admin_token_listing_shows_owner(make_client, role_users):
     items = make_client("ADMIN").get(f"/api/admin/tokens?user_id={role_users['ANALYST']}").json()["items"]
     row = next(i for i in items if i["token_id"] == created["token_id"])
     assert row["username"] == "t_analyst" and row["prefix"] == created["prefix"] and "token" not in row
+
+
+def test_create_admin_script_uses_monitor_app(app_db_client, db_client):
+    from scripts.create_admin import create_admin
+    name = _uname("first")
+    uid = create_admin(app_db_client, name, "Admin Pertama", "GMLS", "password-12345")
+    row = _scalar(db_client, "SELECT r.role_code FROM users u JOIN roles r USING (role_id) WHERE u.user_id = :u", u=uid)
+    assert row == "ADMIN"
+    db_user = _scalar(db_client, "SELECT db_user FROM audit_log WHERE table_name = 'users' AND row_pk = :pk "
+                                 "AND operation = 'I'", pk=str(uid))
+    assert db_user == "monitor_admin"
