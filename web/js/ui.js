@@ -399,11 +399,11 @@ const UI = (() => {
   // Warna sinyal dibatasi 3 (DESIGN §8): tingkat terang phos → amber → alert,
   // ditambah pola arsir untuk "Sangat lebat"/"Ekstrem", dan nama kategori selalu tertulis.
   const BMKG = {
-    RINGAN: { label: 'Ringan', range: '< 20 mm', color: '#1a9960', opacity: .35, mark: '·' },
-    SEDANG: { label: 'Sedang', range: '20–<50 mm', color: '#33ff99', opacity: .55, mark: '▪' },
-    LEBAT: { label: 'Lebat', range: '50–<100 mm', color: '#ffb000', opacity: .6, mark: '▲' },
-    SANGAT_LEBAT: { label: 'Sangat lebat', range: '100–<150 mm', color: '#ff3b3b', opacity: .6, mark: '▲▲', hatch: 'hatch-a' },
-    EKSTREM: { label: 'Ekstrem', range: '≥ 150 mm', color: '#ff3b3b', opacity: .9, mark: '▲▲▲', hatch: 'hatch-b' },
+    RINGAN: { label: 'Ringan', short: 'R', range: '< 20 mm', color: '#1a9960', opacity: .35, mark: '·' },
+    SEDANG: { label: 'Sedang', short: 'S', range: '20–<50 mm', color: '#33ff99', opacity: .55, mark: '▪' },
+    LEBAT: { label: 'Lebat', short: 'L', range: '50–<100 mm', color: '#ffb000', opacity: .6, mark: '▲' },
+    SANGAT_LEBAT: { label: 'Sangat lebat', short: 'SL', range: '100–<150 mm', color: '#ff3b3b', opacity: .6, mark: '▲▲', hatch: 'hatch-a' },
+    EKSTREM: { label: 'Ekstrem', short: 'E', range: '≥ 150 mm', color: '#ff3b3b', opacity: .9, mark: '▲▲▲', hatch: 'hatch-b' },
   };
   function bmkgCategory(mm) {
     if (mm === null || mm === undefined) return null;
