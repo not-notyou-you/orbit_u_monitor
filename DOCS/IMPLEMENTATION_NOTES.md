@@ -152,3 +152,32 @@ diuji dengan CSV sintetis.
 - Kalimat Live kini berbahasa Indonesia dengan desimal koma; label status area: Normal / Waspada / Tinggi / Tidak tersedia. Asersi teks di `tests/test_live_interpret_forecast.py` diterjemahkan (maknanya sama).
 - Berkas akumulasi GPM (`_crop_to_aoi`) kini ditulis lewat `atomic_path()`; PNG perubahan air dan PDF laporan juga.
 - Laporan: Total hujan AOI = rerata antar kecamatan dari jumlah hujan 24 jam; hari hujan = rerata AOI ≥ 0,1 mm; hari lebat = ≥ 50 mm di ≥ 1 kecamatan. Skor kesehatan = rerata komponen yang tersedia (yang tanpa data ditulis "—", bukan nol).
+
+---
+
+## Tahap 4 — Interface & Evidence Implementation
+
+Rencana disetujui pemilik proyek (4 Oktober 2026): Orbital 95 (`DOCS/DESIGN.md`)
+menjadi sumber kebenaran visual; sesi tetap cookie HttpOnly + `X-Requested-With`;
+menu mengikuti `permissions` dari `/api/auth/me` (INTERFACE §3.1, ditegakkan
+backend); 11 halaman; URL `/`, `/masuk`, `/app#…` dengan fragmen `web/pages/*.html`.
+Uji UI memakai DB `themonitor_dev` (salinan data nyata `themonitor` lewat
+`pg_dump --data-only`, baca saja, + 4 akun sintetis `uji_<role>` berorganisasi
+"UJI (akun sintetis themonitor_dev)"), API dengan `SCHEDULER_ENABLED=false`,
+`AUTO_RESUME_JOBS=false`.
+
+### Deviasi & Resolusi
+
+| Tanggal | Halaman | Issue | Resolusi | Status |
+|---------|---------|-------|----------|--------|
+| 2026-10-04 | semua | INTERFACE §1 menyebut design system warisan (glassmorphism, navbar pil, toast), DESIGN.md melarang glassmorphism/toast/sudut membulat. | Orbital 95 menggantikan design system DataLab (keputusan **M50**, README §7). Navbar → menu **Mulai** di taskbar; toast → dialog modal; lightbox → jendela dialog. `web/style.css`, `landing.css`, `icons.js`, `logo.webp`, `app.js` lama dihapus setelah semua halaman pindah. | RESOLVED |
+| 2026-10-04 | semua | Instruksi awal: `Authorization: Bearer` dari `localStorage`. Login hanya menyetel cookie HttpOnly (M20) dan token API tidak boleh menulis (M33). | Cookie `orbit_u_session` + header `X-Requested-With: orbit-u` di setiap request (`web/js/api.js`); JS tidak pernah memegang JWT. Tes `test_no_token_in_local_storage`. | RESOLVED |
+| 2026-10-04 | semua | Matriks role pada instruksi berbeda dari INTERFACE §3.1 (mis. Katalog untuk USER, DATA_ENGINEER ⊃ ANALYST). | Menu dibangun dari `permissions` `/api/auth/me`; DATA_ENGINEER melihat Katalog, Buat Dataset, Laporan (Kesehatan Data); ANALYST melihat Analitik, Kejadian, Laporan (Hidromet). Halaman di luar izin menampilkan jendela "Akses ditolak" (403), sesi habis → `/masuk`. | RESOLVED |
+| 2026-10-04 | semua | Instruksi awal 9 halaman; INTERFACE §2 punya 11. | 11 fragmen: login, home-public, monitoring, statistics, analytics, disasters, catalog, create-dataset, reports, admin, account. Peta perubahan air di Pantauan Live. | RESOLVED |
+| 2026-10-04 | monitoring | Ringkasan "air baru · surut · tetap" (INTERFACE §2.2) butuh angka, tetapi kartu `/live/areas/{id}/card` hanya memuat kalimatnya. | Field aditif `scene.water_change` (`new_km2`, `receded_km2`, `persistent_km2`, `valid_km2`, `same_orbit`, `ref_date`) dari `water_change.load_metrics` di `LiveMonitor.get_card`. Klien lama tidak terpengaruh. | RESOLVED |
+| 2026-10-04 | home-public | Mockup §2.1 "Diperbarui: hujan … · MODIS … · Sentinel-1 …" per sumber; `/public/live` hanya membawa tanggal scene (tanpa `source_status`). | Ditampilkan tanggal scene; tanggal komposit MODIS dan jendela hujan sudah tertulis di kalimat tiap tile (lightbox). Endpoint publik tidak diperluas (prinsip data publik minimum). | ACCEPTED |
+| 2026-10-04 | peta | Peta latar Esri World Street Map (INTERFACE §1) berwarna terang, sedangkan DESIGN §1/§8 menuntut data di layar gelap. | Esri dipertahankan, tile diberi filter CSS (grayscale → invert → rona fosfor) di dalam `.screen`; poligon/titik data digambar tanpa filter. | RESOLVED |
+| 2026-10-04 | semua | Chart.js boleh dari CDN, tetapi grafik Live warisan sudah SVG buatan sendiri. | `UI.chartSVG` (SVG inline, garis `--phos`, grid `--crt-grid`, prakiraan amber putus-putus, ambang merah) — tanpa dependensi/CDN tambahan. | RESOLVED |
+| 2026-10-04 | semua | Leaflet 1.9.4 dari unpkg (sudah dipakai sejak DataLab), tidak ada salinan di repo. | Tetap dari CDN unpkg (disetujui pemilik proyek). Tanpa internet peta tidak tampil; halaman lain tetap berfungsi. | ACCEPTED |
+| 2026-10-04 | hari-ini | Lima kategori BMKG vs batas 3 warna sinyal per screen (DESIGN §8). | Ringan/Sedang = `--phos-dim`/`--phos` dengan tingkat terang berbeda, Lebat = `--amber`, Sangat lebat/Ekstrem = `--alert` + pola arsir berbeda; nama kategori selalu tertulis di kartu dan label peta. | RESOLVED |
+| 2026-10-04 | semua | Font `MS Sans Serif`/`Fixedsys` tidak tersedia di semua OS. | Rantai fallback DESIGN §2 apa adanya (Tahoma / Lucida Console / Courier New); tidak ada webfont diunduh. | ACCEPTED |

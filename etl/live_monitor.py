@@ -579,14 +579,20 @@ class LiveMonitor:
             scene = None
             if sel is not None:
                 from etl.live_metrics import load_scene_metrics
+                from etl.water_change import load_metrics as load_water_change
 
                 dk = sel.scene_date.isoformat()
+                wc = load_water_change(sess, [sel.live_scene_id]).get(sel.live_scene_id)
+                if wc and wc.get("ref_date") is not None:
+                    wc["ref_date"] = wc["ref_date"].isoformat()
                 items = ((sel.previews or {}).get("items") or {})
                 scene = {
                     "date": dk,
                     "status": sel.status,
                     "source_status": sel.source_status or {},
                     "metrics": load_scene_metrics(sess, [sel])[sel.live_scene_id],
+                    # Ringkasan "air baru · surut · tetap" Pantauan Live (INTERFACE §2.2).
+                    "water_change": wc,
                     "interpretations": sel.interpretations or {},
                     "area_status": sel.area_status or {},
                     "previews": {
