@@ -35,16 +35,28 @@ repo** dan harus disalin manual lewat drive eksternal.
 | Sumber | Ukuran | Kenapa |
 |---|---|---|
 | `.env` | 4 KB | kredensial; tidak pernah di-commit |
-| dump database | ±puluhan MB | hasil kerja Tahap 1–4 |
+| dump database | ±puluhan MB | **struktur sekaligus seluruh isi** tabel |
 | dump role | 2 KB | role PostgreSQL bersifat **cluster-wide**, tidak ikut dump database |
+| manifest | 2 KB | sidik jari untuk membuktikan hasil restore identik |
+
+Hentikan dulu API dan scheduler (`SCHEDULER_ENABLED` menulis tiap 02:00), supaya
+dump dan manifest diambil dari keadaan yang sama persis.
 
 ```powershell
 # Role dulu — tanpa ini, restore gagal di setiap GRANT.
 pg_dumpall -U postgres --roles-only > D:\pindah\roles.sql
 
-# Lalu database, format custom (-Fc) supaya bisa pg_restore paralel.
+# Database: -Fc membawa DDL DAN seluruh baris. Tidak perlu --data-only
+# atau --schema-only; keduanya justru memecah yang seharusnya utuh.
 pg_dump -U postgres -Fc -d themonitor -f D:\pindah\themonitor.dump
+
+# Manifest: jumlah objek + jumlah baris per tabel, untuk dibandingkan di §6.
+psql -U postgres -d themonitor -f database/db_manifest.sql > D:\pindah\manifest_lama.txt
 ```
+
+Ambil manifest **segera setelah** dump, sebelum ada yang menulis lagi ke
+database. Kalau tidak, selisih beberapa baris di `audit_log` atau
+`processing_logs` akan muncul sebagai "gagal" padahal restore-nya benar.
 
 ### 1b. Berdasarkan kebutuhan
 
@@ -142,6 +154,13 @@ psql -U postgres -d themonitor -c "CREATE EXTENSION postgis; CREATE EXTENSION pg
 pg_restore -U postgres -d themonitor --no-owner --role=postgres -j 4 D:\pindah\themonitor.dump
 ```
 
+**Peringatan yang wajar muncul dan boleh diabaikan:** `role "postgres" already
+exists` pada langkah 1, dan `extension "postgis" already exists` pada langkah 3
+(dump memuat `CREATE EXTENSION`, sementara Anda sudah membuatnya di langkah 2 —
+itu disengaja, karena PostGIS lebih bersih dipasang lebih dulu). Yang **tidak**
+boleh diabaikan: pesan apa pun yang menyebut `permission denied` atau
+`relation ... does not exist`. Buktinya ada di manifest §6, bukan di layar.
+
 **Kenapa `roles.sql` harus duluan.** Role PostgreSQL hidup di level cluster,
 bukan di dalam database. `pg_dump -d themonitor` tidak memuat `CREATE ROLE`,
 padahal isinya penuh `GRANT ... TO monitor_app`. Tanpa role, setiap GRANT gagal
@@ -161,24 +180,56 @@ psql -U postgres -c "ALTER ROLE monitor_etl PASSWORD '<nilai MONITOR_ETL_PASSWOR
 
 ## 6. Verifikasi sebelum lanjut
 
-Jangan mulai backfill sebelum keempatnya hijau.
+Jangan mulai backfill sebelum ketiganya hijau.
 
 ```powershell
 # 1. Koneksi + kredensial .env sejalan dengan DB.
 python database/apply_schema.py --check
 
-# 2. Jumlah objek. Patokan laptop lama: 38 tabel, 13 VIEW.
-psql -U postgres -d themonitor -c "SELECT count(*) FILTER (WHERE table_type = 'BASE TABLE') AS tabel, count(*) FILTER (WHERE table_type = 'VIEW') AS view FROM information_schema.tables WHERE table_schema = 'public'"
+# 2. Manifest laptop baru.
+psql -U postgres -d themonitor -f database/db_manifest.sql > D:\pindah\manifest_baru.txt
 
-# 3. Izin benar-benar ikut ter-restore — ini yang paling sering gagal diam-diam.
-psql -U postgres -d themonitor -c "SELECT count(*) FROM information_schema.role_table_grants WHERE grantee LIKE 'monitor%'"
-
-# 4. Data inti ada.
-psql -U postgres -d themonitor -c "SELECT (SELECT count(*) FROM administrative_regions) AS wilayah, (SELECT count(*) FROM users) AS akun, (SELECT count(*) FROM region_observations) AS observasi"
+# 3. Bandingkan dengan laptop lama. Tidak ada keluaran = identik.
+Compare-Object (Get-Content D:\pindah\manifest_lama.txt) (Get-Content D:\pindah\manifest_baru.txt)
 ```
 
-Hasil nol pada langkah 3 berarti `roles.sql` tidak dijalankan lebih dulu —
-buang database itu dan ulangi §5 dari awal.
+Inilah bukti "sama persis" yang sebenarnya: `database/db_manifest.sql`
+melaporkan jumlah tabel, VIEW, fungsi, trigger, policy RLS, GRANT ke role
+`monitor_*`, versi ekstensi, **dan jumlah baris setiap tabel**. Kueri yang sama
+dipakai `tests/recovery/backup_restore.sh` langkah 4 untuk menguji
+recoverability (`PIPELINE.md §13`); berkas `.sql` ini versi baca-sajanya,
+karena skrip uji itu menghapus database target sehingga sengaja menolak
+`themonitor`.
+
+Acuan dari laptop lama per 2026-10-05, kalau manifest-nya hilang:
+
+```
+objek|ekstensi|pgcrypto 1.4, postgis 3.6.2
+objek|tabel|39      objek|view|15      objek|fungsi|824
+objek|trigger|29    objek|policy|3     objek|grant|200
+```
+
+Baris data terbesar: `spatial_ref_sys` 8.500 (bawaan PostGIS),
+`processing_logs` 856, `region_observations` 490, `data_products` 250,
+`data_lineage` 144, `live_scene_metrics` 144, `processing_jobs` 105,
+`audit_log` 63, `live_events` 44, `administrative_regions` 29,
+`nasa_scenes` 27, `quality_metrics` 20, `scene_job_state` 19,
+`processing_stages` 13, `regions_of_interest` 11, `app_settings` 10,
+`dataset_jobs` 11, `quality_thresholds` 9, `quality_alerts` 8,
+`live_scenes` 7, `satellite_scenes` 6, `user_activity_logs` 6, `users` 5,
+`roles` 5, `dataset_source_config` 5, `alert_rules` 4, `disaster_types` 4,
+`report_types` 4, `satellite_sources` 4, `fusion_strategies` 3,
+`spectral_bands` 11, `datasets` 2, `live_areas` 1. Sisanya nol.
+
+Cara membaca selisih yang muncul:
+
+| Selisih | Artinya |
+|---|---|
+| `objek\|grant\|0` | `roles.sql` tidak dijalankan lebih dulu. Buang database, ulangi §5 dari awal — ini kegagalan yang paling sering lolos tanpa disadari. |
+| `objek\|ekstensi` berbeda versi | PostGIS laptop baru bukan 3.6.x. Fungsi spasial bisa beda perilaku; pasang versi yang sama. |
+| `spatial_ref_sys` berbeda | Ikut versi PostGIS, bukan data Anda. Abaikan kalau versinya memang beda dan Anda menerimanya. |
+| `audit_log`/`processing_logs` lebih banyak di baru | Normal kalau API/scheduler sempat jalan sebelum manifest diambil. Hentikan, ambil ulang manifest. |
+| Tabel lain berbeda | Restore tidak lengkap. Jangan ditambal — ulangi §5. |
 
 Lalu nyalakan dan coba login:
 
@@ -267,10 +318,10 @@ database produksi — sandinya tertulis di dalam skrip.
 
 | # | Langkah | Perkiraan |
 |---|---|---|
-| 1 | Dump role + database di laptop lama, salin `.env` + `data/` | 30–60 menit (tergantung 13 GB ikut atau tidak) |
+| 1 | Dump role + database + manifest di laptop lama, salin `.env` + `data/` | 30–60 menit (tergantung 13 GB ikut atau tidak) |
 | 2 | Pasang Python 3.12 + PostgreSQL 18 + PostGIS | 45 menit |
 | 3 | Clone, venv, `pip install` | 15 menit |
-| 4 | `.env`, restore, verifikasi §6 | 30 menit |
+| 4 | `.env`, restore, bandingkan manifest (§6) | 30 menit |
 | 5 | MySQL 8 + benchmark (§7b) | 1–2 jam |
 | 6 | Backfill 3 tahun (§7a) | **1,5–2 hari jalan** |
 
