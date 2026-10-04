@@ -44,7 +44,7 @@ const Excel = (() => {
   async function mount(el, codes, opts) {
     opts = opts || {};
     let items;
-    try { items = (await list()).filter(i => codes.includes(i.code)); }
+    try { items = (await list()).filter(i => codes.includes(i.code)).sort((a, b) => codes.indexOf(a.code) - codes.indexOf(b.code)); }
     catch (e) { el.innerHTML = ''; return; }
     if (!items.length) { el.innerHTML = ''; return; }
     const anyDate = items.some(i => i.date_filter);
