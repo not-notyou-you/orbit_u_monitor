@@ -1,0 +1,52 @@
+{
+ "generated_at": "2026-10-04T13:51:04+00:00",
+ "machine": {
+  "os": "Windows-11-10.0.22631-SP0",
+  "python": "3.12.10",
+  "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+  "logical_cpus": 16,
+  "ram_gb": 13.9
+ },
+ "method": {
+  "warmup": 5,
+  "runs": 30,
+  "statistic": "median dan p95 waktu eksekusi + fetch di klien"
+ },
+ "data": {
+  "seed": 20260929,
+  "period": [
+   "2023-01-01",
+   "2025-12-31"
+  ],
+  "rows": {
+   "regions": 28,
+   "observations": 76720,
+   "alerts": 1076,
+   "disasters": 150,
+   "products": 5182,
+   "lineage": 3982
+  },
+  "note": "DATA SINTETIS — bukan data produksi"
+ },
+ "engines": {
+  "PostgreSQL": {
+   "version": "PostgreSQL 18.6 on x86_64-windows",
+   "postgis": "3.6.2",
+   "database": "themonitor_bench",
+   "load_seconds": 4.65,
+   "row_counts": {
+    "regions": 28,
+    "observations": 76720,
+    "alert_events": 1076,
+    "disaster_events": 150,
+    "data_products": 5182,
+    "data_lineage": 3982
+   },
+   "q5_product_id": 6
+  },
+  "MySQL 8.0": {
+   "status": "belum dijalankan",
+   "reason": "driver pymysql belum terpasang"
+  }
+ }
+}

@@ -241,3 +241,6 @@ alembic/versions/__pycache__/
 # Tahap 3: keluaran uji pemulihan (tests/recovery/kill_and_resume.sh)
 tests/recovery/_work/
 tests/recovery/_work_run*.log
+
+# Data benchmark sintetis — dibangkitkan ulang oleh benchmark/generate.py (seed tetap)
+benchmark/data/
