@@ -38,6 +38,10 @@ reportlab==5.0.1
 # pypdf: dipakai HANYA di tes (test_report_generation.py, test_reports.py) untuk membaca balik
 # teks PDF yang dihasilkan reportlab dan memverifikasi section-nya ada.
 pypdf==6.19.0
+# PyMySQL: driver MySQL 8 untuk benchmark/load_mysql.py (M29). Pure-Python,
+# tidak butuh toolchain C seperti mysqlclient. Hanya dipakai benchmark/ --
+# aplikasi tetap PostgreSQL + PostGIS.
+PyMySQL==1.1.1
 python-dotenv==1.0.1
 psutil==6.1.0
 pytest==8.3.4

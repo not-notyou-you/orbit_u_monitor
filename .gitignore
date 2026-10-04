@@ -73,6 +73,11 @@ analytics/*
 *.svg
 *.pdf
 
+# Aset UI yang sengaja di-track meski kena pola *.svg/*.png di atas.
+# web/assets/img/favicon.svg dirujuk index.html, app.html, masuk.html.
+!web/assets/img/*.svg
+!web/assets/img/*.png
+
 # ---------------------------------------------------------------------------
 # PYTHON
 # ---------------------------------------------------------------------------

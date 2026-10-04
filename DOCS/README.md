@@ -279,3 +279,4 @@ Nama DB `sentinel1_flood` warisan DataLab **diganti** menjadi `themonitor` di `.
 | `PIPELINE.md` | Job hidromet, siklus Live, job dataset, laporan, storage, scheduler, QC, lineage, initial loading |
 | `INTERFACE.md` | Halaman per role, endpoint API, kontrak request/response, UML, rencana pengujian |
 | `DESIGN.md` | Design system Orbital 95 (token, bevel, komponen, layout) — sumber kebenaran visual (M50) |
+| `SETUP_LAPTOP_BARU.md` | Pindah ke mesin lain lewat `pg_dump`/`pg_restore`, lalu backfill dan benchmark MySQL 8 |
