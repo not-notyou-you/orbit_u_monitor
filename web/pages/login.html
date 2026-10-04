@@ -1,0 +1,35 @@
+<!-- pages/login.html — fragmen /masuk (INTERFACE.md §2). -->
+<div class="desk-icons" aria-label="Pintasan">
+  <a class="desk-icon" href="/"><span aria-hidden="true" data-icon="globe"></span><span>Beranda</span></a>
+  <a class="desk-icon" href="/docs" target="_blank" rel="noopener"><span aria-hidden="true" data-icon="help"></span><span>Dok. API</span></a>
+</div>
+<section class="window small" aria-labelledby="loginTitle" style="margin-top:8vh">
+  <div class="titlebar"><span class="ttl-icon" data-icon="key"></span><span class="ttl-text"><h1 id="loginTitle">Masuk ke Orbit-U</h1></span></div>
+  <div class="window-body">
+    <div class="dialog-msg"><span data-icon="sat32"></span>
+      <div class="txt">Pantauan Hidrometeorologi Lebak Selatan.<br>Gunakan akun yang diberikan Admin GMLS.</div></div>
+    <div id="loginNotice" class="banner sunken hidden" role="status"></div>
+    <form id="loginForm" novalidate>
+      <fieldset>
+        <legend>Identitas</legend>
+        <div class="field">
+          <label for="username"><u class="k">N</u>ama pengguna</label>
+          <input type="text" id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false"
+                 required accesskey="n" aria-describedby="usernameErr">
+          <span class="err" id="usernameErr" aria-live="polite"></span>
+        </div>
+        <div class="field">
+          <label for="password"><u class="k">K</u>ata sandi</label>
+          <input type="password" id="password" name="password" autocomplete="current-password" required accesskey="k" aria-describedby="passwordErr">
+          <span class="err" id="passwordErr" aria-live="polite"></span>
+        </div>
+        <label class="check"><input type="checkbox" id="showPw"> Tampilkan kata sandi</label>
+      </fieldset>
+      <div class="btn-row end">
+        <button type="submit" class="default" id="loginBtn">Masuk</button>
+        <a class="btn" href="/">Batal</a>
+      </div>
+    </form>
+  </div>
+  <div class="statusbar"><span id="loginStatus">Status: Siap</span><span class="fit">Sesi 8 jam</span></div>
+</section>

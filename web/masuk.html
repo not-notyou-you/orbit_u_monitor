@@ -1,99 +1,21 @@
-<!-- web/masuk.html — halaman Masuk (INTERFACE.md §2, /masuk). Minimal Tahap 2:
-     form username + kata sandi; sesi disimpan server di cookie HttpOnly. -->
 <!doctype html>
+<!-- web/masuk.html — halaman Masuk /masuk (INTERFACE.md §2). Isi dari pages/login.html + js/login.js.
+     Sesi disimpan server di cookie HttpOnly; JavaScript tidak pernah memegang JWT. -->
 <html lang="id">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Masuk · Orbit-U: The Monitor</title>
-<link rel="icon" type="image/webp" href="logo.webp">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=ux3">
-<style>
-  .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
-  .login-card { width: 100%; max-width: 380px; background: var(--panel); border: 1px solid rgba(255,255,255,0.08);
-                border-radius: 18px; padding: 28px 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.45); }
-  .login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
-  .login-brand img { width: 40px; height: 40px; }
-  .login-card h1 { font-size: 18px; margin: 0 0 4px; }
-  .login-card p.sub { margin: 0 0 20px; color: var(--text-dim); font-size: 13px; }
-  .login-card label { display: block; font-size: 12px; color: var(--text-dim); margin: 14px 0 6px; }
-  .login-card input { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; font-size: 14px;
-                      background: var(--panel-alt); color: var(--text); border: 1px solid rgba(255,255,255,0.12); }
-  .login-card input:focus { outline: 2px solid var(--cyan); outline-offset: 1px; }
-  .login-card .btn { width: 100%; margin-top: 20px; justify-content: center; }
-  .login-msg { min-height: 20px; margin-top: 14px; font-size: 13px; }
-  .login-msg.error { color: var(--coral); }
-  .login-msg.info { color: var(--text-dim); }
-  .login-foot { margin-top: 18px; font-size: 12px; color: var(--text-dim); text-align: center; }
-  .login-foot a { color: var(--cyan); }
-</style>
+<title>Masuk — Orbit-U: The Monitor</title>
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/main.css?v=4.0">
 </head>
-<body>
-<main class="login-wrap">
-  <form class="login-card" id="loginForm" novalidate>
-    <div class="login-brand">
-      <img src="logo.webp" alt="">
-      <div>
-        <div class="brand-name">ORBIT-U</div>
-        <div class="brand-sub">Pantauan Hidrometeorologi Lebak Selatan</div>
-      </div>
-    </div>
-    <h1>Masuk</h1>
-    <p class="sub">Gunakan akun yang diberikan Admin GMLS.</p>
-    <label for="username">Nama pengguna</label>
-    <input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
-    <label for="password">Kata sandi</label>
-    <input id="password" name="password" type="password" autocomplete="current-password" required>
-    <button class="btn btn-primary" type="submit" id="submitBtn">Masuk</button>
-    <div class="login-msg" id="loginMsg" role="status" aria-live="polite"></div>
-    <div class="login-foot"><a href="/">Kembali ke Beranda</a></div>
-  </form>
-</main>
-<script>
-// Pesan Indonesia untuk kode error API (INTERFACE.md §5, M21).
-const MESSAGES = {
-  INVALID_CREDENTIALS: 'Nama pengguna atau kata sandi salah.',
-  ACCOUNT_LOCKED: 'Akun dikunci sementara karena terlalu banyak percobaan gagal. Coba lagi dalam 15 menit atau hubungi Admin.',
-  ACCOUNT_INACTIVE: 'Akun ini dinonaktifkan. Hubungi Admin.',
-  VALIDATION_ERROR: 'Isi nama pengguna dan kata sandi.',
-  SESSION_EXPIRED: 'Sesi Anda telah berakhir. Silakan masuk lagi.',
-};
-const params = new URLSearchParams(location.search);
-const msg = document.getElementById('loginMsg');
-if (params.get('alasan') === 'sesi') { msg.className = 'login-msg info'; msg.textContent = MESSAGES.SESSION_EXPIRED; }
-
-function safeNext() {
-  const next = params.get('next') || '/app';
-  // Hanya path lokal: cegah open redirect.
-  return next.startsWith('/') && !next.startsWith('//') ? next : '/app';
-}
-
-document.getElementById('loginForm').addEventListener('submit', async (ev) => {
-  ev.preventDefault();
-  const btn = document.getElementById('submitBtn');
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value;
-  if (!username || !password) { msg.className = 'login-msg error'; msg.textContent = MESSAGES.VALIDATION_ERROR; return; }
-  btn.disabled = true; msg.className = 'login-msg info'; msg.textContent = 'Memeriksa…';
-  try {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'orbit-u' },
-      body: JSON.stringify({ username, password }),
-    });
-    if (res.ok) { location.replace(safeNext()); return; }
-    let data = {}; try { data = await res.json(); } catch (e) {}
-    msg.className = 'login-msg error';
-    msg.textContent = MESSAGES[data.code] || 'Gagal masuk (' + res.status + ').';
-  } catch (e) {
-    msg.className = 'login-msg error'; msg.textContent = 'Tidak dapat menghubungi server.';
-  } finally {
-    btn.disabled = false;
-  }
-});
-</script>
+<body data-requires-auth="false">
+<a class="skip-link" href="#pageRoot">Lompat ke isi</a>
+<main id="pageRoot" tabindex="-1"></main>
+<script src="js/ui.js?v=4.0"></script>
+<script src="js/api.js?v=4.0"></script>
+<script src="js/auth.js?v=4.0"></script>
+<script src="js/app.js?v=4.0"></script>
+<script>Shell.mountPublic({ file: 'login', redirectIfLoggedIn: true });</script>
 </body>
 </html>
