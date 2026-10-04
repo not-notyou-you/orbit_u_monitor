@@ -60,7 +60,7 @@ tombol "Pakai konfigurasi sebelumnya" disembunyikan). Detail: `tests/screenshots
 - [x] 768px (tablet) — satu kolom (< 800 px, DESIGN §5), tile 2 kolom
 - [x] 1920px (desktop) — jendela maks. 1200 px, grid 2 kolom
 
-Tangkapan: `tests/screenshots/<halaman>-{mobile,tablet,desktop}.png` (33 berkas) + `flow-*.png`.
+Tangkapan (lokal, tidak di repo — dibuat ulang dengan `tests/ui/screenshots.py`): `tests/screenshots/<halaman>-{mobile,tablet,desktop}.png` (33 berkas) + `flow-*.png`.
 
 ## Accessibility
 
