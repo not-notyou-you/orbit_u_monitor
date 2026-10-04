@@ -211,6 +211,9 @@ class DatasetSourceConfigResponse(BaseModel):
     processing: list[str]
 
 
+MAX_DATASET_DAYS = 366
+
+
 class CreateDatasetRequest(BaseModel):
     """Payload POST /api/datasets (DOCS/INTERFACE.md, "Create Dataset").
 
@@ -273,6 +276,10 @@ class CreateDatasetRequest(BaseModel):
     def _validate_date_range(self) -> "CreateDatasetRequest":
         if self.date_end < self.date_start:
             raise ValueError("date_end must be >= date_start")
+        # INTERFACE §2.6: wizard dibatasi 366 hari; ditegakkan juga di API agar
+        # klien lain (skrip, Swagger) tidak memicu unduhan bertahun-tahun.
+        if (self.date_end - self.date_start).days + 1 > MAX_DATASET_DAYS:
+            raise ValueError(f"date range must be at most {MAX_DATASET_DAYS} days")
         return self
 
     @model_validator(mode="after")

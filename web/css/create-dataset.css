@@ -1,0 +1,8 @@
+/* css/create-dataset.css — wizard Buat Dataset */
+.cd-src { margin: 6px 0; }
+.cd-src legend { font-weight: 700; }
+.cd-src .opt { display: flex; gap: 4px; align-items: flex-start; margin: 2px 0 2px 16px; }
+.cd-src .opt span small, .cd-opt small { display: block; color: var(--text-mut); }
+.cd-opt { display: flex; gap: 4px; align-items: flex-start; margin: 4px 0; }
+.cd-src[data-off="true"] .opt { color: var(--shadow); }
+#cdRois button .sub { white-space: nowrap; }

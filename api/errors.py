@@ -62,7 +62,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     """Ratakan error validasi Pydantic jadi satu kalimat.
 
     Bentuk bawaan FastAPI (`detail` berisi list of dict) tidak bisa ditampilkan
-    langsung di UI; front-end di web/app.js membaca `detail` sebagai teks.
+    langsung di UI; front-end (web/js/ui.js) menerjemahkan `code` ke pesan Indonesia, `detail` sebagai cadangan.
     """
     messages = []
     for err in exc.errors():
