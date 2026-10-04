@@ -1,0 +1,31 @@
+<!-- pages/reports.html — Laporan (INTERFACE.md §2.7): tab Hidromet (ANALYST, ADMIN) ·
+     Kesehatan Data (DATA_ENGINEER, ADMIN). Laporan muncul setelah periodenya berakhir (M18). -->
+<div class="layout">
+  <div class="control-panel">
+    <form id="rpFilter" novalidate>
+      <fieldset>
+        <legend>Filter</legend>
+        <div class="field"><label for="rpYear">Tahun</label><select id="rpYear"><option value="">Semua tahun</option></select></div>
+        <div class="field"><label for="rpPeriod">Jenis periode</label>
+          <select id="rpPeriod"><option value="">Mingguan dan bulanan</option><option value="_WEEKLY">Mingguan</option><option value="_MONTHLY">Bulanan</option></select></div>
+        <label class="check"><input type="checkbox" id="rpOld"> Tampilkan versi lama (digantikan)</label>
+        <div class="btn-row end"><button type="submit" id="rpApply">Terapkan</button></div>
+      </fieldset>
+    </form>
+    <fieldset id="rpAdmin" hidden>
+      <legend>Administrator</legend>
+      <p style="margin-bottom:6px">Buat ulang laporan periode tertentu. Versi lama ditandai "digantikan"; berkasnya tetap disimpan.</p>
+      <button type="button" id="rpRegen">Buat ulang…</button>
+    </fieldset>
+    <fieldset>
+      <legend>Tentang laporan</legend>
+      <p style="margin:0">Dibuat otomatis oleh penjadwal: mingguan (Senin–Minggu) dan bulanan, setelah periodenya berakhir. Tidak ada laporan untuk periode yang sedang berjalan.</p>
+    </fieldset>
+  </div>
+  <div class="deck">
+    <div class="tabs" role="tablist" aria-label="Jenis laporan" id="rpTabs"></div>
+    <div class="raised tabpanel" role="tabpanel">
+      <div class="screen"><div class="screen-inner"><span class="scr-ch" id="rpCh">LAPORAN</span><span class="scr-rec off" id="rpCount"></span><div id="rpTable"></div></div></div>
+    </div>
+  </div>
+</div>
