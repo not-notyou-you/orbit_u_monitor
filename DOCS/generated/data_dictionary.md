@@ -1,18 +1,18 @@
 # Kamus Data — Orbit-U: The Monitor
 
-> Dibangkitkan otomatis oleh `tools/data_dictionary.py` dari katalog PostgreSQL (database `monitor_schema_check`, 2026-10-03 02:16 UTC). Jangan disunting manual; ubah `database/monitor_schema.sql` (termasuk `COMMENT ON`) lalu bangkitkan ulang.
+> Dibangkitkan otomatis oleh `tools/data_dictionary.py` dari katalog PostgreSQL (database `themonitor_dev`, 2026-10-04 13:45 UTC). Jangan disunting manual; ubah `database/monitor_schema.sql` (termasuk `COMMENT ON`) lalu bangkitkan ulang.
 
-Jumlah: **38 tabel**, **12 VIEW**.
+Jumlah: **38 tabel**, **13 VIEW**.
 
 ## Daftar tabel
 
 | Tabel | Keterangan |
 |---|---|
 | [`administrative_regions`](#administrative_regions) | Batas wilayah resmi COD-AB Indonesia (BPS via OCHA/HDX): Kabupaten Lebak (level 2) dan kecamatannya (level 3). AOI GMLS = kecamatan in_aoi (M8). |
-| [`alert_events`](#alert_events) | Alert hujan per aturan per kecamatan per hari. observed_value/threshold_value/severity adalah salinan historis (Â§5.2). |
+| [`alert_events`](#alert_events) | Alert hujan per aturan per kecamatan per hari. observed_value/threshold_value/severity adalah salinan historis (§5.2). |
 | [`alert_rules`](#alert_rules) | Aturan alert hujan per jenis bencana (ambang BMKG; longsor nonaktif sampai ambang literatur diisi). |
 | [`api_tokens`](#api_tokens) | Token API pribadi untuk skrip/sistem lain (M33). Hanya hash yang disimpan; token utuh ditampilkan sekali. |
-| [`app_settings`](#app_settings) | Pengaturan key-value yang boleh diubah ADMIN tanpa restart (PIPELINE.md Â§11). |
+| [`app_settings`](#app_settings) | Pengaturan key-value yang boleh diubah ADMIN tanpa restart (PIPELINE.md §11). |
 | [`audit_log`](#audit_log) | Jejak perubahan data yang diisi trigger audit_row (append-only, M15). Trigger dipasang di monitor_security.sql. |
 | [`cleanup_operations`](#cleanup_operations) | Progres penghapusan berkas per dataset (cleanup tier akhir job atau hapus dataset). Sengaja tanpa FK ke datasets agar progres tetap terbaca setelah dataset dihapus. |
 | [`data_lineage`](#data_lineage) | Graf asiklik (DAG) transformasi produk: induk -> anak dengan checksum input/output (RM2). |
@@ -60,7 +60,7 @@ Batas wilayah resmi COD-AB Indonesia (BPS via OCHA/HDX): Kabupaten Lebak (level 
 | `admin_level` | `smallint` | NOT NULL |  |  | 2 = kabupaten, 3 = kecamatan. |
 | `in_aoi` | `boolean` | NOT NULL | `false` |  | true = kecamatan termasuk cakupan GMLS (hanya level 3). Diubah ADMIN. |
 | `geom` | `geometry(MultiPolygon,4326)` | NOT NULL |  |  | Poligon batas wilayah, MultiPolygon EPSG:4326 (ST_Multi(ST_MakeValid(...))). |
-| `area_km2` | `numeric(10,2)` | NULL | `GENERATED` |  | Luas geodesik (km2), kolom GENERATED dari geom (redundansi terkendali, Â§9). |
+| `area_km2` | `numeric(10,2)` | NULL | `GENERATED` |  | Luas geodesik (km2), kolom GENERATED dari geom (redundansi terkendali, §9). |
 | `source_dataset` | `character varying(100)` | NOT NULL |  |  | Asal data batas, mis. "COD-AB IDN 2020 (BPS/OCHA)". |
 
 **Constraint**
@@ -74,7 +74,7 @@ Batas wilayah resmi COD-AB Indonesia (BPS via OCHA/HDX): Kabupaten Lebak (level 
 
 ## alert_events
 
-Alert hujan per aturan per kecamatan per hari. observed_value/threshold_value/severity adalah salinan historis (Â§5.2).
+Alert hujan per aturan per kecamatan per hari. observed_value/threshold_value/severity adalah salinan historis (§5.2).
 
 | Kolom | Tipe | Null | Default | Kunci | Keterangan |
 |---|---|---|---|---|---|
@@ -158,7 +158,7 @@ Token API pribadi untuk skrip/sistem lain (M33). Hanya hash yang disimpan; token
 
 ## app_settings
 
-Pengaturan key-value yang boleh diubah ADMIN tanpa restart (PIPELINE.md Â§11).
+Pengaturan key-value yang boleh diubah ADMIN tanpa restart (PIPELINE.md §11).
 
 | Kolom | Tipe | Null | Default | Kunci | Keterangan |
 |---|---|---|---|---|---|
@@ -304,7 +304,7 @@ Satu eksekusi pekerjaan atas sebuah dataset (buat, backfill, siklus Live, hidrom
 | `job_uuid` | `uuid` | NOT NULL | `gen_random_uuid()` | UNIQUE | UUID stabil untuk referensi eksternal. |
 | `dataset_id` | `integer` | NOT NULL |  | FK→datasets | FK -> datasets. |
 | `job_type` | `character varying(20)` | NOT NULL | `'CREATE'::character varying` |  | CREATE \| BACKFILL \| LIVE_INGEST (siklus Live Area) \| HYDROMET_DAILY (job A). |
-| `status` | `character varying(20)` | NOT NULL | `'QUEUED'::character varying` |  | QUEUED, PREPARING, DOWNLOADING, PROCESSING, PAUSED, CLEANUP, COMPLETED, FAILED, CANCELLED. |
+| `status` | `character varying(20)` | NOT NULL | `'QUEUED'::character varying` |  | QUEUED, PREPARING, DOWNLOADING, PROCESSING, PAUSED, CLEANUP, COMPLETED, FAILED, CANCELLED, WAITING_UPSTREAM (hidromet: granule GPM hari itu belum terbit, dicoba lagi maks. 3 hari). |
 | `paused_at` | `timestamp with time zone` | NULL |  |  | Waktu job dijeda. |
 | `paused_by` | `character varying(20)` | NULL |  |  | Penjeda: user \| system. |
 | `pause_reason` | `text` | NULL |  |  | Alasan jeda. |
@@ -323,7 +323,7 @@ Satu eksekusi pekerjaan atas sebuah dataset (buat, backfill, siklus Live, hidrom
 
 **Constraint**
 
-- `chk_dataset_job_status` (CHECK): `CHECK (((status)::text = ANY ((ARRAY['QUEUED'::character varying, 'PREPARING'::character varying, 'DOWNLOADING'::character varying, 'PROCESSING'::character varying, 'PAUSED'::character varying, 'CLEANUP'::character varying, 'COMPLETED'::character varying, 'FAILED'::character varying, 'CANCELLED'::character varying])::text[])))`
+- `chk_dataset_job_status` (CHECK): `CHECK (((status)::text = ANY ((ARRAY['QUEUED'::character varying, 'PREPARING'::character varying, 'DOWNLOADING'::character varying, 'PROCESSING'::character varying, 'PAUSED'::character varying, 'CLEANUP'::character varying, 'COMPLETED'::character varying, 'FAILED'::character varying, 'CANCELLED'::character varying, 'WAITING_UPSTREAM'::character varying])::text[])))`
 - `chk_dataset_job_type` (CHECK): `CHECK (((job_type)::text = ANY ((ARRAY['CREATE'::character varying, 'BACKFILL'::character varying, 'LIVE_INGEST'::character varying, 'HYDROMET_DAILY'::character varying])::text[])))`
 - `dataset_jobs_dataset_id_fkey` (FK): `FOREIGN KEY (dataset_id) REFERENCES datasets(dataset_id) ON DELETE CASCADE`
 - `dataset_jobs_pkey` (PK): `PRIMARY KEY (job_id)`
@@ -376,7 +376,7 @@ Dataset historis (Katalog, DATA_ENGINEER), dataset Live Area, dan dataset sistem
 | `quality_settings` | `jsonb` | NOT NULL | `'{}'::jsonb` |  | Pengaturan kualitas (JSONB, M32), mis. {"min_cloud_cover": 20, "orbit_direction": "ASCENDING"}. Ambang skor kualitas TIDAK di sini: quality_thresholds (K15). |
 | `fusion_grid` | `jsonb` | NULL |  |  | Grid fusion yang dipaku: {transform, width, height, crs, source_product_id, pinned_at}. NULL = belum pernah fusi. |
 | `dataset_kind` | `character varying(10)` | NOT NULL | `'STANDARD'::character varying` |  | STANDARD (Katalog / sistem) \| LIVE_AREA (satu Live Area). LIVE lama dihapus. |
-| `is_system` | `boolean` | NOT NULL | `false` |  | true = dataset sistem (HYDROMET_AOI) yang disembunyikan dari Katalog (PIPELINE.md Â§3.1). |
+| `is_system` | `boolean` | NOT NULL | `false` |  | true = dataset sistem (HYDROMET_AOI) yang disembunyikan dari Katalog (PIPELINE.md §3.1). |
 | `status` | `character varying(20)` | NOT NULL | `'DRAFT'::character varying` |  | Status siklus: DRAFT, QUEUED, PREPARING, DOWNLOADING, PROCESSING, PAUSED, CLEANUP, COMPLETED, FAILED, CANCELLED, DELETING, DELETED. |
 | `total_scenes` | `integer` | NOT NULL | `0` |  | Jumlah scene S1 yang ditemukan. |
 | `completed_scenes` | `integer` | NOT NULL | `0` |  | Jumlah scene S1 yang selesai diproses. |
@@ -681,7 +681,7 @@ Eksekusi satu tahap pipeline (scene/granule x tahap x percobaan). Jangkar: scene
 | `nasa_scene_id` | `bigint` | NULL |  | FK→nasa_scenes | FK -> nasa_scenes: granule MODIS/GPM yang diproses. NULL untuk job S1/FUSION (M30). |
 | `stage_id` | `integer` | NOT NULL |  | FK→processing_stages, UNIQUE | FK -> processing_stages. |
 | `attempt_number` | `smallint` | NOT NULL | `1` | UNIQUE | Percobaan ke berapa untuk (scene, tahap). |
-| `status` | `job_status_enum` | NOT NULL | `'QUEUED'::job_status_enum` |  | QUEUED \| RUNNING \| SUCCESS \| FAILED \| CANCELLED. |
+| `status` | `job_status_enum` | NOT NULL | `'QUEUED'::job_status_enum` |  | QUEUED \| RUNNING \| SUCCESS \| FAILED \| CANCELLED \| WAITING_UPSTREAM (granule hulu belum terbit) \| SKIPPED_LOCKED (run scheduler dilewati: advisory lock dipegang worker lain). |
 | `queued_at` | `timestamp with time zone` | NOT NULL | `now()` |  | Waktu masuk antrean. |
 | `started_at` | `timestamp with time zone` | NULL |  |  | Waktu mulai. |
 | `completed_at` | `timestamp with time zone` | NULL |  |  | Waktu selesai. |
@@ -694,7 +694,7 @@ Eksekusi satu tahap pipeline (scene/granule x tahap x percobaan). Jangkar: scene
 | `error_code` | `character varying(50)` | NULL |  |  | Kode galat (nama exception), mis. MemoryError. |
 | `error_message` | `text` | NULL |  |  | Pesan galat. |
 | `log_file_path` | `text` | NULL |  |  | Path berkas log tahap. |
-| `parameters_json` | `jsonb` | NOT NULL | `'{}'::jsonb` |  | Parameter reproduksibilitas (JSONB, M32): versi software, window Lee, run GPM, ambang. Nama "parameters" di DATABASE.md Â§4.1 (K8). |
+| `parameters_json` | `jsonb` | NOT NULL | `'{}'::jsonb` |  | Parameter reproduksibilitas (JSONB, M32): versi software, window Lee, run GPM, ambang. Nama "parameters" di DATABASE.md §4.1 (K8). |
 | `created_at` | `timestamp with time zone` | NOT NULL | `now()` |  | Waktu baris dibuat. |
 | `updated_at` | `timestamp with time zone` | NOT NULL | `now()` |  | Waktu baris terakhir diubah (trigger). |
 
@@ -864,7 +864,7 @@ Nilai harian per kecamatan per band dari GPM/MODIS (zonal statistics, M7). Dasar
 | `value` | `numeric(10,4)` | NULL |  |  | Nilai agregat (satuan band: mm, indeks, %). NULL bila valid_fraction < 0,1. |
 | `valid_fraction` | `numeric(5,4)` | NOT NULL |  |  | Bagian poligon yang punya piksel valid (0-1). |
 | `source_product_id` | `bigint` | NULL |  | FK→data_products | FK -> data_products: COG asal nilai (lineage, RM2). |
-| `run_type` | `character varying(5)` | NULL |  |  | Run IMERG untuk band GPM: F \| L \| E. Final menimpa Late (PIPELINE.md Â§3.3). |
+| `run_type` | `character varying(5)` | NULL |  |  | Run IMERG untuk band GPM: F \| L \| E. Final menimpa Late (PIPELINE.md §3.3). |
 | `job_id` | `bigint` | NULL |  | FK→dataset_jobs | FK -> dataset_jobs yang menghitung nilai. |
 | `computed_at` | `timestamp with time zone` | NOT NULL | `now()` |  | Waktu nilai dihitung. |
 
@@ -938,7 +938,7 @@ Master role aplikasi (5 role, M13). Setiap role dipetakan ke satu role PostgreSQ
 | `role_id` | `smallint` | NOT NULL | `nextval('roles_role_id_seq'::regclass)` | PK | PK surrogate. |
 | `role_code` | `character varying(20)` | NOT NULL |  | UNIQUE | Alternate key. PUBLIC \| USER \| ANALYST \| DATA_ENGINEER \| ADMIN. |
 | `role_name` | `character varying(50)` | NOT NULL |  |  | Label role untuk UI (Bahasa Indonesia), mis. "Relawan". |
-| `db_role` | `character varying(40)` | NOT NULL |  | UNIQUE | Nama role PostgreSQL padanannya, mis. monitor_analyst (DATABASE.md Â§8.1). |
+| `db_role` | `character varying(40)` | NOT NULL |  | UNIQUE | Nama role PostgreSQL padanannya, mis. monitor_analyst (DATABASE.md §8.1). |
 | `requires_login` | `boolean` | NOT NULL |  |  | false hanya untuk PUBLIC (pengunjung tanpa akun). |
 | `description` | `text` | NULL |  |  | Uraian singkat kebutuhan akses role ini. |
 
@@ -1133,4 +1133,5 @@ Akun pengguna yang login (USER s.d. ADMIN). Akun dinonaktifkan, tidak pernah dih
 | `v_public_live_latest` | `area_id`, `area_name`, `live_scene_id`, `scene_date`, `status`, `area_status`, `interpretations`, `previews`, `source_status` | Scene Live terbaru per area aktif (READY/PARTIAL, berkas belum dihapus): status area, kalimat kondisi, manifest preview. PUBLIC+. |
 | `v_ringkasan_kualitas` | `source_code`, `week_start`, `n_quality_metrics`, `avg_quality_score`, `n_fail`, `n_warning`, `n_quality_alerts`, `n_observations`, `avg_valid_fraction` | Per sumber per minggu (Senin): jumlah & rata-rata skor quality_metrics, FAIL/WARNING, quality_alerts, dan rata-rata valid_fraction region_observations. DATA_ENGINEER, ADMIN. |
 | `v_statistik_hari_ini` | `obs_date`, `region_id`, `pcode`, `region_name`, `rain_24h_mm`, `rain_72h_mm`, `rain_7d_mm`, `rain_30d_mm`, `gpm_run`, `bmkg_category`, `ndvi`, `ndvi_date`, `ndwi`, `ndwi_date`, `modis_flood_pct`, `modis_date` | Baris v_hujan_harian_kecamatan untuk tanggal terakhir yang lengkap (semua kecamatan in_aoi punya RAIN_24H) + NDVI/NDWI/FLOOD MODIS terakhir yang tersedia. USER+. |
+| `v_unduhan_per_role` | `log_date_wib`, `action`, `role_code`, `n_downloads`, `bytes_sent` | Jumlah dan volume unduhan/ekspor per tanggal WIB, jenis aksi, dan role pengunduh; tanpa nama pengguna. DATA_ENGINEER, ADMIN, ETL (laporan). |
 | `v_users_safe` | `user_id`, `role_id`, `role_code`, `username`, `full_name`, `organization`, `is_active`, `last_login_at`, `created_by`, `created_at`, `updated_at` | users tanpa password_hash, failed_login_count, locked_until. ADMIN (UI) dan semua role untuk join nama. |

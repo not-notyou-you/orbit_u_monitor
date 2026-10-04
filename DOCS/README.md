@@ -197,6 +197,9 @@ Keputusan rancangan awal (D1–D24) yang masih berlaku dirangkum; keputusan baru
 | M47 | Audit trigger mengabaikan perubahan yang hanya menyentuh kolom pembukuan (login, `last_used_at` token, progres pipeline, siklus Live) | Tanpa ini `audit_log` dibanjiri baris otomatis dan perubahan bermakna sulit ditemukan |
 | M48 | Setiap request bertoken dicatat satu baris (`API_REQUEST` atau `DOWNLOAD_*`); `bytes_sent` = byte yang benar-benar terkirim | M33 "setiap pemakaian token tercatat" + log unduhan RM4 |
 | M49 | Scene Live untuk selain ADMIN: ≤ 30 hari + scene terbaru; `/storage/*` ADMIN; `/scenes?source=` default S1 | Melengkapi aturan §3.1 untuk endpoint warisan yang tidak disebut dokumen |
+| M50 | **Design system Orbital 95** (`DESIGN.md`) menggantikan design system DataLab (glassmorphism, navbar pil, toast): jendela berbevel + taskbar dengan menu **Mulai** per role, data di "layar CRT", dialog modal untuk semua pesan; UI tetap vanilla JS + Leaflet tanpa build. Kode error API diterjemahkan di `web/js/ui.js` | Keputusan pemilik proyek Tahap 4; satu bahasa visual "kontrol abu-abu, data di layar gelap" |
+| M51 | Tambahan API aditif untuk UI Tahap 4: `scene.water_change` pada kartu Live, `by_rule` pada `/alerts/evaluation`; batas 366 hari dataset ditegakkan juga di API; path preview Live dicari koneksi etl setelah scene terbukti terlihat role pemanggil | INTERFACE §2.2/§2.4/§2.6 butuh angka/aturan yang belum diekspos; USER/ANALYST tidak boleh membaca `datasets` (§8.3) |
+| M52 | Uji UI berbasis browser headless (CDP) terhadap DB terpisah `themonitor_dev` dengan akun sintetis `uji_<role>`: `tests/ui/screenshots.py` (3 lebar × 11 halaman × role) dan `tests/ui/flows.py` (alur tulis); bukan bagian pytest | Bukti tahap prototyping/testing DBSDLC tanpa menyentuh DB produksi dan tanpa memicu unduhan |
 
 ---
 
@@ -275,3 +278,4 @@ Nama DB `sentinel1_flood` warisan DataLab **diganti** menjadi `themonitor` di `.
 | `DATABASE.md` | DBMS selection, ERD, master & transaksi, DDL, normalisasi, index, VIEW, role & GRANT, audit |
 | `PIPELINE.md` | Job hidromet, siklus Live, job dataset, laporan, storage, scheduler, QC, lineage, initial loading |
 | `INTERFACE.md` | Halaman per role, endpoint API, kontrak request/response, UML, rencana pengujian |
+| `DESIGN.md` | Design system Orbital 95 (token, bevel, komponen, layout) — sumber kebenaran visual (M50) |
