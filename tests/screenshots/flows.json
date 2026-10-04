@@ -1,0 +1,93 @@
+[
+ {
+  "flow": "auth: login salah → dialog pesan Indonesia; login benar → /app",
+  "status": "PASS",
+  "notes": "INVALID_CREDENTIALS diterjemahkan; redirect ke /app#pantauan",
+  "errors": [],
+  "seconds": 8.0
+ },
+ {
+  "flow": "auth: tanpa sesi → /app dialihkan ke /masuk; keluar menghapus sesi",
+  "status": "PASS",
+  "notes": "tanpa sesi → /masuk?next=%2Fapp%23analitik; keluar → /masuk?alasan=keluar, /auth/me 401",
+  "errors": [],
+  "seconds": 9.7
+ },
+ {
+  "flow": "rbac: menu Mulai per role sesuai permissions; halaman terlarang → 'Akses ditolak'",
+  "status": "PASS",
+  "notes": "menu user:3, analyst:6, data_engineer:6, admin:9; akses langsung ditolak di UI",
+  "errors": [],
+  "seconds": 30.8
+ },
+ {
+  "flow": "keyboard: menu Mulai (Enter/panah/Escape), tab admin dengan panah",
+  "status": "PASS",
+  "notes": "Start menu & tablist bisa dioperasikan keyboard",
+  "errors": [],
+  "seconds": 6.5
+ },
+ {
+  "flow": "akun: buat token (tampil sekali) lalu cabut",
+  "status": "PASS",
+  "notes": "token baru dipakai → 200; setelah dicabut → 401",
+  "errors": [],
+  "seconds": 10.8
+ },
+ {
+  "flow": "statistik: ANALYST tandai alert sudah dibaca (dengan catatan); USER tanpa tombol",
+  "status": "PASS",
+  "notes": "kecamatan dengan alert aktif 3 → 2",
+  "errors": [],
+  "seconds": 19.0
+ },
+ {
+  "flow": "kejadian: validasi formulir, catat, ubah, hapus (soft delete)",
+  "status": "PASS",
+  "notes": "buat → ubah (verifikasi) → hapus; 4 pesan validasi klien",
+  "errors": [],
+  "seconds": 29.3
+ },
+ {
+  "flow": "katalog: semua tab dataset UJI SINTETIS terbuka tanpa error",
+  "status": "PASS",
+  "notes": "tab: ringkasan, sumber, struktur, pratinjau, produk, log",
+  "errors": [],
+  "seconds": 18.7
+ },
+ {
+  "flow": "buat dataset: validasi langkah, konfigurasi sebelumnya, ringkasan (tanpa kirim)",
+  "status": "PASS",
+  "notes": "validasi 4 langkah + ringkasan; tombol 'Buat dataset' TIDAK diklik (akan mengunduh)",
+  "errors": [],
+  "seconds": 12.9
+ },
+ {
+  "flow": "analitik: filter, rentang terbalik ditolak, ekspor CSV tercatat",
+  "status": "PASS",
+  "notes": "validasi tanggal + band NDVI + CSV tanpa error",
+  "errors": [],
+  "seconds": 11.8
+ },
+ {
+  "flow": "laporan: unduh PDF (ANALYST) dan tab sesuai audiens",
+  "status": "PASS",
+  "notes": "ANALYST ['Hidromet'], DATA_ENGINEER ['Kesehatan Data']",
+  "errors": [],
+  "seconds": 11.2
+ },
+ {
+  "flow": "admin: 12 tab terbuka tanpa error; buat akun + validasi + CANNOT_MODIFY_SELF",
+  "status": "PASS",
+  "notes": "12 tab; akun uji_flow_22710 dibuat; CANNOT_MODIFY_SELF diterjemahkan",
+  "errors": [],
+  "seconds": 57.2
+ },
+ {
+  "flow": "error 404/500: halaman fragmen hilang & API error menampilkan dialog, bukan layar putih",
+  "status": "PASS",
+  "notes": "404 → 'Data tidak ditemukan.'; 500 → 'Terjadi kesalahan di server.'",
+  "errors": [],
+  "seconds": 6.0
+ }
+]
