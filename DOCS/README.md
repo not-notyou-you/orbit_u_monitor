@@ -280,3 +280,4 @@ Nama DB `sentinel1_flood` warisan DataLab **diganti** menjadi `themonitor` di `.
 | `INTERFACE.md` | Halaman per role, endpoint API, kontrak request/response, UML, rencana pengujian |
 | `DESIGN.md` | Design system Orbital 95 (token, bevel, komponen, layout) — sumber kebenaran visual (M50) |
 | `SETUP_LAPTOP_BARU.md` | Pindah ke mesin lain lewat `pg_dump`/`pg_restore`, lalu backfill dan benchmark MySQL 8 |
+| `PROMPT_LAPTOP_BARU.md` | Prompt siap pakai untuk Claude Code di laptop baru, menjalankan SETUP_LAPTOP_BARU.md dari awal sampai backfill |
