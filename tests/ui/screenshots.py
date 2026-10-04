@@ -128,7 +128,7 @@ class CDP:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base", default="http://127.0.0.1:8011")
+    ap.add_argument("--base", default="http://127.0.0.1:8013")
     ap.add_argument("--password-env", default="UJI_PASSWORD")
     ap.add_argument("--pages", default="")
     ap.add_argument("--widths", default="320,768,1920")
@@ -160,6 +160,8 @@ def main(argv: list[str]) -> int:
         cdp = CDP(page["webSocketDebuggerUrl"])
         for d in ("Page", "Runtime", "Network", "Log"):
             cdp.call(f"{d}.enable")
+        # Tanpa cache: gambar yang di-cache sesi role lain bisa menutupi 403.
+        cdp.call("Network.setCacheDisabled", cacheDisabled=True)
 
         current_role = "∅"
 

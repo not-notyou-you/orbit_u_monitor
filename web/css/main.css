@@ -281,7 +281,7 @@ u.k { text-decoration: underline; }
 .table-wrap { overflow-x: auto; }
 
 /* Readout */
-.readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
 .readout .screen-inner { padding: 8px; min-height: 0; }
 .readout .r-lbl { color: var(--phos-dim); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; display: block; }
 .readout .r-val { font-size: 26px; line-height: 1.2; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

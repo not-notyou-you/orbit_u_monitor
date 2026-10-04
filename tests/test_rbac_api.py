@@ -446,3 +446,55 @@ def test_live_card_user_window(make_client, live_area_with_scenes):
     admin = make_client("ADMIN")
     assert len(admin.get(f"/api/live/areas/{area}/card").json()["dates"]) == 3
     assert admin.get(f"/api/live/areas/{area}/card?date={old}").status_code == 200
+
+
+def test_live_area_backed_by_dataset_readable_by_user(make_client, db_client, sample_region, role_users):
+    """Tahap 4: area Live nyata selalu punya `dataset_id`; USER tidak punya SELECT
+    pada `datasets` (§8.3), jadi daftar/kartu tidak boleh membaca tabel itu untuknya
+    (dulu 403 DB_PERMISSION_DENIED). Ukuran berkas hanya untuk role yang berhak."""
+    ds = _insert_dataset(db_client, sample_region, role_users["ADMIN"], is_system=True, name="rbac live ds")
+    with db_client.session() as sess:
+        sess.execute(text("UPDATE datasets SET total_size_bytes = 4096 WHERE dataset_id = :d"), {"d": ds})
+        area = sess.scalar(text("""
+            INSERT INTO live_areas (dataset_id, name, bbox_wkt, status)
+            VALUES (:d, 'rbac live ds area', 'POLYGON((0 0,1 0,1 1,0 1,0 0))', 'ACTIVE') RETURNING area_id"""), {"d": ds})
+        sess.execute(text("INSERT INTO live_scenes (area_id, scene_date, status) VALUES (:a, CURRENT_DATE, 'READY')"), {"a": area})
+    for role, size in (("USER", 0), ("ANALYST", 0), ("ADMIN", 4096)):
+        c = make_client(role)
+        r = c.get("/api/live/areas")
+        assert r.status_code == 200, (role, r.text)
+        mine = next(a for a in r.json() if a["area_id"] == area)
+        assert mine["total_size_bytes"] == size, role
+        card = c.get(f"/api/live/areas/{area}/card")
+        assert card.status_code == 200, (role, card.text)
+        assert "water_change" in card.json()["scene"]
+
+
+def test_live_preview_readable_by_user_and_analyst(make_client, db_client, etl_db_client, sample_region, role_users, tmp_path, monkeypatch):
+    """Tahap 4: preview Live untuk USER/ANALYST dulu 403 DB_PERMISSION_DENIED karena
+    path dicari lewat `datasets`. Kini path dicari koneksi etl setelah scene terbukti terlihat."""
+    from etl import live_monitor as lm
+
+    ds = _insert_dataset(db_client, sample_region, role_users["ADMIN"], is_system=True, name="rbac preview ds")
+    with db_client.session() as sess:
+        area = sess.scalar(text("""
+            INSERT INTO live_areas (dataset_id, name, bbox_wkt, status)
+            VALUES (:d, 'rbac preview area', 'POLYGON((0 0,1 0,1 1,0 1,0 0))', 'ACTIVE') RETURNING area_id"""), {"d": ds})
+        sess.execute(text("INSERT INTO live_scenes (area_id, scene_date, status) VALUES (:a, CURRENT_DATE, 'READY')"), {"a": area})
+    png = tmp_path / "s1_vv.png"
+    png.write_bytes(b"\x89PNG\r\n\x1a\nfake")
+    seen = {}
+
+    def fake_preview_path(self, area_id, scene_date, key):
+        # Tanpa SET ROLE: koneksi etl boleh membaca datasets.
+        with self._db.session() as s:
+            seen["folder_ok"] = s.scalar(text("SELECT count(*) FROM datasets WHERE dataset_id = :d"), {"d": ds}) == 1
+        return png
+
+    monkeypatch.setattr(lm.LiveMonitor, "preview_path", fake_preview_path)
+    for role in ("USER", "ANALYST"):
+        r = make_client(role).get(f"/api/live/areas/{area}/preview/{date.today().isoformat()}/s1_vv.png")
+        assert r.status_code == 200, (role, r.text)
+        assert seen.pop("folder_ok")
+    r = make_client("USER").get(f"/api/live/areas/{area}/preview/{(date.today() - timedelta(days=1)).isoformat()}/s1_vv.png")
+    assert r.status_code == 404

@@ -793,8 +793,9 @@ class LiveMonitor:
             ev = sess.scalar(select(LiveEvent).where(LiveEvent.area_id == a.area_id)
                              .order_by(LiveEvent.event_id.desc()).limit(1))
             step, status = (ev.step, ev.status) if ev is not None else ("CYCLE", "STARTED")
+            can_jobs = _can_select(sess, "dataset_jobs")
         phase = self._PHASES.get(step, "Processing")
-        if step == "INGEST" and status == "STARTED" and a.dataset_id is not None:
+        if step == "INGEST" and status == "STARTED" and a.dataset_id is not None and can_jobs:
             from etl.dataset_manager import DatasetManager
             try:
                 prog = DatasetManager(self._db).get_progress(a.dataset_id) or {}
@@ -847,7 +848,9 @@ class LiveMonitor:
             dates = [s.scene_date.isoformat() for s in scenes]
             latest = scenes[0] if scenes else None
             size = 0
-            if a.dataset_id is not None:
+            # USER/ANALYST tidak punya SELECT pada `datasets` (DATABASE §8.3):
+            # ukuran berkas hanya untuk role yang boleh membacanya.
+            if a.dataset_id is not None and _can_select(sess, "datasets"):
                 d = sess.get(Dataset, a.dataset_id)
                 size = int(d.total_size_bytes or 0) if d else 0
         return {
@@ -875,6 +878,12 @@ class LiveMonitor:
             "total_size_bytes": size,
             "created_at": a.created_at,
         }
+
+
+def _can_select(sess, table: str) -> bool:
+    """True bila role aktif (hasil SET LOCAL ROLE di API, atau pemilik/etl) boleh SELECT tabel."""
+    from sqlalchemy import text
+    return bool(sess.scalar(text("SELECT has_table_privilege(:t, 'SELECT')"), {"t": table}))
 
 
 def _check_retention(value, upper: int = MAX_RETENTION) -> int:
