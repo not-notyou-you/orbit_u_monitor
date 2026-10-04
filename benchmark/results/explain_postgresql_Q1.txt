@@ -1,0 +1,29 @@
+Sort  (cost=129.23..129.25 rows=10 width=177) (actual time=0.298..0.301 rows=10.00 loops=1)
+  Sort Key: r.region_name
+  Sort Method: quicksort  Memory: 25kB
+  Buffers: shared hit=18
+  ->  GroupAggregate  (cost=128.21..129.06 rows=10 width=177) (actual time=0.220..0.274 rows=10.00 loops=1)
+        Group Key: r.region_id
+        Buffers: shared hit=18
+        ->  Sort  (cost=128.21..128.27 rows=25 width=29) (actual time=0.206..0.214 rows=70.00 loops=1)
+              Sort Key: r.region_id
+              Sort Method: quicksort  Memory: 28kB
+              Buffers: shared hit=18
+              ->  Hash Join  (cost=2.70..127.63 rows=25 width=29) (actual time=0.080..0.166 rows=70.00 loops=1)
+                    Hash Cond: (o.region_id = r.region_id)
+                    Buffers: shared hit=18
+                    ->  Index Scan using obs_date_band on observations o  (cost=0.29..125.02 rows=70 width=16) (actual time=0.015..0.053 rows=70.00 loops=1)
+                          Index Cond: (obs_date = '2024-12-15'::date)
+                          Index Searches: 1
+                          Buffers: shared hit=16
+                    ->  Hash  (cost=2.28..2.28 rows=10 width=17) (actual time=0.056..0.057 rows=10.00 loops=1)
+                          Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                          Buffers: shared hit=2
+                          ->  Seq Scan on regions r  (cost=0.00..2.28 rows=10 width=17) (actual time=0.026..0.036 rows=10.00 loops=1)
+                                Filter: in_aoi
+                                Rows Removed by Filter: 18
+                                Buffers: shared hit=2
+Planning:
+  Buffers: shared hit=2
+Planning Time: 0.484 ms
+Execution Time: 0.371 ms

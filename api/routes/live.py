@@ -135,7 +135,7 @@ async def area_card(area_id: int, date: str | None = Query(None, description="YY
 
 @router.get("/areas/{area_id}/preview/{scene_date}/{key}.png", summary="PNG preview of a single scene")
 async def area_preview(area_id: int, scene_date: str, key: str,
-                       db: DatabaseClient = Depends(get_db),
+                       db: DatabaseClient = Depends(get_db), etl: DatabaseClient = Depends(get_etl_db),
                        principal: Principal = Depends(current_principal)):
     from fastapi.responses import FileResponse
     d = _parse_date(scene_date)
@@ -143,7 +143,15 @@ async def area_preview(area_id: int, scene_date: str, key: str,
     if cutoff is not None and d < cutoff and d != _latest_scene_date(db, area_id):
         raise ApiError(403, f"Scenes older than {USER_WINDOW_DAYS} days are available to ADMIN only",
                        "SCENE_OUT_OF_RANGE")
-    path = _monitor(db).preview_path(area_id, d, key)
+    # Scene harus terlihat oleh role pemanggil (live_scenes: S untuk USER+). Folder
+    # berkasnya ada di `datasets`, yang tidak boleh dibaca USER/ANALYST (§8.3), jadi
+    # path dicari dengan koneksi etl SETELAH pemeriksaan ini (pola /public, T3-18).
+    with db.session() as sess:
+        visible = sess.scalar(select(func.count()).select_from(LiveScene).where(
+            LiveScene.area_id == area_id, LiveScene.scene_date == d, LiveScene.deleted_at.is_(None)))
+    if not visible:
+        raise HTTPException(404, "Preview not found")
+    path = LiveMonitor(etl).preview_path(area_id, d, key)
     if path is None:
         raise HTTPException(404, "Preview not found")
     # private: gambar hanya untuk pengguna login, jangan disimpan cache bersama.

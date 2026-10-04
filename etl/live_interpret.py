@@ -67,7 +67,7 @@ THRESHOLDS: dict[str, float] = {
 }
 
 # Nilai kategori ini tampil apa adanya di UI dan disorot di dalam kalimat
-# (web/app.js: lmTile), jadi harus muncul persis seperti ditulis di `text`.
+# (web/js/live-tiles.js: sentenceHTML), jadi harus muncul persis seperti ditulis di `text`.
 NORMAL = "normal"
 WASPADA = "alert"
 TINGGI = "high"

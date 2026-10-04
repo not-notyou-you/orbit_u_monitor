@@ -1,0 +1,2 @@
+# Skrip shell harus LF agar bash tidak gagal pada CR (core.autocrlf=true di Windows).
+*.sh text eol=lf

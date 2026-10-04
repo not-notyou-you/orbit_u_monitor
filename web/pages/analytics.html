@@ -1,0 +1,41 @@
+<!-- pages/analytics.html — Analitik (INTERFACE.md §2.4): tren, heatmap, korelasi kejadian,
+     evaluasi alert, riwayat alert, ekspor CSV. ANALYST & ADMIN. -->
+<div class="layout">
+  <div class="control-panel">
+    <form id="anForm" novalidate>
+      <fieldset>
+        <legend>Filter</legend>
+        <div class="field-row">
+          <div class="field"><label for="anFrom">Dari tanggal</label><input type="date" id="anFrom" required aria-describedby="anDateErr"></div>
+          <div class="field"><label for="anTo">Sampai</label><input type="date" id="anTo" required aria-describedby="anDateErr"></div>
+        </div>
+        <span class="err field" id="anDateErr" aria-live="polite"></span>
+        <div class="field"><label for="anBand">Band</label>
+          <select id="anBand">
+            <option value="RAIN_24H">Hujan 24 jam (mm)</option><option value="RAIN_72H">Hujan 72 jam (mm)</option>
+            <option value="RAIN_7D">Hujan 7 hari (mm)</option><option value="RAIN_30D">Hujan 30 hari (mm)</option>
+            <option value="NDVI">NDVI (indeks)</option><option value="NDWI">NDWI (indeks)</option><option value="FLOOD">Banjir MODIS (%)</option>
+          </select></div>
+        <div class="field"><span class="lbl" id="anRegLbl">Kecamatan</span>
+          <div class="listbox" id="anRegions" role="group" aria-labelledby="anRegLbl"></div>
+          <div class="btn-row" style="margin-top:4px"><button type="button" class="small" id="anAll">Semua</button><button type="button" class="small" id="anNone">Kosongkan</button></div>
+        </div>
+        <div class="btn-row end"><button type="submit" class="default" id="anApply">Terapkan</button></div>
+      </fieldset>
+    </form>
+    <fieldset>
+      <legend>Ekspor</legend>
+      <p style="margin-bottom:6px">CSV observasi sesuai filter (tanggal, band; satu kecamatan bila hanya satu dipilih). Unduhan tercatat (EXPORT_CSV).</p>
+      <button type="button" id="anCsv">Ekspor CSV</button>
+    </fieldset>
+    <div id="anExcel"></div>
+  </div>
+  <div class="deck">
+    <div class="readouts" id="anReadouts"></div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-01 · TREN PER KECAMATAN</span><span class="scr-rec off" id="anTrendRec"></span><div id="anTrend"></div></div></div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-02 · HEATMAP HUJAN HARIAN (RERATA KECAMATAN TERPILIH, MM)</span><div id="anHeat" class="table-wrap"></div></div></div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-03 · KORELASI KEJADIAN × HUJAN 24 JAM / 72 JAM</span><div id="anCorr"></div></div></div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-04 · EVALUASI ALERT (WARNING+ VS KEJADIAN TERVERIFIKASI)</span><div id="anEval"></div></div></div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-05 · RIWAYAT ALERT</span><span class="scr-rec off" id="anAlertRec"></span><div id="anAlerts"></div></div></div>
+  </div>
+</div>

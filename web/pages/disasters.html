@@ -1,0 +1,31 @@
+<!-- pages/disasters.html — Kejadian Bencana (INTERFACE.md §2.5): tabel + peta titik + formulir.
+     Hapus = soft delete dengan konfirmasi. ANALYST & ADMIN. -->
+<div class="layout">
+  <div class="control-panel">
+    <fieldset>
+      <legend>Kejadian</legend>
+      <button type="button" class="default" id="dzNew">Catat kejadian baru…</button>
+    </fieldset>
+    <form id="dzFilter" novalidate>
+      <fieldset>
+        <legend>Filter</legend>
+        <div class="field-row">
+          <div class="field"><label for="dzFrom">Dari tanggal</label><input type="date" id="dzFrom"></div>
+          <div class="field"><label for="dzTo">Sampai</label><input type="date" id="dzTo"></div>
+        </div>
+        <div class="field"><label for="dzType">Jenis bencana</label><select id="dzType"><option value="">Semua jenis</option></select></div>
+        <div class="field"><label for="dzRegion">Kecamatan</label><select id="dzRegion"><option value="">Semua kecamatan</option></select></div>
+        <div class="field"><label for="dzVer">Verifikasi</label>
+          <select id="dzVer"><option value="">Semua</option><option value="true">Terverifikasi</option><option value="false">Belum diverifikasi</option></select></div>
+        <div class="btn-row end"><button type="submit" id="dzApply">Terapkan</button></div>
+      </fieldset>
+    </form>
+    <div id="dzExcel"></div>
+  </div>
+  <div class="deck">
+    <div class="screen"><div class="screen-inner flush"><span class="scr-ch">CH-01 · PETA TITIK KEJADIAN</span><span class="scr-rec off" id="dzMapRec"></span>
+      <div class="map" id="dzMap" role="img" aria-label="Peta titik kejadian bencana; daftar lengkap ada di tabel"></div></div></div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-02 · DAFTAR KEJADIAN</span><span class="scr-rec off" id="dzCount"></span>
+      <div id="dzTable"></div></div></div>
+  </div>
+</div>

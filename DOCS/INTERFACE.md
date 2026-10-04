@@ -10,7 +10,7 @@
 |---|---|
 | Bahasa | UI Bahasa Indonesia (label, pesan, tanggal `id-ID`, angka `1.234,5`). Kode, endpoint, field JSON, dan `detail` error API Bahasa Inggris; frontend menerjemahkan kode error ke pesan Indonesia (M21) |
 | Teknologi | HTML/CSS/JS vanilla + Leaflet, tanpa build tooling [WARIS] |
-| Design system | Palet, glassmorphism, navbar pil, toast, lightbox, ring progres [WARIS] |
+| Design system | **Orbital 95** (`DESIGN.md`, M50): jendela berbevel, taskbar + menu Mulai per role, data dalam layar CRT, dialog modal. Menggantikan glassmorphism/navbar pil/toast DataLab |
 | Prioritas informasi | Kondisi terbaru di atas, arsip di bawah |
 | Peta latar | Esri World Street Map [WARIS] + poligon kecamatan AOI |
 | Satu origin | Frontend disajikan FastAPI yang sama → cookie `SameSite=Strict`, tanpa CORS |

@@ -1,0 +1,46 @@
+<!-- pages/catalog.html — Katalog Dataset (INTERFACE.md §2.6) [WARIS DataLab View 2], diterjemahkan.
+     Tanpa Merge, tanpa reference layers. DATA_ENGINEER & ADMIN. -->
+<div class="layout wide-left">
+  <div class="control-panel">
+    <fieldset>
+      <legend>Dataset</legend>
+      <div class="field"><label for="ctSearch">Cari nama</label><input type="search" id="ctSearch" placeholder="ketik untuk menyaring…"></div>
+      <div class="listbox" id="ctList" role="listbox" aria-label="Daftar dataset" style="max-height:320px"></div>
+      <div class="btn-row" style="margin-top:6px">
+        <button type="button" class="small" id="ctRefresh">Muat ulang</button>
+        <a class="btn small" href="#buat-dataset">Buat dataset baru…</a>
+      </div>
+    </fieldset>
+    <fieldset id="ctActions">
+      <legend>Aksi dataset terpilih</legend>
+      <div class="btn-row" style="margin-bottom:6px">
+        <button type="button" data-act="download">Unduh ZIP</button>
+        <button type="button" data-act="report">Laporan PDF</button>
+      </div>
+      <div class="btn-row" style="margin-bottom:6px">
+        <button type="button" class="small" data-act="pause">Jeda</button>
+        <button type="button" class="small" data-act="resume">Lanjutkan</button>
+        <button type="button" class="small" data-act="retry">Coba ulang</button>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="small" data-act="cancel">Batalkan proses…</button>
+        <button type="button" class="small" data-act="delete">Hapus…</button>
+      </div>
+      <p class="mut" id="ctActNote" style="margin:6px 0 0;font-size:11px"></p>
+    </fieldset>
+    <div id="ctExcel"></div>
+  </div>
+  <div class="deck">
+    <div class="readouts" id="ctReadouts"></div>
+    <div id="ctProgress"></div>
+    <div class="tabs" role="tablist" aria-label="Rincian dataset">
+      <button type="button" role="tab" data-tab="ringkasan" aria-selected="true">Ringkasan</button>
+      <button type="button" role="tab" data-tab="sumber" aria-selected="false" tabindex="-1">Detail sumber</button>
+      <button type="button" role="tab" data-tab="struktur" aria-selected="false" tabindex="-1">Struktur &amp; kualitas</button>
+      <button type="button" role="tab" data-tab="pratinjau" aria-selected="false" tabindex="-1">Pratinjau</button>
+      <button type="button" role="tab" data-tab="produk" aria-selected="false" tabindex="-1">Produk &amp; asal-usul</button>
+      <button type="button" role="tab" data-tab="log" aria-selected="false" tabindex="-1">Log</button>
+    </div>
+    <div class="raised tabpanel" role="tabpanel" id="ctPanel"></div>
+  </div>
+</div>

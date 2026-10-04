@@ -1,0 +1,30 @@
+<!-- pages/statistics.html — Statistik Hari Ini (INTERFACE.md §2.3): spanduk alert,
+     koroplet kategori BMKG hujan 24 jam, kartu per kecamatan. -->
+<div id="stAlerts" aria-live="polite"></div>
+<div class="layout">
+  <div class="control-panel">
+    <fieldset>
+      <legend>Tanggal data</legend>
+      <p id="stDate" style="margin:0">—</p>
+    </fieldset>
+    <fieldset>
+      <legend>Kategori BMKG (hujan 24 jam)</legend>
+      <div class="screen"><div class="screen-inner"><span class="scr-ch">LEGENDA</span><div id="stLegend"></div></div></div>
+      <p class="mut" style="margin:4px 0 0;font-size:11px">Setiap kartu dan label peta menuliskan nama kategori; warna dan arsir hanya penanda tambahan.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Tampilan</legend>
+      <div class="field"><label for="stSort">Urutkan kartu</label>
+        <select id="stSort"><option value="rain">Hujan 24 jam (tertinggi dulu)</option><option value="name">Nama kecamatan</option></select></div>
+      <button type="button" id="stReload">Muat ulang</button>
+    </fieldset>
+    <div id="stExcel"></div>
+  </div>
+  <div class="deck">
+    <div class="readouts" id="stReadouts"></div>
+    <div class="screen"><div class="screen-inner flush"><span class="scr-ch">CH-01 · KOROPLET HUJAN 24 JAM</span><span class="scr-rec" id="stMapRec"></span>
+      <div class="map" id="stMap" role="img" aria-label="Peta kecamatan AOI berwarna menurut kategori hujan BMKG"></div></div></div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-02 · KARTU PER KECAMATAN</span><span class="scr-rec off" id="stCount"></span>
+      <div id="stCards"></div></div></div>
+  </div>
+</div>

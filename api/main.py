@@ -185,7 +185,7 @@ _ROLE_ORDER = ("PUBLIC", "USER", "ANALYST", "DATA_ENGINEER", "ADMIN")
 
 
 def custom_openapi() -> dict:
-    """OpenAPI dengan `x-min-role` per operasi (INTERFACE.md §6.1)."""
+    """OpenAPI dengan `x-min-role`, deskripsi, contoh, dan skema error per operasi (INTERFACE.md §6.1)."""
     if app.openapi_schema:
         return app.openapi_schema
     schema = get_openapi(title=app.title, version=app.version, description=app.description,
@@ -207,6 +207,9 @@ def custom_openapi() -> dict:
         "sessionCookie": {"type": "apiKey", "in": "cookie", "name": "orbit_u_session"},
     })
     schema["security"] = [{"bearerToken": []}, {"sessionCookie": []}]
+    # Deskripsi, contoh, dan skema error untuk developer (INTERFACE.md §6.1).
+    from api.openapi_docs import enrich
+    enrich(schema)
     app.openapi_schema = schema
     return schema
 

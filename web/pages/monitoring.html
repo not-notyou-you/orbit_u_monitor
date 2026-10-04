@@ -1,0 +1,33 @@
+<!-- pages/monitoring.html — Pantauan Live (INTERFACE.md §2.2): kartu Live warisan + 9 tile
+     (termasuk Perubahan air), ringkasan perubahan air, grafik + prakiraan berlabel, aksi ADMIN. -->
+<div class="layout">
+  <div class="control-panel">
+    <fieldset>
+      <legend>Live Area</legend>
+      <div class="field"><label for="lmArea">Area</label><select id="lmArea"></select></div>
+      <dl class="kv lm-meta" id="lmMeta"></dl>
+    </fieldset>
+    <fieldset>
+      <legend>Tanggal tersimpan</legend>
+      <div class="listbox" id="lmDates" role="listbox" aria-label="Tanggal scene tersimpan"></div>
+      <p class="mut" id="lmDatesNote" style="margin:4px 0 0;font-size:11px"></p>
+    </fieldset>
+    <fieldset id="lmAdmin" hidden>
+      <legend>Aksi Administrator</legend>
+      <div class="btn-row" style="margin-bottom:8px">
+        <button type="button" id="lmCheck">Periksa sekarang</button>
+        <button type="button" id="lmRetry" disabled>Coba ulang sumber gagal</button>
+      </div>
+      <div class="field">
+        <label for="lmRetention">Retensi scene (1–60)</label>
+        <div class="btn-row"><input type="number" id="lmRetention" min="1" max="60" style="width:80px"><button type="button" class="small" id="lmRetentionSave">Simpan</button></div>
+        <span class="hint">Scene tertua di luar retensi dihapus otomatis.</span>
+      </div>
+      <div class="btn-row"><button type="button" id="lmReport">Laporan dataset area (PDF)</button><button type="button" id="lmLogBtn">Log siklus…</button></div>
+    </fieldset>
+    <div id="lmExcel"></div>
+  </div>
+  <div class="deck" id="lmDeck">
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">SYS</span><div class="scr-empty" role="status">MEMUAT DATA…</div></div></div>
+  </div>
+</div>

@@ -579,14 +579,20 @@ class LiveMonitor:
             scene = None
             if sel is not None:
                 from etl.live_metrics import load_scene_metrics
+                from etl.water_change import load_metrics as load_water_change
 
                 dk = sel.scene_date.isoformat()
+                wc = load_water_change(sess, [sel.live_scene_id]).get(sel.live_scene_id)
+                if wc and wc.get("ref_date") is not None:
+                    wc["ref_date"] = wc["ref_date"].isoformat()
                 items = ((sel.previews or {}).get("items") or {})
                 scene = {
                     "date": dk,
                     "status": sel.status,
                     "source_status": sel.source_status or {},
                     "metrics": load_scene_metrics(sess, [sel])[sel.live_scene_id],
+                    # Ringkasan "air baru · surut · tetap" Pantauan Live (INTERFACE §2.2).
+                    "water_change": wc,
                     "interpretations": sel.interpretations or {},
                     "area_status": sel.area_status or {},
                     "previews": {
@@ -792,8 +798,11 @@ class LiveMonitor:
             from etl.dataset_manager import DatasetManager
             try:
                 prog = DatasetManager(self._db).get_progress(a.dataset_id) or {}
-            except Exception:
-                logger.exception("[LIVE] progres area=%d gagal dibaca", a.area_id)
+            except Exception as exc:
+                # USER/ANALYST tidak punya SELECT pada dataset_jobs (§8.3): progres
+                # rinci memang bukan untuk mereka, jadi bukan kesalahan yang dicatat.
+                if getattr(getattr(exc, "orig", None), "pgcode", None) != "42501":
+                    logger.exception("[LIVE] progres area=%d gagal dibaca", a.area_id)
                 prog = {}
             total = int(prog.get("total_scenes") or 0)
             failed = min(total, int(prog.get("failed_count") or 0))
@@ -841,7 +850,9 @@ class LiveMonitor:
             dates = [s.scene_date.isoformat() for s in scenes]
             latest = scenes[0] if scenes else None
             size = 0
-            if a.dataset_id is not None:
+            # USER/ANALYST tidak punya SELECT pada `datasets` (DATABASE §8.3):
+            # ukuran berkas hanya untuk role yang boleh membacanya.
+            if a.dataset_id is not None and _can_select(sess, "datasets"):
                 d = sess.get(Dataset, a.dataset_id)
                 size = int(d.total_size_bytes or 0) if d else 0
         return {
@@ -869,6 +880,12 @@ class LiveMonitor:
             "total_size_bytes": size,
             "created_at": a.created_at,
         }
+
+
+def _can_select(sess, table: str) -> bool:
+    """True bila role aktif (hasil SET LOCAL ROLE di API, atau pemilik/etl) boleh SELECT tabel."""
+    from sqlalchemy import text
+    return bool(sess.scalar(text("SELECT has_table_privilege(:t, 'SELECT')"), {"t": table}))
 
 
 def _check_retention(value, upper: int = MAX_RETENTION) -> int:

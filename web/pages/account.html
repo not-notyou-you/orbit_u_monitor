@@ -1,0 +1,45 @@
+<!-- pages/account.html — Akun Saya (INTERFACE.md §2.9): profil, ubah sandi, token API, panduan. -->
+<div class="layout">
+  <div class="control-panel">
+    <fieldset>
+      <legend>Profil</legend>
+      <div class="screen"><div class="screen-inner"><span class="scr-ch">PROFIL</span><dl class="kv" id="profile"></dl></div></div>
+      <p class="mut" style="margin:4px 0 0;font-size:11px">Nama, organisasi, dan peran diatur Administrator.</p>
+    </fieldset>
+    <form id="pwForm" novalidate>
+      <fieldset>
+        <legend>Ubah kata sandi</legend>
+        <div class="field"><label for="oldPw">Kata sandi lama</label>
+          <input type="password" id="oldPw" autocomplete="current-password" required aria-describedby="oldPwErr"><span class="err" id="oldPwErr"></span></div>
+        <div class="field"><label for="newPw">Kata sandi baru</label>
+          <input type="password" id="newPw" autocomplete="new-password" required minlength="10" aria-describedby="newPwHint newPwErr">
+          <span class="hint" id="newPwHint">Minimal 10 karakter.</span><span class="err" id="newPwErr"></span></div>
+        <div class="field"><label for="newPw2">Ulangi kata sandi baru</label>
+          <input type="password" id="newPw2" autocomplete="new-password" required aria-describedby="newPw2Err"><span class="err" id="newPw2Err"></span></div>
+        <div class="btn-row end"><button type="submit" class="default" id="pwBtn">Simpan</button></div>
+      </fieldset>
+    </form>
+  </div>
+  <div class="deck">
+    <form id="tokenForm" novalidate>
+      <fieldset>
+        <legend>Buat token API</legend>
+        <p>Token untuk skrip atau sistem lain (header <code>Authorization: Bearer</code>). Token hanya bisa <b>membaca</b> data; aksi tulis tetap lewat sesi web.</p>
+        <div class="cols-3">
+          <div class="field"><label for="tkName">Nama token</label><input type="text" id="tkName" maxlength="60" required placeholder="mis. skrip analisis" aria-describedby="tkNameErr"><span class="err" id="tkNameErr"></span></div>
+          <div class="field"><label for="tkScope">Cakupan</label>
+            <select id="tkScope"><option value="READ">READ — baca saja</option><option value="READ_DOWNLOAD">READ_DOWNLOAD — baca + unduh berkas</option></select></div>
+          <div class="field"><label for="tkDays">Masa berlaku (hari)</label><input type="number" id="tkDays" min="1" max="180" value="90" required aria-describedby="tkDaysErr"><span class="err" id="tkDaysErr"></span></div>
+        </div>
+        <div class="btn-row end"><button type="submit" class="default" id="tkBtn">Buat token</button></div>
+      </fieldset>
+    </form>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-01 · TOKEN API MILIK SAYA</span><span class="scr-rec off" id="tkCount"></span><div id="tokenList"></div></div></div>
+    <fieldset>
+      <legend>Panduan singkat</legend>
+      <div class="screen"><div class="screen-inner"><span class="scr-ch">CONTOH · CURL</span><pre class="scr-text" style="margin:0;overflow-x:auto" id="curlEx"></pre></div></div>
+      <div class="screen" style="margin-top:8px"><div class="screen-inner"><span class="scr-ch">CONTOH · PYTHON</span><pre class="scr-text" style="margin:0;overflow-x:auto" id="pyEx"></pre></div></div>
+      <p style="margin:8px 0 0">Dokumentasi lengkap setiap endpoint: <a href="/docs" target="_blank" rel="noopener">/docs</a> (Swagger). Panduan alur lengkap: <code>docs/api_examples.md</code>.</p>
+    </fieldset>
+  </div>
+</div>

@@ -285,3 +285,16 @@ class TestPerSourceCardStats:
         )
         assert item["scenes_by_source"] == {"sentinel1": 1}   # 1 scene, 2 baris
         assert item["bytes_by_source"]["sentinel1"] == int(4.0 * 1024 * 1024)
+
+
+def test_create_dataset_rejects_range_over_366_days():
+    """INTERFACE §2.6: rentang wizard ≤ 366 hari, ditegakkan juga di skema API (Tahap 4)."""
+    import pytest
+    from pydantic import ValidationError
+
+    from api.schemas import CreateDatasetRequest
+
+    base = {"region_id": 1, "name": "x", "sources": {"gpm": {"processing": ["RAW"]}}}
+    CreateDatasetRequest(**base, date_start="2024-01-01", date_end="2024-12-31")  # 366 hari (kabisat)
+    with pytest.raises(ValidationError, match="at most 366 days"):
+        CreateDatasetRequest(**base, date_start="2024-01-01", date_end="2025-01-01")

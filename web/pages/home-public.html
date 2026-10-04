@@ -1,0 +1,48 @@
+<!-- pages/home-public.html — Beranda Publik (INTERFACE.md §2.1). Tanpa riwayat, grafik,
+     prakiraan, unduhan, atau nilai per kecamatan. -->
+<div class="desk-icons" aria-label="Pintasan">
+  <a class="desk-icon" href="/masuk" id="iconLogin"><span aria-hidden="true" data-icon="key"></span><span>Masuk</span></a>
+  <a class="desk-icon" href="/app" id="iconApp" hidden><span aria-hidden="true" data-icon="monitor"></span><span>Aplikasi</span></a>
+  <a class="desk-icon" href="/docs" target="_blank" rel="noopener"><span aria-hidden="true" data-icon="help"></span><span>Dok. API</span></a>
+</div>
+
+<section class="window" aria-labelledby="homeTitle">
+  <div class="titlebar">
+    <span class="ttl-icon" data-icon="satellite"></span>
+    <span class="ttl-text"><h1 id="homeTitle">ORBIT-U · Pantauan Hidrometeorologi Lebak Selatan</h1></span>
+  </div>
+  <div class="window-body">
+    <div class="layout">
+      <div class="control-panel">
+        <fieldset id="areaBox" hidden>
+          <legend>Live Area</legend>
+          <div class="field"><label for="areaSelect">Pilih area</label><select id="areaSelect"></select></div>
+        </fieldset>
+        <fieldset>
+          <legend>Akses</legend>
+          <p>Masuk untuk melihat riwayat 30 hari, prakiraan, statistik per kecamatan, dan alert.</p>
+          <div class="btn-row"><a class="btn default" href="/masuk" id="btnLogin">Masuk…</a></div>
+        </fieldset>
+        <fieldset>
+          <legend>Tiga satelit</legend>
+          <p><b>Sentinel-1</b> — radar, menembus awan dan malam; melihat genangan dan kebasahan permukaan (±6–12 hari sekali).</p>
+          <p><b>MODIS</b> — optik harian; indeks vegetasi (NDVI), air (NDWI), dan peta genangan. Terhalang awan.</p>
+          <p style="margin:0"><b>GPM IMERG</b> — perkiraan curah hujan harian dari satelit (resolusi ±10 km), belum dikalibrasi penakar hujan.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Batasan data</legend>
+          <p style="margin:0">Satelit tidak menangkap puncak banjir bandang. Nilai hujan adalah perkiraan satelit, bukan pengukuran stasiun. Tile kosong berarti data belum tersedia atau tertutup awan.</p>
+        </fieldset>
+      </div>
+      <div class="deck" id="homeDeck">
+        <div class="screen"><div class="screen-inner"><span class="scr-ch">SYS</span><div class="scr-empty" role="status">MEMUAT DATA…</div></div></div>
+      </div>
+    </div>
+    <div class="banner sunken" role="note" style="margin-top:8px">
+      <span data-icon="warn32"></span>
+      <div class="b-body"><b>Ini bukan peringatan dini resmi.</b> Ikuti informasi BMKG dan BPBD.<br>
+        Kontak: Gerakan Masyarakat Lebak Selatan (GMLS), sekretariat Panggarangan, Kabupaten Lebak.</div>
+    </div>
+  </div>
+  <div class="statusbar"><span id="homeStatus">Status: Memuat…</span><span class="fit">Data: ESA Copernicus · NASA MODIS · NASA GPM</span></div>
+</section>

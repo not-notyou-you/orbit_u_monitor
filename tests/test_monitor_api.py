@@ -85,7 +85,10 @@ class TestAlerts:
 
     def test_evaluation(self, make_client):
         body = make_client("ANALYST").get("/api/alerts/evaluation").json()
-        assert set(body) >= {"hit", "miss", "false_alarm", "pod", "far"}
+        assert set(body) >= {"hit", "miss", "false_alarm", "pod", "far", "by_rule"}
+        # Rincian per aturan (Tahap 4, Analitik) menjumlah sama dengan total.
+        for k in ("hit", "miss", "false_alarm"):
+            assert sum(r[k] for r in body["by_rule"]) == body[k]
         assert make_client("USER").get("/api/alerts/evaluation").status_code == 403
 
     def test_rules_crud_without_delete(self, make_client):
