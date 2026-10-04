@@ -91,12 +91,25 @@ def evaluation(sess: Session = Depends(get_session), date_from: date | None = No
     counts = dict(sess.execute(text(f"SELECT outcome, count(*) FROM v_evaluasi_alert WHERE {' AND '.join(where)} "
                                     "GROUP BY outcome"), params).all())
     hit, miss, fa = (int(counts.get(k, 0)) for k in ("HIT", "MISS", "FALSE_ALARM"))
+    # Rincian per aturan (INTERFACE §2.4 "tabel per aturan"). MISS tidak punya
+    # alert, jadi tidak punya aturan: dikelompokkan dengan rule_code NULL.
+    by_rule: dict = {}
+    for code, outcome, n in sess.execute(text(f"""
+            SELECT ru.rule_code, v.outcome, count(*)
+            FROM v_evaluasi_alert v
+            LEFT JOIN alert_events a ON a.alert_id = v.alert_id
+            LEFT JOIN alert_rules ru ON ru.rule_id = a.rule_id
+            WHERE {' AND '.join(w.replace('ref_date', 'v.ref_date') for w in where)}
+            GROUP BY ru.rule_code, v.outcome ORDER BY ru.rule_code NULLS LAST"""), params).all():
+        r = by_rule.setdefault(code, {"rule_code": code, "hit": 0, "miss": 0, "false_alarm": 0})
+        r[{"HIT": "hit", "MISS": "miss", "FALSE_ALARM": "false_alarm"}[outcome]] = int(n)
     pod = hit / (hit + miss) if hit + miss else None
     far = fa / (hit + fa) if hit + fa else None
     return {"hit": hit, "miss": miss, "false_alarm": fa,
             # Probability of detection & false alarm ratio; None bila penyebut nol
             # (tidak ada angka karangan).
             "pod": None if pod is None else round(pod, 4), "far": None if far is None else round(far, 4),
+            "by_rule": list(by_rule.values()),
             "definition": "WARNING+ alerts vs verified events of the same type in the same kecamatan, "
                           "alert 0-3 days before the event (DATABASE.md §7)"}
 

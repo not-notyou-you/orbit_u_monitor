@@ -481,3 +481,10 @@ u.k { text-decoration: underline; }
 .kcard { border: 1px solid var(--phos-dim); padding: 6px 8px; min-width: 0; }
 .kcard header { display: flex; justify-content: space-between; gap: 6px; align-items: baseline; margin-bottom: 4px; flex-wrap: wrap; }
 .kcard .kv { gap: 1px 8px; }
+.chart .mk { stroke: var(--amber); stroke-width: 1; stroke-dasharray: 1 2; }
+.chart .mk-lbl { fill: var(--amber); font-family: var(--font-data); font-size: 10px; }
+/* Heatmap hujan (bulan × hari) */
+.heat { border-collapse: collapse; font-size: 10px; }
+.heat th { color: var(--phos-dim); font-weight: 400; padding: 0 2px; text-align: right; }
+.heat td { width: 18px; height: 16px; padding: 0; border: 1px solid var(--crt); text-align: center; font-size: 9px; }
+.heat td.na { background: transparent; outline: 1px dotted var(--crt-grid); }

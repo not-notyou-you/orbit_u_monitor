@@ -345,7 +345,10 @@ const UI = (() => {
     const ys = all.map(p => p.y).concat(fc.flatMap(p => [p.lo, p.hi, p.mean]).filter(v => v !== null && v !== undefined)).concat(Object.values(thr));
     let y0 = Math.min(...ys), y1 = Math.max(...ys);
     if (opts.bar || opts.zero) y0 = Math.min(0, y0);
-    const pad = (y1 - y0) * 0.08 || 1; if (!opts.bar) y0 -= pad; y1 += pad;
+    const pad = (y1 - y0) * 0.08 || 1;
+    // Nilai tak-negatif (hujan) tidak diberi ruang di bawah nol.
+    if (!opts.bar && !(opts.zero && y0 >= 0)) y0 -= pad;
+    y1 += pad;
     const X = v => L + (v - x0) / (x1 - x0) * (W - L - R);
     const Y = v => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
     let g = '';
@@ -365,6 +368,14 @@ const UI = (() => {
     });
     const unit = opts.unit ? ' ' + opts.unit : '';
     const hits = [];
+    // Penanda kejadian: garis vertikal amber + nomor (keterangan di tabel/tooltip).
+    (opts.markers || []).forEach((m, k) => {
+      const mx = X(t(m.x));
+      if (mx < L || mx > W - R) return;
+      g += '<line class="mk" x1="' + mx + '" x2="' + mx + '" y1="' + T + '" y2="' + (H - B) + '"/>' +
+        '<text class="mk-lbl" x="' + (mx + 2) + '" y="' + (T + 9 + (k % 3) * 10) + '">' + esc(m.label || String(k + 1)) + '</text>';
+      hits.push({ x: mx, y: T + 6, tip: m.tip || m.label });
+    });
     series.forEach((s, si) => {
       const pts = s.points.filter(p => p.y !== null && p.y !== undefined);
       if (opts.bar) {
