@@ -793,14 +793,16 @@ class LiveMonitor:
             ev = sess.scalar(select(LiveEvent).where(LiveEvent.area_id == a.area_id)
                              .order_by(LiveEvent.event_id.desc()).limit(1))
             step, status = (ev.step, ev.status) if ev is not None else ("CYCLE", "STARTED")
-            can_jobs = _can_select(sess, "dataset_jobs")
         phase = self._PHASES.get(step, "Processing")
-        if step == "INGEST" and status == "STARTED" and a.dataset_id is not None and can_jobs:
+        if step == "INGEST" and status == "STARTED" and a.dataset_id is not None:
             from etl.dataset_manager import DatasetManager
             try:
                 prog = DatasetManager(self._db).get_progress(a.dataset_id) or {}
-            except Exception:
-                logger.exception("[LIVE] progres area=%d gagal dibaca", a.area_id)
+            except Exception as exc:
+                # USER/ANALYST tidak punya SELECT pada dataset_jobs (§8.3): progres
+                # rinci memang bukan untuk mereka, jadi bukan kesalahan yang dicatat.
+                if getattr(getattr(exc, "orig", None), "pgcode", None) != "42501":
+                    logger.exception("[LIVE] progres area=%d gagal dibaca", a.area_id)
                 prog = {}
             total = int(prog.get("total_scenes") or 0)
             failed = min(total, int(prog.get("failed_count") or 0))
