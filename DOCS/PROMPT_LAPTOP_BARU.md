@@ -3,6 +3,12 @@
 Buka Claude Code di dalam folder repo hasil `git clone`, lalu salin seluruh blok
 di bawah sebagai pesan pertama. Dokumen acuannya: `DOCS/SETUP_LAPTOP_BARU.md`.
 
+> **Pemasangan perangkat lunak adalah tugas Anda, bukan Claude Code.** Installer
+> PostgreSQL dan Python berbentuk GUI dan meminta hak administrator. Selesaikan
+> §2 `SETUP_LAPTOP_BARU.md` lebih dulu, dan pastikan `psql --version` menjawab
+> 18.x serta `py -3.12 --version` menjawab 3.12.x, sebelum mengirim prompt ini.
+> Tanpa itu Claude Code hanya akan berhenti di langkah 1 dan menunggu Anda.
+
 Siapkan dulu sebelum mengirim:
 
 - `roles.sql`, `themonitor.dump`, `manifest_lama.txt` dari laptop lama
@@ -29,20 +35,29 @@ sebelum langkah 1. Tandanya: output pull memuat penghapusan `old_ref/`,
    Folder ini clone era lama yang baru saya pull ke versi sekarang, bukan clone
    baru. Jangan asumsikan lingkungannya bersih.
    - Pastikan HEAD sudah di commit terbaru origin/main dan working tree bersih.
-   - venv yang ada dibangun untuk requirements.txt versi LAMA. Buat ulang dari
-     nol (hapus venv, python -m venv venv, pip install -r requirements.txt) —
-     jangan sekadar pip install di atasnya, karena paket untuk modul yang sudah
-     dihapus masih tertinggal. Pastikan PyMySQL ikut terpasang.
-   - .env yang ada juga versi lama (kemungkinan masih DB_NAME=sentinel1_flood
-     dan COPERNICUS_* warisan DataLab). GANTI seluruhnya dengan .env yang saya
-     bawa dari laptop lama; jangan ditambal sebagian. Tunjukkan dulu ke saya
-     selisih kunci antara .env lama di sini dan .env.example sekarang.
-   - Periksa berkas untracked yang tertinggal (mis. run.bat, run.ps1, venv
-     cadangan). Tunjukkan isinya ke saya dan sebutkan mana yang menunjuk ke
-     berkas yang sudah tidak ada. JANGAN hapus apa pun tanpa izin saya.
-   - Periksa apakah di PostgreSQL sini sudah ada database bernama themonitor
-     atau sentinel1_flood. Kalau themonitor sudah ada, LAPOR DAN BERHENTI —
-     saya yang memutuskan apakah dibuang atau dipakai. Jangan dropdb sendiri.
+   - venv yang ada dibangun untuk requirements.txt versi LAMA, dan dengan
+     Python yang salah versi. Buat ulang dari nol memakai Python 3.12 secara
+     eksplisit — jangan sekadar pip install di atas venv lama, karena paket
+     untuk modul yang sudah dihapus (dataset_merge, land_mask,
+     water_occurrence, refusion) masih tertinggal di sana. Pastikan PyMySQL
+     ikut terpasang. Periksa `python --version` di dalam venv baru sebelum
+     lanjut; kalau bukan 3.12.x, berhenti.
+   - .env yang ada milik proyek LAIN (DB_NAME=thedatalab, API_PORT=8000).
+     GANTI seluruhnya dengan .env yang saya bawa dari laptop lama; jangan
+     ditambal sebagian. Tunjukkan dulu ke saya selisih kuncinya terhadap
+     .env.example sekarang.
+   - run.ps1 dan run.bat adalah launcher saya sendiri — JANGAN dihapus.
+     Keduanya sudah memakai port 8001 yang benar, tetapi run.ps1 masih
+     memeriksa service `postgresql-x64-14` dan menyebut database
+     `orbit_u_monitor` serta "migrasi 001-026" yang sudah tidak ada.
+     Perbarui komentar dan nama service-nya ke PostgreSQL 18, lalu usulkan
+     ke saya untuk di-commit supaya tidak hilang lagi.
+   - venv_broken_bigdata/ boleh dihapus setelah saya setujui. Pastikan dulu
+     isinya memang venv, bukan folder proyek.
+   - Periksa apakah masih ada database warisan (thedatalab, orbit_u_monitor,
+     sentinel1_flood) di instance PostgreSQL yang aktif. Laporkan daftarnya.
+     Kalau sudah ada database bernama themonitor, LAPOR DAN BERHENTI — saya
+     yang memutuskan. Jangan dropdb sendiri.
    - Laporkan sisa ruang disk sebelum kita bicara restore dan backfill.
 ```
 
