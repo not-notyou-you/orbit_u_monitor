@@ -16,6 +16,38 @@ Anda.
 
 ---
 
+## Kalau folder itu clone LAMA, bukan clone baru
+
+Kalau di laptop tujuan sudah ada clone era lama dan Anda tiba di versi ini lewat
+`git pull` (bukan `git clone`), tambahkan **LANGKAH 0** di bawah ke dalam prompt,
+sebelum langkah 1. Tandanya: output pull memuat penghapusan `old_ref/`,
+`database/migrations/0xx`, `docker-compose.yml`, `web/app.js`, atau
+`web/style.css`.
+
+```
+0. BERSIHKAN SISA CLONE LAMA (sebelum apa pun yang lain)
+   Folder ini clone era lama yang baru saya pull ke versi sekarang, bukan clone
+   baru. Jangan asumsikan lingkungannya bersih.
+   - Pastikan HEAD sudah di commit terbaru origin/main dan working tree bersih.
+   - venv yang ada dibangun untuk requirements.txt versi LAMA. Buat ulang dari
+     nol (hapus venv, python -m venv venv, pip install -r requirements.txt) —
+     jangan sekadar pip install di atasnya, karena paket untuk modul yang sudah
+     dihapus masih tertinggal. Pastikan PyMySQL ikut terpasang.
+   - .env yang ada juga versi lama (kemungkinan masih DB_NAME=sentinel1_flood
+     dan COPERNICUS_* warisan DataLab). GANTI seluruhnya dengan .env yang saya
+     bawa dari laptop lama; jangan ditambal sebagian. Tunjukkan dulu ke saya
+     selisih kunci antara .env lama di sini dan .env.example sekarang.
+   - Periksa berkas untracked yang tertinggal (mis. run.bat, run.ps1, venv
+     cadangan). Tunjukkan isinya ke saya dan sebutkan mana yang menunjuk ke
+     berkas yang sudah tidak ada. JANGAN hapus apa pun tanpa izin saya.
+   - Periksa apakah di PostgreSQL sini sudah ada database bernama themonitor
+     atau sentinel1_flood. Kalau themonitor sudah ada, LAPOR DAN BERHENTI —
+     saya yang memutuskan apakah dibuang atau dipakai. Jangan dropdb sendiri.
+   - Laporkan sisa ruang disk sebelum kita bicara restore dan backfill.
+```
+
+---
+
 ```
 Saya baru saja clone repo ini di laptop baru (Windows) dan ingin memindahkan
 seluruh proyek ke sini, lalu menyelesaikan pekerjaan yang tersisa.
