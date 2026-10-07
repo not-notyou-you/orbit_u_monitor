@@ -1,4 +1,7 @@
-// js/home-public.js — Beranda Publik: GET /api/public/live (scene terbaru tiap Live Area aktif).
+// js/home-public.js — Kondisi Terkini (`/kondisi`, INTERFACE.md §2.2).
+// Sumber: GET /api/public/live (scene terbaru tiap Live Area aktif). Halaman
+// publik kedua; sambutan, penjelasan, dan navigasi ada di Beranda (`/`,
+// js/landing.js).
 'use strict';
 Pages['home-public'] = {
   async init(root, ctx) {
@@ -43,7 +46,16 @@ Pages['home-public'] = {
             '<p class="scr-text v-dim" style="margin:6px 0 0">' + LiveTiles.sentenceHTML((it.interpretations || {}).gpm_rain_72h) + '</p>' +
             '<p class="lbl" style="margin:6px 0 0">DIPERBARUI: SCENE ' + UI.esc(UI.date(it.scene_date)) + ' · KLIK TILE UNTUK LEGENDA DAN PENJELASAN</p>' }) +
         LiveTiles.rowsHTML(it.previews || {}, it.interpretations || {}, { sceneDate: it.scene_date });
-      LiveTiles.bindLightbox(deck, it.previews || {}, it.interpretations || {}, it.scene_date);
+      // "Lihat 3D" juga ada di halaman publik: /relief memakai sumber publik
+      // yang sama, jadi pengunjung tanpa akun tetap bisa membukanya. Titipan
+      // lewat sessionStorage, sama seperti di Pantauan Live -- /relief adalah
+      // pindah halaman penuh, bukan perubahan hash.
+      LiveTiles.bindLightbox(deck, it.previews || {}, it.interpretations || {}, it.scene_date, {
+        action: { label: 'Lihat 3D', onPick: item => {
+          Terrain3DHandoff.set({ area_id: it.area_id, date: it.scene_date, key: item.key });
+          location.href = '/relief';
+        } },
+      });
       status('Siap · ' + it.area_name + ' · scene ' + UI.date(it.scene_date));
     }
   },

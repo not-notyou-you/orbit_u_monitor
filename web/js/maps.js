@@ -42,6 +42,6 @@ const Maps = (() => {
     return regionsCache;
   }
 
-  return { create, ensurePatterns, regions, available };
+  return { create, ensurePatterns, regions, available, TILE_URL, TILE_ATTR };
 })();
 window.Maps = Maps;

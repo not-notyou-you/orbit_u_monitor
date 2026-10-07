@@ -215,8 +215,8 @@ Pages['create-dataset'] = (() => {
     await UI.busy($('#cdSubmit'), async () => {
       try {
         const r = await API.post('/api/datasets', body);
-        await UI.info('Buat dataset', 'Dataset #' + r.dataset_id + ' dibuat (status: ' + r.status + '). Pantau progresnya di Katalog.');
-        location.hash = 'katalog';
+        await UI.info('Buat dataset', 'Dataset #' + r.dataset_id + ' dibuat (status: ' + r.status + '). Pantau progresnya di tab "Dataset tersimpan".');
+        location.hash = '#data/tersimpan';
       } catch (e) { err(UI.errorText(e)); UI.showError('Buat dataset', e); }
     });
   }

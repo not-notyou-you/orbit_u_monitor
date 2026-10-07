@@ -1,10 +1,12 @@
 # api/routes/disasters.py
 """Kejadian bencana dan master jenis (INTERFACE.md §4.6).
 
-``/disasters`` ANALYST (RLS/GRANT: analyst SIU, tanpa D -> hapus = soft
-delete ``deleted_at``). ``/disaster-types``: GET USER, tulis ADMIN.
-Validasi bersama dengan ``scripts/import_disasters.py`` ada di
-``etl.disasters``.
+Baca ``/disasters`` terbuka untuk semua (M56): pengunjung membaca VIEW
+``v_public_kejadian`` (365 hari terakhir, tanpa kolom internal), role login
+membaca ``disaster_events`` tanpa batas waktu. Tulis ANALYST (GRANT analyst
+SIU, tanpa D -> hapus = soft delete ``deleted_at``). ``/disaster-types``: GET
+PUBLIC, tulis ADMIN. Validasi bersama dengan ``scripts/import_disasters.py``
+ada di ``etl.disasters``.
 """
 
 from __future__ import annotations
@@ -21,10 +23,20 @@ from api.errors import ApiError
 from api.schemas_monitor import DisasterCreate, DisasterTypeCreate, DisasterTypeUpdate, DisasterUpdate
 from etl import disasters as dz
 
-router = APIRouter()        # /api/disasters (ANALYST, dijaga di api/main.py)
-types_router = APIRouter()  # /api/disaster-types (USER)
+router = APIRouter()        # /api/disasters (baca PUBLIC, tulis ANALYST)
+types_router = APIRouter()  # /api/disaster-types (baca PUBLIC, tulis ADMIN)
 
 ADMIN = [Depends(require_role("ADMIN"))]
+ANALYST = [Depends(require_role("ANALYST"))]
+PUBLIC_WINDOW_DAYS = 365
+
+# Kolom VIEW publik = EVENT_SELECT tanpa source_reference/recorded_by/verified_by.
+_PUBLIC_SELECT = """
+    SELECT e.event_id, e.disaster_type_code, e.disaster_type_name, e.region_id, e.pcode, e.region_name,
+           e.village_name, e.lat, e.lon, e.event_date, e.event_end_date, e.description, e.impact_summary,
+           e.info_source, e.is_verified
+    FROM v_public_kejadian e
+"""
 
 
 def _get(sess: Session, event_id: int) -> dict:
@@ -38,13 +50,16 @@ def _value_error(exc: ValueError) -> ApiError:
     return ApiError(400, str(exc), "INVALID_DISASTER")
 
 
-@router.get("", summary="List disaster events")
+@router.get("", summary="List disaster events (visitors: last 365 days)")
 def list_disasters(sess: Session = Depends(get_session),
+                   principal: Principal = Depends(current_principal),
                    date_from: date | None = None, date_to: date | None = None,
                    type_code: str | None = None, region_id: int | None = None,
                    is_verified: bool | None = None,
                    limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0)) -> dict:
-    where, params = ["e.deleted_at IS NULL"], {}
+    public = not principal.is_authenticated
+    type_col = "e.disaster_type_code" if public else "dt.type_code"
+    where, params = ([] if public else ["e.deleted_at IS NULL"]) or ["true"], {}
     if date_from:
         where.append("e.event_date >= :a")
         params["a"] = date_from
@@ -52,7 +67,7 @@ def list_disasters(sess: Session = Depends(get_session),
         where.append("e.event_date <= :b")
         params["b"] = date_to
     if type_code:
-        where.append("dt.type_code = :t")
+        where.append(f"{type_col} = :t")
         params["t"] = type_code
     if region_id is not None:
         where.append("e.region_id = :r")
@@ -61,16 +76,31 @@ def list_disasters(sess: Session = Depends(get_session),
         where.append("e.is_verified = :v")
         params["v"] = is_verified
     cond = " AND ".join(where)
-    total = sess.scalar(text(f"SELECT count(*) FROM disaster_events e JOIN disaster_types dt USING (disaster_type_id) "
-                             f"WHERE {cond}"), params)
-    rows = sess.execute(text(f"{dz.EVENT_SELECT} WHERE {cond} ORDER BY e.event_date DESC, e.event_id DESC "
+    if public:
+        count_sql, select_sql = "SELECT count(*) FROM v_public_kejadian e", _PUBLIC_SELECT
+    else:
+        count_sql = "SELECT count(*) FROM disaster_events e JOIN disaster_types dt USING (disaster_type_id)"
+        select_sql = dz.EVENT_SELECT
+    total = sess.scalar(text(f"{count_sql} WHERE {cond}"), params)
+    rows = sess.execute(text(f"{select_sql} WHERE {cond} ORDER BY e.event_date DESC, e.event_id DESC "
                              "LIMIT :limit OFFSET :offset"), {**params, "limit": limit, "offset": offset}).mappings().all()
-    return {"items": [dz.event_dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
+    return {"items": [dz.event_dict(r) for r in rows], "total": total, "limit": limit, "offset": offset,
+            # Batas yang berlaku untuk pemanggil, supaya UI bisa mengatakannya.
+            "window_days": PUBLIC_WINDOW_DAYS if public else None}
 
 
-@router.get("/{event_id}", summary="Disaster event detail with rainfall H-0..H-2")
-def get_disaster(event_id: int, sess: Session = Depends(get_session)) -> dict:
+@router.get("/{event_id}", summary="Disaster event detail; rainfall H-0..H-2 for ANALYST")
+def get_disaster(event_id: int, sess: Session = Depends(get_session),
+                 principal: Principal = Depends(current_principal)) -> dict:
+    if not principal.is_authenticated:
+        row = sess.execute(text(_PUBLIC_SELECT + " WHERE e.event_id = :e"), {"e": event_id}).mappings().first()
+        if row is None:
+            raise ApiError(404, f"Disaster event {event_id} not found", "NOT_FOUND")
+        return {**dz.event_dict(row), "rain": None}
     event = _get(sess, event_id)
+    if not principal.has_role("ANALYST"):
+        # v_kejadian_dan_hujan milik ANALYST (evaluasi alert, M16).
+        return {**event, "rain": None}
     rain = sess.execute(text("SELECT * FROM v_kejadian_dan_hujan WHERE event_id = :e"), {"e": event_id}).mappings().first()
     event["rain"] = [{
         "day": f"H-{k}",
@@ -81,7 +111,7 @@ def get_disaster(event_id: int, sess: Session = Depends(get_session)) -> dict:
     return event
 
 
-@router.post("", status_code=201, summary="Record a disaster event")
+@router.post("", status_code=201, summary="Record a disaster event", dependencies=ANALYST)
 def create_disaster(req: DisasterCreate, sess: Session = Depends(get_session),
                     principal: Principal = Depends(current_principal)) -> dict:
     try:
@@ -91,7 +121,7 @@ def create_disaster(req: DisasterCreate, sess: Session = Depends(get_session),
     return _get(sess, event_id)
 
 
-@router.put("/{event_id}", summary="Change a disaster event")
+@router.put("/{event_id}", summary="Change a disaster event", dependencies=ANALYST)
 def update_disaster(event_id: int, req: DisasterUpdate, sess: Session = Depends(get_session),
                     principal: Principal = Depends(current_principal)) -> dict:
     _get(sess, event_id)
@@ -102,7 +132,7 @@ def update_disaster(event_id: int, req: DisasterUpdate, sess: Session = Depends(
     return _get(sess, event_id)
 
 
-@router.delete("/{event_id}", summary="Soft-delete a disaster event")
+@router.delete("/{event_id}", summary="Soft-delete a disaster event", dependencies=ANALYST)
 def delete_disaster(event_id: int, sess: Session = Depends(get_session)) -> dict:
     _get(sess, event_id)
     sess.execute(text("UPDATE disaster_events SET deleted_at = now(), updated_at = now() WHERE event_id = :e"),

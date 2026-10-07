@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import logging
 import threading
+from datetime import date
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -104,3 +105,45 @@ def regenerate(req: ReportRegenerateRequest, principal: Principal = Depends(curr
     threading.Thread(target=_regenerate, args=(etl, req.report_code, start, principal.user_id),
                      name=f"report-{req.report_code}-{start}", daemon=True).start()
     return {"accepted": True, "report_code": req.report_code, "period_start": start, "period_end": end}
+
+
+MAX_CUSTOM_DAYS = 366
+_KIND_ROLE = {"HYDROMET": "ANALYST", "DATAHEALTH": "DATA_ENGINEER"}
+
+
+@router.get("/custom.pdf", summary="Report for a free date range (generated now, not stored)",
+            dependencies=[Depends(require_role("USER", download=True))])
+def custom_report(request: Request, kind: str = Query(..., pattern="^(HYDROMET|DATAHEALTH)$"),
+                  date_from: date = Query(...), date_to: date = Query(...),
+                  principal: Principal = Depends(current_principal), etl=Depends(get_etl_db)) -> Response:
+    """Same templates as the weekly/monthly reports, for any range up to 366
+    days (M56). Audience as for stored reports: HYDROMET for ANALYST,
+    DATAHEALTH for DATA_ENGINEER, ADMIN both. The PDF is built with the
+    pipeline connection (like the scheduler) after the audience check, and
+    is returned directly instead of being registered in generated_reports,
+    whose periods are fixed weeks and months."""
+    if not principal.has_role(_KIND_ROLE[kind]):
+        raise ApiError(403, f"{kind} reports are for {_KIND_ROLE[kind]}", "REPORT_AUDIENCE")
+    if date_from > date_to or (date_to - date_from).days + 1 > MAX_CUSTOM_DAYS:
+        raise ApiError(400, f"date_from must be before date_to and the range at most {MAX_CUSTOM_DAYS} days",
+                       "INVALID_DATE_RANGE")
+    import tempfile
+    from datetime import datetime, timezone
+
+    from etl.report_periodic import build_pdf, builder_for
+
+    code = f"{kind}_{'MONTHLY' if (date_to - date_from).days >= 7 else 'WEEKLY'}"
+    label = {"HYDROMET": "Laporan Hidrometeorologi", "DATAHEALTH": "Laporan Kesehatan Data"}[kind]
+    with tempfile.TemporaryDirectory(prefix="orbit_u_custom_") as wd:
+        with etl.session() as sess:
+            doc = builder_for(code)(sess, code, date_from, date_to, Path(wd),
+                                    [f"Rentang dipilih sendiri: {date_from:%d-%m-%Y} s.d. {date_to:%d-%m-%Y}."])
+        doc.title = f"{label} (rentang bebas)"
+        out = Path(wd) / "custom.pdf"
+        build_pdf(doc, out, datetime.now(timezone.utc))
+        body = out.read_bytes()
+    filename = f"{kind}_{date_from.isoformat()}_{date_to.isoformat()}.pdf"
+    mark_download(request, "DOWNLOAD_REPORT", "report_custom", None, format="pdf", kind=kind,
+                  date_from=str(date_from), date_to=str(date_to), filename=filename)
+    return Response(body, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})

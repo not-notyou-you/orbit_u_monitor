@@ -1,0 +1,53 @@
+page 1 : BERANDA (all)
+1.1 hero section sambutan (all)
+1.2 penjelasan web (all)
+1.3 navigasi halaman yang tersedia (sesuai role)
+1.4 AOI-Visualisasi map-daftar nama daerah (all) 
+
+page 2 : 3D AOI (all kecuali publik)
+
+page 3 : citra satelit (publik hanya bisa melihat terbaru sebulan kebelakang, user hanya bisa melihat terbaru setahun kebelakang, role lain bisa liat semua yang tersedia)
+3.1 overall rekapitulasi informasi lalu navigasi ke 3.2 hingga 3.5
+3.2 sentinel 1
+3.3 modis
+3.4 GPM
+3.5 report, bisa generate report pdf sesuai halaman apa yang ingin di generate bisa saja salah satu dari 4 halaman itu, lebih dari satu halaman atau bahkan semua nya dalam 1 pdf)
+note page 3 : untuk halaman persatelit ada penjelasan itu satelit tentang apa, daftar tanggal, visualisasi png, inforasi informasi yang bisa diambil per sateit, perbandingan 2 tanggal yang tersedia
+
+page 4 : diagram (hanya untuk analyst dan admin)
+4.1 keadaan terbaru, menampilkan semua band di Dalam satu line chart, setiap band punya warna nya masing masing, 30 hari terakhir, auto update data terbaru, ini untuk melihat trend relasi antar band
+4.2 Analisa daerah, pulih daerah apa aja (menentukan warna untuk tiap daerah), pilih tanggal berapa saja, pilih band, lalu muncul tampilan line chart nya, ada fitur generate report membuat pdf sesuai tanggal dan dearah yang sudah di pilih tapi di dalam report ada semua band
+note : ada penjelasan untuk setiap band yang di pilih dalam line chart nya, ada threshold masing masing untuk setiap band nya
+
+page 5 : kejadian
+5.1 melihat kejadian (public hanya setahun kebelakang, selain public bisa melihat semua nya)
+5.2 CRUD kejadian (hanya analyst dan admin)
+
+page 6 : data (hanya admin dan data enginer)
+5.1 inofrmasi overall data dan navigasi ke sub page 6 lain
+5.2 daftar data sentinel (yang ada, bisa menjalankan backfill, proses backfill terlihat jelas di sini termasuk log nya, bisa update atau hapus data juga)
+5.3 daftar data gpm (yang ada, bisa menjalankan backfill, proses backfill terlihat jelas di sini termasuk log nya, bisa update atau hapus data juga)
+5.4 daftar data modis (yang ada, bisa menjalankan backfill, proses backfill terlihat jelas di sini termasuk log nya, bisa update atau hapus data juga)
+5.5 download data (bisa pilih data apa saja, tanggal berapa aja, mode nya bagaimana pakah tidak di fusion, kalua di fusion apakah full coverage, coocucrence, ataupun hybrid)
+5.6 EDA (sebagaimana data enginer melakukan EDA saat mau buat model data, tepatnya di data understanding, sesuai satelit dan tanggal nya yang di pilih)
+
+page 7 : download report
+7.1 Kesehatan data (untuk data engineer dan admin)
+7.2 keadaan AOI dari satelit (untuk analyst dan admin)
+note page 7 : auto bulanan, auto mingguan, generate sendiri bebas mau tanggal berapa aja
+
+page 8 : system aplikasi
+8.1 tentang aplikasi (all)
+8.2 logs (data enginer hanya bisa melihat terkait halaman data, sementara analyst terkait halaman kejadian, admin bisa semua nya termasuk logs login/registrasi)
+8.3 manajemen akun
+8.4 pengaturan aplikasi
+
+page 0 : login 
+input username dan passrowd
+penjelasan benefit kalua buat akun (jadi user, tidak perlu jelaskan fitur khusu admin, analyst dan data engener)
+
+page -0 : registration (hanya tampil di publik untuk jadi user karena role selain itu di generate langsung oleh admin)
+email:
+username:
+password:
+confirm password:

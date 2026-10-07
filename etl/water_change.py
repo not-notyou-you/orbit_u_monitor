@@ -164,11 +164,19 @@ def _read_linear(path: Path) -> tuple[np.ndarray, object, object]:
         return lin, src.transform, src.crs
 
 
-def read_vh_pair(cur_path: Path, prev_path: Path, max_side: int = MAX_SIDE):
-    """(cur_lin, prev_lin, transform, crs) di grid turunan scene sekarang."""
+def read_vh_pair(cur_path: Path, prev_path: Path, max_side: int = MAX_SIDE, grid=None):
+    """(cur_lin, prev_lin, transform, crs) di grid turunan scene sekarang.
+
+    `grid` != None -> dipakai apa adanya (etl.aoi_coverage): bingkainya jadi
+    AOI, sama untuk setiap tanggal, dan PNG hasilnya setumpuk dengan preview
+    lain. Tanpa itu grid diturunkan dari raster scene sekarang seperti dulu,
+    sehingga bingkainya ikut berubah tiap kali footprint S1 berubah."""
     cur, cur_tf, crs = _read_linear(cur_path)
-    h, w = _target_shape(cur.shape[1], cur.shape[0], max_side)
-    dst_tf = cur_tf * cur_tf.scale(cur.shape[1] / w, cur.shape[0] / h)
+    if grid is not None:
+        h, w, dst_tf, crs = grid.height, grid.width, grid.transform, grid.crs
+    else:
+        h, w = _target_shape(cur.shape[1], cur.shape[0], max_side)
+        dst_tf = cur_tf * cur_tf.scale(cur.shape[1] / w, cur.shape[0] / h)
     out = []
     for arr, tf, src_crs in ((cur, cur_tf, crs), _read_linear(prev_path)):
         dst = np.full((h, w), np.nan, dtype="float64")
@@ -245,8 +253,9 @@ def mask_swath_edges(db: np.ndarray, transform, crs, buffer_m: float = EDGE_BUFF
 
 
 def compute(cur_vh: Path, prev_vh: Path, threshold_db: float = DEFAULT_THRESHOLD_DB,
-            max_side: int = MAX_SIDE, edge_buffer_m: float = EDGE_BUFFER_M) -> WaterChange:
-    cur_lin, prev_lin, tf, crs = read_vh_pair(cur_vh, prev_vh, max_side)
+            max_side: int = MAX_SIDE, edge_buffer_m: float = EDGE_BUFFER_M,
+            grid=None) -> WaterChange:
+    cur_lin, prev_lin, tf, crs = read_vh_pair(cur_vh, prev_vh, max_side, grid=grid)
     cur_db = mask_swath_edges(to_db(cur_lin), tf, crs, edge_buffer_m)
     prev_db = mask_swath_edges(to_db(prev_lin), tf, crs, edge_buffer_m)
     classes = classify(cur_db, prev_db, threshold_db)
@@ -273,15 +282,26 @@ def _label_font(size: int):
         return ImageFont.load_default()
 
 
-def render_png(wc: WaterChange, path: Path, *, orbit_differs: bool = False, max_side: int = PNG_MAX_SIDE) -> dict:
-    """PNG RGB: latar VH abu, kelas berwarna, NoData kotak-kotak, label orbit."""
+def render_png(wc: WaterChange, path: Path, *, orbit_differs: bool = False, max_side: int = PNG_MAX_SIDE,
+               regions=None, out_shape: tuple[int, int] | None = None) -> dict:
+    """PNG RGB: latar VH abu, kelas berwarna, NoData kotak-kotak, label orbit.
+
+    `regions` != None -> varian garis wilayah `{stem}_adm.png` ikut ditulis
+    (etl/admin_overlay.py); namanya dikembalikan di legenda sebagai "file_adm"
+    supaya live_cycle bisa mencatatnya di item preview scene."""
+    from affine import Affine
     from PIL import Image, ImageDraw
 
     classes, db = wc.classes, wc.vh_db
     # Diskalakan (nearest) ke sisi terpanjang max_side, naik maupun turun,
     # supaya tile seragam dan label orbit selalu terbaca.
-    s = max_side / max(classes.shape)
-    h, w = max(1, round(classes.shape[0] * s)), max(1, round(classes.shape[1] * s))
+    if out_shape is not None:
+        # Ukuran preview scene, diminta persis: satu piksel selisih sudah
+        # membuat PNG ini tidak setumpuk dengan tujuh PNG lainnya.
+        h, w = out_shape
+    else:
+        s = max_side / max(classes.shape)
+        h, w = max(1, round(classes.shape[0] * s)), max(1, round(classes.shape[1] * s))
     if (h, w) != classes.shape:
         ri = (np.arange(h) * classes.shape[0] / h).astype(int)
         ci = (np.arange(w) * classes.shape[1] / w).astype(int)
@@ -308,7 +328,15 @@ def render_png(wc: WaterChange, path: Path, *, orbit_differs: bool = False, max_
         draw.multiline_text((8, 8), text, fill=(180, 40, 40), font=font)
     with atomic_path(path) as tmp:
         img.save(tmp, format="PNG")
+    # Transform scene ikut diskalakan seperti gambarnya, kalau tidak garis
+    # wilayah akan tergambar di koordinat grid sebelum penskalaan nearest.
+    tf = wc.transform * Affine.scale(wc.classes.shape[1] / w, wc.classes.shape[0] / h)
+    file_adm = None
+    if regions:
+        from etl import admin_overlay
+        file_adm = admin_overlay.write_variant(path, tf, wc.crs, regions)
     return {
+        "file_adm": file_adm,
         "type": "categorical",
         "categories": [{"value": c, "color": COLORS.get(c, "#00000000" if c == LAND else "checker"),
                         "label": LABELS[c]} for c in (PERSISTENT, NEW, RECEDED, LAND, NODATA)],

@@ -1,10 +1,11 @@
-<!-- pages/reports.html — Laporan (INTERFACE.md §2.7): tab Hidromet (ANALYST, ADMIN) ·
-     Kesehatan Data (DATA_ENGINEER, ADMIN). Laporan muncul setelah periodenya berakhir (M18). -->
+<!-- pages/reports.html — Laporan (INTERFACE.md §2 halaman 7): tab router
+     Kesehatan data (DATA_ENGINEER, ADMIN) · Keadaan AOI (ANALYST, ADMIN).
+     Otomatis mingguan/bulanan (M18) + buat sendiri untuk rentang bebas (M56). -->
 <div class="layout">
   <div class="control-panel">
     <form id="rpFilter" novalidate>
       <fieldset>
-        <legend>Filter</legend>
+        <legend>Cari laporan</legend>
         <div class="field"><label for="rpYear">Tahun</label><select id="rpYear"><option value="">Semua tahun</option></select></div>
         <div class="field"><label for="rpPeriod">Jenis periode</label>
           <select id="rpPeriod"><option value="">Mingguan dan bulanan</option><option value="_WEEKLY">Mingguan</option><option value="_MONTHLY">Bulanan</option></select></div>
@@ -12,20 +13,30 @@
         <div class="btn-row end"><button type="submit" id="rpApply">Terapkan</button></div>
       </fieldset>
     </form>
+    <form id="rpCustom" novalidate>
+      <fieldset>
+        <legend>Buat sendiri (rentang bebas)</legend>
+        <div class="field-row">
+          <div class="field"><label for="rpFrom">Dari</label><input type="date" id="rpFrom" required></div>
+          <div class="field"><label for="rpTo">Sampai</label><input type="date" id="rpTo" required></div>
+        </div>
+        <span class="err" id="rpCustomErr" aria-live="polite"></span>
+        <p class="mut" style="font-size:11px;margin:0 0 6px">Maksimal 366 hari. PDF dibuat saat itu juga dan langsung diunduh; tidak disimpan di daftar.</p>
+        <div class="btn-row end"><button type="submit" class="default" id="rpCustomGo">Buat &amp; unduh PDF</button></div>
+      </fieldset>
+    </form>
     <fieldset id="rpAdmin" hidden>
-      <legend>Administrator</legend>
+      <legend>Aksi Administrator</legend>
       <p style="margin-bottom:6px">Buat ulang laporan periode tertentu. Versi lama ditandai "digantikan"; berkasnya tetap disimpan.</p>
       <button type="button" id="rpRegen">Buat ulang…</button>
     </fieldset>
     <fieldset>
       <legend>Tentang laporan</legend>
       <p style="margin:0">Dibuat otomatis oleh penjadwal: mingguan (Senin–Minggu) dan bulanan, setelah periodenya berakhir. Tidak ada laporan untuk periode yang sedang berjalan.</p>
+      <p style="margin:6px 0 0">Backfill <b>tidak</b> membuat laporan untuk periode lampau. Untuk periode hasil backfill gunakan "Buat sendiri" di atas, atau minta Administrator "Buat ulang" per periode.</p>
     </fieldset>
   </div>
   <div class="deck">
-    <div class="tabs" role="tablist" aria-label="Jenis laporan" id="rpTabs"></div>
-    <div class="raised tabpanel" role="tabpanel">
-      <div class="screen"><div class="screen-inner"><span class="scr-ch" id="rpCh">LAPORAN</span><span class="scr-rec off" id="rpCount"></span><div id="rpTable"></div></div></div>
-    </div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch" id="rpCh">LAPORAN</span><span class="scr-rec off" id="rpCount"></span><div id="rpTable"></div></div></div>
   </div>
 </div>

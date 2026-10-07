@@ -404,3 +404,74 @@ def test_error_format_has_detail_and_code(make_client):
     assert set(body) == {"detail", "code"} and body["code"] == "NOT_FOUND"
     resp = make_client("DATA_ENGINEER").get("/api/products?tier=INVALID")
     assert "code" in resp.json() and "detail" in resp.json()
+
+
+class TestRegisterAndSession:
+    """Registrasi mandiri dan /auth/session (M56)."""
+
+    @pytest.fixture(autouse=True)
+    def _fresh_limiter(self):
+        from api.routes.auth import register_rate_limiter
+        register_rate_limiter.reset()
+        yield
+        register_rate_limiter.reset()
+
+    @staticmethod
+    def _body(name, **kw):
+        return {"email": f"{name}@example.org", "username": name, "password": TEST_PASSWORD,
+                "password_confirm": TEST_PASSWORD, **kw}
+
+    def test_register_creates_signed_in_user(self, make_client, db_client):
+        name = f"reg_{int(time.time() * 1000) % 10_000_000}"
+        client = make_client(None)
+        r = client.post("/api/auth/register", json=self._body(name, email=f"{name.upper()}@Example.org"))
+        assert r.status_code == 201, r.text
+        assert r.json()["role_code"] == "USER" and "account.manage" in r.json()["permissions"]
+        assert "orbit_u_session" in r.cookies
+        assert client.get("/api/auth/me").json()["username"] == name
+        with db_client.session() as sess:
+            row = sess.execute(text("""SELECT u.email, r.role_code, u.created_by FROM users u
+                                       JOIN roles r USING (role_id) WHERE username = :u"""), {"u": name}).one()
+        assert row == (f"{name}@example.org", "USER", None)
+        assert _activity(db_client, "REGISTER", username=None, user_id=None) is not None
+
+    def test_role_cannot_be_chosen(self, make_client, db_client):
+        name = f"reg_{int(time.time() * 1000) % 10_000_000}r"
+        r = make_client(None).post("/api/auth/register", json=self._body(name, role_code="ADMIN"))
+        assert r.status_code == 201 and r.json()["role_code"] == "USER"
+
+    def test_validation_and_duplicates(self, make_client):
+        name = f"reg_{int(time.time() * 1000) % 10_000_000}d"
+        anon = make_client(None)
+        r = anon.post("/api/auth/register", json=self._body(name, password_confirm="beda-sekali-123"))
+        assert (r.status_code, r.json()["code"]) == (400, "PASSWORD_MISMATCH")
+        r = anon.post("/api/auth/register", json=self._body(name, password="pendek", password_confirm="pendek"))
+        assert (r.status_code, r.json()["code"]) == (400, "PASSWORD_POLICY")
+        assert anon.post("/api/auth/register", json=self._body(name, email="bukan-email")).status_code == 422
+        assert anon.post("/api/auth/register", json=self._body(name)).status_code == 201
+        r = make_client(None).post("/api/auth/register", json=self._body(name, email=f"lain_{name}@example.org"))
+        assert (r.status_code, r.json()["code"]) == (409, "USERNAME_TAKEN")
+        r = make_client(None).post("/api/auth/register", json=self._body(name + "x", email=f"{name}@EXAMPLE.org"))
+        assert (r.status_code, r.json()["code"]) == (409, "EMAIL_TAKEN")
+
+    def test_rate_limited_per_address(self, make_client):
+        base = f"rl_{int(time.time() * 1000) % 10_000_000}"
+        codes = [make_client(None).post("/api/auth/register", json=self._body(f"{base}_{i}")).status_code
+                 for i in range(6)]
+        assert codes[:5] == [201] * 5 and codes[5] == 429
+
+    def test_session_endpoint_for_visitor_and_user(self, make_client):
+        anon = make_client(None).get("/api/auth/session")
+        assert anon.status_code == 200
+        body = anon.json()
+        assert body["authenticated"] is False and body["role_code"] == "PUBLIC" and body["user"] is None
+        assert {"home.view", "citra.view", "disasters.view", "about.view"} <= set(body["permissions"])
+        assert "aoi3d.view" not in body["permissions"]
+        user = make_client("USER").get("/api/auth/session").json()
+        assert user["authenticated"] is True and user["user"]["role_code"] == "USER"
+        assert "aoi3d.view" in user["permissions"] and "diagram.view" not in user["permissions"]
+        analyst = make_client("ANALYST").get("/api/auth/session").json()["permissions"]
+        assert {"diagram.view", "disasters.manage", "logs.disasters"} <= set(analyst)
+        assert "logs.data" not in analyst and "datasets.manage" not in analyst
+        de = make_client("DATA_ENGINEER").get("/api/auth/session").json()["permissions"]
+        assert {"datasets.manage", "eda.view", "logs.data"} <= set(de) and "diagram.view" not in de

@@ -1,0 +1,32 @@
+<!-- pages/disasters-view.html — Kejadian › Lihat (INTERFACE.md §2 halaman 5.1).
+     Semua peran. Pengunjung melihat 365 hari terakhir (VIEW v_public_kejadian),
+     peran lain seluruh riwayat. Tidak ada aksi tulis di sini; CRUD ada di
+     tab Kelola (ANALYST & ADMIN). -->
+<div class="layout">
+  <div class="control-panel">
+    <form id="dvFilter" novalidate>
+      <fieldset>
+        <legend>Saring kejadian</legend>
+        <div class="field-row">
+          <div class="field"><label for="dvFrom">Dari tanggal</label><input type="date" id="dvFrom"></div>
+          <div class="field"><label for="dvTo">Sampai</label><input type="date" id="dvTo"></div>
+        </div>
+        <div class="field"><label for="dvType">Jenis bencana</label><select id="dvType"><option value="">Semua jenis</option></select></div>
+        <div class="field"><label for="dvRegion">Kecamatan</label><select id="dvRegion"><option value="">Semua kecamatan</option></select></div>
+        <div class="btn-row end"><button type="submit" id="dvApply">Terapkan</button></div>
+      </fieldset>
+    </form>
+    <div id="dvWindow" class="banner sunken" role="note" hidden></div>
+    <div id="dvManage" hidden>
+      <fieldset><legend>Kelola</legend>
+        <p class="mut" style="font-size:11px;margin:0 0 6px">Peran Anda boleh menambah dan mengubah catatan kejadian.</p>
+        <a class="btn" href="#kejadian/kelola">Kelola kejadian →</a></fieldset>
+    </div>
+  </div>
+  <div class="deck">
+    <div class="screen"><div class="screen-inner flush"><span class="scr-ch">CH-01 · PETA TITIK KEJADIAN</span><span class="scr-rec off" id="dvMapRec"></span>
+      <div class="map" id="dvMap" role="img" aria-label="Peta titik kejadian bencana; daftar lengkap ada di tabel"></div></div></div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-02 · DAFTAR KEJADIAN</span><span class="scr-rec off" id="dvCount"></span>
+      <div id="dvTable"></div></div></div>
+  </div>
+</div>

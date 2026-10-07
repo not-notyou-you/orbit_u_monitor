@@ -23,7 +23,8 @@ from api.activity import ActivityLogMiddleware
 from api.deps import get_db, require_role, set_clients
 from api.security import jwt_secret
 from api.routes import (
-    admin, admin_monitor, alerts, auth, datasets, excel, disasters, health, hydromet, lineage, live, pipeline,
+    admin, admin_monitor, alerts, auth, citra, data, datasets, diagram, excel, disasters, health, hydromet, lineage,
+    live, logs, pipeline,
     products, public, quality, regions, report, reports, scenes, storage,
 )
 
@@ -138,6 +139,12 @@ def _role(min_role: str) -> list:
 app.include_router(health.router, prefix="/api", tags=["Health"], dependencies=_role("PUBLIC"))
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(public.router, prefix="/api/public", tags=["Public"], dependencies=_role("PUBLIC"))
+# Susunan halaman v2 (M56): Citra per satelit, batas waktu per role di VIEW.
+app.include_router(citra.router, prefix="/api/citra", tags=["Imagery"], dependencies=_role("PUBLIC"))
+app.include_router(diagram.router, prefix="/api/diagram", tags=["Diagram"], dependencies=_role("ANALYST"))
+app.include_router(data.router, prefix="/api/data", tags=["Data"], dependencies=_role("DATA_ENGINEER"))
+# Log per halaman: role per route (DATA_ENGINEER / ANALYST), tidak bertingkat.
+app.include_router(logs.router, prefix="/api/logs", tags=["Logs"], dependencies=_role("USER"))
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"], dependencies=_role("ADMIN"))
 app.include_router(scenes.router, prefix="/api/scenes", tags=["Scenes"], dependencies=_role("DATA_ENGINEER"))
 app.include_router(products.router, prefix="/api/products", tags=["Products"], dependencies=_role("DATA_ENGINEER"))
@@ -152,16 +159,17 @@ app.include_router(pipeline.router, prefix="/api/pipeline", tags=["Pipeline"], d
 app.include_router(datasets.router, prefix="/api/datasets", tags=["Datasets"], dependencies=_role("DATA_ENGINEER"))
 app.include_router(report.router, prefix="/api/datasets", tags=["Report"], dependencies=_role("DATA_ENGINEER"))
 app.include_router(live.router, prefix="/api/live", tags=["Live"], dependencies=_role("USER"))
-app.include_router(regions.router, prefix="/api/regions", tags=["Regions"], dependencies=_role("USER"))
+# Peta kecamatan AOI terbuka untuk Beranda publik (M56); ROI sistem tetap USER.
+app.include_router(regions.router, prefix="/api/regions", tags=["Regions"], dependencies=_role("PUBLIC"))
 app.include_router(regions.rois_router, prefix="/api/rois", tags=["Regions"], dependencies=_role("USER"))
 # Tahap 3: monitoring (INTERFACE.md §4.4–4.6, §4.9).
 app.include_router(admin_monitor.router, prefix="/api/admin", tags=["Admin"], dependencies=_role("ADMIN"))
 app.include_router(hydromet.router, prefix="/api/hydromet", tags=["Hydromet"], dependencies=_role("USER"))
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"], dependencies=_role("USER"))
 app.include_router(alerts.rules_router, prefix="/api/alert-rules", tags=["Alerts"], dependencies=_role("USER"))
-app.include_router(disasters.router, prefix="/api/disasters", tags=["Disasters"], dependencies=_role("ANALYST"))
+app.include_router(disasters.router, prefix="/api/disasters", tags=["Disasters"], dependencies=_role("PUBLIC"))
 app.include_router(disasters.types_router, prefix="/api/disaster-types", tags=["Disasters"],
-                   dependencies=_role("USER"))
+                   dependencies=_role("PUBLIC"))
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"], dependencies=_role("USER"))
 app.include_router(excel.router, prefix="/api/excel", tags=["Excel"], dependencies=_role("USER"))
 
@@ -217,17 +225,42 @@ def custom_openapi() -> dict:
 app.openapi = custom_openapi
 
 
-# "/" milik landing page (web/index.html); aplikasi kerjanya ada di "/app".
-# Halaman HTML tidak membawa data; pemeriksaan login /app dilakukan app.js
-# lewat /api/auth/me (data tetap dijaga API).
+# Susunan halaman v2 (M56): aplikasi /app terbuka untuk pengunjung, jadi "/"
+# langsung menyajikannya (Beranda). Halaman publik lama dialihkan ke tab
+# padanannya: /kondisi -> Citra Satelit, /relief -> 3D AOI (butuh akun; router
+# mengantar pengunjung ke /masuk). Halaman HTML tidak membawa data; izin
+# disusun app.js dari /api/auth/session dan data tetap dijaga API.
+from fastapi.responses import RedirectResponse  # noqa: E402
+
+
+@app.get("/", include_in_schema=False)
+async def web_home() -> FileResponse:
+    return FileResponse("web/app.html")
+
+
 @app.get("/app", include_in_schema=False)
 async def web_app() -> FileResponse:
     return FileResponse("web/app.html")
 
 
+@app.get("/kondisi", include_in_schema=False)
+async def web_conditions() -> RedirectResponse:
+    return RedirectResponse("/app#citra", status_code=301)
+
+
+@app.get("/relief", include_in_schema=False)
+async def web_relief() -> RedirectResponse:
+    return RedirectResponse("/app#aoi-3d", status_code=301)
+
+
 @app.get("/masuk", include_in_schema=False)
 async def web_login() -> FileResponse:
     return FileResponse("web/masuk.html")
+
+
+@app.get("/daftar", include_in_schema=False)
+async def web_register() -> FileResponse:
+    return FileResponse("web/daftar.html")
 
 
 app.mount("/", StaticFiles(directory="web", html=True), name="web")

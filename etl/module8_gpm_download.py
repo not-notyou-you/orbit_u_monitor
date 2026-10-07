@@ -91,6 +91,14 @@ IMERG_RESOLUTION_DEG = 0.1
 S1_RESOLUTION_M = 10
 S1_RESOLUTION_DEG = S1_RESOLUTION_M / 111_320.0  # meters -> degrees at the equator
 MAX_RETRIES = 3
+# Download granule dapat jatah lebih banyak daripada listing, dengan tangga
+# jeda dg.connection_retry_delay (5/10/20/40/80/120 s) alih-alih retry_delay
+# (2/4 s). Alasannya sama dengan yang sudah berlaku di module1 untuk CDSE
+# (download_guard.py sekitar baris 274): SSL EOF / IncompleteRead berarti
+# jaringan sedang gangguan beberapa menit, bukan granule rusak, dan jatah
+# 3 x 2-4 s habis dalam <10 detik -- terbukti pada backfill 2026-10-05, saat
+# 2024-02-05 dan 2024-02-06 menyerah dalam ~6 detik di tengah outage ISP.
+DOWNLOAD_MAX_RETRIES = int(os.getenv("GPM_DOWNLOAD_MAX_RETRIES", "6"))
 DEFAULT_NODATA = -9999.9
 
 GPM_PRODUCT_TYPE = "GPM_RAINFALL"
@@ -317,28 +325,47 @@ def _download_with_retry(
         f".{os.getpid()}.{threading.get_ident()}{out_path.suffix}.part"
     )
     last_exc: Exception | None = None
+    # Byte yang sudah aman di .part dari attempt sebelumnya; dikirim sebagai
+    # header Range supaya transfer yang putus di 26 dari 29 MB tidak ditarik
+    # ulang dari nol (lihat module1 baris ~405 untuk pola yang sama di CDSE).
+    resume_from = 0
 
-    for attempt in range(1, MAX_RETRIES + 1):
+    for attempt in range(1, DOWNLOAD_MAX_RETRIES + 1):
         attempt_started = time.monotonic()
         retry_after = None
         _plog_event(
             plog, dataset_id, scene_id, "DOWNLOAD", "RUNNING",
-            f"{item_label}: downloading (attempt {attempt}/{MAX_RETRIES})",
-            {"item": item_label, "attempt": attempt, "max_retries": MAX_RETRIES, "url": url},
+            f"{item_label}: downloading (attempt {attempt}/{DOWNLOAD_MAX_RETRIES})"
+            + (f", resume dari {resume_from / 1e6:.0f} MB" if resume_from else ""),
+            {"item": item_label, "attempt": attempt, "max_retries": DOWNLOAD_MAX_RETRIES,
+             "url": url, "resume_from_bytes": resume_from},
         )
         try:
+            headers = dict(_auth_headers())
+            if resume_from:
+                headers["Range"] = f"bytes={resume_from}-"
             with dg.source_slot(dg.GESDISC), requests.get(
-                url, headers=_auth_headers(), stream=True, timeout=dg.REQUEST_TIMEOUT
+                url, headers=headers, stream=True, timeout=dg.REQUEST_TIMEOUT
             ) as r:
                 # 401/403: token Earthdata bersama semua job -- gagal cepat.
                 dg.raise_for_nasa_auth(r, "GESDISC", url)
                 if r.status_code in dg.THROTTLE_STATUSES:
                     retry_after = r.headers.get("Retry-After")
                 r.raise_for_status()
-                expected_size = int(r.headers.get("Content-Length", 0))
-                downloaded = 0
+                # 206 = server menghormati Range, isinya sisa berkas. 200 saat
+                # kita minta Range = server mengabaikannya dan mengirim ulang
+                # dari awal, jadi .part lama harus dibuang supaya tidak dobel.
+                resumed = resume_from > 0 and r.status_code == 206
+                if resume_from and not resumed:
+                    logger.info("[M8] server mengabaikan Range, mulai dari awal: %s",
+                                out_path.name)
+                    resume_from = 0
+                body_size = int(r.headers.get("Content-Length", 0))
+                # Content-Length pada 206 hanya sisanya; ukuran utuh = offset + sisa.
+                expected_size = (resume_from + body_size) if body_size else 0
+                downloaded = resume_from
                 guard = dg.StallGuard()
-                with open(tmp_path, "wb") as f:
+                with open(tmp_path, "ab" if resumed else "wb") as f:
                     for chunk in r.iter_content(chunk_size=dg.CHUNK_SIZE):
                         f.write(chunk)
                         downloaded += len(chunk)
@@ -363,6 +390,7 @@ def _download_with_retry(
             # kalau proses lain sudah menang duluan menulis out_path.
             os.replace(tmp_path, out_path)
             dg.clear_auth_failure("GESDISC")
+            dg.record_connection_success(dg.GESDISC)
             checksum = _md5(out_path)
             logger.info("[M8] downloaded %s (md5=%s...)", out_path.name, checksum[:12])
             _plog_event(
@@ -383,17 +411,31 @@ def _download_with_retry(
             )
             logger.warning(
                 "[M8] download gagal (attempt %d/%d) %s: %s",
-                attempt, MAX_RETRIES, out_path.name, exc,
+                attempt, DOWNLOAD_MAX_RETRIES, out_path.name, exc,
             )
-            tmp_path.unlink(missing_ok=True)
             auth_failed = isinstance(exc, dg.NasaAuthError)
-            is_final = auth_failed or not_found or attempt == MAX_RETRIES
+            # requests.RequestException turunan OSError, jadi ConnectionError,
+            # ChunkedEncodingError (IncompleteRead) dan SSLError semua tertangkap
+            # di sini -- sama seperti predikat module1.
+            conn_lost = (not auth_failed and not not_found
+                         and isinstance(exc, (ConnectionError, TimeoutError, OSError)))
+            if conn_lost and tmp_path.exists():
+                # Simpan yang sudah turun; attempt berikutnya lanjut lewat Range.
+                resume_from = tmp_path.stat().st_size
+                logger.info("[M8] akan resume dari %.0f MB: %s",
+                            resume_from / 1e6, out_path.name)
+            else:
+                resume_from = 0
+                tmp_path.unlink(missing_ok=True)
+            is_final = auth_failed or not_found or attempt == DOWNLOAD_MAX_RETRIES
             _plog_event(
                 plog, dataset_id, scene_id, "DOWNLOAD", "FAILED" if is_final else "RUNNING",
-                f"{item_label}: attempt {attempt}/{MAX_RETRIES} failed ({exc})",
+                f"{item_label}: attempt {attempt}/{DOWNLOAD_MAX_RETRIES} failed ({exc})",
                 {
-                    "item": item_label, "attempt": attempt, "max_retries": MAX_RETRIES,
+                    "item": item_label, "attempt": attempt,
+                    "max_retries": DOWNLOAD_MAX_RETRIES,
                     "error_type": type(exc).__name__, "error_message": str(exc),
+                    "resume_from_bytes": resume_from,
                     "duration_seconds": round(time.monotonic() - attempt_started, 3),
                 },
             )
@@ -403,15 +445,30 @@ def _download_with_retry(
                 raise _GranuleNotFound(str(exc)) from exc
             if auth_failed:
                 raise
-            if attempt < MAX_RETRIES:
-                # Retry-After (429/503, dibatasi) atau backoff + jitter.
-                dg.backoff_wait(
-                dg.GESDISC, attempt,
-                "server rate-limiting (429/503)" if retry_after else "failed, retrying",
-                retry_after=retry_after, max_attempts=MAX_RETRIES,
-            )
+            if attempt < DOWNLOAD_MAX_RETRIES:
+                if conn_lost and retry_after is None:
+                    # Koneksi diputus: tangga 5/10/20/40/80/120 s, bukan 2/4 s.
+                    # Retry instan hanya menabrak kondisi yang sama lagi.
+                    dg.record_connection_failure(dg.GESDISC)
+                    delay = dg.connection_retry_delay(attempt)
+                    dg.note_wait(dg.GESDISC, delay, "connection lost",
+                                 attempt, DOWNLOAD_MAX_RETRIES)
+                    logger.info("[M8] menunggu %.0f s sebelum mencoba lagi "
+                                "(connection lost, attempt %d/%d)",
+                                delay, attempt, DOWNLOAD_MAX_RETRIES)
+                    dg.sleep_or_cancel(delay, None)
+                else:
+                    # Retry-After (429/503, dibatasi) atau backoff + jitter.
+                    dg.backoff_wait(
+                        dg.GESDISC, attempt,
+                        "server rate-limiting (429/503)" if retry_after else "failed, retrying",
+                        retry_after=retry_after, max_attempts=DOWNLOAD_MAX_RETRIES,
+                    )
 
-    raise RuntimeError(f"download failed for {url} after {MAX_RETRIES} attempts: {last_exc}")
+    tmp_path.unlink(missing_ok=True)
+    raise RuntimeError(
+        f"download failed for {url} after {DOWNLOAD_MAX_RETRIES} attempts: {last_exc}"
+    )
 
 
 def _snap_resolution(res: float) -> float:

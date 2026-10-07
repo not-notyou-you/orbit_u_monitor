@@ -1,0 +1,25 @@
+<!-- pages/citra.html — Citra Satelit › Ringkasan (INTERFACE.md §2 halaman 3.1).
+     Rekap per satelit untuk area terpilih, lalu navigasi ke 3.2–3.5. Batas
+     waktu per peran ditegakkan di API/VIEW; halaman ini hanya mengatakannya. -->
+<div class="layout">
+  <div class="control-panel">
+    <fieldset>
+      <legend>Area</legend>
+      <div class="field"><label for="ciArea">Live Area</label><select id="ciArea"></select></div>
+      <div id="ciWindow" class="mut" style="font-size:11px"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Lanjut ke</legend>
+      <div class="btn-row" style="flex-direction:column;align-items:stretch">
+        <a class="btn" href="#citra/sentinel-1">Sentinel-1 →</a>
+        <a class="btn" href="#citra/modis">MODIS →</a>
+        <a class="btn" href="#citra/gpm">GPM →</a>
+        <a class="btn" href="#citra/laporan">Laporan PDF →</a>
+      </div>
+    </fieldset>
+  </div>
+  <div class="deck">
+    <div id="ciStatus"></div>
+    <div class="sat-cards" id="ciCards"></div>
+  </div>
+</div>

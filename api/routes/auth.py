@@ -19,6 +19,8 @@ from api.schemas import (
     LoginRequest,
     MeResponse,
     OkResponse,
+    RegisterRequest,
+    SessionInfoResponse,
     TokenCreateRequest,
     TokenCreateResponse,
     TokenItem,
@@ -26,6 +28,7 @@ from api.schemas import (
 )
 from api.security import (
     SESSION_COOKIE,
+    RateLimiter,
     SESSION_HOURS,
     burn_password_check,
     cookie_secure,
@@ -39,29 +42,49 @@ from api.security import (
 router = APIRouter()
 
 # Kunci fitur untuk UI (menu per role). Bukan penegak akses: API dan DB
-# tetap memeriksa sendiri (INTERFACE.md §3.2).
+# tetap memeriksa sendiri (INTERFACE.md §3.2). Susunan halaman v2 (M56):
+# Beranda, Citra, Kejadian (lihat), dan Tentang terbuka untuk pengunjung.
 PERMISSIONS: dict[str, str] = {
+    "home.view": "PUBLIC",
+    "citra.view": "PUBLIC",
+    "disasters.view": "PUBLIC",
+    "about.view": "PUBLIC",
     "live.latest": "PUBLIC",
+    "aoi3d.view": "USER",
     "live.recent": "USER",
     "hydromet.today": "USER",
     "alerts.view": "USER",
     "account.manage": "USER",
     "alerts.acknowledge": "ANALYST",
     "analytics.view": "ANALYST",
+    "diagram.view": "ANALYST",
     "disasters.manage": "ANALYST",
     "reports.hydromet": "ANALYST",
+    "logs.disasters": "ANALYST",
     "datasets.manage": "DATA_ENGINEER",
+    "eda.view": "DATA_ENGINEER",
     "reports.datahealth": "DATA_ENGINEER",
+    "logs.data": "DATA_ENGINEER",
     "admin.system": "ADMIN",
     "admin.accounts": "ADMIN",
+    "logs.all": "ADMIN",
 }
+
+# Registrasi mandiri: 5 akun per alamat IP per jam (in-process, seperti
+# token_rate_limiter). Cukup untuk menahan skrip pendaftaran massal tanpa
+# CAPTCHA; organisasi pengguna < 100 akun.
+register_rate_limiter = RateLimiter(limit=5, window_s=3600)
+
+
+def _permissions(principal: Principal) -> list[str]:
+    return [k for k, role in PERMISSIONS.items() if principal.has_role(role)]
 
 
 def _me(principal: Principal) -> MeResponse:
     return MeResponse(
         user_id=principal.user_id, username=principal.username, full_name=principal.full_name,
         organization=principal.organization, role_code=principal.role_code, auth=principal.auth,
-        permissions=[k for k, role in PERMISSIONS.items() if principal.has_role(role)],
+        permissions=_permissions(principal),
     )
 
 
@@ -120,6 +143,53 @@ def login(req: LoginRequest, request: Request, sess: Session = Depends(get_sessi
     response = JSONResponse(_me(principal).model_dump())
     _set_session_cookie(response, token)
     return response
+
+
+@router.post("/register", status_code=201, summary="Create a USER account (self-registration)",
+             dependencies=[Depends(require_role("PUBLIC"))],
+             responses={409: {"description": "Username or email already registered"},
+                        429: {"description": "Too many registrations from this address"}})
+def register(req: RegisterRequest, request: Request, sess: Session = Depends(get_session)):
+    """Visitors become `USER`; other roles are created by an ADMIN. The role
+    is fixed inside the database function `auth_register_user`, so this
+    endpoint cannot create anything else. On success the new account is
+    signed in (sets `orbit_u_session`)."""
+    meta = request_meta(request)
+    if req.password != req.password_confirm:
+        raise ApiError(400, "Password confirmation does not match", "PASSWORD_MISMATCH")
+    problem = password_policy_error(req.password)
+    if problem:
+        raise ApiError(400, problem, "PASSWORD_POLICY")
+    if not register_rate_limiter.allow(meta.get("ip") or "unknown"):
+        raise ApiError(429, "Too many registrations from this address; try again later", "RATE_LIMITED",
+                       headers={"Retry-After": "3600"})
+    username, email = req.username.strip().lower(), req.email.strip().lower()
+    try:
+        with sess.begin_nested():
+            user_id = sess.scalar(text("SELECT auth_register_user(:u, :e, :h)"),
+                                  {"u": username, "e": email, "h": hash_password(req.password)})
+    except IntegrityError as exc:
+        constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", "") or ""
+        if "email" in constraint:
+            raise ApiError(409, "Email is already registered", "EMAIL_TAKEN")
+        raise ApiError(409, f"Username {username} already exists", "USERNAME_TAKEN")
+    log_activity(sess, "REGISTER", user_id=user_id, target_type="users", target_id=user_id, **meta)
+    token, _exp = create_session_jwt(user_id, "USER")
+    principal = Principal(role_code="USER", user_id=user_id, username=username, full_name=username,
+                          auth="session")
+    response = JSONResponse(_me(principal).model_dump(), status_code=201)
+    _set_session_cookie(response, token)
+    return response
+
+
+@router.get("/session", response_model=SessionInfoResponse,
+            summary="Role and feature keys of the caller, also for visitors who are not signed in")
+def session_info(principal: Principal = Depends(require_role("PUBLIC"))) -> SessionInfoResponse:
+    """Unlike `/me` this never returns 401: a visitor gets role `PUBLIC` and
+    the public feature keys, which the web UI uses to build its menu."""
+    return SessionInfoResponse(authenticated=principal.is_authenticated, role_code=principal.role_code,
+                               permissions=_permissions(principal),
+                               user=_me(principal) if principal.is_authenticated else None)
 
 
 @router.post("/logout", response_model=OkResponse, summary="Sign out (clears the session cookie)")

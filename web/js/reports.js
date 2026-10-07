@@ -1,8 +1,10 @@
-// js/reports.js — Laporan (INTERFACE.md §2.7, §4.8). Daftar disaring RLS per audiens.
+// js/reports.js — Laporan (#laporan/kesehatan-data, #laporan/keadaan-aoi; INTERFACE.md §2
+// halaman 7, §4.8). Jenis laporan dari tab router (ctx.tab.kind). Daftar
+// disaring RLS per audiens; "Buat sendiri" = GET /api/reports/custom.pdf (M56).
 'use strict';
 Pages['reports'] = (() => {
   const TABS = [
-    { key: 'HYDROMET', label: 'Hidromet', perm: 'reports.hydromet' },
+    { key: 'HYDROMET', label: 'Keadaan AOI', perm: 'reports.hydromet' },
     { key: 'DATAHEALTH', label: 'Kesehatan Data', perm: 'reports.datahealth' },
   ];
   const STATUS = { READY: 'SIAP', FAILED: 'GAGAL', GENERATING: 'DIBUAT…', SUPERSEDED: 'DIGANTIKAN', PENDING: 'MENUNGGU' };
@@ -10,11 +12,12 @@ Pages['reports'] = (() => {
   let st = null;
 
   async function init(root, ctx) {
-    const tabs = TABS.filter(t => Auth.can(t.perm));
-    st = { root, ctx, tab: tabs[0].key, page: 1, admin: ctx.me.role_code === 'ADMIN' };
+    const kind = (ctx.tab && ctx.tab.kind) || TABS.find(t => Auth.can(t.perm)).key;
+    st = { root, ctx, tab: kind, page: 1, admin: !!ctx.me && ctx.me.role_code === 'ADMIN' };
     const $ = s => UI.$(s, root);
-    $('#rpTabs').innerHTML = tabs.map((t, i) => '<button type="button" role="tab" data-tab="' + t.key + '" aria-selected="' + (i === 0) + '"' + (i ? ' tabindex="-1"' : '') + '>' + t.label + '</button>').join('');
-    UI.bindTabs(root, k => { st.tab = k; st.page = 1; load(); });
+    const today = UI.isoDate(new Date());
+    $('#rpTo').value = UI.addDays(today, -1); $('#rpFrom').value = UI.addDays(today, -14);
+    $('#rpCustom').addEventListener('submit', ev => { ev.preventDefault(); custom(); });
     const y = new Date().getFullYear();
     $('#rpYear').insertAdjacentHTML('beforeend', Array.from({ length: y - 2022 }, (_, i) => '<option>' + (y - i) + '</option>').join(''));
     $('#rpFilter').addEventListener('submit', ev => { ev.preventDefault(); st.page = 1; UI.busy($('#rpApply'), load); });
@@ -51,6 +54,19 @@ Pages['reports'] = (() => {
     UI.$$('[data-regen]', st.root).forEach(b => b.addEventListener('click', () => regenerate(r.items.find(i => String(i.report_id) === b.dataset.regen))));
     UI.$$('#rpTable [data-page]', st.root).forEach(b => b.addEventListener('click', () => { st.page = Number(b.dataset.page); load(); }));
     st.ctx.setStatus('Siap · ' + UI.int(r.total) + ' laporan');
+  }
+
+  async function custom() {
+    const $ = s => UI.$(s, st.root);
+    const from = $('#rpFrom').value, to = $('#rpTo').value;
+    const days = from && to ? Math.round((UI.parseDate(to) - UI.parseDate(from)) / 864e5) + 1 : 0;
+    $('#rpCustomErr').textContent = !from || !to || days < 1 ? 'Isi tanggal awal dan akhir (awal ≤ akhir).' : days > 366 ? 'Rentang maksimal 366 hari.' : '';
+    if ($('#rpCustomErr').textContent) return;
+    await UI.busy($('#rpCustomGo'), async () => {
+      st.ctx.setStatus('Membuat PDF…');
+      try { await API.download('/api/reports/custom.pdf' + API.qs({ kind: st.tab, date_from: from, date_to: to }), 'laporan.pdf'); st.ctx.setStatus('PDF diunduh'); }
+      catch (e) { st.ctx.setStatus('Gagal'); UI.showError('Laporan rentang bebas', e); }
+    });
   }
 
   async function regenerate(item) {

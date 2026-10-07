@@ -1,0 +1,84 @@
+/* web/css/tema/pilihan.css — pemilih tema di Beranda (pages/home.html, M57).
+   Satu kartu radio per tema dengan pratinjau jendela mini. Warna pratinjau
+   sengaja ditulis tetap (bukan token), supaya tiap kartu selalu menampilkan
+   temanya sendiri apa pun tema yang sedang aktif. Kartunya sendiri memakai
+   token, jadi ikut tema aktif. */
+
+.tema-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.tp-opt {
+  position: relative; display: flex; flex-direction: column; gap: 6px; padding: 6px; cursor: pointer;
+  border: 1px solid var(--shadow); background: var(--field); color: var(--text); min-width: 0;
+}
+.tp-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+.tp-opt:hover { border-color: var(--text); }
+.tp-opt.on { outline: 2px solid var(--select); outline-offset: -2px; border-color: var(--select); }
+.tp-opt:focus-within { outline: 2px dotted var(--text); outline-offset: 2px; }
+.tp-opt.on:focus-within { outline: 2px solid var(--select); outline-offset: 2px; }
+.tp-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tp-name { font-weight: 700; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.tp-name small { font-weight: 400; color: var(--text-mut); }
+.tp-name .tp-check { margin-left: auto; font-size: 11px; color: var(--select); visibility: hidden; }
+.tp-opt.on .tp-check { visibility: visible; }
+.tp-desc { font-size: 11px; color: var(--text-mut); line-height: 1.4; }
+.tema-pick-note { font-size: 11px; color: var(--text-mut); margin: 8px 0 0; }
+
+/* ------------------------------------------------------- pratinjau jendela mini */
+.tp-prev { display: block; height: 74px; padding: 9px 12px 12px; overflow: hidden; }
+.tp-win { display: flex; flex-direction: column; height: 100%; }
+.tp-bar { display: flex; justify-content: flex-end; align-items: center; gap: 3px; height: 13px; padding: 0 3px; flex: none; }
+.tp-bar i { display: block; width: 7px; height: 7px; }
+.tp-body { display: flex; flex-direction: column; justify-content: center; gap: 4px; flex: 1; padding: 4px 6px; }
+.tp-ln { display: block; height: 4px; width: 80%; }
+.tp-ln.s { width: 50%; }
+.tp-btn { display: block; width: 26px; height: 9px; align-self: flex-end; }
+
+/* Orbital 95 */
+.tp-o95 { background: #0b1e3a; }
+.tp-o95 .tp-win { background: #c0c0c0; padding: 2px;
+  box-shadow: inset -1px -1px #000, inset 1px 1px #fff, inset -2px -2px #808080, inset 2px 2px #dfdfdf; }
+.tp-o95 .tp-bar { background: linear-gradient(90deg, #000080, #1084d0); }
+.tp-o95 .tp-bar i { background: #c0c0c0; box-shadow: inset -1px -1px #000, inset 1px 1px #fff; }
+.tp-o95 .tp-ln { background: #33ff99; }
+.tp-o95 .tp-body { background: #000; margin: 3px 0 0; }
+.tp-o95 .tp-btn { background: #c0c0c0; box-shadow: inset -1px -1px #000, inset 1px 1px #fff; }
+
+/* Kertas Mint */
+.tp-mint { background: #eef7f0 linear-gradient(#dbeee0 1px, transparent 1px) 0 0 / 10px 10px; }
+.tp-mint .tp-win { background: #fafdfb; border: 2px solid #1f2a5a; border-radius: 7px;
+  box-shadow: 3px 3px 0 #7fe0ea, 3px 3px 0 2px #1f2a5a; transform: rotate(-1deg); }
+.tp-mint .tp-bar { background: #7fe0ea; border-bottom: 2px solid #1f2a5a; border-radius: 5px 5px 0 0; }
+.tp-mint .tp-bar i { border: 1.5px solid #1f2a5a; border-radius: 50%; background: #fafdfb; }
+.tp-mint .tp-ln { background: #1f2a5a; border-radius: 4px; }
+.tp-mint .tp-ln.s { background: #59639a; }
+.tp-mint .tp-btn { background: #1f2a5a; border-radius: 4px; box-shadow: 2px 2px 0 #7fe0ea; }
+
+/* Mika Pasir */
+.tp-pasir { background: radial-gradient(ellipse at 20% 0, #f1dfae, transparent 60%), #f6eedb; }
+.tp-pasir .tp-win { background: rgba(253, 248, 236, .9); border: 1.5px solid #d9c49a; border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(74, 50, 34, .12); }
+.tp-pasir .tp-bar i { width: 6px; height: 1.5px; background: #8a6a4e; }
+.tp-pasir .tp-bar i:nth-child(2) { width: 6px; height: 6px; background: none; border: 1.5px solid #8a6a4e; }
+.tp-pasir .tp-bar i:last-child { width: 6px; height: 6px;
+  background: linear-gradient(45deg, transparent 43%, #8a6a4e 43% 57%, transparent 57%),
+              linear-gradient(-45deg, transparent 43%, #8a6a4e 43% 57%, transparent 57%); }
+.tp-pasir .tp-ln { background: #4a3222; border-radius: 3px; }
+.tp-pasir .tp-ln.s { background: #c9a24a; }
+.tp-pasir .tp-btn { background: #4a3222; border-radius: 3px; }
+
+/* Piksel Marun */
+.tp-piksel { background: linear-gradient(180deg, #e4e4e4 0 70%, #c9c9c9 70%); }
+.tp-piksel .tp-win { background: #f2f2f2; border: 3px solid #2b2b2b; box-shadow: 3px 3px 0 #2b2b2b; }
+.tp-piksel .tp-bar { background: #7a1f2b; border-bottom: 3px solid #2b2b2b; height: 14px; }
+.tp-piksel .tp-bar i { background: #f2f2f2; border: 1.5px solid #2b2b2b; }
+.tp-piksel .tp-ln { background: #2b2b2b; }
+.tp-piksel .tp-ln.s { background: #6a6a6a; }
+.tp-piksel .tp-btn { background: #7a1f2b; border: 2px solid #2b2b2b; }
+
+/* Kartu pemilih di tema non-bawaan: ikut bentuk tema aktif. */
+html.tema-alt .tp-opt { border: var(--t-bw-ctl) solid var(--t-line-soft); border-radius: var(--t-r2); background: var(--t-card-solid); }
+html.tema-alt .tp-opt:hover { border-color: var(--t-line); }
+html.tema-alt .tp-opt.on { border-color: var(--t-line); outline: 2px solid var(--t-focus); outline-offset: 1px; }
+html.tema-alt .tp-prev { border-radius: calc(var(--t-r2) - 2px); }
+html.tema-alt .tp-name .tp-check { color: var(--t-tx); }
+
+@media (prefers-reduced-motion: reduce) { .tp-mint .tp-win { transform: none; } }

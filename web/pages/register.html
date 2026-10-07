@@ -1,0 +1,47 @@
+<!-- pages/register.html — fragmen /daftar (INTERFACE.md §2 halaman -0). Email, nama
+     pengguna, kata sandi, konfirmasi. Peran lain dibuat Administrator. -->
+<div class="desk-icons" aria-label="Pintasan">
+  <a class="desk-icon" href="/app#beranda"><span aria-hidden="true" data-icon="globe"></span><span>Beranda</span></a>
+  <a class="desk-icon" href="/masuk"><span aria-hidden="true" data-icon="key"></span><span>Masuk</span></a>
+</div>
+<section class="window small" aria-labelledby="regTitle" style="margin-top:6vh">
+  <div class="titlebar"><span class="ttl-icon" data-icon="user"></span><span class="ttl-text"><h1 id="regTitle">Daftar akun Relawan</h1></span></div>
+  <div class="window-body">
+    <div class="dialog-msg"><span data-icon="info32"></span>
+      <div class="txt">Akun yang dibuat di sini berperan <b>Relawan</b>. Akun Analis, Data Engineer, dan Administrator dibuat oleh Administrator GMLS.</div></div>
+    <form id="regForm" novalidate>
+      <fieldset>
+        <legend>Akun baru</legend>
+        <div class="field">
+          <label for="rEmail">Email</label>
+          <input type="email" id="rEmail" autocomplete="email" maxlength="254" required aria-describedby="rEmailErr">
+          <span class="err" id="rEmailErr" aria-live="polite"></span>
+        </div>
+        <div class="field">
+          <label for="rUser">Nama pengguna</label>
+          <input type="text" id="rUser" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="50" required aria-describedby="rUserErr rUserHint">
+          <span class="hint" id="rUserHint">3–50 karakter: huruf kecil, angka, titik, atau garis bawah. Contoh: relawan.bayah</span>
+          <span class="err" id="rUserErr" aria-live="polite"></span>
+        </div>
+        <div class="field">
+          <label for="rPw">Kata sandi</label>
+          <input type="password" id="rPw" autocomplete="new-password" required aria-describedby="rPwErr rPwHint">
+          <span class="hint" id="rPwHint">Minimal 10 karakter.</span>
+          <span class="err" id="rPwErr" aria-live="polite"></span>
+        </div>
+        <div class="field">
+          <label for="rPw2">Konfirmasi kata sandi</label>
+          <input type="password" id="rPw2" autocomplete="new-password" required aria-describedby="rPw2Err">
+          <span class="err" id="rPw2Err" aria-live="polite"></span>
+        </div>
+        <label class="check"><input type="checkbox" id="rShow"> Tampilkan kata sandi</label>
+      </fieldset>
+      <div class="btn-row end">
+        <button type="submit" class="default" id="regBtn">Daftar</button>
+        <a class="btn" href="/app#beranda">Batal</a>
+      </div>
+    </form>
+    <p style="margin:8px 0 0">Sudah punya akun? <a href="/masuk">Masuk</a>.</p>
+  </div>
+  <div class="statusbar"><span id="regStatus">Status: Siap</span><span class="fit">Peran: Relawan</span></div>
+</section>

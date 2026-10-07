@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges" role="img" aria-label="Logo Orbit-U: The Monitor">
+  <rect width="32" height="32" fill="#0b1e3a"/>
+  <rect x="1" y="1" width="30" height="30" fill="none" stroke="#1f4d35"/>
+  <!-- sayap panel surya -->
+  <rect x="2" y="12" width="9" height="9" fill="#000080" stroke="#4de1ff"/>
+  <rect x="21" y="12" width="9" height="9" fill="#000080" stroke="#4de1ff"/>
+  <rect x="2" y="16" width="9" height="1" fill="#4de1ff"/>
+  <rect x="21" y="16" width="9" height="1" fill="#4de1ff"/>
+  <!-- badan -->
+  <rect x="12" y="13" width="8" height="8" fill="#c0c0c0" stroke="#000"/>
+  <rect x="14" y="15" width="4" height="4" fill="#33ff99"/>
+  <!-- antena + pulsa -->
+  <rect x="15" y="6" width="2" height="7" fill="#dfdfdf"/>
+  <rect x="14" y="4" width="4" height="2" fill="#ffd800"/>
+  <rect x="11" y="24" width="10" height="1" fill="#33ff99"/>
+  <rect x="8" y="27" width="16" height="1" fill="#5fd99b"/>
+</svg>

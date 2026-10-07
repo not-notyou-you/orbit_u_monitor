@@ -1,0 +1,110 @@
+<!-- pages/landing.html — Beranda publik (`/`), INTERFACE.md §2.1. Halaman
+     sambutan, bukan monitor: urutannya sambutan → penjelasan → navigasi halaman.
+     Pengunjung baru perlu tahu dulu ini apa dan apa batasannya sebelum melihat
+     angka. Tile satelit ada di halaman tersendiri, `/kondisi` (§2.2); di sini
+     hanya ada strip satu baris status area sebagai pengantar ke sana. -->
+<div class="desk-icons" aria-label="Pintasan">
+  <a class="desk-icon" href="/kondisi"><span aria-hidden="true" data-icon="monitor"></span><span>Kondisi</span></a>
+  <a class="desk-icon" href="/relief"><span aria-hidden="true" data-icon="satellite"></span><span>Relief 3D</span></a>
+  <a class="desk-icon" href="/masuk" id="iconLogin"><span aria-hidden="true" data-icon="key"></span><span>Masuk</span></a>
+  <a class="desk-icon" href="/app" id="iconApp" hidden><span aria-hidden="true" data-icon="satellite"></span><span>Aplikasi</span></a>
+  <a class="desk-icon" href="/docs" target="_blank" rel="noopener"><span aria-hidden="true" data-icon="help"></span><span>Dok. API</span></a>
+</div>
+
+<section class="window" aria-labelledby="landingTitle">
+  <div class="titlebar">
+    <span class="ttl-icon" data-icon="satellite"></span>
+    <span class="ttl-text"><h1 id="landingTitle">Orbit-U: The Monitor</h1></span>
+  </div>
+  <div class="window-body">
+
+    <!-- ------------------------------------------------------- 1. sambutan -->
+    <div class="hero">
+      <img class="hero-logo" src="assets/img/logo.svg" alt="Logo Orbit-U: The Monitor" width="64" height="64">
+      <div class="hero-text">
+        <p class="hero-name">Orbit-U: The Monitor</p>
+        <p class="hero-tag">Pantauan Hidrometeorologi Lebak Selatan</p>
+        <p class="hero-lede">
+          Selamat datang. Orbit-U membaca tiga sumber satelit — <b>Sentinel-1</b>, <b>MODIS</b>,
+          dan <b>GPM IMERG</b> — lalu merangkumnya menjadi satu kalimat kondisi untuk wilayah
+          Lebak Selatan: seberapa basah permukaannya, seberapa banyak hujan tiga hari terakhir,
+          dan di mana genangan bertambah. Dibuat untuk relawan dan analis
+          Gugus Mitigasi Lebak Selatan (GMLS).
+        </p>
+        <div class="btn-row">
+          <a class="btn default" href="/kondisi">Lihat kondisi terkini</a>
+          <a class="btn" href="/masuk" id="btnPrimary">Masuk…</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Strip satu baris: pengantar ke halaman Kondisi terkini, bukan monitor.
+         Tile, readout, dan kalimat kondisi lengkapnya ada di `/kondisi`. -->
+    <div class="hero-strip screen" id="heroStrip">
+      <div class="screen-inner" role="status" aria-label="Ringkasan kondisi terkini">
+        <p class="hs-line"><span class="lbl">STATUS AREA:</span> <span class="v-dim">MEMUAT…</span></p>
+      </div>
+    </div>
+
+    <!-- ----------------------------------------------------- 2. penjelasan -->
+    <div class="cols-2" style="margin-top:8px">
+      <fieldset>
+        <legend>Apa ini</legend>
+        <p>Satu tempat untuk menjawab <b>“bagaimana kondisinya sekarang?”</b> tanpa harus
+          mengolah citra satelit sendiri. Pipeline harian mengunduh scene terbaru, menghitung
+          indeks (NDVI, NDWI, perubahan air, curah hujan), lalu menyajikannya sebagai gambar
+          kecil beserta kalimat penjelasannya.</p>
+        <p>Halaman <b>Kondisi terkini</b> terbuka untuk siapa saja. Riwayat 30 hari,
+          grafik, prakiraan statistik, angka per kecamatan, katalog dataset, dan unduhan hanya
+          untuk pengguna yang sudah masuk.</p>
+        <p style="margin:0">Data dasar: ESA Copernicus (Sentinel-1), NASA MODIS, NASA GPM IMERG.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Yang perlu diketahui lebih dulu</legend>
+        <ul class="facts">
+          <li><b>Ini bukan peringatan dini resmi.</b> Untuk keputusan evakuasi, ikuti BMKG dan BPBD.</li>
+          <li><b>Satelit tidak melihat puncak banjir bandang.</b> Sentinel-1 melewati wilayah ini
+            hanya ±6–12 hari sekali; banjir yang naik dan surut dalam beberapa jam bisa terlewat.</li>
+          <li><b>Angka hujan adalah perkiraan satelit</b> (petak ±10 km), belum dikalibrasi dengan
+            penakar hujan di lapangan.</li>
+          <li><b>MODIS terhalang awan.</b> Saat musim hujan, tile optik sering kosong — justru ketika
+            paling dibutuhkan. Radar Sentinel-1 tetap menembus awan.</li>
+          <li><b>Tile kosong = data belum ada</b>, bukan berarti kondisi aman.</li>
+        </ul>
+      </fieldset>
+    </div>
+
+    <!-- ------------------------------------------------ 3. navigasi halaman -->
+    <fieldset>
+      <legend id="menuLegend">Menu</legend>
+      <p id="menuIntro" class="mut" style="font-size:11px">Memuat menu…</p>
+      <div class="navcards" id="navCards"></div>
+      <div id="rolesBox" hidden>
+        <p style="margin:10px 0 4px"><b>Akses menurut peran</b> — akun diberikan oleh Admin GMLS.</p>
+        <div class="table-wrap">
+          <table class="roles">
+            <thead><tr><th scope="col">Peran</th><th scope="col">Bisa melakukan</th></tr></thead>
+            <tbody>
+              <tr><td>Publik</td><td>Halaman ini: kondisi terkini tiap Live Area, legenda dan kalimat penjelasan tile.</td></tr>
+              <tr><td>Relawan (USER)</td><td>Tambahan: Kondisi (citra 30 hari, prakiraan, hujan per kecamatan) dan akun sendiri.</td></tr>
+              <tr><td>Analis (ANALYST)</td><td>Tambahan: Riwayat (tren dan laporan hidrometeorologi), Kejadian bencana, penandaan alert.</td></tr>
+              <tr><td>Data Engineer</td><td>Tambahan: Data (katalog dan pembuatan dataset), laporan kesehatan data.</td></tr>
+              <tr><td>Administrator</td><td>Tambahan: Pengaturan (pengguna, Live Area, wilayah, aturan, pipeline, jejak audit).</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="banner sunken" role="note">
+      <span data-icon="warn32"></span>
+      <div class="b-body"><b>Ini bukan peringatan dini resmi.</b> Ikuti informasi BMKG dan BPBD.<br>
+        Kontak: Gugus Mitigasi Lebak Selatan (GMLS), sekretariat Panggarangan, Kabupaten Lebak.</div>
+    </div>
+  </div>
+  <div class="statusbar">
+    <span id="landingStatus">Status: Memuat…</span>
+    <span class="fit">Data: ESA Copernicus · NASA MODIS · NASA GPM</span>
+  </div>
+</section>

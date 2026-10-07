@@ -1,10 +1,14 @@
 // web/js/auth.js — sesi dan izin UI (INTERFACE.md §3, §6).
-// Izin menu diambil dari `permissions` GET /api/auth/me (sumber: backend).
+// Izin menu diambil dari `permissions` GET /api/auth/session (sumber: backend).
+// Endpoint itu juga menjawab pengunjung yang belum masuk (peran PUBLIC), jadi
+// menu pengunjung disusun dengan cara yang sama (M56).
 // Menyembunyikan menu hanya kenyamanan; API dan DB tetap menegakkan akses.
 'use strict';
 
 const Auth = (() => {
   let me = null;
+  let perms = [];
+  let roleCode = 'PUBLIC';
 
   function loginUrl(reason) {
     const next = location.pathname + location.hash;
@@ -19,20 +23,22 @@ const Auth = (() => {
   });
 
   async function load() {
-    try { me = await API.get('/api/auth/me', { noRedirect: true }); }
-    catch (e) { me = null; if (e.status !== 401) throw e; }
+    const s = await API.get('/api/auth/session', { noRedirect: true });
+    me = s.user || null;
+    perms = s.permissions || [];
+    roleCode = s.role_code || 'PUBLIC';
     return me;
   }
 
   async function require() {
-    const m = await load();
+    const m = await load().catch(() => null);
     if (!m) { location.replace(loginUrl()); return new Promise(() => {}); }
     return m;
   }
 
-  const can = perm => !!(me && me.permissions && me.permissions.includes(perm));
-  const canAny = perms => !perms || !perms.length || perms.some(can);
-  const role = () => (me ? me.role_code : 'PUBLIC');
+  const can = perm => perms.includes(perm);
+  const canAny = list => !list || !list.length || list.some(can);
+  const role = () => roleCode;
 
   async function logout() {
     try { await API.post('/api/auth/logout', null, { noRedirect: true }); } catch (e) { /* tetap keluar */ }

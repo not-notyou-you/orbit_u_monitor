@@ -1,0 +1,35 @@
+<!-- pages/eda.html — Data › EDA (INTERFACE.md §2 halaman 6.6). Tahap data
+     understanding sebelum membuat model data: per satelit dan rentang tanggal —
+     kelengkapan, statistik deskriptif, sebaran, pencilan, dan korelasi. -->
+<div class="layout">
+  <div class="control-panel">
+    <form id="edForm" novalidate>
+      <fieldset>
+        <legend>Data</legend>
+        <div class="field"><label for="edSource">Satelit</label>
+          <select id="edSource"><option value="gpm">GPM (hujan per kecamatan)</option><option value="modis">MODIS (indeks per kecamatan)</option>
+            <option value="s1">Sentinel-1 (statistik raster per scene)</option></select></div>
+        <div class="field-row">
+          <div class="field"><label for="edFrom">Dari</label><input type="date" id="edFrom" required></div>
+          <div class="field"><label for="edTo">Sampai</label><input type="date" id="edTo" required></div>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="small" data-range="30">30 hari</button>
+          <button type="button" class="small" data-range="90">90 hari</button>
+          <button type="button" class="small" data-range="365">1 tahun</button>
+        </div>
+        <div class="btn-row end"><button type="submit" class="default" id="edGo">Analisis</button></div>
+      </fieldset>
+    </form>
+    <fieldset>
+      <legend>Cara membaca</legend>
+      <ul class="facts" style="font-size:11px">
+        <li><b>Kosong</b> = sel yang seharusnya ada (hari × kecamatan) tetapi tidak bernilai.</li>
+        <li><b>Pencilan</b> = di luar Q1 − 1,5·IQR s.d. Q3 + 1,5·IQR.</li>
+        <li><b>Korelasi</b> = Pearson berpasangan; n = jumlah pasangan.</li>
+        <li><b>Skew</b> &gt; 1 = ekor kanan panjang (khas curah hujan).</li>
+      </ul>
+    </fieldset>
+  </div>
+  <div class="deck" id="edOut"></div>
+</div>

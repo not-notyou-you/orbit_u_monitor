@@ -1,14 +1,16 @@
-<!-- pages/catalog.html — Katalog Dataset (INTERFACE.md §2.6) [WARIS DataLab View 2], diterjemahkan.
-     Tanpa Merge, tanpa reference layers. DATA_ENGINEER & ADMIN. -->
+<!-- pages/catalog.html — Data → Dataset tersimpan (INTERFACE.md §2.6) [WARIS
+     DataLab View 2], diterjemahkan. Tanpa Merge, tanpa reference layers.
+     DATA_ENGINEER & ADMIN. Sejak M53 ini satu tab di tujuan "Data" bersama
+     "Buat dataset baru", bukan menu utama tersendiri. -->
 <div class="layout wide-left">
   <div class="control-panel">
     <fieldset>
-      <legend>Dataset</legend>
+      <legend>Pilih dataset</legend>
       <div class="field"><label for="ctSearch">Cari nama</label><input type="search" id="ctSearch" placeholder="ketik untuk menyaring…"></div>
       <div class="listbox" id="ctList" role="listbox" aria-label="Daftar dataset" style="max-height:320px"></div>
       <div class="btn-row" style="margin-top:6px">
         <button type="button" class="small" id="ctRefresh">Muat ulang</button>
-        <a class="btn small" href="#buat-dataset">Buat dataset baru…</a>
+        <a class="btn small" href="#data/buat">Buat dataset baru…</a>
       </div>
     </fieldset>
     <fieldset id="ctActions">

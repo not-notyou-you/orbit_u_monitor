@@ -43,6 +43,8 @@ EXPECTED: dict[tuple[str, str], tuple] = {
     ("POST", "/api/auth/login"): (P,),
     ("POST", "/api/auth/logout"): (U,),
     ("GET", "/api/auth/me"): (U,),
+    ("GET", "/api/auth/session"): (P,),
+    ("POST", "/api/auth/register"): (P,),
     ("POST", "/api/auth/change-password"): (U,),
     ("GET", "/api/auth/tokens"): (U,),
     ("POST", "/api/auth/tokens"): (U,),
@@ -109,11 +111,35 @@ EXPECTED: dict[tuple[str, str], tuple] = {
     ("GET", "/api/live/areas/{area_id}/log"): (A,),
     ("POST", "/api/live/areas/{area_id}/scenes/{scene_date}/retry"): (A,),
     # wilayah (§4.4)
-    ("GET", "/api/regions"): (U,),
+    ("GET", "/api/regions"): (P,),
     ("GET", "/api/rois"): (U,),
     # publik (§4.2, Tahap 3)
     ("GET", "/api/public/live"): (P,),
     ("GET", "/api/public/live/{area_id}/preview/{key}.png"): (P,),
+    # citra satelit (M56): batas waktu per role di VIEW v_citra_scenes
+    ("GET", "/api/citra/summary"): (P,),
+    ("GET", "/api/citra/sources/{key}"): (P,),
+    ("GET", "/api/citra/areas/{area_id}/scenes"): (P,),
+    ("GET", "/api/citra/areas/{area_id}/scenes/{scene_date}"): (P,),
+    ("GET", "/api/citra/areas/{area_id}/preview/{scene_date}/{key}.png"): (P,),
+    ("GET", "/api/citra/report.pdf"): (P, DL),
+    # diagram (M56)
+    ("GET", "/api/diagram/bands"): (AN,),
+    ("GET", "/api/diagram/latest"): (AN,),
+    ("GET", "/api/diagram/regions"): (AN,),
+    ("GET", "/api/diagram/report.pdf"): (AN, DL),
+    # halaman Data (M56)
+    ("GET", "/api/data/summary"): (DE,),
+    ("GET", "/api/data/{source}/items"): (DE,),
+    ("PATCH", "/api/data/{source}/items/{item_id}"): (DE,),
+    ("POST", "/api/data/{source}/items/{item_id}/reprocess"): (DE,),
+    ("POST", "/api/data/{source}/backfill"): (DE,),
+    ("GET", "/api/data/{source}/backfill"): (DE,),
+    ("GET", "/api/data/backfill/runs/{run_id}"): (DE,),
+    ("GET", "/api/data/eda"): (DE,),
+    # log per halaman (M56)
+    ("GET", "/api/logs/data"): (DE,),
+    ("GET", "/api/logs/kejadian"): (AN,),
     # hidromet (§4.4)
     ("GET", "/api/hydromet/today"): (U,),
     ("GET", "/api/hydromet/observations"): (U,),
@@ -127,12 +153,13 @@ EXPECTED: dict[tuple[str, str], tuple] = {
     ("POST", "/api/alert-rules"): (A,),
     ("PUT", "/api/alert-rules/{rule_id}"): (A,),
     # kejadian bencana (§4.6)
-    ("GET", "/api/disasters"): (AN,),
+    # M56: baca terbuka (PUBLIC lewat v_public_kejadian), tulis ANALYST
+    ("GET", "/api/disasters"): (P,),
     ("POST", "/api/disasters"): (AN,),
-    ("GET", "/api/disasters/{event_id}"): (AN,),
+    ("GET", "/api/disasters/{event_id}"): (P,),
     ("PUT", "/api/disasters/{event_id}"): (AN,),
     ("DELETE", "/api/disasters/{event_id}"): (AN,),
-    ("GET", "/api/disaster-types"): (U,),
+    ("GET", "/api/disaster-types"): (P,),
     ("POST", "/api/disaster-types"): (A,),
     ("PUT", "/api/disaster-types/{type_id}"): (A,),
     # laporan periodik (§4.8): audiens ANALYST/DATA_ENGINEER dicek di route
@@ -140,6 +167,7 @@ EXPECTED: dict[tuple[str, str], tuple] = {
     ("GET", "/api/reports"): (U,),
     ("GET", "/api/reports/{report_id}/download"): (U, DL),
     ("POST", "/api/reports/regenerate"): (A,),
+    ("GET", "/api/reports/custom.pdf"): (U, DL),   # + audiens per jenis (REPORT_AUDIENCE)
     # administrasi wilayah & ingest (§4.9)
     ("GET", "/api/admin/regions"): (A,),
     ("PATCH", "/api/admin/regions/{region_id}"): (A,),
@@ -163,7 +191,7 @@ EXPECTED: dict[tuple[str, str], tuple] = {
 
 PATH_VALUES = {
     "scene_date": "2026-01-01", "key": "vv", "tier": "raw", "scene": "20260101",
-    "level": "processed", "kind": "grayscale", "filename": "x.png", "entity": "alerts", "source": "GPM",
+    "level": "processed", "kind": "grayscale", "filename": "x.png", "entity": "alerts", "source": "gpm",
 }
 # 403 yang sah walau role cukup: aturan bisnis, bukan role.
 BUSINESS_403 = {"NOT_DATASET_OWNER", "SCENE_OUT_OF_RANGE", "CANNOT_MODIFY_SELF", "REPORT_AUDIENCE",
@@ -263,10 +291,14 @@ def test_read_token_respects_scope_and_write_ban(make_client, monkeypatch):
     monkeypatch.setattr(LiveMonitor, "start_cycle", lambda self, area_id: False)
     created = make_client("ADMIN").post("/api/auth/tokens", json={"name": "rbac", "scope": "READ"}).json()
     bearer = make_client(token=created["token"], csrf=False)
+    from api.security import token_rate_limiter
     for method, path in ALL_ROUTES:
         expected = EXPECTED[(method, path)]
         if path == "/api/auth/login":
             continue
+        # Satu permintaan per route; jumlah route sudah melewati batas 120/menit
+        # per token (M56), dan batas itu bukan yang diuji di sini.
+        token_rate_limiter.reset()
         resp = _call(bearer, method, path)
         body = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else None
         code = body.get("code") if isinstance(body, dict) else None
@@ -416,7 +448,7 @@ def test_last_config_is_per_user(make_client, db_client, sample_region, role_use
     assert make_client("DATA_ENGINEER").get("/api/datasets/last-config").status_code == 200
 
 
-# --- Live: USER dibatasi 30 hari (§4.3) ---------------------------------------
+# --- Live: USER dibatasi 365 hari, ANALYST/DATA_ENGINEER/ADMIN semua (M56) ----
 
 @pytest.fixture
 def live_area_with_scenes(db_client):
@@ -425,7 +457,7 @@ def live_area_with_scenes(db_client):
         area = sess.scalar(text("""
             INSERT INTO live_areas (name, bbox_wkt, status) VALUES ('rbac area', 'POLYGON((0 0,1 0,1 1,0 1,0 0))', 'ACTIVE')
             RETURNING area_id"""))
-        for d in (today - timedelta(days=5), today - timedelta(days=45), today - timedelta(days=90)):
+        for d in (today - timedelta(days=5), today - timedelta(days=400), today - timedelta(days=500)):
             sess.execute(text("INSERT INTO live_scenes (area_id, scene_date, status) VALUES (:a, :d, 'READY')"),
                          {"a": area, "d": d})
     return area, today
@@ -433,7 +465,7 @@ def live_area_with_scenes(db_client):
 
 def test_live_card_user_window(make_client, live_area_with_scenes):
     area, today = live_area_with_scenes
-    recent, old = (today - timedelta(days=5)).isoformat(), (today - timedelta(days=45)).isoformat()
+    recent, old = (today - timedelta(days=5)).isoformat(), (today - timedelta(days=400)).isoformat()
 
     user = make_client("USER")
     card = user.get(f"/api/live/areas/{area}/card").json()
@@ -443,9 +475,10 @@ def test_live_card_user_window(make_client, live_area_with_scenes):
     resp = user.get(f"/api/live/areas/{area}/preview/{old}/vv.png")
     assert resp.status_code == 403
 
-    admin = make_client("ADMIN")
-    assert len(admin.get(f"/api/live/areas/{area}/card").json()["dates"]) == 3
-    assert admin.get(f"/api/live/areas/{area}/card?date={old}").status_code == 200
+    for role in ("ANALYST", "DATA_ENGINEER", "ADMIN"):
+        c = make_client(role)
+        assert len(c.get(f"/api/live/areas/{area}/card").json()["dates"]) == 3, role
+        assert c.get(f"/api/live/areas/{area}/card?date={old}").status_code == 200, role
 
 
 def test_live_area_backed_by_dataset_readable_by_user(make_client, db_client, sample_region, role_users):
@@ -485,7 +518,7 @@ def test_live_preview_readable_by_user_and_analyst(make_client, db_client, etl_d
     png.write_bytes(b"\x89PNG\r\n\x1a\nfake")
     seen = {}
 
-    def fake_preview_path(self, area_id, scene_date, key):
+    def fake_preview_path(self, area_id, scene_date, key, boundaries=False):
         # Tanpa SET ROLE: koneksi etl boleh membaca datasets.
         with self._db.session() as s:
             seen["folder_ok"] = s.scalar(text("SELECT count(*) FROM datasets WHERE dataset_id = :d"), {"d": ds}) == 1

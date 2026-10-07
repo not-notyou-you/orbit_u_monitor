@@ -42,14 +42,19 @@ class TestHydromet:
         assert bayah["active_alert"]["severity"] == "WARNING"       # severity tertinggi hari itu
         assert next(x for x in body["regions"] if x["pcode"] == "TST003")["active_alert"] is None
 
-    def test_user_limited_to_30_days(self, make_client, recent_obs):
-        old = (_today() - timedelta(days=200)).isoformat()
+    def test_user_limited_to_365_days(self, make_client, recent_obs):
+        """M56: USER 365 hari (sama dengan halaman Citra); ANALYST/DATA_ENGINEER semua."""
+        old = (_today() - timedelta(days=400)).isoformat()
         r = make_client("USER").get(f"/api/hydromet/observations?date_from={old}")
         assert r.status_code == 403 and r.json()["code"] == "DATE_OUT_OF_RANGE"
         assert make_client("ANALYST").get(f"/api/hydromet/observations?date_from={old}").status_code == 200
+        assert make_client("DATA_ENGINEER").get(f"/api/hydromet/observations?date_from={old}").status_code == 200
+        within = (_today() - timedelta(days=200)).isoformat()
+        assert make_client("USER").get(f"/api/hydromet/observations?date_from={within}").status_code == 200
         r = make_client("USER").get("/api/hydromet/observations?band=RAIN_24H")
         assert r.status_code == 200 and r.json()["total"] >= 3
-        assert make_client("USER").get("/api/hydromet/trend?days=90").status_code == 403
+        assert make_client("USER").get("/api/hydromet/trend?days=90").status_code == 200
+        assert make_client("USER").get("/api/hydromet/trend?days=366").status_code == 403
 
     def test_trend_shape(self, make_client, recent_obs):
         body = make_client("USER").get("/api/hydromet/trend?band=RAIN_24H&days=7").json()
@@ -115,7 +120,9 @@ class TestDisasters:
                 "location": {"lat": -6.65, "lon": 106.25}, "event_date": recent_obs.isoformat(),
                 "description": "Luapan sungai merendam permukiman uji.", "info_source": "GMLS", "is_verified": True}
         assert make_client("USER").post("/api/disasters", json=body).status_code == 403
-        assert make_client("DATA_ENGINEER").get("/api/disasters").status_code == 403
+        # M56: semua role login boleh MELIHAT kejadian; menulis tetap ANALYST.
+        assert make_client("DATA_ENGINEER").get("/api/disasters").status_code == 200
+        assert make_client("DATA_ENGINEER").post("/api/disasters", json=body).status_code == 403
         r = analyst.post("/api/disasters", json=body)
         assert r.status_code == 201, r.text
         ev = r.json()
@@ -133,6 +140,33 @@ class TestDisasters:
         with db_client.session() as sess:     # soft delete: baris masih ada
             assert sess.scalar(text("SELECT deleted_at IS NOT NULL FROM disaster_events WHERE event_id = :e"),
                                {"e": ev["event_id"]})
+
+    def test_public_sees_last_365_days_without_internal_columns(self, make_client, synthetic_aoi):
+        """M56: pengunjung membaca v_public_kejadian (365 hari, tanpa kolom
+        internal); USER membaca seluruh riwayat tanpa angka hujan (milik ANALYST)."""
+        analyst = make_client("ANALYST")
+        today = _today()
+        ids = {}
+        for label, days in (("baru", 20), ("lama", 500)):
+            r = analyst.post("/api/disasters", json={
+                "disaster_type_code": "BANJIR", "region_id": synthetic_aoi["TST001"],
+                "event_date": (today - timedelta(days=days)).isoformat(), "info_source": "GMLS",
+                "source_reference": "catatan internal GMLS", "description": f"Kejadian uji publik {label}."})
+            assert r.status_code == 201, r.text
+            ids[label] = r.json()["event_id"]
+        anon = make_client(None)
+        body = anon.get("/api/disasters?limit=1000").json()
+        seen = {e["event_id"] for e in body["items"]}
+        assert ids["baru"] in seen and ids["lama"] not in seen and body["window_days"] == 365
+        item = next(e for e in body["items"] if e["event_id"] == ids["baru"])
+        assert "source_reference" not in item and "recorded_by" not in item
+        assert anon.get(f"/api/disasters/{ids['lama']}").status_code == 404
+        assert anon.get(f"/api/disasters/{ids['baru']}").json()["rain"] is None
+        assert anon.get("/api/disaster-types").status_code == 200
+        user = make_client("USER").get("/api/disasters?limit=1000").json()
+        assert {ids["baru"], ids["lama"]} <= {e["event_id"] for e in user["items"]} and user["window_days"] is None
+        assert make_client("USER").get(f"/api/disasters/{ids['lama']}").json()["rain"] is None
+        assert anon.post("/api/disasters", json={}).status_code == 401
 
     def test_validation(self, make_client, synthetic_aoi):
         analyst = make_client("ANALYST")
@@ -198,10 +232,17 @@ class TestPublicLive:
             area = sess.scalar(text("""INSERT INTO live_areas (dataset_id, name, bbox_wkt, status)
                 VALUES (:d, 'Area Publik Uji', 'POLYGON((106 -7,106.5 -7,106.5 -6.5,106 -6.5,106 -7))', 'ACTIVE')
                 RETURNING area_id"""), {"d": ds})
+            # Scene terbaru membawa `grid` (georeferensi empat sudut, yang
+            # dipakai Relief 3D); yang lebih tua tidak, meniru scene yang
+            # dirender sebelum georeferensi itu dicatat.
+            grid = ('"grid": {"width": 768, "height": 576, "crs": "EPSG:32748", '
+                    '"corners_wgs84": [[106,-6.5],[106.5,-6.5],[106.5,-7],[106,-7]]}, ')
             for d in (date(2024, 1, 10), date(2024, 1, 22)):
+                previews = ('{' + (grid if d == date(2024, 1, 22) else '') +
+                            '"items": {"s1_vh": {"file": "s1_vh.png", "label": "VH"}}}')
                 sess.execute(text("""INSERT INTO live_scenes (area_id, dataset_id, scene_date, status, previews, interpretations)
                     VALUES (:a, :ds, :d, 'READY', CAST(:p AS jsonb), '{}')"""),
-                    {"a": area, "ds": ds, "d": d, "p": '{"items": {"s1_vh": {"file": "s1_vh.png", "label": "VH"}}}'})
+                    {"a": area, "ds": ds, "d": d, "p": previews})
         from etl.live_monitor import _LiveFiles
         files = _LiveFiles(ds, "live_publik_uji", "LIVE_AREA")
         p = files.preview_dir(date(2024, 1, 22)) / "s1_vh.png"
@@ -223,6 +264,10 @@ class TestPublicLive:
         r = anon.get(url + "?date=2024-01-10")
         assert r.status_code == 403 and r.json()["code"] == "SCENE_NOT_PUBLIC"
         assert anon.get(f"/api/public/live/{area}/preview/modis_ndvi.png").status_code == 404
+        # Georeferensi ikut ke payload publik: tanpa ini halaman /relief tidak
+        # bisa menempatkan citra di atas DEM dan jatuh ke pesan "belum ada
+        # georeferensi". Empat sudut, bukan bbox.
+        assert len(item["preview_grid"]["corners_wgs84"]) == 4
 
 
 class TestImportDisasters:

@@ -57,5 +57,6 @@ def is_locked(db, key: str) -> bool:
         return bool(conn.execute(text("""
             SELECT EXISTS (SELECT 1 FROM pg_locks
                            WHERE locktype = 'advisory' AND granted
+                             AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
                              AND objid = (hashtext(:k)::bigint & 4294967295)::oid)
         """), {"k": f"orbit-u:{key}"}).scalar())

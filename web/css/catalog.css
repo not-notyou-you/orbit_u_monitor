@@ -2,8 +2,5 @@
 #ctList button .st { margin-left: auto; padding-left: 8px; font-size: 11px; }
 #ctList button { flex-wrap: nowrap; }
 #ctList button .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ct-bar { display: grid; grid-template-columns: 110px minmax(0, 1fr) 90px; gap: 6px; align-items: center; margin: 2px 0; }
-.ct-bar .trk { height: 8px; border: 1px solid var(--phos-dim); }
-.ct-bar .trk i { display: block; height: 100%; background: var(--phos); }
 .ct-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-bottom: 8px; }
 .ct-filters .field { margin: 0; }

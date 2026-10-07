@@ -1,0 +1,40 @@
+/* dashboard/css/konsep44.css */
+:root{--bg:#e4e4e4;--card:#f2f2f2;--line:#2b2b2b;--tx:#2b2b2b;--mut:#6a6a6a;--acc:#7a1f2b;--map-lo:#f2f2f2;--map-hi:#2b2b2b;--map-wet:#7a1f2b;--map-dry:#cfcfcf}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Pixelify Sans","Silkscreen","Courier New",monospace;color:var(--tx);min-height:100vh;background:linear-gradient(180deg,#e4e4e4 0 70%,#c9c9c9 70%);image-rendering:pixelated}
+body::before{content:"";position:fixed;left:6%;top:70%;width:220px;height:60px;margin-top:-60px;background:var(--acc);clip-path:polygon(0 100%,20% 30%,35% 60%,55% 0,75% 50%,100% 100%);opacity:.5;z-index:-1;box-shadow:0 0 0 #000}
+.app{max-width:1160px;margin:0 auto;padding:28px;display:grid;grid-template-columns:1fr 1fr 300px;grid-template-areas:"top top top" "maps maps panel" "metrics metrics panel" "foot foot foot";gap:22px}
+.top,.panel,.map,.m{background:var(--card);border:4px solid var(--line);box-shadow:inset -4px -4px 0 #c4c4c4,inset 4px 4px 0 #fafafa,6px 6px 0 var(--line);position:relative}
+.top{grid-area:top;display:flex;justify-content:space-between;align-items:center;padding:44px 20px 16px}
+.top::before,.panel::before,.map::before{content:"";position:absolute;left:0;right:0;top:0;height:26px;background:var(--acc);border-bottom:4px solid var(--line)}
+.top::after,.panel::after,.map::after{content:"x";color:var(--card);position:absolute;right:6px;top:3px;width:18px;height:18px;line-height:14px;text-align:center;font-size:13px;font-weight:700;background:var(--card);border:2px solid var(--line)}
+.brand{display:flex;gap:14px;align-items:center}
+.logo{width:40px;height:40px;padding:6px;background:var(--acc);color:var(--card);border:4px solid var(--line);shape-rendering:crispEdges}
+h1{font-size:18px;margin:0;text-transform:uppercase;letter-spacing:.04em}
+.title p{margin:4px 0 0;font-size:12px;color:var(--mut)}
+.status{display:flex;gap:8px;align-items:center;font-size:12px;border:3px solid var(--line);padding:4px 10px;background:#fafafa}
+.dot{width:10px;height:10px;background:var(--acc);border:2px solid var(--line);animation:b 1s steps(2) infinite}
+@keyframes b{50%{background:var(--card)}}
+.panel{grid-area:panel;padding:40px 16px 16px}
+.panel-title{color:var(--card);position:absolute;left:10px;top:3px;display:flex;gap:6px;align-items:center;font-size:13px;margin:0;z-index:1;text-transform:uppercase}
+.ico{width:14px;height:14px}
+.field{margin-top:12px}
+label{display:block;font-size:12px;margin-bottom:6px}
+.val{float:right;background:var(--line);color:var(--card);padding:0 6px}
+input[type=range]{width:100%;accent-color:var(--line)}
+input[type=file]{font-size:11px;width:100%;font-family:inherit}
+.run{width:100%;margin-top:18px;padding:11px;background:var(--acc);color:var(--card);border:4px solid var(--line);box-shadow:inset -4px -4px 0 #4f121b,inset 4px 4px 0 #a8505c;font-family:inherit;font-size:14px;text-transform:uppercase;cursor:pointer;display:flex;justify-content:center;gap:8px;align-items:center}
+.run:active{box-shadow:inset 4px 4px 0 #4f121b}
+.maps{grid-area:maps;display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.map{padding:40px 14px 14px}
+.map h3{color:var(--card);position:absolute;left:10px;top:3px;font-size:13px;margin:0;z-index:1;text-transform:uppercase}
+canvas{width:100%;image-rendering:pixelated;display:block;border:4px solid var(--line)}
+.legend{font-size:11px;margin-top:10px;display:flex;align-items:center;gap:6px;text-transform:uppercase}
+.sw{width:14px;height:14px;border:3px solid var(--line);margin-left:8px}
+.sw:first-child{margin-left:0}
+.sw.lo{background:var(--map-lo)}.sw.hi{background:var(--map-hi)}.sw.wet{background:var(--map-wet)}.sw.dry{background:var(--map-dry)}
+.metrics{grid-area:metrics;display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.m{padding:14px}
+.m span{font-size:11px;color:var(--mut);text-transform:uppercase}.m b{display:block;font-size:24px;margin-top:6px}
+.foot{grid-area:foot;font-size:12px;text-align:center;text-transform:uppercase;letter-spacing:.1em}
+@media(max-width:880px){.app{grid-template-columns:1fr;grid-template-areas:"top" "panel" "maps" "metrics" "foot";padding:16px}.maps,.metrics{grid-template-columns:1fr}.top{flex-direction:column;align-items:flex-start;gap:12px}}

@@ -1,20 +1,101 @@
-// js/admin.js — Administrasi (INTERFACE.md §2.8, §4.9). Semua tab ADMIN.
+// js/admin.js — Sistem › Manajemen akun dan Sistem › Pengaturan aplikasi (M56). Semua bagian ADMIN.
 // Aksi yang memicu unduhan/pipeline (picu ingestion, proses ulang, periksa Live)
 // selalu lewat dialog konfirmasi yang menyebut akibatnya.
+//
+// Susunan: dulu 12 tab rata dalam satu baris; lalu (M53) lima kelompok dengan
+// tablist sendiri di dalam halaman ini. Masalahnya, kelompok yang dipilih hanya
+// hidup di memori, jadi 13 bagiannya tidak bisa dibagikan, tidak bisa
+// di-bookmark, dan hilang tiap refresh.
+//
+// Sekarang kelompoknya adalah tab router biasa (ROUTES di app.js), dan bagian
+// di dalamnya adalah segmen ketiga hash: #pengaturan/jejak/audit. Halaman ini
+// tinggal merender baris bagian + panelnya, dan mengikuti `ctx.sub`. Fungsi
+// perender tiap bagian tidak berubah; hanya cara masuknya.
 'use strict';
 Pages['admin'] = (() => {
   const ROLES = [['USER', 'Relawan (USER)'], ['ANALYST', 'Analis (ANALYST)'], ['DATA_ENGINEER', 'Data Engineer'], ['ADMIN', 'Administrator']];
   const SEV = [['INFO', 'Info'], ['WARNING', 'Peringatan'], ['CRITICAL', 'Kritis']];
   const BANDS = ['RAIN_24H', 'RAIN_72H', 'RAIN_7D', 'RAIN_30D', 'NDVI', 'NDWI', 'FLOOD'];
   const OPS = { I: 'INSERT', U: 'UPDATE', D: 'DELETE' };
+
+  // Bagian per kelompok. Kuncinya sekaligus segmen ketiga hash, jadi namanya
+  // Indonesia dan sejalan dengan judulnya. Judul & keterangan kelompoknya
+  // sendiri ada di ROUTES (app.js) sebagai title + lede.
+  // M56: dua kelompok di bawah Sistem. Log (masuk, unduhan, audit) pindah ke
+  // Sistem › Log (js/logs.js); kelompok `jejak` tetap ada untuk hash lama.
+  const SECTIONS = {
+    pengaturan: [{ key: 'ringkasan', title: 'Ringkasan' }, { key: 'pipeline', title: 'Pipeline' },
+                 { key: 'scene', title: 'Scene' }, { key: 'live', title: 'Live Area' },
+                 { key: 'penyimpanan', title: 'Penyimpanan' }, { key: 'arsip', title: 'Arsip' },
+                 { key: 'wilayah', title: 'Wilayah' }, { key: 'aturan', title: 'Aturan & ambang' },
+                 { key: 'aplikasi', title: 'Aplikasi' }],
+    akses: [{ key: 'pengguna', title: 'Pengguna' }, { key: 'token', title: 'Token API' }],
+    jejak: [{ key: 'masuk', title: 'Log Masuk' }, { key: 'unduhan', title: 'Log Unduhan' },
+            { key: 'audit', title: 'Audit' }],
+  };
+  // Kelompok → tab router di bawah #sistem.
+  const GROUP_TAB = { pengaturan: 'pengaturan', akses: 'pengguna', jejak: 'log' };
+  const TABS = {
+    ringkasan: tabSummary, pengguna: tabUsers, scene: tabScenes, live: tabLive, wilayah: tabRegions,
+    aturan: tabRules, pipeline: tabPipeline, arsip: tabArchive, penyimpanan: tabStorage,
+    aplikasi: tabSettings, token: tabTokens,
+    masuk: () => tabLog('login'), unduhan: () => tabLog('download'), audit: tabAudit,
+  };
+  // Kelompok yang memuat sebuah bagian — dipakai Ringkasan untuk menyusun hash
+  // tujuan "Buka →" tanpa perlu tahu susunannya.
+  const groupOf = key => Object.keys(SECTIONS).find(g => SECTIONS[g].some(t => t.key === key)) || 'pengaturan';
+  const hashOf = key => '#sistem/' + GROUP_TAB[groupOf(key)] + (key === 'ringkasan' ? '' : '/' + key);
   let st = null;
 
+  // Kelompoknya datang dari router (ctx.tab), bagiannya dari segmen ketiga
+  // (ctx.sub). Sub yang tidak dikenal — mis. hash lama atau salah tulis —
+  // jatuh ke bagian pertama kelompok itu, bukan ke halaman kosong.
   async function init(root, ctx) {
-    st = { root, ctx, tab: 'users', users: null, page: {} };
-    UI.bindTabs(root, t => { st.tab = t; render(); });
+    const group = (ctx.tab && (ctx.tab.group || ctx.tab.key)) || 'pengaturan';
+    st = { root, ctx, group: group, tab: sectionKey(group, ctx.sub), users: null, page: {} };
+    renderSub();
     await render();
   }
   function destroy() { if (st && st.map) st.map.remove(); st = null; }
+
+  // Dipanggil router saat hanya segmen ketiga yang berubah: panel diganti,
+  // fragmen dan baris bagiannya tetap.
+  async function onSub(sub) {
+    if (!st) return;
+    const key = sectionKey(st.group, sub);
+    if (key === st.tab) return;
+    st.tab = key;
+    syncSub();
+    await render();
+  }
+
+  function sectionKey(group, sub) {
+    const list = SECTIONS[group] || SECTIONS.pengaturan;
+    return (list.find(t => t.key === sub) || list[0]).key;
+  }
+
+  // Baris bagian hanya dirender bila kelompoknya punya lebih dari satu bagian
+  // (Ringkasan tidak). Memilih bagian berarti pindah hash, bukan mengubah state
+  // internal — dengan begitu tombol Kembali peramban ikut menyusurinya.
+  function renderSub() {
+    const box = UI.$('#adSub', st.root);
+    const list = SECTIONS[st.group] || [];
+    box.hidden = list.length < 2;
+    if (list.length < 2) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="sub-row" role="tablist" aria-label="Bagian ' +
+      UI.esc((st.ctx.tab && st.ctx.tab.title) || 'Pengaturan') + '">' + list.map(t =>
+        '<button type="button" role="tab" data-tab="' + t.key + '" aria-selected="' + (t.key === st.tab) + '"' +
+        (t.key === st.tab ? '' : ' tabindex="-1"') + '>' + UI.esc(t.title) + '</button>').join('') + '</div>';
+    UI.bindTabs(UI.$('.sub-row', box), key => { if (key !== st.tab) st.ctx.go(hashOf(key)); });
+  }
+
+  // Setelah router mengganti bagian, baris tabnya perlu ikut menunjuk ke sana.
+  function syncSub() {
+    UI.$$('#adSub .sub-row [role=tab]', st.root).forEach(b => {
+      const on = b.dataset.tab === st.tab;
+      b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1;
+    });
+  }
 
   const panel = () => UI.$('#adPanel', st.root);
   const pg = k => st.page[k] || 1;
@@ -24,10 +105,12 @@ Pages['admin'] = (() => {
   async function render() {
     if (st.map) { st.map.remove(); st.map = null; }
     panel().innerHTML = UI.screenHTML({ channel: 'SYS', body: UI.loadingHTML() });
-    const fn = { users: tabUsers, scenes: tabScenes, live: tabLive, regions: tabRegions, rules: tabRules, pipeline: tabPipeline,
-      archive: tabArchive, login: () => tabLog('login'), download: () => tabLog('download'), audit: tabAudit, settings: tabSettings, tokens: tabTokens }[st.tab];
-    try { await fn(); st.ctx.setStatus('Siap · ' + UI.$('[role=tab][aria-selected=true]', st.root).textContent); }
-    catch (e) { panel().innerHTML = UI.screenHTML({ channel: 'SYS', body: UI.emptyHTML('GAGAL MEMUAT') }); UI.showError('Administrasi', e); }
+    const list = SECTIONS[st.group] || [];
+    const groupTitle = (st.ctx.tab && st.ctx.tab.title) || 'Pengaturan';
+    const title = (list.find(t => t.key === st.tab) || {}).title || groupTitle;
+    const fn = TABS[st.tab];
+    try { await fn(); st.ctx.setStatus('Siap · ' + groupTitle + (list.length > 1 ? ' → ' + title : '')); }
+    catch (e) { panel().innerHTML = UI.screenHTML({ channel: 'SYS', body: UI.emptyHTML('GAGAL MEMUAT') }); UI.showError('Pengaturan', e); }
   }
 
   // ---------------------------------------------------------------- pembantu formulir dialog
@@ -409,6 +492,72 @@ Pages['admin'] = (() => {
     });
   }
 
+  // ================================================================ 7b. Penyimpanan
+  // Ringkasan disk SELURUH mesin (semua dataset digabung), berbeda dari tab
+  // Struktur di Katalog yang hanya menghitung satu dataset. Hanya baca:
+  // berkas dihapus lewat penghapusan dataset dan retensi Live, tidak dari sini.
+  async function tabStorage() {
+    const s = await API.get('/api/storage/summary');
+    const totalMb = ((s.total || {}).size_mb) || 0;
+    const tiers = Object.entries(s.tiers || {}).filter(([, t]) => t.file_count > 0);
+    const empty = Object.keys(s.tiers || {}).length - tiers.length;
+    const part = s.partial_downloads || {};
+
+    panel().innerHTML =
+      '<div class="readouts" style="margin-bottom:8px">' +
+        UI.readoutHTML('TOTAL DI DISK', UI.esc((s.total || {}).size_human || UI.NA), 'SELURUH DATASET') +
+        UI.readoutHTML('TIER TERPAKAI', UI.int(tiers.length), 'KOSONG ' + UI.int(empty)) +
+        UI.readoutHTML('UNDUHAN TERPUTUS', UI.int(part.file_count), UI.esc(part.size_human || '0 MB'),
+          part.file_count ? 'v-amber' : '') +
+      '</div>' +
+      UI.screenHTML({ channel: 'CH-01 · PENYIMPANAN PER TIER', rec: UI.esc((s.total || {}).size_human || ''), recCls: 'off',
+        body: tiers.length ? tiers.map(([name, t]) =>
+          UI.barHTML(name, t.size_mb, totalMb, t.size_human) +
+          '<p class="v-dim" style="margin:0 0 4px 116px;font-size:11px">' + UI.int(t.file_count) + ' berkas' +
+          (t.description ? ' · ' + UI.esc(t.description) : '') +
+          (Object.keys(t.sources || {}).length ? ' · ' + Object.entries(t.sources).map(([k, v]) =>
+            UI.esc((UI.SOURCE_LABEL[k] || k) + ' ' + v.size_human)).join(' · ') : '') +
+          ' · <a href="#" data-stier="' + UI.esc(name) + '">daftar berkas</a></p>').join('')
+          : UI.emptyHTML('BELUM ADA BERKAS DI DISK') }) +
+      '<div style="height:8px"></div>' +
+      '<div class="cols-2">' +
+        UI.screenHTML({ channel: 'CH-02 · PER SATELIT', body: UI.tableHTML([
+          { label: 'Sumber', get: x => UI.SOURCE_LABEL[x.src] || x.src },
+          { label: 'Berkas', cls: 'r', get: x => UI.int(x.file_count) },
+          { label: 'Ukuran', cls: 'r', get: x => x.size_human },
+        ], Object.entries(s.by_source || {}).map(([src, v]) => Object.assign({ src: src }, v)),
+          { empty: 'BELUM ADA BERKAS PER SATELIT' }) }) +
+        UI.screenHTML({ channel: 'CH-03 · UNDUHAN TERPUTUS (.part)', rec: part.file_count ? '● ADA' : '● TIDAK ADA', recCls: part.file_count ? '' : 'off',
+          body: '<p class="scr-text" style="margin:0">' + UI.int(part.file_count) + ' BERKAS · ' + UI.esc(part.size_human || '0 MB') + '</p>' +
+            '<p class="v-dim" style="margin:4px 0 0;font-size:11px">Berkas .part adalah unduhan yang terhenti; pipeline melanjutkannya sendiri pada siklus berikutnya.' +
+            (part.file_count ? ' <a href="#" data-stier="partial">daftar berkas</a>' : '') + '</p>' }) +
+      '</div>' +
+      '<div id="stFiles"></div>';
+
+    bindStorageFiles();
+  }
+
+  // Satu tier bisa tersebar di banyak folder dataset, jadi daftarnya diratakan
+  // dulu dan dibatasi 500 baris — sama seperti daftar berkas di Katalog, yang
+  // tanpa batas itu pernah membekukan tab.
+  function bindStorageFiles() {
+    UI.$$('[data-stier]', panel()).forEach(a => a.addEventListener('click', async ev => {
+      ev.preventDefault();
+      const tier = a.dataset.stier;
+      const box = UI.$('#stFiles', panel());
+      box.innerHTML = '<div style="height:8px"></div>' + UI.screenHTML({ channel: 'BERKAS ' + tier.toUpperCase(), body: UI.loadingHTML() });
+      try {
+        const r = await API.get('/api/storage/files/' + encodeURIComponent(tier));
+        const rows = (r.directories || []).flatMap(d => (d.files || []).map(f => ({ dir: d.path, name: f.name, size_mb: f.size_mb })));
+        box.innerHTML = '<div style="height:8px"></div>' + UI.screenHTML({
+          channel: 'BERKAS TIER ' + tier.toUpperCase(), rec: UI.int(rows.length) + ' BERKAS', recCls: 'off',
+          body: UI.tableHTML([{ label: 'Nama', key: 'name' }, { label: 'MB', cls: 'r', get: x => UI.num(x.size_mb, 2) },
+            { label: 'Folder', key: 'dir' }], rows.slice(0, 500), { empty: 'TIDAK ADA BERKAS' }) +
+            (rows.length > 500 ? '<p class="v-dim" style="margin:6px 0 0;font-size:11px">Menampilkan 500 dari ' + UI.int(rows.length) + ' berkas.</p>' : '') });
+      } catch (e) { box.innerHTML = ''; UI.showError('Daftar berkas', e); }
+    }));
+  }
+
   // ================================================================ 8–9. Log Masuk / Unduhan
   async function tabLog(kind) {
     const p = panel(), key = 'log_' + kind;
@@ -512,5 +661,80 @@ Pages['admin'] = (() => {
     bindPager('tokens', tabTokens);
   }
 
-  return { init, destroy };
+  // ================================================================ 0. Ringkasan
+  // Pintu masuk Pengaturan (M53): satu layar yang menjawab "apa yang perlu saya
+  // kerjakan hari ini". Tidak ada aksi tulis di sini — hanya temuan beserta
+  // tautan ke bagian yang menanganinya. Tiap sumber gagal sendiri-sendiri.
+  async function tabSummary() {
+    const p = panel();
+    const [pipe, alerts, userList] = await Promise.all([
+      API.get('/api/admin/pipeline/status').catch(() => null),
+      API.get('/api/alerts?status=active&limit=200').then(r => r.items || []).catch(() => null),
+      users().catch(() => null),
+    ]);
+
+    const hy = (pipe && pipe.hydromet) || {};
+    const areas = (pipe && pipe.live_areas) || [];
+    const cred = (pipe && pipe.credentials) || {};
+    const credMissing = Object.keys(cred).filter(k => !cred[k]);
+    const areaBad = areas.filter(a => a.status && /FAIL|ERROR|STALE/i.test(a.status));
+    const locked = (userList || []).filter(u => u.is_locked);
+    const queued = ((pipe && pipe.queue) || {}).dataset_jobs_queued;
+
+    // Temuan: hanya hal yang butuh tindakan, paling mendesak dulu.
+    const findings = [];
+    if (!pipe) findings.push(['v-alert', 'Status pipeline tidak dapat dibaca.', 'Periksa LINK di taskbar; API atau basis data mungkin tidak terjangkau.', null]);
+    if (credMissing.length) findings.push(['v-alert', 'Kredensial belum diisi: ' + credMissing.join(', ') + '.',
+      'Job yang membutuhkannya akan gagal. Isi di .env lalu jalankan ulang server.', null]);
+    if (hy.failed) findings.push(['v-alert', UI.int(hy.failed) + ' job hidromet berstatus FAILED.',
+      'Lihat sebabnya di log pipeline, lalu picu ulang rentang tanggalnya.', 'pipeline']);
+    if (areaBad.length) findings.push(['v-amber', UI.int(areaBad.length) + ' Live Area bermasalah: ' + areaBad.map(a => a.name).join(', ') + '.',
+      'Coba ulang sumber yang gagal dari Operasi → Live Area.', 'live']);
+    if (hy.waiting) findings.push(['v-amber', UI.int(hy.waiting) + ' job menunggu data hulu (WAITING_UPSTREAM).',
+      'Normal bila granule penyedia belum terbit; menetap berhari-hari berarti ada masalah.', 'pipeline']);
+    if (alerts === null) findings.push(['v-amber', 'Daftar alert tidak dapat dibaca.', 'Coba muat ulang halaman.', null]);
+    else if (alerts.length) findings.push(['v-amber', UI.int(alerts.length) + ' alert hujan belum ditandai dibaca.',
+      'Penandaan dilakukan di Kondisi → Hujan per kecamatan, oleh Analis atau Administrator.', null]);
+    if (locked.length) findings.push(['', UI.int(locked.length) + ' akun terkunci.',
+      'Buka kuncinya di Pengguna & akses → Pengguna.', 'pengguna']);
+    if (!areas.length) findings.push(['', 'Belum ada Live Area.',
+      'Tanpa Live Area, halaman publik dan Kondisi tidak punya scene untuk ditampilkan.', 'live']);
+
+    p.innerHTML =
+      '<div class="readouts" style="margin-bottom:8px">' +
+        UI.readoutHTML('PERLU PERHATIAN', UI.int(findings.length),
+          findings.length ? 'LIHAT DAFTAR DI BAWAH' : 'TIDAK ADA', findings.length ? 'v-amber' : '') +
+        UI.readoutHTML('HIDROMET TERAKHIR', UI.esc(hy.last_completed ? UI.date(hy.last_completed) : UI.NA),
+          'OBSERVASI ' + UI.esc(hy.last_observation_date ? UI.date(hy.last_observation_date) : UI.NA), 'v-cyan') +
+        UI.readoutHTML('ALERT AKTIF', alerts === null ? UI.NA : UI.int(alerts.length),
+          alerts === null ? 'TIDAK DAPAT DIBACA' : 'BELUM DITANDAI DIBACA', alerts && alerts.length ? 'v-amber' : '') +
+        UI.readoutHTML('ANTREAN DATASET', queued === undefined || queued === null ? UI.NA : UI.int(queued), 'JOB MENUNGGU') +
+      '</div>' +
+      UI.screenHTML({ channel: 'CH-00 · PERLU PERHATIAN', rec: findings.length ? '● CHECK' : '● NOMINAL', recCls: findings.length ? '' : 'live',
+        body: findings.length
+          ? '<ul class="findings">' + findings.map(f =>
+              '<li><b class="' + f[0] + '">' + UI.esc(f[1]) + '</b><br><span class="v-dim">' + UI.esc(f[2]) + '</span>' +
+              (f[3] ? ' <button type="button" class="link-btn" data-goto="' + f[3] + '">Buka →</button>' : '') + '</li>').join('') + '</ul>'
+          : UI.emptyHTML('TIDAK ADA TEMUAN. SISTEM BERJALAN NORMAL.') }) +
+      '<div style="height:8px"></div>' +
+      '<div class="cols-2">' +
+        UI.screenHTML({ channel: 'CH-01 · JOB TERAKHIR PER JENIS', body: UI.tableHTML([
+          { label: 'Jenis', key: 'kind' },
+          { label: 'Status', html: true, get: j => '<span class="' + (/FAIL/i.test(j.status || '') ? 'v-alert' : /QUEUED|RUNNING|WAITING/i.test(j.status || '') ? 'v-amber' : '') + '">' + UI.esc(j.status || UI.NA) + '</span>' },
+          { label: 'Tanggal data', get: j => UI.date(j.date_range_start) },
+          { label: 'Selesai', get: j => j.completed_at ? UI.dateTime(j.completed_at) : '' },
+        ], (pipe && pipe.latest_jobs) || [], { empty: 'BELUM ADA JOB' }) }) +
+        UI.screenHTML({ channel: 'CH-02 · LIVE AREA', body: UI.tableHTML([
+          { label: 'Area', key: 'name' },
+          { label: 'Status', html: true, get: a => '<span class="' + (/FAIL|ERROR/i.test(a.status || '') ? 'v-alert' : '') + '">' + UI.esc(a.status || UI.NA) + '</span>' },
+          { label: 'Diperiksa', get: a => UI.dateTime(a.last_checked_at) },
+        ], areas, { empty: 'BELUM ADA LIVE AREA' }) }) +
+      '</div>';
+
+    // "Buka →" sekarang berpindah lewat hash, jadi bagian yang dituju bisa
+    // dibagikan dan tombol Kembali peramban mengembalikan admin ke Ringkasan.
+    UI.$$('[data-goto]', p).forEach(b => b.addEventListener('click', () => st.ctx.go(hashOf(b.dataset.goto))));
+  }
+
+  return { init, destroy, onSub };
 })();

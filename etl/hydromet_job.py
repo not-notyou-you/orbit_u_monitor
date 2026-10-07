@@ -360,6 +360,21 @@ def pending_dates(db, date_from: date, date_to: date) -> list[date]:
     return [d for d in (date_from + timedelta(days=i) for i in range(days)) if d not in done]
 
 
+def modis_missing_dates(db, date_from: date, date_to: date) -> list[date]:
+    """Tanggal di [date_from, date_to] tanpa satu pun observasi MODIS (FLOOD,
+    NDVI, NDWI), termasuk yang Job Hidromet-nya sudah COMPLETED karena GPM
+    selesai tetapi MODIS gagal/terlewat. Dipakai backfill MODIS halaman Data
+    (M56): ``pending_dates`` saja akan melewati tanggal-tanggal itu."""
+    with db.session() as sess:
+        have = set(sess.scalars(text("""
+            SELECT DISTINCT o.obs_date FROM region_observations o JOIN spectral_bands b USING (band_id)
+            JOIN satellite_sources s USING (source_id)
+            WHERE s.source_code = 'MODIS' AND o.obs_date BETWEEN :a AND :b"""),
+            {"a": date_from, "b": date_to}).all())
+    days = (date_to - date_from).days + 1
+    return [d for d in (date_from + timedelta(days=i) for i in range(days)) if d not in have]
+
+
 def waiting_dates(db) -> list[date]:
     """Tanggal WAITING_UPSTREAM yang masih boleh dicoba lagi."""
     ctx = context(db)
@@ -417,9 +432,19 @@ def refresh_late_to_final(db, fetchers: Fetchers | None = None,
 
 
 def backfill(db, date_from: date, date_to: date, *, modis: bool = True, fetchers: Fetchers | None = None,
-             dry_run: bool = False, echo=print) -> dict:
+             dry_run: bool = False, max_consecutive_failures: int = 5, echo=print,
+             pending_fn=None) -> dict:
     """Backfill berurutan dan resume-aware di bawah advisory lock ``hydromet``
-    (scripts/backfill_hydromet.py, POST /admin/ingest). Mengembalikan ringkasan."""
+    (scripts/backfill_hydromet.py, POST /admin/ingest). Mengembalikan ringkasan.
+
+    Berhenti lebih awal setelah `max_consecutive_failures` hari FAILED berurutan
+    (0 = jangan pernah berhenti). Gangguan jaringan panjang membuat setiap hari
+    gagal di tahap download, dan menyapu ratusan tanggal dalam keadaan itu hanya
+    membuang waktu tanpa menghasilkan satu baris pun -- backfill 2026-10-05
+    menggagalkan hari demi hari selama outage ISP sampai dihentikan manual.
+    Tanggal yang belum COMPLETED tidak hilang: jalankan ulang perintah yang sama
+    setelah jaringan pulih. WAITING_UPSTREAM tidak dihitung sebagai kegagalan --
+    itu granule yang memang belum dipublikasikan, bukan tanda jaringan rusak."""
     import time
 
     from etl.advisory_lock import advisory_lock
@@ -430,10 +455,12 @@ def backfill(db, date_from: date, date_to: date, *, modis: bool = True, fetchers
             summary["locked"] = True
             echo("[SKIP] another worker holds the 'hydromet' lock (scheduler or another backfill)")
             return summary
-        pending = pending_dates(db, date_from, date_to)
+        # pending_fn: tanggal yang dikerjakan; default yang belum COMPLETED.
+        # Backfill MODIS memakai modis_missing_dates.
+        pending = (pending_fn or pending_dates)(db, date_from, date_to)
         total = (date_to - date_from).days + 1
         summary["skipped_done"] = total - len(pending)
-        echo(f"[INFO] {total} days in range, {summary['skipped_done']} already COMPLETED, {len(pending)} to do")
+        echo(f"[INFO] {total} days in range, {summary['skipped_done']} already done, {len(pending)} to do")
         if dry_run:
             for d in pending:
                 echo(f"  {d}")
@@ -441,9 +468,24 @@ def backfill(db, date_from: date, date_to: date, *, modis: bool = True, fetchers
         if fetchers is None:
             fetchers = Fetchers() if modis else Fetchers(modis=None)
         ctx = context(db)
+        consecutive_failed = 0
         for i, d in enumerate(pending, 1):
             t0 = time.monotonic()
             res = run_day(db, d, fetchers=fetchers, ctx=ctx)
             summary[res.status] = summary.get(res.status, 0) + 1
             echo(f"[{i}/{len(pending)}] {d} {res.status} ({time.monotonic() - t0:.0f}s) {res.message}")
+            if res.status == "FAILED":
+                consecutive_failed += 1
+            else:
+                consecutive_failed = 0
+            if max_consecutive_failures and consecutive_failed >= max_consecutive_failures:
+                summary["aborted_after"] = str(d)
+                remaining = len(pending) - i
+                echo(f"[ABORT] {consecutive_failed} hari FAILED berurutan "
+                     f"(terakhir {d}); {remaining} tanggal belum dikerjakan. "
+                     "Biasanya jaringan/kredensial, bukan data. Perbaiki lalu "
+                     "jalankan ulang perintah yang sama -- tanggal COMPLETED dilewati.")
+                logger.error("[HYDROMET] backfill dihentikan: %d FAILED berurutan, "
+                             "sisa %d tanggal", consecutive_failed, remaining)
+                break
     return summary

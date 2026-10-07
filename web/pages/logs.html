@@ -1,0 +1,15 @@
+<!-- pages/logs.html — Sistem › Log (INTERFACE.md §2 halaman 8.2). Bagian yang
+     tampil mengikuti peran: Data Engineer → log halaman Data; Analis → log
+     halaman Kejadian; Administrator → semuanya, termasuk masuk/registrasi,
+     unduhan, dan audit lengkap. Semua baca saja. -->
+<div class="subtabs" id="lgSub"></div>
+<form id="lgFilter" class="raised filter-bar" novalidate>
+  <div class="field" style="margin:0"><label for="lgFrom">Dari</label><input type="date" id="lgFrom"></div>
+  <div class="field" style="margin:0"><label for="lgTo">Sampai</label><input type="date" id="lgTo"></div>
+  <div class="field" style="margin:0" id="lgKindBox"><label for="lgKind">Jenis</label>
+    <select id="lgKind"><option value="">Semua</option><option value="AKTIVITAS">Aktivitas</option><option value="AUDIT">Perubahan data (audit)</option></select></div>
+  <div class="field" style="margin:0" id="lgActBox"><label for="lgAct">Aksi</label><select id="lgAct"></select></div>
+  <div class="field" style="margin:0" id="lgQBox"><label for="lgQ">Cari</label><input type="search" id="lgQ" maxlength="100" placeholder="pengguna, objek, isi"></div>
+  <button type="submit" id="lgApply">Terapkan</button>
+</form>
+<div id="lgList"></div>

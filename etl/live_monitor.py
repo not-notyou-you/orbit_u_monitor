@@ -244,6 +244,16 @@ def _granule_date(name: str) -> date | None:
     return None
 
 
+def _preview_urls(item: dict, url: str) -> dict:
+    """Item preview + URL-nya. "url_boundaries" hanya ada kalau varian garis
+    wilayah memang pernah dirender untuk scene itu, jadi UI bisa menonaktifkan
+    checkbox-nya alih-alih meminta berkas yang tidak ada."""
+    out = {**item, "url": url}
+    if item.get("file_adm"):
+        out["url_boundaries"] = url + "?boundaries=1"
+    return out
+
+
 # ---------------------------------------------------------------------------
 # LiveMonitor
 # ---------------------------------------------------------------------------
@@ -596,16 +606,26 @@ class LiveMonitor:
                     "interpretations": sel.interpretations or {},
                     "area_status": sel.area_status or {},
                     "previews": {
-                        k: {**v, "url": f"/api/live/areas/{area_id}/preview/{dk}/{k}.png"}
+                        k: _preview_urls(v, f"/api/live/areas/{area_id}/preview/{dk}/{k}.png")
                         for k, v in items.items()
                     },
                     "previews_skipped": (sel.previews or {}).get("skipped") or {},
+                    # Georeferensi grid PNG (empat sudut lon/lat). None untuk
+                    # scene yang dirender sebelum ini dicatat -- konsumennya
+                    # harus punya jalan mundur, mis. bbox daerah.
+                    "preview_grid": (sel.previews or {}).get("grid"),
                     "updated_at": sel.updated_at,
                 }
         return {"area": area, "scene": scene, "dates": dates,
                 "forecast": forecast, "forecast_updated_at": forecast_at}
 
-    def preview_path(self, area_id: int, scene_date: date, key: str) -> Path | None:
+    def preview_path(self, area_id: int, scene_date: date, key: str,
+                     boundaries: bool = False) -> Path | None:
+        """PNG satu lapisan. `boundaries` = varian garis wilayah
+        (`{key}_adm.png`); kalau varian itu belum pernah dirender (scene lama,
+        batas wilayah belum dimuat) jatuh kembali ke PNG biasa -- UI tetap
+        menampilkan gambar, cuma tanpa garis."""
+        from etl.admin_overlay import adm_name
         from etl.live_interpret import PREVIEW_KEYS
         from etl.water_change import PREVIEW_KEY as WATER_CHANGE_KEY
         if key not in PREVIEW_KEYS and key != WATER_CHANGE_KEY:
@@ -616,7 +636,12 @@ class LiveMonitor:
         if info is None:
             return None
         files = _LiveFiles(*info)
-        p = files.preview_dir(scene_date) / f"{key}.png"
+        pdir = files.preview_dir(scene_date)
+        if boundaries:
+            adm = pdir / adm_name(f"{key}.png")
+            if adm.is_file() and files._inside(adm):
+                return adm
+        p = pdir / f"{key}.png"
         return p if p.is_file() and files._inside(p) else None
 
     def events(self, area_id: int, limit: int = 100) -> list[dict]:

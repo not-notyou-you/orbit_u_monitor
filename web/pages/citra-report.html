@@ -1,0 +1,33 @@
+<!-- pages/citra-report.html — Citra Satelit › Laporan PDF (INTERFACE.md §2 halaman 3.5).
+     Pengguna memilih halaman mana yang dicetak (satu, beberapa, atau semua),
+     tanggal scene, dan (opsional) tanggal pembanding; hasilnya SATU berkas PDF. -->
+<div class="layout">
+  <div class="control-panel">
+    <form id="crForm" novalidate>
+      <fieldset>
+        <legend>Halaman yang dicetak</legend>
+        <label class="check"><input type="checkbox" name="pages" value="ringkasan" checked> Ringkasan</label>
+        <label class="check"><input type="checkbox" name="pages" value="s1" checked> Sentinel-1</label>
+        <label class="check"><input type="checkbox" name="pages" value="modis" checked> MODIS</label>
+        <label class="check"><input type="checkbox" name="pages" value="gpm" checked> GPM</label>
+        <div class="btn-row" style="margin-top:6px">
+          <button type="button" class="small" id="crAll">Pilih semua</button>
+          <button type="button" class="small" id="crNone">Kosongkan</button>
+        </div>
+        <span class="err" id="crPagesErr" aria-live="polite"></span>
+      </fieldset>
+      <fieldset>
+        <legend>Scene</legend>
+        <div class="field"><label for="crArea">Live Area</label><select id="crArea"></select></div>
+        <div class="field"><label for="crDate">Tanggal scene</label><select id="crDate"></select></div>
+        <label class="check"><input type="checkbox" id="crCmpOn"> Sertakan perbandingan dengan tanggal lain</label>
+        <div class="field" id="crCmpBox" hidden><label for="crCmp">Tanggal pembanding</label><select id="crCmp"></select></div>
+        <p id="crWindow" class="mut" style="font-size:11px;margin:4px 0 0"></p>
+      </fieldset>
+      <div class="btn-row end"><button type="submit" class="default" id="crGo">Unduh PDF</button></div>
+    </form>
+  </div>
+  <div class="deck">
+    <div id="crPreview"></div>
+  </div>
+</div>

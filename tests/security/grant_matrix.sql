@@ -36,6 +36,11 @@ CREATE TEMP TABLE gm_expected (
 INSERT INTO gm_expected VALUES
 --   objek                      pub  usr    ana    eng    adm     etl
     ('v_public_live_latest',     'S', 'S',   'S',   'S',   'S',    ''),
+    -- susunan halaman v2 (M56): batas waktu per role di dalam VIEW (bagian 2)
+    ('v_public_kejadian',        'S', 'S',   'S',   'S',   'S',    ''),
+    ('v_citra_scenes',           'S', 'S',   'S',   'S',   'S',    ''),
+    ('v_citra_metrics',          'S', 'S',   'S',   'S',   'S',    ''),
+    ('v_citra_obs_aoi',          'S', 'S',   'S',   'S',   'S',    ''),
     -- live_areas: PUBLIC hanya GRANT kolom (diuji di bagian 2)
     ('live_areas',               '',  'S',   'S',   'S',   'SIU',  'SIU'),
     ('live_scenes',              '',  'S',   'S',   'S',   'SIU',  'SIU'),
@@ -47,21 +52,23 @@ INSERT INTO gm_expected VALUES
     ('v_statistik_hari_ini',     '',  'S',   'S',   'S',   'S',    'S'),
     ('v_alert_aktif',            '',  'S',   'S',   'S',   'S',    'S'),
     -- master referensi
-    ('satellite_sources',        '',  'S',   'S',   'S',   'S',    'S'),
-    ('spectral_bands',           '',  'S',   'S',   'S',   'S',    'S'),
+    -- PUBLIC S: penjelasan satelit/band halaman Citra (M56)
+    ('satellite_sources',        'S', 'S',   'S',   'S',   'S',    'S'),
+    ('spectral_bands',           'S', 'S',   'S',   'S',   'S',    'S'),
     ('processing_stages',        '',  'S',   'S',   'S',   'S',    'S'),
     ('fusion_strategies',        '',  'S',   'S',   'S',   'S',    'S'),
     ('report_types',             '',  'S',   'S',   'S',   'S',    'S'),
-    ('administrative_regions',   '',  'S',   'S',   'S',   'SIU',  'S'),
+    -- PUBLIC S: peta kecamatan Beranda publik (M56)
+    ('administrative_regions',   'S', 'S',   'S',   'S',   'SIU',  'S'),
     ('regions_of_interest',      '',  'S',   'S',   'S',   'SIU',  'S'),
     ('alert_rules',              '',  'S',   'S',   'S',   'SIU',  'S'),
     ('quality_thresholds',       '',  'S',   'S',   'S',   'SIU',  'S'),
-    ('disaster_types',           '',  'S',   'S',   'S',   'SIU',  'S'),
+    ('disaster_types',           'S', 'S',   'S',   'S',   'SIU',  'S'),
     ('app_settings',             '',  'S',   'S',   'S',   'SIU',  'S'),
     -- alert & kejadian; U(ack) analyst = GRANT kolom (bagian 2)
     ('alert_events',             '',  'S',   'S',   'S',   'SIUD', 'SI'),
-    -- etl S: job laporan Hidromet (Tahap 3)
-    ('disaster_events',          '',  '',    'SIU', '',    'SIU',  'S'),
+    -- etl S: job laporan Hidromet (Tahap 3); usr S: semua role login melihat (M56)
+    ('disaster_events',          '',  'S',   'SIU', 'S',   'SIU',  'S'),
     ('v_kejadian_dan_hujan',     '',  '',    'S',   '',    'S',    'S'),
     ('v_evaluasi_alert',         '',  '',    'S',   '',    'S',    'S'),
     ('region_observations',      '',  'S',   'S',   'S',   'S',    'SIU'),
@@ -70,8 +77,9 @@ INSERT INTO gm_expected VALUES
     ('dataset_source_config',    '',  '',    '',    'SIU', 'SIUD', 'SIU'),
     ('dataset_jobs',             '',  '',    '',    'SIU', 'SIUD', 'SIU'),
     ('scene_job_state',          '',  '',    '',    'SIU', 'SIUD', 'SIU'),
-    ('satellite_scenes',         '',  '',    '',    'S',   'SU',   'SIU'),
-    ('nasa_scenes',              '',  '',    '',    'S',   'SU',   'SIU'),
+    -- eng U: soft delete scene dari halaman Data (M56)
+    ('satellite_scenes',         '',  '',    '',    'SU',  'SU',   'SIU'),
+    ('nasa_scenes',              '',  '',    '',    'SU',  'SU',   'SIU'),
     ('data_products',            '',  '',    '',    'S',   'S',    'SIUD'),
     ('data_lineage',             '',  '',    '',    'S',   'S',    'SIU'),
     ('quality_metrics',          '',  '',    '',    'S',   'S',    'SIU'),
@@ -94,7 +102,10 @@ INSERT INTO gm_expected VALUES
     ('user_activity_logs',       'I', 'I',   'I',   'I',   'SI',   'I'),
     ('audit_log',                '',  '',    '',    '',    'S',    ''),
     ('v_log_login',              '',  '',    '',    '',    'S',    ''),
-    ('v_log_unduhan',            '',  '',    '',    '',    'S',    '');
+    ('v_log_unduhan',            '',  '',    '',    '',    'S',    ''),
+    -- log per halaman (M56)
+    ('v_log_data',               '',  '',    '',    'S',   'S',    ''),
+    ('v_log_kejadian',           '',  '',    'S',   '',    'S',    '');
 
 DO $$
 DECLARE
@@ -201,6 +212,20 @@ INSERT INTO api_tokens (user_id, token_name, token_prefix, token_hash, scopes, e
 SELECT u.user_id, 'gm', 'trn_' || substr(md5(u.username), 1, 4), repeat('0', 64), 'READ', now() + INTERVAL '1 day'
 FROM users u WHERE u.username IN ('gm_user', 'gm_user2');
 
+-- Batas waktu per role (M56): satu area, scene 10/100/400/500 hari lalu
+-- (terbaru = 10 hari), kejadian 10 dan 400 hari lalu.
+INSERT INTO live_areas (name, bbox_wkt, status) VALUES ('gm_area', 'POLYGON((0 0,1 0,1 1,0 1,0 0))', 'ACTIVE');
+INSERT INTO live_scenes (area_id, scene_date, status)
+SELECT a.area_id, CURRENT_DATE - d, 'READY'
+FROM live_areas a, unnest(ARRAY[10, 100, 400, 500]) d WHERE a.name = 'gm_area';
+INSERT INTO administrative_regions (pcode, region_name, admin_level, geom, source_dataset)
+VALUES ('GM0000', 'gm kabupaten', 2, ST_Multi(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))', 4326)), 'gm');
+INSERT INTO disaster_events (disaster_type_id, region_id, event_date, description, info_source, recorded_by)
+SELECT (SELECT min(disaster_type_id) FROM disaster_types),
+       (SELECT region_id FROM administrative_regions WHERE pcode = 'GM0000'), CURRENT_DATE - d,
+       'gm kejadian uji', 'GMLS', (SELECT user_id FROM users WHERE username = 'gm_analyst')
+FROM unnest(ARRAY[10, 400]) d;
+
 INSERT INTO generated_reports (report_type_id, period_start, period_end, file_path,
                                file_size_bytes, checksum_sha256, status)
 SELECT t.report_type_id, DATE '2020-01-06', DATE '2020-01-12', '/tmp/gm.pdf', 1, repeat('0', 64), 'READY'
@@ -247,6 +272,22 @@ BEGIN
         ('monitor_public',  NULL, 'SELECT * FROM auth_get_user(''gm_user'')', 'OK'),
         ('monitor_public',  NULL, 'SELECT * FROM users', 'DENIED'),
         ('monitor_etl',     NULL, 'SELECT * FROM auth_get_user(''gm_user'')', 'DENIED'),
+        -- Registrasi (M56): hanya lewat fungsi; tidak bisa INSERT users langsung.
+        ('monitor_public',  NULL, 'SELECT auth_register_user(''gm_reg'', ''gm_reg@example.org'', ''$2b$12$' || repeat('a', 53) || ''')', 'OK'),
+        ('monitor_public',  NULL, 'INSERT INTO users (role_id, username, password_hash, full_name) VALUES (1, ''gm_x'', ''x'', ''x'')', 'DENIED'),
+        ('monitor_etl',     NULL, 'SELECT auth_register_user(''gm_reg'', ''gm_reg@example.org'', ''x'')', 'DENIED'),
+        -- Kejadian (M56): PUBLIC hanya lewat VIEW; USER baca tabel tanpa tulis.
+        ('monitor_public',  NULL, 'SELECT * FROM disaster_events', 'DENIED'),
+        ('monitor_user',    NULL, 'SELECT count(*) FROM disaster_events', 'OK'),
+        ('monitor_user',    NULL, 'UPDATE disaster_events SET is_verified = true WHERE false', 'DENIED'),
+        -- Citra (M56): PUBLIC tidak membaca live_scenes langsung.
+        ('monitor_public',  NULL, 'SELECT * FROM live_scenes', 'DENIED'),
+        -- Log per halaman (M56).
+        ('monitor_analyst', NULL, 'SELECT count(*) FROM v_log_data', 'DENIED'),
+        ('monitor_data_engineer', NULL, 'SELECT count(*) FROM v_log_kejadian', 'DENIED'),
+        ('monitor_data_engineer', NULL, 'SELECT count(*) FROM v_log_login', 'DENIED'),
+        ('monitor_data_engineer', NULL, 'UPDATE nasa_scenes SET is_valid = is_valid WHERE false', 'OK'),
+        ('monitor_analyst', NULL, 'UPDATE nasa_scenes SET is_valid = is_valid WHERE false', 'DENIED'),
         -- RLS api_tokens: tidak bisa membuat token atas nama orang lain.
         ('monitor_user', u1, format('INSERT INTO api_tokens (user_id, token_name, token_prefix, token_hash, scopes, expires_at) VALUES (%s, ''x'', ''trn_gm01'', repeat(''0'', 64), ''READ'', now() + interval ''1 day'')', u1), 'OK'),
         ('monitor_user', u1, format('INSERT INTO api_tokens (user_id, token_name, token_prefix, token_hash, scopes, expires_at) VALUES (%s, ''x'', ''trn_gm02'', repeat(''0'', 64), ''READ'', now() + interval ''1 day'')', u2), 'DENIED'),
@@ -275,6 +316,45 @@ BEGIN
     n := pg_temp.gm_count('monitor_user', u1, format('UPDATE api_tokens SET revoked_at = now() WHERE user_id = %s RETURNING 1', u2));
     IF n IS NOT NULL THEN problems := problems || 'api_tokens RLS: user revoked another user''s token'; END IF;
 
+    -- Registrasi: akun yang dibuat fungsi selalu USER, apa pun pemanggilnya.
+    n := pg_temp.gm_count('monitor_public', NULL,
+        'SELECT auth_register_user(''gm_reg2'', ''GM_Reg2@Example.org'', ''$2b$12$' || repeat('b', 53) || ''')');
+    IF (SELECT r.role_code FROM users u JOIN roles r USING (role_id) WHERE u.user_id = n) <> 'USER' THEN
+        problems := problems || 'auth_register_user created a non-USER account'::text;
+    END IF;
+    IF (SELECT email FROM users WHERE user_id = n) <> 'gm_reg2@example.org' THEN
+        problems := problems || 'auth_register_user did not lowercase the email'::text;
+    END IF;
+    BEGIN
+        n := pg_temp.gm_count('monitor_public', NULL,
+            'SELECT auth_register_user(''gm_reg3'', ''gm_reg2@EXAMPLE.org'', ''$2b$12$' || repeat('c', 53) || ''')');
+        problems := problems || 'auth_register_user accepted a duplicate email'::text;
+    EXCEPTION WHEN unique_violation THEN NULL;
+    END;
+
+    -- Batas waktu citra per role (v_citra_scenes).
+    n := pg_temp.gm_count('monitor_public', NULL, 'SELECT count(*) FROM v_citra_scenes WHERE area_name = ''gm_area''');
+    IF n <> 1 THEN problems := problems || format('v_citra_scenes: public sees %s scenes, expected 1 (30 days)', n); END IF;
+    n := pg_temp.gm_count('monitor_user', NULL, 'SELECT count(*) FROM v_citra_scenes WHERE area_name = ''gm_area''');
+    IF n <> 2 THEN problems := problems || format('v_citra_scenes: user sees %s scenes, expected 2 (365 days)', n); END IF;
+    n := pg_temp.gm_count('monitor_analyst', NULL, 'SELECT count(*) FROM v_citra_scenes WHERE area_name = ''gm_area''');
+    IF n <> 4 THEN problems := problems || format('v_citra_scenes: analyst sees %s scenes, expected 4', n); END IF;
+    n := pg_temp.gm_count('monitor_data_engineer', NULL, 'SELECT count(*) FROM v_citra_scenes WHERE area_name = ''gm_area''');
+    IF n <> 4 THEN problems := problems || format('v_citra_scenes: data engineer sees %s scenes, expected 4', n); END IF;
+    n := pg_temp.gm_count('monitor_admin', NULL, 'SELECT count(*) FROM v_citra_scenes WHERE area_name = ''gm_area''');
+    IF n <> 4 THEN problems := problems || format('v_citra_scenes: admin sees %s scenes, expected 4', n); END IF;
+    -- Scene terbaru tetap terlihat publik walau lebih tua dari 30 hari.
+    UPDATE live_scenes SET status = 'FAILED' WHERE scene_date = CURRENT_DATE - 10
+       AND area_id = (SELECT area_id FROM live_areas WHERE name = 'gm_area');
+    n := pg_temp.gm_count('monitor_public', NULL, 'SELECT count(*) FROM v_citra_scenes WHERE area_name = ''gm_area'' AND scene_date = CURRENT_DATE - 100');
+    IF n <> 1 THEN problems := problems || format('v_citra_scenes: public does not see the latest scene (got %s)', n); END IF;
+
+    -- Kejadian: PUBLIC 365 hari lewat VIEW, USER semua lewat tabel.
+    n := pg_temp.gm_count('monitor_public', NULL, 'SELECT count(*) FROM v_public_kejadian WHERE description = ''gm kejadian uji''');
+    IF n <> 1 THEN problems := problems || format('v_public_kejadian: public sees %s events, expected 1', n); END IF;
+    n := pg_temp.gm_count('monitor_user', NULL, 'SELECT count(*) FROM disaster_events WHERE description = ''gm kejadian uji''');
+    IF n <> 2 THEN problems := problems || format('disaster_events: user sees %s events, expected 2', n); END IF;
+
     -- RLS generated_reports: audiens.
     n := pg_temp.gm_count('monitor_analyst', NULL, 'SELECT count(*) FROM generated_reports g JOIN report_types t USING (report_type_id) WHERE t.report_code LIKE ''HYDROMET%''');
     IF n <> 1 THEN problems := problems || format('reports RLS: analyst sees %s hydromet rows, expected 1', n); END IF;
@@ -291,7 +371,7 @@ BEGIN
         RAISE EXCEPTION E'Behavioural security checks failed (% problems):\n%',
             array_length(problems, 1), array_to_string(problems, E'\n');
     END IF;
-    RAISE NOTICE 'Part 2 OK: column grants, RLS, append-only, auth functions';
+    RAISE NOTICE 'Part 2 OK: column grants, RLS, append-only, auth functions, role windows';
 END $$;
 
 -- monitor_app tanpa SET ROLE: tidak bisa membaca apa pun (bahkan tidak punya

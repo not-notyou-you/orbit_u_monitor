@@ -627,6 +627,25 @@ class MeResponse(BaseModel):
     permissions: list[str]
 
 
+EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+
+
+class RegisterRequest(BaseModel):
+    """Registrasi mandiri (M56): selalu menjadi USER."""
+    email: str = Field(min_length=6, max_length=254, pattern=EMAIL_PATTERN)
+    username: str = Field(pattern=USERNAME_PATTERN)
+    password: str = Field(min_length=1, max_length=200)
+    password_confirm: str = Field(min_length=1, max_length=200)
+
+
+class SessionInfoResponse(BaseModel):
+    """Peran dan izin pemanggil, termasuk pengunjung yang belum masuk (M56)."""
+    authenticated: bool
+    role_code: str
+    permissions: list[str]
+    user: MeResponse | None = None
+
+
 class ChangePasswordRequest(BaseModel):
     old_password: str = Field(min_length=1, max_length=200)
     new_password: str = Field(min_length=1, max_length=200)
@@ -674,6 +693,7 @@ class AdminUserItem(BaseModel):
     username: str
     full_name: str
     organization: str | None = None
+    email: str | None = None
     role_code: str
     is_active: bool
     is_locked: bool

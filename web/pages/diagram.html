@@ -1,0 +1,54 @@
+<!-- pages/diagram.html — Diagram (INTERFACE.md §2 halaman 4). Satu fragmen untuk
+     dua tab: "Keadaan terbaru" (semua band, 30 hari, satu grafik) dan
+     "Analisa daerah" (kecamatan × tanggal × band + PDF). Bagian yang tidak
+     dipakai tab aktif disembunyikan oleh js/diagram.js. ANALYST & ADMIN. -->
+
+<!-- 4.1 keadaan terbaru -->
+<section id="dgLatest" hidden>
+  <div class="screen"><div class="screen-inner">
+    <span class="scr-ch">CH-01 · SEMUA BAND · 30 HARI</span><span class="scr-rec live" id="dgRec">● AUTO</span>
+    <div id="dgChart"></div>
+    <div class="band-chips" id="dgChips" role="group" aria-label="Band yang ditampilkan"></div>
+    <p class="scr-text v-dim" style="margin:6px 0 0">Satuan tiap band berbeda (dB, %, mm, indeks), jadi setiap garis diskalakan ke rentang biasanya dalam setahun (0 = rendah biasa, 1 = tinggi biasa). Satu titik per tanggal; garis terputus di hari tanpa data. Arahkan kursor ke titik untuk nilai aslinya. Garis putus berwarna = ambang band itu.</p>
+    <p class="scr-text v-amber" id="dgStale" style="margin:6px 0 0" hidden></p>
+  </div></div>
+  <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-02 · NILAI TERAKHIR & PENJELASAN</span>
+    <div id="dgExplain"></div></div></div>
+</section>
+
+<!-- 4.2 analisa daerah -->
+<section id="dgRegions" hidden>
+  <div class="layout">
+    <div class="control-panel">
+      <form id="dgForm" novalidate>
+        <fieldset>
+          <legend>Kecamatan</legend>
+          <p class="mut" style="font-size:11px;margin:0 0 4px">Centang kecamatan, lalu pilih warnanya.</p>
+          <div class="region-pick" id="dgRegionList"></div>
+          <span class="err" id="dgRegionErr" aria-live="polite"></span>
+        </fieldset>
+        <fieldset>
+          <legend>Tanggal</legend>
+          <div class="field-row">
+            <div class="field"><label for="dgFrom">Dari</label><input type="date" id="dgFrom" required></div>
+            <div class="field"><label for="dgTo">Sampai</label><input type="date" id="dgTo" required></div>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="small" data-range="30">30 hari</button>
+            <button type="button" class="small" data-range="90">90 hari</button>
+            <button type="button" class="small" data-range="365">1 tahun</button>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Band</legend>
+          <div id="dgBandList"></div>
+        </fieldset>
+        <div class="btn-row end">
+          <button type="button" id="dgPdf">Buat PDF (semua band)…</button>
+          <button type="submit" class="default" id="dgGo">Tampilkan</button>
+        </div>
+      </form>
+    </div>
+    <div class="deck" id="dgRegionCharts"></div>
+  </div>
+</section>

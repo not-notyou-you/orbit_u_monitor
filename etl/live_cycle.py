@@ -49,6 +49,10 @@ MAX_S1_ATTEMPTS = 3
 # Jendela discovery minimum di siklus rutin: menangkap scene yang terbit
 # terlambat di katalog Copernicus.
 ROUTINE_LOOKBACK_DAYS = 10
+# Peta perubahan air dihitung di grid preview yang diperhalus WC_REFINE kali:
+# luas km2 dari piksel 768-an terlalu kasar, sedangkan PNG-nya tetap harus
+# seukuran preview lain. 3 menjaga kehalusannya setara MAX_SIDE lama (2048).
+WC_REFINE = 3
 
 
 def _now() -> datetime:
@@ -255,7 +259,7 @@ def _cycle_result(mon: LiveMonitor, area_id: int, targets: list[date],
     siklus yang tidak mulus tidak terlihat sama dengan yang mulus."""
     from etl import download_guard as dg
 
-    full, partial, failed = 0, [], 0
+    full, partial, failed, incomplete = 0, [], 0, 0
     if targets:
         with mon._db.session() as sess:
             rows = sess.scalars(select(LiveScene).where(
@@ -269,6 +273,8 @@ def _cycle_result(mon: LiveMonitor, area_id: int, targets: list[date],
                     partial.append(", ".join(bad) or "source")
                 elif r.status == "FAILED":
                     failed += 1
+                elif r.status == "INCOMPLETE":
+                    incomplete += 1
     parts = []
     if not targets:
         parts.append(f"no new scenes ({stored}/{retention} stored)")
@@ -282,12 +288,14 @@ def _cycle_result(mon: LiveMonitor, area_id: int, targets: list[date],
             detail.append(f"{len(partial)} partial ({'/'.join(srcs)} failed)")
         if failed:
             detail.append(f"{failed} failed Sentinel-1")
+        if incomplete:
+            detail.append(f"{incomplete} rejected (Sentinel-1 does not cover the AOI)")
         if detail:
             parts[-1] += " — " + ", ".join(detail)
     auth = dg.active_auth_failures()
     if auth:
         parts.append("NASA token rejected")
-    level = "warn" if (partial or failed or auth) else "ok"
+    level = "warn" if (partial or failed or incomplete or auth) else "ok"
     return {"level": level, "text": "Done: " + "; ".join(parts)}
 
 
@@ -296,6 +304,7 @@ def _cycle_result(mon: LiveMonitor, area_id: int, targets: list[date],
 # ---------------------------------------------------------------------------
 
 def _discover_new_dates(mon, area_id, bbox_wkt, retention, kept, scenes) -> list[date]:
+    from etl import aoi_coverage as aoi_cov
     from etl.module1_download import discover_scenes
     from etl.module5_orchestrator import _drop_dates_barely_covering_aoi, _scene_date
 
@@ -316,9 +325,16 @@ def _discover_new_dates(mon, area_id, bbox_wkt, retention, kept, scenes) -> list
     except Exception as exc:
         mon.log(area_id, "DISCOVER", "FAILED", f"Failed to check for Sentinel-1 scenes: {exc}")
         raise
-    # Filter cakupan yang sama dengan orchestrator, supaya tanggal yang pasti
-    # dibuang job tidak dijadikan scene.
-    found = _drop_dates_barely_covering_aoi(found, bbox_wkt, job_id=0)
+    # LAPIS 1 gerbang kelengkapan AOI (etl/aoi_coverage.py): buang tanggal yang
+    # footprint-nya saja sudah tidak menutup AOI, SEBELUM diunduh. Ambangnya
+    # live.min_aoi_coverage, bukan MIN_S1_AOI_COVERAGE milik orchestrator --
+    # yang itu penjaga pemborosan unduhan arsip (5%), terlalu longgar untuk
+    # menjamin kelengkapan. Footprint bersifat optimis, jadi lapis 2 di
+    # finalize_scene masih mengukur ulang dari pikselnya.
+    with mon._db.session() as sess:
+        min_cov = aoi_cov.min_coverage(sess)
+    found = _drop_dates_barely_covering_aoi(found, bbox_wkt, job_id=0,
+                                            min_fraction=min_cov)
     dates = sorted({d for s in found if (d := _scene_date(s))}, reverse=True)
 
     def known(d: date) -> bool:
@@ -391,6 +407,7 @@ def _ingest(mon: LiveMonitor, area_id: int, dataset_id: int, dates: list[date]) 
 def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
     """Metrik + status sumber + preview untuk satu scene. Kalimat kondisi
     ditulis reinterpret_all (butuh scene sebelumnya)."""
+    from etl import aoi_coverage as aoi_cov
     from etl import live_metrics as lmx
 
     info = _area_files(mon, area_id)
@@ -405,8 +422,31 @@ def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
         row = sess.scalar(select(LiveScene).where(
             LiveScene.area_id == area_id, LiveScene.scene_date == scene_date))
         prev_attempts = int(((row.source_status or {}).get("sentinel1") or {}).get("attempts") or 0) if row else 0
+        area = sess.get(LiveArea, area_id)
+        bbox_wkt = area.bbox_wkt if area else None
+        min_cov = aoi_cov.min_coverage(sess)
 
-    if status["sentinel1"]["status"] != "OK":
+    # LAPIS 2 gerbang kelengkapan AOI: diukur dari piksel, bukan footprint.
+    # Dicatat juga saat lolos -- angkanya yang membuat scene lama bisa diaudit
+    # ulang tanpa membaca rasternya lagi (scripts/repair_incomplete_scenes.py).
+    coverage = aoi_cov.scene_coverage(inputs.get("s1"), bbox_wkt) if bbox_wkt else None
+    if coverage is not None:
+        status["sentinel1"]["aoi_coverage"] = round(coverage, 4)
+        status["sentinel1"]["aoi_coverage_min"] = min_cov
+
+    if status["sentinel1"]["status"] == "OK" and coverage is not None and coverage < min_cov:
+        # Bukan FAILED: FAILED memicu unduh ulang sampai MAX_S1_ATTEMPTS,
+        # padahal mengulang tidak akan menambah cakupan -- pada tanggal itu
+        # satelitnya memang tidak melewati sisa AOI. Baris ini tetap disimpan
+        # sebagai catatan supaya tanggalnya tidak ditemukan ulang tiap siklus.
+        status["sentinel1"]["status"] = "INCOMPLETE"
+        scene_status = "INCOMPLETE"
+        previews = {}
+        mon.log(area_id, "SCENE", "WARNING",
+                f"Scene {scene_date} rejected: Sentinel-1 covers only "
+                f"{coverage * 100:.1f}% of the AOI (minimum {min_cov * 100:.0f}%)",
+                scene_date=scene_date, source_status=status)
+    elif status["sentinel1"]["status"] != "OK":
         status["sentinel1"]["attempts"] = prev_attempts + 1
         scene_status = "FAILED"
         previews = {}
@@ -416,8 +456,10 @@ def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
     else:
         previews = {}
         try:
+            from etl.admin_overlay import load_regions
             from etl.live_preview import render_scene_previews
-            previews = render_scene_previews(files, scene_date, inputs)
+            previews = render_scene_previews(files, scene_date, inputs,
+                                             load_regions(mon._db), bbox_wkt=bbox_wkt)
         except Exception as exc:
             logger.exception("[LIVE] preview %s gagal", scene_date)
             mon.log(area_id, "PREVIEW", "FAILED", f"Preview for {scene_date} failed: {exc}",
@@ -446,7 +488,22 @@ def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
                 next(iter(f.values())).name.rsplit("_", 3)[0] for f in inputs["s1"]
             ]
             row.updated_at = _now()
-    if scene_status != "FAILED":
+    if scene_status == "INCOMPLETE":
+        # Berkasnya tidak berguna untuk apa pun -- dihapus sekarang, bukan
+        # menunggu retensi: enforce_retention hanya menghitung READY/PARTIAL,
+        # jadi scene ini tidak akan pernah tersapu dan COG-nya menumpuk.
+        mon.delete_scene(area_id, scene_date,
+                         reason=f"AOI coverage {coverage * 100:.1f}% below "
+                                f"{min_cov * 100:.0f}%")
+        with mon._db.session() as sess:
+            row = sess.scalar(select(LiveScene).where(
+                LiveScene.area_id == area_id, LiveScene.scene_date == scene_date))
+            if row is not None:
+                # delete_scene menyetel DELETED; alasan sebenarnya disimpan di
+                # status supaya terbedakan dari scene yang kena retensi.
+                row.status = "INCOMPLETE"
+                row.source_status = _jsonable(status)
+    if scene_status in ("READY", "PARTIAL"):
         try:
             water_change_stage(mon, area_id, scene_date, files, inputs)
         except Exception as exc:
@@ -455,6 +512,33 @@ def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
             mon.log(area_id, "WATER_CHANGE", "FAILED", f"Water change map for {scene_date} failed: {exc}",
                     scene_date=scene_date)
     return scene_status
+
+
+def _drop_water_change(mon: LiveMonitor, area_id: int, scene_date: date,
+                       files: _LiveFiles) -> None:
+    """Buang PNG + entri preview peta perubahan air satu scene.
+
+    Dipakai saat scene tidak lagi punya pembanding. Metrik di
+    live_scene_water_change dibiarkan: tabel itu log, dan baris lamanya tetap
+    benar untuk tanggal pembanding yang dicatatnya."""
+    from etl import water_change as wcm
+
+    pdir = files.preview_dir(scene_date)
+    for name in (f"{wcm.PREVIEW_KEY}.png", f"{wcm.PREVIEW_KEY}_adm.png"):
+        try:
+            (pdir / name).unlink(missing_ok=True)
+        except OSError:
+            logger.warning("[LIVE] gagal menghapus %s", pdir / name)
+    with mon._db.session() as sess:
+        row = sess.scalar(select(LiveScene).where(
+            LiveScene.area_id == area_id, LiveScene.scene_date == scene_date))
+        if row is None:
+            return
+        previews = dict(row.previews or {})
+        items = dict(previews.get("items") or {})
+        if items.pop(wcm.PREVIEW_KEY, None) is not None:
+            previews["items"] = items
+            row.previews = previews
 
 
 def _scene_vh(files: _LiveFiles, frames: list, scratch_key: str):
@@ -481,6 +565,7 @@ def water_change_stage(mon: LiveMonitor, area_id: int, scene_date: date, files: 
 
     from etl import live_metrics as lmx
     from etl import water_change as wcm
+    from etl.live_preview import LIVE_MAX_SIDE as LIVE_PREVIEW_MAX_SIDE
     from etl.settings import get_setting
 
     with mon._db.session() as sess:
@@ -491,11 +576,18 @@ def water_change_stage(mon: LiveMonitor, area_id: int, scene_date: date, files: 
             LiveScene.deleted_at.is_(None), LiveScene.status.in_(("READY", "PARTIAL")))
             .order_by(LiveScene.scene_date.desc())).all()
         threshold = float(get_setting(sess, "water.vh_threshold_db"))
+        area = sess.get(LiveArea, area_id)
+        bbox_wkt = area.bbox_wkt if area else None
         cur_id, cur_products = cur.live_scene_id, list(cur.s1_product_ids or [])
         candidates = [(p.live_scene_id, p.scene_date, list(p.s1_product_ids or [])) for p in prevs]
     prev = next(((sid, d, prods, fr) for sid, d, prods in candidates
                  if (fr := lmx.s1_frames(files.root, d))), None)
     if prev is None:
+        # Sisa render terdahulu harus ikut pergi. Tanpa ini, scene yang
+        # pembandingnya baru saja hilang (kena retensi, atau ditolak gerbang
+        # AOI) menyimpan PNG lama selamanya: bingkainya ketinggalan zaman dan
+        # isinya membandingkan dengan tanggal yang rasternya sudah tidak ada.
+        _drop_water_change(mon, area_id, scene_date, files)
         mon.log(area_id, "WATER_CHANGE", "SKIPPED", f"Scene {scene_date}: no comparison scene yet",
                 scene_date=scene_date)
         return None
@@ -508,12 +600,28 @@ def water_change_stage(mon: LiveMonitor, area_id: int, scene_date: date, files: 
             mon.log(area_id, "WATER_CHANGE", "SKIPPED", f"Scene {scene_date}: VH band missing",
                     scene_date=scene_date)
             return None
-        wc = wcm.compute(cur_vh, prev_vh, threshold)
+        # Satu bingkai dengan tujuh preview lain: grid AOI yang sama, cuma
+        # WC_REFINE kali lebih halus supaya luas km2 tidak dihitung dari
+        # piksel 768-an. Penurunannya kembali ke ukuran preview jadi bulat.
+        grid = out_shape = None
+        if bbox_wkt:
+            from etl import aoi_coverage as aoi_cov
+            import rasterio
+            with rasterio.open(cur_vh) as src:
+                scene_crs = src.crs
+            base = aoi_cov.preview_grid(bbox_wkt, scene_crs, LIVE_PREVIEW_MAX_SIDE)
+            grid = aoi_cov.refine(base, WC_REFINE)
+            out_shape = (base.height, base.width)
+        wc = wcm.compute(cur_vh, prev_vh, threshold, grid=grid)
         with mon._db.session() as sess:
             orbits = wcm.orbit_metadata(sess, cur_products + prev_products)
         same = wcm.same_orbit(cur_products, prev_products, orbits)
+        from etl.admin_overlay import load_regions
         legend = wcm.render_png(wc, files.preview_dir(scene_date) / f"{wcm.PREVIEW_KEY}.png",
-                                orbit_differs=same is False)
+                                orbit_differs=same is False, regions=load_regions(mon._db),
+                                out_shape=out_shape)
+        # "file_adm" milik item preview, bukan legenda yang dikirim ke UI.
+        file_adm = legend.pop("file_adm", None)
     finally:
         for d in (s1, s2):
             if d is not None:
@@ -524,7 +632,8 @@ def water_change_stage(mon: LiveMonitor, area_id: int, scene_date: date, files: 
         previews = dict(row.previews or {})
         items = dict(previews.get("items") or {})
         items[wcm.PREVIEW_KEY] = {"file": f"{wcm.PREVIEW_KEY}.png", "label": "Perubahan air Sentinel-1",
-                                  "legend": legend, "ref_date": prev_date.isoformat()}
+                                  "legend": legend, "ref_date": prev_date.isoformat(),
+                                  "file_adm": file_adm}
         previews["items"] = items
         row.previews = _jsonable(previews)
     mon.log(area_id, "WATER_CHANGE", "OK",

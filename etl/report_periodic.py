@@ -125,8 +125,12 @@ class Doc:
     def h2(self, title: str) -> None:
         self.story.append(Paragraph(rg._e(title), self.S.sub))
 
+    def para(self, body: str) -> Paragraph:
+        """Paragraf tanpa langsung ditambahkan (untuk KeepTogether)."""
+        return Paragraph(rg._e(body), self.S.body)
+
     def p(self, body: str) -> None:
-        self.story.append(Paragraph(rg._e(body), self.S.body))
+        self.story.append(self.para(body))
 
     def note(self, body: str) -> None:
         self.story.append(Paragraph(rg._e(body), self.S.note))
@@ -180,13 +184,15 @@ def _decorator(title: str, generated_at: datetime):
     return _draw
 
 
-def build_pdf(doc: Doc, out_path: Path, generated_at: datetime) -> None:
-    """Sampul singkat + isi, ditulis atomik."""
+def build_pdf(doc: Doc, out_path: Path, generated_at: datetime, period_label: str | None = None) -> None:
+    """Sampul singkat + isi, ditulis atomik. ``period_label`` menggantikan
+    baris periode bawaan (laporan non-hidromet, mis. Citra dan Diagram)."""
     S = doc.S
+    period = period_label or (f"Periode: {doc.period[0]:%d-%m-%Y} s.d. {doc.period[1]:%d-%m-%Y} "
+                              "(tanggal data hidromet = hari UTC)")
     head = [Paragraph(rg._e(doc.title), S.title), Spacer(1, 6),
             Paragraph(rg._e(doc.subtitle), S.cover_subtitle), Spacer(1, 4),
-            Paragraph(rg._e(f"Periode: {doc.period[0]:%d-%m-%Y} s.d. {doc.period[1]:%d-%m-%Y} "
-                            "(tanggal data hidromet = hari UTC)"), S.body),
+            Paragraph(rg._e(period), S.body),
             Paragraph(rg._e(f"Dibuat: {generated_at.astimezone(WIB):%Y-%m-%d %H:%M} WIB oleh {SOFTWARE}"), S.note),
             Spacer(1, 12)]
     with atomic_path(out_path) as tmp:

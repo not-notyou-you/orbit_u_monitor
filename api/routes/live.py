@@ -1,9 +1,10 @@
 # api/routes/live.py
 """Live Monitoring (INTERFACE.md §4.3).
 
-Baca: USER (router dijaga require_role("USER") di api/main.py); USER s.d.
-DATA_ENGINEER hanya melihat scene 30 hari terakhir (plus scene terbaru, yang
-toh terlihat publik). Tulis dan log: ADMIN.
+Baca: USER (router dijaga require_role("USER") di api/main.py). Batas waktu
+sama dengan halaman Citra (M56, VIEW v_citra_scenes): USER 365 hari terakhir
+(plus scene terbaru, yang toh terlihat publik); ANALYST, DATA_ENGINEER, ADMIN
+tanpa batas. Tulis dan log: ADMIN.
 
 Perubahan baris (buat/ubah daerah) berjalan di sesi request ADMIN; siklus,
 retensi, dan penghapusan berkas dikerjakan LiveMonitor dengan koneksi
@@ -23,7 +24,7 @@ from etl.live_monitor import LiveMonitor
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-USER_WINDOW_DAYS = 30
+USER_WINDOW_DAYS = 365
 ADMIN = [Depends(require_role("ADMIN"))]
 
 
@@ -32,8 +33,8 @@ def _monitor(db: DatabaseClient, etl: DatabaseClient | None = None) -> LiveMonit
 
 
 def _cutoff(principal: Principal) -> date | None:
-    """Tanggal scene tertua yang boleh dilihat; None = tanpa batas (ADMIN)."""
-    if principal.has_role("ADMIN"):
+    """Tanggal scene tertua yang boleh dilihat; None = tanpa batas."""
+    if principal.has_role("ANALYST") or principal.has_role("DATA_ENGINEER"):
         return None
     return date.today() - timedelta(days=USER_WINDOW_DAYS)
 
@@ -121,7 +122,7 @@ async def area_card(area_id: int, date: str | None = Query(None, description="YY
     d = _parse_date(date) if date else None
     cutoff = _cutoff(principal)
     if cutoff is not None and d is not None and d < cutoff and d != _latest_scene_date(db, area_id):
-        raise ApiError(403, f"Scenes older than {USER_WINDOW_DAYS} days are available to ADMIN only",
+        raise ApiError(403, f"Scenes older than {USER_WINDOW_DAYS} days are available to ANALYST, DATA_ENGINEER and ADMIN only",
                        "SCENE_OUT_OF_RANGE")
     try:
         card = _monitor(db).get_card(area_id, d)
@@ -135,13 +136,14 @@ async def area_card(area_id: int, date: str | None = Query(None, description="YY
 
 @router.get("/areas/{area_id}/preview/{scene_date}/{key}.png", summary="PNG preview of a single scene")
 async def area_preview(area_id: int, scene_date: str, key: str,
+                       boundaries: bool = Query(False, description="Variant with kecamatan borders and names"),
                        db: DatabaseClient = Depends(get_db), etl: DatabaseClient = Depends(get_etl_db),
                        principal: Principal = Depends(current_principal)):
     from fastapi.responses import FileResponse
     d = _parse_date(scene_date)
     cutoff = _cutoff(principal)
     if cutoff is not None and d < cutoff and d != _latest_scene_date(db, area_id):
-        raise ApiError(403, f"Scenes older than {USER_WINDOW_DAYS} days are available to ADMIN only",
+        raise ApiError(403, f"Scenes older than {USER_WINDOW_DAYS} days are available to ANALYST, DATA_ENGINEER and ADMIN only",
                        "SCENE_OUT_OF_RANGE")
     # Scene harus terlihat oleh role pemanggil (live_scenes: S untuk USER+). Folder
     # berkasnya ada di `datasets`, yang tidak boleh dibaca USER/ANALYST (§8.3), jadi
@@ -151,7 +153,7 @@ async def area_preview(area_id: int, scene_date: str, key: str,
             LiveScene.area_id == area_id, LiveScene.scene_date == d, LiveScene.deleted_at.is_(None)))
     if not visible:
         raise HTTPException(404, "Preview not found")
-    path = LiveMonitor(etl).preview_path(area_id, d, key)
+    path = LiveMonitor(etl).preview_path(area_id, d, key, boundaries=boundaries)
     if path is None:
         raise HTTPException(404, "Preview not found")
     # private: gambar hanya untuk pengguna login, jangan disimpan cache bersama.

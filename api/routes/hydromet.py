@@ -23,7 +23,10 @@ from api.errors import ApiError
 
 router = APIRouter()
 
-USER_MAX_DAYS = 30
+# Batas USER sama dengan halaman Citra (M56): 365 hari. ANALYST dan
+# DATA_ENGINEER melihat seluruh arsip. Rentang bawaan tanpa date_from: 30 hari.
+USER_MAX_DAYS = 365
+DEFAULT_DAYS = 30
 WIB = ZoneInfo("Asia/Jakarta")
 BANDS = ("RAIN_24H", "RAIN_72H", "RAIN_7D", "RAIN_30D", "FLOOD", "NDVI", "NDWI")
 _SEVERITY_ORDER = {"INFO": 1, "WARNING": 2, "CRITICAL": 3}
@@ -37,15 +40,19 @@ def _utc_today() -> date:
     return datetime.now(timezone.utc).date()
 
 
+def _full_archive(principal: Principal) -> bool:
+    return principal.has_role("ANALYST") or principal.has_role("DATA_ENGINEER")
+
+
 def _check_range(principal: Principal, date_from: date | None, date_to: date | None) -> tuple[date, date]:
     today = _utc_today()
     date_to = date_to or today
     if date_from is None:
-        date_from = date_to - timedelta(days=USER_MAX_DAYS - 1)
+        date_from = date_to - timedelta(days=DEFAULT_DAYS - 1)
     if date_from > date_to:
         raise ApiError(400, "date_from must not be after date_to", "INVALID_DATE_RANGE")
-    if not principal.has_role("ANALYST") and date_from < today - timedelta(days=USER_MAX_DAYS):
-        raise ApiError(403, f"USER can only view the last {USER_MAX_DAYS} days; ANALYST sees the full archive",
+    if not _full_archive(principal) and date_from < today - timedelta(days=USER_MAX_DAYS):
+        raise ApiError(403, f"USER can only view the last {USER_MAX_DAYS} days; ANALYST and DATA_ENGINEER see the full archive",
                        "DATE_OUT_OF_RANGE")
     return date_from, date_to
 
@@ -122,7 +129,7 @@ def observations(sess: Session = Depends(get_session), principal: Principal = De
 def trend(sess: Session = Depends(get_session), principal: Principal = Depends(current_principal),
           band: str = Query("RAIN_24H", pattern="^(" + "|".join(BANDS) + ")$"),
           days: int = Query(30, ge=1, le=366)) -> dict:
-    if days > USER_MAX_DAYS and not principal.has_role("ANALYST"):
+    if days > USER_MAX_DAYS and not _full_archive(principal):
         raise ApiError(403, f"USER can only view the last {USER_MAX_DAYS} days", "DATE_OUT_OF_RANGE")
     end = sess.scalar(text("""
         SELECT max(o.obs_date) FROM region_observations o JOIN spectral_bands b USING (band_id)

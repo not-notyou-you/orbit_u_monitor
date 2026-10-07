@@ -1,0 +1,28 @@
+Bahan pindah Orbit-U: The Monitor
+Dibuat 2026-10-05 dari D:\try\2_themonitor\themonitor (PostgreSQL 18.6, PostGIS 3.6.2)
+
+ISI
+  roles.sql          role PostgreSQL cluster-wide (7 role monitor_*, termasuk hash sandi)
+  themonitor.dump    pg_dump -Fc: struktur DAN seluruh isi tabel (1182 objek)
+  manifest_lama.txt  sidik jari untuk dibandingkan setelah restore
+  .env               kredensial; JANGAN di-commit
+
+URUTAN DI LAPTOP BARU  (rinciannya di DOCS/SETUP_LAPTOP_BARU.md §5-§6)
+  1. psql -U postgres -f roles.sql
+  2. createdb -U postgres themonitor
+  3. psql -U postgres -d themonitor -c "CREATE EXTENSION postgis; CREATE EXTENSION pgcrypto;"
+  4. pg_restore -U postgres -d themonitor --no-owner --role=postgres -j 4 themonitor.dump
+  5. psql -U postgres -d themonitor -f database/db_manifest.sql > manifest_baru.txt
+  6. Compare-Object (gc manifest_lama.txt) (gc manifest_baru.txt)     -> tanpa keluaran = identik
+
+.env
+  PostgreSQL 18 di laptop baru dipasang di port 5432, sama seperti di sini,
+  jadi DB_PORT dan DATABASE_URL tidak perlu diubah selain SANDI.
+  Ubah hanya: DB_PASSWORD, dan bagian sandi di DATABASE_URL.
+  JANGAN ubah JWT_SECRET, MONITOR_APP_PASSWORD, MONITOR_ETL_PASSWORD
+  -- sandi kedua role itu sudah ter-hash di roles.sql dan harus cocok.
+
+YANG TIDAK ADA DI SINI
+  data/datasets  (13 GB) -- 250 baris data_products menunjuk ke sana.
+  Tanpa folder itu, manifest tetap identik tetapi unduhan/preview produk gagal.
+  Salin terpisah kalau drive-nya muat.

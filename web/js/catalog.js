@@ -2,16 +2,18 @@
 // Daftar + aksi di Control Panel; rincian dataset terpilih di tab property sheet (screen).
 'use strict';
 Pages['catalog'] = (() => {
-  const STATUS = { QUEUED: 'Antre', PREPARING: 'Menyiapkan', DOWNLOADING: 'Mengunduh', PROCESSING: 'Memproses', PAUSED: 'Dijeda',
-    CLEANUP: 'Membersihkan', COMPLETED: 'Selesai', PARTIAL: 'Sebagian', FAILED: 'Gagal', CANCELLED: 'Dibatalkan', DELETING: 'Menghapus', DRAFT: 'Draf' };
-  const ACTIVE = new Set(['QUEUED', 'PREPARING', 'DOWNLOADING', 'PROCESSING', 'PAUSED', 'CLEANUP', 'DELETING']);
-  const SRC = { sentinel1: 'Sentinel-1', modis: 'MODIS', gpm: 'GPM', fusion: 'Fusion', SENTINEL1: 'Sentinel-1', MODIS: 'MODIS', GPM: 'GPM', FUSION: 'Fusion' };
+  // Label status, himpunan status aktif, dan nama satelit dipakai bersama
+  // halaman "Proses berjalan" dan bagian Penyimpanan, jadi definisinya satu di
+  // ui.js (UI.datasetStatus / UI.DATASET_ACTIVE / UI.SOURCE_LABEL).
+  // PHASE dan KIND di bawah hanya dipakai Katalog.
+  const ACTIVE = UI.DATASET_ACTIVE;
+  const SRC = UI.SOURCE_LABEL;
   const PHASE = { download: 'Diunduh', processing: 'Diproses', fusion: 'Difusikan' };
   const KIND = { grayscale: 'Grayscale', colored: 'Berwarna', composite: 'Komposit & overlay' };
   let st = null;
 
   async function init(root, ctx) {
-    st = { root, ctx, items: [], sel: null, tab: 'ringkasan', prog: {}, timer: null, pv: {} };
+    st = { root, ctx, items: [], sel: null, tab: 'ringkasan', prog: {}, del: {}, timer: null, pv: {} };
     const $ = s => UI.$(s, root);
     $('#ctSearch').addEventListener('input', renderList);
     $('#ctList').addEventListener('keydown', listKeys);
@@ -40,7 +42,7 @@ Pages['catalog'] = (() => {
     const rows = st.items.filter(d => !q || d.name.toLowerCase().includes(q));
     UI.$('#ctList', st.root).innerHTML = rows.length ? rows.map(d =>
       '<button type="button" role="option" data-id="' + d.dataset_id + '" aria-selected="' + (d.dataset_id === st.sel) + '">' +
-        '<span class="nm">' + UI.esc(d.name) + '</span><span class="st">' + UI.esc(STATUS[d.status] || d.status) + '</span></button>').join('')
+        '<span class="nm">' + UI.esc(d.name) + '</span><span class="st">' + UI.esc(UI.datasetStatus(d.status)) + '</span></button>').join('')
       : '<p class="mut" style="padding:4px">' + (st.items.length ? 'Tidak ada yang cocok.' : 'Belum ada dataset. Buat lewat "Buat dataset baru".') + '</p>';
     UI.$$('#ctList [data-id]', st.root).forEach(b => b.addEventListener('click', () => select(Number(b.dataset.id))));
   }
@@ -62,14 +64,29 @@ Pages['catalog'] = (() => {
       st.ctx.setStatus('Belum ada dataset'); return;
     }
     try { st.prog[id] = await API.get('/api/datasets/' + id + '/status'); } catch (e) { st.prog[id] = null; }
+    // Penghapusan punya progresnya sendiri (cleanup_operations) dan endpointnya
+    // 404 kalau tidak ada yang sedang dihapus, jadi hanya ditanya saat relevan.
+    const deleting = d.status === 'DELETING' || d.status === 'CLEANUP';
+    st.del[id] = deleting ? await API.get('/api/datasets/' + id + '/deletion-progress').catch(() => null) : null;
     const p = st.prog[id];
+    const del = st.del[id];
+    // Saat dataset sedang dihapus, angka pipeline tidak lagi bergerak; yang
+    // bergerak adalah jumlah berkas yang terhapus. Readout terakhir karena itu
+    // berganti isi, bukan ditambah di sebelahnya.
     UI.$('#ctReadouts', st.root).innerHTML =
-      UI.readoutHTML('STATUS', UI.esc((STATUS[d.status] || d.status).toUpperCase()), UI.esc(d.status), d.status === 'FAILED' ? 'v-alert' : ACTIVE.has(d.status) ? 'v-amber' : '') +
+      UI.readoutHTML('STATUS', UI.esc(UI.datasetStatus(d.status).toUpperCase()), UI.esc(d.status), d.status === 'FAILED' ? 'v-alert' : ACTIVE.has(d.status) ? 'v-amber' : '') +
       UI.readoutHTML('SCENE SELESAI', UI.int(d.completed_scenes) + '/' + UI.int(d.total_scenes), 'GAGAL ' + UI.int(d.failed_scenes), d.failed_scenes ? 'v-amber' : '') +
       UI.readoutHTML('UKURAN', UI.esc(UI.bytes(d.total_size_bytes)), 'DI DISK') +
-      UI.readoutHTML('PROGRES', p ? UI.int(p.progress_percent) + '%' : UI.NA, p && p.paused ? 'DIJEDA' + (p.pause_reason ? ': ' + UI.esc(p.pause_reason) : '') : 'PIPELINE');
-    UI.$('#ctProgress', st.root).innerHTML = p && ACTIVE.has(d.status)
-      ? '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + p.progress_percent + '" aria-label="Progres dataset"><i style="width:' + Math.max(1, p.progress_percent) + '%"></i></div>' : '';
+      (del
+        ? UI.readoutHTML('DIHAPUS', UI.int(del.deleted_count) + '/' + UI.int(del.total_files),
+            UI.esc((del.status || 'MEMBERSIHKAN').toUpperCase()), 'v-amber')
+        : UI.readoutHTML('PROGRES', p ? UI.int(p.progress_percent) + '%' : UI.NA,
+            p && p.paused ? 'DIJEDA' + (p.pause_reason ? ': ' + UI.esc(p.pause_reason) : '') : 'PIPELINE'));
+    UI.$('#ctProgress', st.root).innerHTML = del
+      ? UI.progressHTML(del.progress_percent, 'Progres penghapusan') +
+        '<p class="v-dim" style="margin:4px 0 0;font-size:11px">Penghapusan berjalan di latar belakang; angkanya diperbarui tiap 10 detik.' +
+        (del.freed_bytes ? ' Sudah dibebaskan ' + UI.esc(UI.bytes(del.freed_bytes)) + '.' : '') + '</p>'
+      : (p && ACTIVE.has(d.status) ? UI.progressHTML(p.progress_percent, 'Progres dataset') : '');
     st.ctx.setStatus((quiet ? 'Diperbarui · ' : 'Siap · ') + d.name);
     renderTab();
   }
@@ -108,7 +125,7 @@ Pages['catalog'] = (() => {
             collect: win => UI.$('#delForce', win).checked });
           if (force === null || force === 'cancel') return;
           await API.del(base + '?force=' + !!force);
-          UI.info('Hapus dataset', 'Penghapusan dimulai. Berkas dihapus oleh pipeline di latar belakang.');
+          UI.info('Hapus dataset', 'Penghapusan dimulai. Progresnya tampil di panel kanan selama dataset ini terpilih.');
         }
         await load(true);
       } catch (e) { UI.showError('Aksi dataset', e); }
@@ -155,14 +172,9 @@ Pages['catalog'] = (() => {
       ['PEMBUAT', d.created_by_name], ['DIBUAT', UI.dateTime(d.created_at)], ['DIPERBARUI', UI.dateTime(d.updated_at)],
       ['DISALIN DARI', d.last_config_source ? 'dataset #' + d.last_config_source : null]];
     const per = Object.keys(d.scenes_by_source || {}).map(k => (SRC[k] || k) + ': ' + UI.int(d.scenes_by_source[k]) + ' scene · ' + UI.bytes((d.bytes_by_source || {})[k])).join('\n');
-    return UI.screenHTML({ channel: 'CH-01 · KONFIGURASI DATASET #' + d.dataset_id, rec: UI.esc((STATUS[d.status] || d.status).toUpperCase()),
+    return UI.screenHTML({ channel: 'CH-01 · KONFIGURASI DATASET #' + d.dataset_id, rec: UI.esc(UI.datasetStatus(d.status).toUpperCase()),
       recCls: d.status === 'COMPLETED' ? 'off' : '', body: '<dl class="kv">' + kv.map(([k, v]) => '<dt>' + k + '</dt><dd class="scr-text">' + UI.esc(v || UI.NA) + '</dd>').join('') + '</dl>' +
         (per ? '<p class="scr-text" style="margin:8px 0 0"><span class="lbl">PER SATELIT:</span>\n' + UI.esc(per) + '</p>' : '') });
-  }
-
-  function barRow(label, size, total, right) {
-    const pct = total > 0 ? size / total * 100 : 0;
-    return '<div class="ct-bar"><span>' + UI.esc(label) + '</span><span class="trk" role="img" aria-label="' + UI.esc(label + ' ' + UI.num(pct, 0) + '%') + '"><i style="width:' + Math.max(pct, size ? 1 : 0).toFixed(1) + '%"></i></span><span class="num" style="text-align:right">' + UI.esc(right) + '</span></div>';
   }
 
   function sourcesHTML(data) {
@@ -171,7 +183,7 @@ Pages['catalog'] = (() => {
     return keys.map((k, i) => {
       const s = data.sources[k];
       return UI.screenHTML({ channel: 'CH-0' + (i + 1) + ' · ' + SRC[k], rec: UI.bytes(s.size_bytes), recCls: 'off', body: s.stages.map(stg =>
-        barRow((PHASE[stg.phase] || stg.phase) + ' · ' + stg.tier, stg.size_bytes, s.size_bytes, UI.bytes(stg.size_bytes)) +
+        UI.barHTML((PHASE[stg.phase] || stg.phase) + ' · ' + stg.tier, stg.size_bytes, s.size_bytes, UI.bytes(stg.size_bytes)) +
         '<details><summary class="v-dim" style="cursor:pointer">' + UI.int(stg.scenes.length) + ' item · ' + UI.int(stg.file_count) + ' berkas</summary>' +
         UI.tableHTML([{ label: 'Item', key: 'scene' }, { label: 'Berkas', cls: 'r', key: 'file_count' }, { label: 'Ukuran', cls: 'r', get: x => UI.bytes(x.size_bytes) }], stg.scenes) + '</details>').join('') });
     }).join('<div style="height:8px"></div>') +
@@ -183,7 +195,7 @@ Pages['catalog'] = (() => {
     if (s.legacy_layout) return UI.screenHTML({ channel: 'STRUKTUR', body: UI.emptyHTML('DATASET MEMAKAI FORMAT FOLDER LAMA — BERKAS TETAP DAPAT DIUNDUH (ZIP)') });
     const tiers = Object.entries(s.tiers || {});
     return '<div data-keep>' + UI.screenHTML({ channel: 'CH-01 · PENYIMPANAN PER TIER', rec: UI.bytes(s.total_size_bytes), recCls: 'off',
-      body: tiers.length ? tiers.map(([t, x]) => barRow(t, x.size_bytes, s.total_size_bytes, UI.bytes(x.size_bytes)) +
+      body: tiers.length ? tiers.map(([t, x]) => UI.barHTML(t, x.size_bytes, s.total_size_bytes, UI.bytes(x.size_bytes)) +
         '<p class="v-dim" style="margin:0 0 4px 116px;font-size:11px">' + UI.int(x.file_count) + ' berkas · ' + UI.int(x.scene_count) + ' item' +
         (Object.keys(x.sources || {}).length ? ' · ' + Object.entries(x.sources).map(([k, v]) => (SRC[k] || k) + ' ' + UI.bytes(v.size_bytes)).join(' · ') : '') +
         ' · <a href="#" data-tier="' + UI.esc(t) + '">daftar berkas</a></p>').join('') : UI.emptyHTML('BELUM ADA BERKAS') }) +
@@ -242,14 +254,14 @@ Pages['catalog'] = (() => {
       UI.screenHTML({ channel: 'PRATINJAU · ' + fmtKey(scene.scene) + (pv.level ? ' · ' + pv.level : ''), rec: scene.coverage_quality === 'partial' ? '● CAKUPAN SEBAGIAN' : '',
         body: (block.info && block.info.purpose ? '<p class="scr-text v-dim" style="margin:0 0 6px">' + UI.esc(block.info.purpose) + '</p>' : '') +
           (block.images.length ? '<div class="tiles">' + block.images.map((img, i) => '<div class="tile"><span class="tl"><span>' + UI.esc(img.label || img.key) + '</span><span>' + UI.esc(SRC[img.source] || '') + '</span></span>' +
-            '<button type="button" class="thumb" data-pv="' + i + '" aria-label="' + UI.esc((img.label || img.key) + ': buka legenda') + '"><img loading="lazy" src="' + UI.esc(img.url) + '" alt=""></button></div>').join('') + '</div>'
+            '<button type="button" class="thumb" data-pv="' + i + '" aria-label="' + UI.esc((img.label || img.key) + ': buka legenda') + '"><img loading="lazy" ' + UI.imgAttrs(img) + ' alt=""></button></div>').join('') + '</div>'
             : UI.emptyHTML('TIDAK ADA GAMBAR JENIS INI UNTUK TANGGAL INI')) +
           ((scene.skipped || []).length ? '<p class="v-amber" style="margin:6px 0 0">' + UI.int(scene.skipped.length) + ' LAPISAN TIDAK DIRENDER: ' + UI.esc(scene.skipped.map(s => s.key).join(', ')) + '</p>' : '') });
     const re = () => drawPreview(d);
     UI.$('#pvScene', panel).addEventListener('change', e => { pv.scene = e.target.value; re(); });
     if (UI.$('#pvLevel', panel)) UI.$('#pvLevel', panel).addEventListener('change', e => { pv.level = e.target.value; re(); });
     UI.$('#pvKind', panel).addEventListener('change', e => { pv.kind = e.target.value; re(); });
-    const items = block.images.map(img => ({ url: img.url, title: img.label || img.key, legend: legendOf(img), note: UI.esc(img.interpretation || img.note || '') }));
+    const items = block.images.map(img => ({ url: img.url, url_boundaries: img.url_boundaries, title: img.label || img.key, legend: legendOf(img), note: UI.esc(img.interpretation || img.note || '') }));
     UI.$$('[data-pv]', panel).forEach(b => b.addEventListener('click', () => UI.lightbox(items, Number(b.dataset.pv))));
   }
   function legendOf(img) {

@@ -47,15 +47,17 @@ Orbit-U **tidak menggantikan** SIGAP DESA (PHP/MySQL milik GMLS). Data warga, KK
 
 ## 3. Pengguna dan Hak Akses
 
-| Role | Login | Kebutuhan |
-|---|---|---|
-| `PUBLIC` | Tidak | Scene Live terbaru: 8 preview, kalimat kondisi, status area |
-| `USER` | Ya | Scene Live 30 hari terakhir + forecast, statistik hujan hari ini per kecamatan, alert aktif (lihat saja) |
-| `ANALYST` | Ya | Semua milik USER + Analitik + acknowledge alert + CRUD kejadian bencana + unduh **Laporan Hidromet** mingguan/bulanan |
-| `DATA_ENGINEER` | Ya | Semua milik USER + Katalog Dataset (buat dataset historis, unduh produk & fusion HDF5, lineage, kualitas) + unduh **Laporan Kesehatan Data** mingguan/bulanan |
-| `ADMIN` | Ya | Semua akses + kelola scene, Live Area, pengguna, aturan alert, wilayah AOI, pengaturan; lihat log login, log unduhan, audit trail |
+Susunan halaman M56: Beranda → 3D AOI → Citra Satelit → Diagram → Kejadian → Data → Laporan → Sistem, plus Masuk (`/masuk`) dan Registrasi (`/daftar`).
 
-Matriks rinci per halaman dan endpoint: INTERFACE.md §3. Penegakan di basis data: DATABASE.md §8.
+| Role | Akun | Kebutuhan |
+|---|---|---|
+| `PUBLIC` | Tanpa akun | Beranda, Citra Satelit **30 hari terakhir** (termasuk PDF), Kejadian **365 hari terakhir**, Sistem › Tentang |
+| `USER` | Registrasi mandiri `/daftar` | Semua milik PUBLIC + 3D AOI, Citra **365 hari**, seluruh riwayat kejadian, hujan per kecamatan + alert aktif, akun & token API sendiri |
+| `ANALYST` | Dibuat ADMIN | Semua milik USER + Citra semua tanggal, Diagram (semua band 30 hari, analisa daerah + PDF, tren & evaluasi alert), kelola kejadian, acknowledge alert, Laporan Keadaan AOI, log halaman Kejadian |
+| `DATA_ENGINEER` | Dibuat ADMIN | Semua milik USER + Citra semua tanggal, Data (per satelit + backfill dengan log, unduh/fusion, dataset, proses, EDA), Laporan Kesehatan Data, log halaman Data |
+| `ADMIN` | Dibuat ADMIN | Semua akses + Sistem › Manajemen akun, Pengaturan aplikasi, seluruh log (masuk/registrasi, unduhan, audit) |
+
+Matriks rinci per halaman dan endpoint: INTERFACE.md §3. Batas waktu per peran ditegakkan di VIEW (`v_citra_scenes`, `v_public_kejadian`), bukan hanya di menu. Penegakan di basis data: DATABASE.md §8.
 
 ---
 
@@ -106,7 +108,7 @@ Label yang dipakai di keempat dokumen:
 | Dataset LIVE lama (`dataset_kind='LIVE'`, `live_dataset_sources`, `/api/live` lama) | Sudah legacy di DataLab |
 | `refusion.py` (kecuali pembaca frame S1, dipindah ke orchestrator), `cleanup` tier machine-wide | Alat perawatan riset; tidak dibutuhkan operasional |
 | TimescaleDB, `dataset_versions`, `api_access_logs`, `processing_rules`, Docker | Diganti tabel Monitor atau tidak dipakai |
-| Landing page berbahasa Inggris | Diganti Beranda Publik berbahasa Indonesia |
+| Landing page berbahasa Inggris | Diganti halaman publik berbahasa Indonesia (`/`) |
 
 ### Diwariskan
 
@@ -135,7 +137,7 @@ Autentikasi + 5 role + GRANT nyata, token API pribadi, audit trigger, log login/
 |---|---|
 | RM1 — basis data relasional terintegrasi untuk ingestion 3 satelit | Skema master/transaksi, `satellite_scenes`/`nasa_scenes`, `region_observations`, `fusion_products`, job hidromet + Live + dataset |
 | RM2 — lineage + quality metrics | `data_lineage` (SHA-256 input/output), `processing_jobs.parameters`, `quality_metrics`, `quality_thresholds`, `v_ringkasan_kualitas`, Laporan Kesehatan Data |
-| RM3 — dashboard + API user-friendly | Beranda Publik, Pantauan Live, Statistik Hari Ini, Analitik, Kejadian Bencana, Katalog, Laporan, REST API |
+| RM3 — dashboard + API user-friendly | Halaman publik, Beranda, Kondisi, Riwayat, Kejadian, Data, Pengaturan, REST API (susunan M53) |
 | RM4 — kontrol akses berbasis role + audit trail | 5 role aplikasi ↔ 5 role PostgreSQL, `SET LOCAL ROLE`, VIEW per role, `audit_log` (trigger), `user_activity_logs` |
 
 Tahap DBSDLC yang dipenuhi tiap dokumen: DATABASE.md (conceptual, logical, physical, DBMS selection, data loading), PIPELINE.md (implementation, data conversion & loading), INTERFACE.md (pemodelan sistem, desain antarmuka, prototyping, testing).
@@ -199,8 +201,12 @@ Keputusan rancangan awal (D1–D24) yang masih berlaku dirangkum; keputusan baru
 | M49 | Scene Live untuk selain ADMIN: ≤ 30 hari + scene terbaru; `/storage/*` ADMIN; `/scenes?source=` default S1 | Melengkapi aturan §3.1 untuk endpoint warisan yang tidak disebut dokumen |
 | M50 | **Design system Orbital 95** (`DESIGN.md`) menggantikan design system DataLab (glassmorphism, navbar pil, toast): jendela berbevel + taskbar dengan menu **Mulai** per role, data di "layar CRT", dialog modal untuk semua pesan; UI tetap vanilla JS + Leaflet tanpa build. Kode error API diterjemahkan di `web/js/ui.js` | Keputusan pemilik proyek Tahap 4; satu bahasa visual "kontrol abu-abu, data di layar gelap" |
 | M51 | Tambahan API aditif untuk UI Tahap 4: `scene.water_change` pada kartu Live, `by_rule` pada `/alerts/evaluation`; batas 366 hari dataset ditegakkan juga di API; path preview Live dicari koneksi etl setelah scene terbukti terlihat role pemanggil | INTERFACE §2.2/§2.4/§2.6 butuh angka/aturan yang belum diekspos; USER/ANALYST tidak boleh membaca `datasets` (§8.3) |
-| M52 | Uji UI berbasis browser headless (CDP) terhadap DB terpisah `themonitor_dev` dengan akun sintetis `uji_<role>`: `tests/ui/screenshots.py` (3 lebar × 11 halaman × role) dan `tests/ui/flows.py` (alur tulis); bukan bagian pytest | Bukti tahap prototyping/testing DBSDLC tanpa menyentuh DB produksi dan tanpa memicu unduhan |
-
+| M52 | Uji UI berbasis browser headless (CDP) terhadap DB terpisah `themonitor_dev` dengan akun sintetis `uji_<role>`: `tests/ui/screenshots.py` (3 lebar × 12 halaman × role) dan `tests/ui/flows.py` (alur tulis); bukan bagian pytest | Bukti tahap prototyping/testing DBSDLC tanpa menyentuh DB produksi dan tanpa memicu unduhan |
+| M53 | **Susunan halaman dirombak menurut pertanyaan pengguna, bukan pembagian tabel** (INTERFACE.md §2). Sembilan menu → **lima tujuan + Beranda**, diurut menurut waktu (sekarang → masa lalu → arsip → sistem): `#beranda`, `#kondisi` (tab `citra` + `kecamatan`), `#riwayat` (tab `grafik` + `laporan`), `#kejadian`, `#data` (tab `daftar` + `buat`), `#pengaturan`. Dua halaman publik (`/` dan `/kondisi`) jadi satu; `/kondisi` dialihkan 301, dan tile pindah ke bagian terakhir `/` sehingga urutan sambutan → penjelasan → navigasi tetap utuh. Administrasi: 12 tab rata → 5 kelompok dengan tab **Ringkasan** sebagai pintu masuk. Tambahan: menu bar di bawah title bar, satu baris instruksi (`lede`) per tujuan/tab, "Akun Saya" pindah ke tray. Hash lama tetap hidup lewat `Shell.ALIASES`; DESIGN.md tidak berubah | Susunan lama mewarisi pemisahan DataLab: satu pertanyaan ("bagaimana kondisi sekarang?") dijawab dua halaman karena sumber datanya berbeda tabel, daftar dan pembuatnya jadi dua menu, dan alert aktif — informasi terpenting — hanya terlihat bila pengguna kebetulan membuka Statistik Hari Ini. 33 tujuan navigasi untuk organisasi dengan <10 akun; sembilan label dengan sembilan pola penamaan. Perender tiap halaman tidak ditulis ulang (kontrak `Pages[x].init/destroy` dipertahankan), hanya cara masuknya |
+| M54 | **Dua halaman publik tetap terpisah**, mengoreksi klausa halaman publik pada M53: `/` adalah Beranda publik (sambutan → penjelasan → navigasi halaman, plus strip satu baris status area) dan `/kondisi` adalah Kondisi Terkini (tile satelit). Pengalihan 301 dibatalkan; `web/kondisi.html`, `pages/home-public.html`, dan `js/home-public.js` dipulihkan. Susunan di dalam aplikasi (lima tujuan + Beranda) tidak berubah | Keputusan pemilik proyek. Pengunjung yang belum tahu apa pun tentang sistem ini perlu pengantar — sambutan, penjelasan, lalu navigasi — sedangkan yang sudah tahu bisa langsung ke `/kondisi`. Menggabung keduanya memaksa satu urutan untuk dua kebutuhan yang berbeda |
+| M55 | **Relief 3D**: pratinjau scene Live ditempel sebagai tekstur di atas DEM dengan kamera 3D MapLibre (`pages/terrain3d.html` + `js/terrain3d.js` + `css/terrain3d.css`), sebagai tab `#kondisi/relief` **dan** halaman publik `/relief` — satu fragmen dan satu skrip, mode dipilih dari `body[data-requires-auth]`. DEM dari AWS Terrain Tiles (terrarium, turunan SRTM, ~30 m, tanpa kunci API); MapLibre dimuat dari CDN hanya saat halaman ini dibuka. Georeferensi preview disimpan sebagai **empat sudut lon/lat** di `live_scenes.previews.grid` (`module10.grid_corners_wgs84`) dan diekspos di kartu Live serta `/api/public/live`; scene lama diisi `scripts/backfill_preview_grid.py`, yang menolak menulis kalau ukuran grid tidak cocok dengan PNG di disk. Leaflet tidak dipakai di halaman ini | Relief menjawab "di mana air ini sebenarnya" lebih langsung daripada citra datar, dan Leaflet tidak punya kamera 3D. Empat sudut, bukan bbox: extent grid milik SCENE, bukan AOI — scene satu frame menutupi AOI jauh lebih sempit daripada scene mosaik (area 1: 27 Sep 2026 membentang 105,86–106,17°, 4 Okt 2026 105,86–106,53°), jadi bbox daerah menggeser citra puluhan kilometer. Tinggi berasal dari DEM, **bukan** dari Sentinel-1 — GRD tidak mengukur elevasi, dan itu dikatakan di halamannya supaya tidak dibaca sebagai hasil ukur radar |
+| M56 | **Susunan halaman v2 mengikuti rancangan pemilik proyek** (`DOCS/rancangan kasar.txt`, INTERFACE.md). Delapan halaman: Beranda, 3D AOI, Citra Satelit (ringkasan, Sentinel-1, MODIS, GPM, laporan PDF multi-halaman), Diagram (semua band 30 hari, analisa daerah + PDF semua band), Kejadian (lihat, kelola), Data (ringkasan, per satelit dengan backfill + log, unduh, tersimpan, proses, EDA), Laporan (otomatis + rentang bebas), Sistem (tentang, log per peran, akun, manajemen akun, pengaturan) + Masuk dan Registrasi. Aplikasi `/` = `/app` terbuka untuk pengunjung; menu dari `GET /api/auth/session`. **Registrasi mandiri** membuat USER lewat fungsi `auth_register_user` (peran dikunci di DB, `users.email` baru). Batas waktu: PUBLIC 30 hari citra / 365 hari kejadian, USER 365 hari, ANALYST/DATA_ENGINEER/ADMIN semua — ditegakkan di VIEW `v_citra_scenes`/`v_public_kejadian` dengan `pg_has_role(current_user, …)`. Kejadian: baca semua peran, tulis ANALYST (M16 tetap). Log per halaman lewat VIEW `v_log_data` (DATA_ENGINEER) dan `v_log_kejadian` (ANALYST). Soft delete scene pindah dari ADMIN ke DATA_ENGINEER. Hash dan halaman publik lama dialihkan; berkas halaman publik lama (`landing`, `home-public`, `kondisi.html`, `relief.html`, `index.html`) dan `monitoring` tidak lagi dirujuk. Migrasi DB berjalan: `database/migrations/m56_susunan_halaman_v2.sql` | Permintaan pemilik proyek. Batas M49 (selain ADMIN ≤ 30 hari) diganti; M53/M54 (susunan dan halaman publik) digantikan. Batas waktu di VIEW, bukan di API saja, supaya lapis 3 (M14) tetap berlaku untuk aturan baru |
+| M57 | **Empat tema tampilan, Orbital 95 tetap bawaan.** Tiga konsep di `DOCS/design tambahan/` dijadikan tema: konsep38 → **Kertas Mint** (`mint`), konsep41 → **Mika Pasir** (`pasir`), konsep44 → **Piksel Marun** (`piksel`). Dipilih di Beranda (bagian *Tema tampilan*, `pages/home.html` + `js/home.js`), diterapkan `web/js/theme.js` sebagai `data-theme` di `<html>` sebelum `<body>` diurai, dan disimpan di `localStorage` (`orbit-u.tema`) per peramban, bukan per akun. CSS ada di `web/css/tema/`: `umum.css` (struktur bersama, tercakup `html.tema-alt`) + satu berkas per tema (tercakup `html[data-theme="…"]`) + `pilihan.css` (kartu pemilih). Hanya bahasa visual konsep yang diambil; struktur halaman, router, dan data tidak berubah, layar CRT menjadi panel terang dengan token `--crt/--phos/--amber/--alert/--cyan` per tema, dan rotasi kartu konsep hanya dipakai di kartu navigasi. Aturan DESIGN.md (siku, tanpa blur) tetap berlaku untuk Orbital 95 dan `css/*.css`; `css/tema/` dikecualikan dan diuji tercakup selektornya (`tests/test_web_ui.py`) | Permintaan pemilik proyek: konsep tambahan dipakai sebagai pilihan, bukan pengganti, dan harus disesuaikan dengan halaman asli. Menyimpan di peramban cukup karena tema tidak memengaruhi data atau akses, dan pengunjung tanpa akun juga bisa memilih |
 ---
 
 ## 8. Anti Over-Engineering
@@ -255,6 +261,10 @@ python scripts/load_regions.py --aoi "Banjarsari,Wanasalam,Cijaku,Malingping,Cih
 # 5. Admin pertama
 python scripts/create_admin.py --username admin
 
+# 5b. DB yang sudah berjalan sebelum M56 (langkah 2 sudah memuatnya untuk DB baru):
+#     users.email, VIEW per peran, GRANT baru, fungsi registrasi. Idempoten.
+python database/apply_schema.py --migrate m56_susunan_halaman_v2.sql
+
 # 6. Backfill hidromet harian 2023–2025 (GPM + MODIS → region_observations →
 #    alert_events). Bisa dihentikan dan dijalankan ulang (tanggal COMPLETED dilewati).
 python scripts/backfill_hydromet.py --from 2023-01-01 --to 2025-12-31
@@ -277,7 +287,9 @@ Nama DB `sentinel1_flood` warisan DataLab **diganti** menjadi `themonitor` di `.
 | `README.md` | Dokumen ini |
 | `DATABASE.md` | DBMS selection, ERD, master & transaksi, DDL, normalisasi, index, VIEW, role & GRANT, audit |
 | `PIPELINE.md` | Job hidromet, siklus Live, job dataset, laporan, storage, scheduler, QC, lineage, initial loading |
-| `INTERFACE.md` | Halaman per role, endpoint API, kontrak request/response, UML, rencana pengujian |
-| `DESIGN.md` | Design system Orbital 95 (token, bevel, komponen, layout) — sumber kebenaran visual (M50) |
+| `INTERFACE.md` | Susunan halaman M56, matriks akses per peran, endpoint baru/berubah, kode galat, pengujian |
+| `rancangan kasar.txt` | Rancangan halaman dari pemilik proyek (sumber M56) |
+| `DESIGN.md` | Design system Orbital 95 (token, bevel, komponen, layout) — sumber kebenaran visual tema bawaan (M50); tiga tema tambahan di `web/css/tema/` (M57) |
+| `design tambahan/` | Konsep visual sumber tema Kertas Mint (konsep38), Mika Pasir (konsep41), Piksel Marun (konsep44) — M57 |
 | `SETUP_LAPTOP_BARU.md` | Pindah ke mesin lain lewat `pg_dump`/`pg_restore`, lalu backfill dan benchmark MySQL 8 |
 | `PROMPT_LAPTOP_BARU.md` | Prompt siap pakai untuk Claude Code di laptop baru, menjalankan SETUP_LAPTOP_BARU.md dari awal sampai backfill |

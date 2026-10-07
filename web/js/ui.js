@@ -98,15 +98,17 @@ const UI = (() => {
     TOKEN_SCOPE_FORBIDDEN: 'Cakupan token tidak mengizinkan unduhan.',
     RATE_LIMITED: 'Terlalu banyak permintaan. Tunggu sekitar satu menit lalu coba lagi.',
     NOT_DATASET_OWNER: 'Hanya pembuat dataset atau administrator yang boleh menghapusnya.',
-    SCENE_OUT_OF_RANGE: 'Scene ini lebih tua dari 30 hari dan hanya dapat dilihat administrator.',
+    SCENE_OUT_OF_RANGE: 'Scene ini di luar rentang waktu peran Anda (pengunjung 30 hari, Relawan 1 tahun). Analis, Data Engineer, dan Administrator melihat semuanya.',
     PASSWORD_POLICY: 'Kata sandi belum memenuhi kebijakan: minimal 10 karakter dan maksimal 72 byte.',
     INVALID_OLD_PASSWORD: 'Kata sandi lama salah.',
     USERNAME_TAKEN: 'Nama pengguna sudah dipakai.',
+    EMAIL_TAKEN: 'Email ini sudah terdaftar. Masuk dengan akun tersebut, atau gunakan email lain.',
+    PASSWORD_MISMATCH: 'Konfirmasi kata sandi tidak sama dengan kata sandi.',
     CANNOT_MODIFY_SELF: 'Anda tidak dapat menonaktifkan atau menurunkan peran akun sendiri.',
     TOKEN_ALREADY_REVOKED: 'Token ini sudah dicabut sebelumnya.',
     INVALID_DATE_RANGE: 'Rentang tanggal tidak valid (tanggal akhir sebelum tanggal awal, atau melebihi batas).',
     ALERT_ALREADY_ACKED: 'Alert ini sudah ditandai dibaca oleh pengguna lain.',
-    DATE_OUT_OF_RANGE: 'Data lebih tua dari 30 hari hanya dapat dilihat Analis dan Administrator.',
+    DATE_OUT_OF_RANGE: 'Data lebih tua dari 1 tahun hanya dapat dilihat Analis, Data Engineer, dan Administrator.',
     SCENE_NOT_PUBLIC: 'Hanya scene terbaru yang terbuka untuk umum. Masuk untuk melihat scene lain.',
     THRESHOLD_REQUIRED: 'Aturan aktif wajib memiliki nilai ambang.',
     RULE_CODE_TAKEN: 'Kode aturan sudah dipakai.',
@@ -121,6 +123,9 @@ const UI = (() => {
     INVALID_PERIOD: 'Periode tidak valid: laporan mingguan dimulai hari Senin, bulanan tanggal 1.',
     FILE_MISSING: 'Berkas tidak ditemukan di arsip.',
     INVALID_SOURCE: 'Sumber satelit tidak dikenal.',
+    INVALID_PAGES: 'Pilih minimal satu halaman laporan: Ringkasan, Sentinel-1, MODIS, atau GPM.',
+    INVALID_BAND: 'Band ini tidak dihitung per kecamatan (Sentinel-1 hanya tingkat AOI).',
+    BACKFILL_RUNNING: 'Backfill GPM/MODIS lain masih berjalan. Tunggu sampai selesai, lalu coba lagi.',
     REASON_REQUIRED: 'Alasan wajib diisi saat menonaktifkan scene.',
     NOT_REPROCESSABLE: 'Scene ini milik dataset Katalog dan tidak dapat diproses ulang dari sini.',
     INVALID_THRESHOLD: 'Nilai ambang tidak valid.',
@@ -307,19 +312,63 @@ const UI = (() => {
     return select;
   }
 
+  // ---------------------------------------------- preferensi "Garis wilayah"
+  // Server merender dua varian tiap preview map (polos dan bergaris wilayah,
+  // lihat etl/admin_overlay.py). Pilihan pengguna disimpan di localStorage
+  // dan hanya menukar src <img> -- halaman tidak digambar ulang, jadi posisi
+  // gulir, tab, dan lightbox yang terbuka tidak hilang saat dicentang.
+  const ADM_KEY = 'orbit-u.garis_wilayah';
+  let admOn = null;
+
+  function boundaries() {
+    if (admOn === null) { try { admOn = localStorage.getItem(ADM_KEY) === '1'; } catch (e) { admOn = false; } }
+    return admOn;
+  }
+  function setBoundaries(on) {
+    admOn = !!on;
+    try { localStorage.setItem(ADM_KEY, admOn ? '1' : '0'); } catch (e) { /* mode privat: pilihan tidak diingat */ }
+    applyBoundaries();
+    document.dispatchEvent(new CustomEvent('orbit-u:garis-wilayah', { detail: admOn }));
+  }
+  // Tiap <img> preview ditulis dengan data-url (polos) + data-url-adm
+  // (bergaris) oleh imgAttrs(); ini yang menukar keduanya.
+  function applyBoundaries(root) {
+    $$('img[data-url]', root).forEach(img => {
+      const want = (boundaries() && img.dataset.urlAdm) || img.dataset.url;
+      if (img.getAttribute('src') !== want) img.setAttribute('src', want);
+    });
+  }
+  // p = item preview dari API: {url, url_boundaries?}. url_boundaries tidak
+  // ada untuk scene yang varian bergarisnya belum pernah dirender -- tile itu
+  // tetap tampil polos walau checkbox aktif.
+  function imgSrc(p) { return (boundaries() && p.url_boundaries) || p.url; }
+  function imgAttrs(p) {
+    return 'src="' + esc(imgSrc(p)) + '" data-url="' + esc(p.url) + '"' +
+      (p.url_boundaries ? ' data-url-adm="' + esc(p.url_boundaries) + '"' : '');
+  }
+
   // Lightbox preview citra: jendela dialog dengan gambar di dalam screen.
-  function lightbox(items, index) {
+  //
+  // opts.action = {label} menambah satu tombol aksi di samping Tutup. Promise
+  // dialog ini lalu RESOLVE DENGAN ITEM yang sedang dilihat (bukan `true`),
+  // supaya pemanggil tahu lapisan mana yang dimaksud -- indeks yang sedang
+  // tampil hidup di closure ini, bukan di pemanggil, karena tombol
+  // Sebelumnya/Berikutnya bisa menggesernya setelah dialog dibuka.
+  function lightbox(items, index, opts) {
+    opts = opts || {};
     let i = index || 0;
     const render = win => {
       const it = items[i];
       $('.lb-body', win).innerHTML = screenHTML({ channel: it.channel || it.title, rec: it.rec || '', flush: false,
-        body: '<img src="' + esc(it.url) + '" alt="' + esc(it.title) + '" style="display:block;margin:0 auto;max-height:60vh">' +
+        body: '<img ' + imgAttrs(it) + ' alt="' + esc(it.title) + '" style="display:block;margin:0 auto;max-height:60vh">' +
           (it.legend || '') + (it.note ? '<p class="scr-text" style="margin-top:8px">' + it.note + '</p>' : '') });
       $('.lb-pos', win).textContent = (i + 1) + ' / ' + items.length + ' — ' + it.title;
     };
+    const actionBtn = opts.action ? [{ label: opts.action.label, value: 'action' }] : [];
     return dialog({ title: 'Pratinjau citra', wide: 'x',
       body: '<div class="lb-body"></div><div class="btn-row" style="margin:8px 0"><button type="button" class="small lb-prev">‹ Sebelumnya</button><span class="lb-pos"></span><button type="button" class="small lb-next">Berikutnya ›</button></div>',
-      buttons: [{ label: 'Tutup', value: true, default: true, cancel: true }],
+      buttons: actionBtn.concat([{ label: 'Tutup', value: true, default: true, cancel: true }]),
+      collect: (win, val) => val === 'action' ? items[i] : val,
       onOpen: win => {
         render(win);
         const go = d => { i = (i + d + items.length) % items.length; render(win); };
@@ -330,7 +379,9 @@ const UI = (() => {
   }
 
   // ------------------------------------------------------------------ grafik SVG di screen
-  // series: [{label, cls, points:[{x:'YYYY-MM-DD', y}]}]; opts: {bar, thresholds:{name:v}, forecast:{points:[{x,mean,lo,hi}]}, unit, selected}
+  // series: [{label, cls, color?, points:[{x:'YYYY-MM-DD', y}]}]; opts: {bar, thresholds:{name:v}, forecast:{points:[{x,mean,lo,hi}]}, unit, selected}
+  // `color` (opsional) mewarnai garis satu seri — dipakai Diagram, tempat setiap
+  // band/kecamatan punya warna tetap.
   function chartSVG(series, opts) {
     opts = opts || {};
     const W = opts.width || 560, H = opts.height || 190, L = 44, R = 12, T = 14, B = 24;
@@ -355,7 +406,7 @@ const UI = (() => {
     for (let k = 0; k <= 3; k++) {
       const v = y0 + (y1 - y0) * k / 3;
       g += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/>' +
-        '<text class="axis" x="' + (L - 4) + '" y="' + (Y(v) + 3) + '" text-anchor="end">' + num(v, Math.abs(y1 - y0) < 5 ? 1 : 0) + '</text>';
+        '<text class="axis" x="' + (L - 4) + '" y="' + (Y(v) + 3) + '" text-anchor="end">' + num(v, Math.abs(y1 - y0) < 0.5 ? 2 : Math.abs(y1 - y0) < 5 ? 1 : 0) + '</text>';
     }
     const dates = Array.from(new Set(all.map(p => p.x).concat(fc.map(p => p.x)))).sort();
     const step = Math.max(1, Math.ceil(dates.length / 6));
@@ -385,10 +436,15 @@ const UI = (() => {
       } else {
         // Garis putus di nilai kosong (tidak menyambung celah data).
         let seg = [];
-        const flush = () => { if (seg.length > 1) g += '<polyline class="line ' + (s.cls || '') + '" points="' + seg.join(' ') + '"/>'; seg = []; };
+        const stroke = s.color ? ' style="stroke:' + esc(s.color) + '"' : '';
+        const fill = s.color ? ' style="fill:' + esc(s.color) + '"' : '';
+        // Satu titik saja tetap digambar sebagai titik (polyline butuh dua).
+        const flush = () => { if (seg.length > 1) g += '<polyline class="line ' + (s.cls || '') + '"' + stroke + ' points="' + seg.join(' ') + '"/>'; seg = []; };
         s.points.forEach(p => { if (p.y === null || p.y === undefined) flush(); else seg.push(X(t(p.x)) + ',' + Y(p.y)); });
         flush();
-        if (pts.length <= 40) pts.forEach(p => { g += '<rect class="dot" x="' + (X(t(p.x)) - 2) + '" y="' + (Y(p.y) - 2) + '" width="4" height="4"/>'; });
+        // Satu titik per tanggal yang berdata; diperkecil bila rapat.
+        const ds = pts.length > 120 ? 2 : pts.length > 60 ? 3 : 4;
+        pts.forEach(p => { g += '<rect class="dot"' + fill + ' x="' + (X(t(p.x)) - ds / 2) + '" y="' + (Y(p.y) - ds / 2) + '" width="' + ds + '" height="' + ds + '"/>'; });
       }
       pts.forEach(p => hits.push({ x: X(t(p.x)), y: Y(p.y), tip: (series.length > 1 ? s.label + ' · ' : '') + date(p.x) + ': ' + num(p.y, 1) + unit }));
     });
@@ -426,6 +482,40 @@ const UI = (() => {
   const ROLE_LABEL = { PUBLIC: 'Publik', USER: 'Relawan (USER)', ANALYST: 'Analis (ANALYST)', DATA_ENGINEER: 'Data Engineer', ADMIN: 'Administrator' };
   const LEVEL = [{ label: 'Normal', cls: '' }, { label: 'Waspada', cls: 'v-amber' }, { label: 'Tinggi', cls: 'v-alert' }];
 
+  // Label dataset & satelit. Dulu ada salinannya di catalog.js saja; begitu
+  // "Proses berjalan" dan Penyimpanan ikut memakainya, satu salinan di sini
+  // mencegah dua daftar status yang perlahan berbeda isi.
+  const DATASET_STATUS = {
+    QUEUED: 'Antre', PREPARING: 'Menyiapkan', DOWNLOADING: 'Mengunduh', PROCESSING: 'Memproses', PAUSED: 'Dijeda',
+    CLEANUP: 'Membersihkan', COMPLETED: 'Selesai', PARTIAL: 'Sebagian', FAILED: 'Gagal', CANCELLED: 'Dibatalkan',
+    DELETING: 'Menghapus', DRAFT: 'Draf',
+  };
+  // Status yang masih bergerak: selama salah satunya ada, halaman perlu menjadwal
+  // pembaruan berkala.
+  const DATASET_ACTIVE = new Set(['QUEUED', 'PREPARING', 'DOWNLOADING', 'PROCESSING', 'PAUSED', 'CLEANUP', 'DELETING']);
+  const SOURCE_LABEL = { sentinel1: 'Sentinel-1', modis: 'MODIS', gpm: 'GPM', fusion: 'Fusion',
+    SENTINEL1: 'Sentinel-1', MODIS: 'MODIS', GPM: 'GPM', FUSION: 'Fusion' };
+  const datasetStatus = code => DATASET_STATUS[code] || code || NA;
+
+  // Bar proporsi berlabel: nama di kiri, palang di tengah, angka di kanan.
+  // Dipakai Katalog (per sumber, per tier), Penyimpanan mesin, dan Proses
+  // berjalan. `total` 0 menghasilkan palang kosong, bukan NaN.
+  function barHTML(label, size, total, right) {
+    const share = total > 0 ? size / total * 100 : 0;
+    return '<div class="bar-row"><span>' + esc(label) + '</span>' +
+      '<span class="trk" role="img" aria-label="' + esc(label + ' ' + num(share, 0) + '%') + '">' +
+      '<i style="width:' + Math.max(share, size ? 1 : 0).toFixed(1) + '%"></i></span>' +
+      '<span class="num" style="text-align:right">' + esc(right) + '</span></div>';
+  }
+
+  // Palang progres pipeline/penghapusan. `percent` di luar 0–100 dijepit supaya
+  // nilai aneh dari server tidak merusak tata letak.
+  function progressHTML(percent, label) {
+    const v = Math.max(0, Math.min(100, Number(percent) || 0));
+    return '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' +
+      v.toFixed(0) + '" aria-label="' + esc(label || 'Progres') + '"><i style="width:' + Math.max(1, v).toFixed(1) + '%"></i></div>';
+  }
+
   // Unduh berkas (Blob) dengan nama dari Content-Disposition.
   function saveBlob(blob, name) {
     const a = document.createElement('a');
@@ -436,7 +526,9 @@ const UI = (() => {
 
   return { icon, ICONS, NA, num, int, pct, bytes, date, dateTime, isoDate, addDays, parseDate, esc, $, $$,
     ERROR_TEXT, errorText, windowHTML, dialog, info, warn, showError, confirm, busy, screenHTML, readoutHTML,
+    boundaries, setBoundaries, applyBoundaries, imgSrc, imgAttrs,
     emptyHTML, loadingHTML, tableHTML, pagerHTML, bindTabs, lightbox, chartSVG, BMKG, bmkgCategory, bmkgClass,
-    SEVERITY, ROLE_LABEL, LEVEL, saveBlob };
+    SEVERITY, ROLE_LABEL, LEVEL, saveBlob,
+    DATASET_STATUS, DATASET_ACTIVE, SOURCE_LABEL, datasetStatus, barHTML, progressHTML };
 })();
 window.UI = UI;

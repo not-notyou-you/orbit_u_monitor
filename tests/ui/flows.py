@@ -182,7 +182,7 @@ def f_login(b: Browser):
 @flow("auth: tanpa sesi → /app dialihkan ke /masuk; keluar menghapus sesi")
 def f_guard(b: Browser):
     b.login(None)
-    b.go("/app#analitik", 2.0)
+    b.go("/app#riwayat/grafik", 2.0)
     p = b.js("location.pathname + location.search")
     assert p.startswith("/masuk") and "next=" in p, p
     b.login("user"); b.go("/app#akun", 2.0)
@@ -197,39 +197,57 @@ def f_guard(b: Browser):
 
 @flow("rbac: menu Mulai per role sesuai permissions; halaman terlarang → 'Akses ditolak'")
 def f_rbac(b: Browser):
+    # Lima tujuan + Beranda + Akun Saya. Tujuan bertab terlihat bila minimal
+    # satu tabnya boleh dibuka: data_engineer melihat "riwayat" karena Laporan
+    # Kesehatan Data, walau tab Grafik & tren tertutup untuknya.
+    #
+    # `data-hash` hanya ada di item tingkat atas; tab dari tujuan bertab dirender
+    # sebagai sub-item ber-`data-tab-hash`, jadi pemeriksaan izin di bawah ini
+    # tetap membandingkan tujuan dengan tujuan.
+    allhash = {"beranda", "kondisi", "riwayat", "kejadian", "data", "pengaturan", "akun"}
     expect = {
-        "user": {"pantauan", "hari-ini", "akun"},
-        "analyst": {"pantauan", "hari-ini", "analitik", "kejadian", "laporan", "akun"},
-        "data_engineer": {"pantauan", "hari-ini", "katalog", "buat-dataset", "laporan", "akun"},
-        "admin": {"pantauan", "hari-ini", "analitik", "kejadian", "katalog", "buat-dataset", "laporan", "admin", "akun"},
+        "user": {"beranda", "kondisi", "akun"},
+        "analyst": {"beranda", "kondisi", "riwayat", "kejadian", "akun"},
+        "data_engineer": {"beranda", "kondisi", "riwayat", "data", "akun"},
+        "admin": allhash,
     }
     notes = []
     for role, want in expect.items():
         b.login(role); b.go("/app#akun", 2.0)
         got = set(b.js("Array.from(document.querySelectorAll('#startList a[data-hash]')).map(a => a.dataset.hash)") or [])
         assert got == want, (role, sorted(got ^ want))
-        for h in {"admin", "katalog", "analitik"} - want:
+        for h in sorted(allhash - want):
             b.go("/app#" + h, 1.5)
             assert "Akses ditolak" in b.text("#main"), (role, h)
         notes.append(f"{role}:{len(got)}")
-    b.login("user"); b.go("/app#admin", 1.5); b.shot("rbac-user-admin")
-    return "menu " + ", ".join(notes) + "; akses langsung ditolak di UI"
+    # Sub-item menu Mulai: ADMIN melihat tab tiap tujuan bertab langsung di menu,
+    # termasuk bagian Pengaturan, jadi tujuan + tab tercapai dalam satu klik.
+    b.login("admin"); b.go("/app#akun", 2.0)
+    subs = set(b.js("Array.from(document.querySelectorAll('#startList a[data-tab-hash]')).map(a => a.dataset.tabHash)") or [])
+    for want in ("kondisi/citra", "riwayat/laporan", "data/proses", "pengaturan/jejak"):
+        assert want in subs, (want, sorted(subs))
+    b.login("user"); b.go("/app#pengaturan", 1.5); b.shot("rbac-user-admin")
+    return "menu " + ", ".join(notes) + f"; {len(subs)} sub-item; akses langsung ditolak di UI"
 
 
 @flow("keyboard: menu Mulai (Enter/panah/Escape), tab admin dengan panah")
 def f_keyboard(b: Browser):
-    b.login("admin"); b.go("/app#admin", 2.0)
+    b.login("admin"); b.go("/app#pengaturan", 2.0)
     b.js("document.getElementById('startBtn').focus()")
     b.key("Enter")
     assert b.js("document.activeElement && document.activeElement.getAttribute('role') === 'menuitem'"), "fokus tidak masuk menu"
     b.key("ArrowDown")
     b.key("Escape")
     assert b.js("document.getElementById('startMenu').classList.contains('hidden') && document.activeElement.id === 'startBtn'"), "Escape tidak menutup"
-    b.js("document.querySelector('#adTabs [role=tab]').focus()")
+    # Kelompok Pengaturan kini tab router biasa, jadi tablist-nya ada di jendela
+    # halaman seperti tujuan bertab lainnya.
+    b.js("document.querySelector('#pageWindow .tabs [role=tab]').focus()")
     b.key("ArrowRight", wait=1.5)
-    sel = b.js("document.querySelector('#adTabs [aria-selected=true]').dataset.tab")
-    assert sel == "scenes", sel
-    return "Start menu & tablist bisa dioperasikan keyboard"
+    sel = b.js("document.querySelector('#pageWindow .tabs [aria-selected=true]').dataset.tab")
+    assert sel == "operasi", sel
+    h = b.js("location.hash")
+    assert h.startswith("#pengaturan/operasi"), h
+    return f"Start menu & tablist bisa dioperasikan keyboard; hash mengikuti tab ({h})"
 
 
 @flow("akun: buat token (tampil sekali) lalu cabut")
@@ -251,9 +269,9 @@ def f_token(b: Browser):
 
 @flow("statistik: ANALYST tandai alert sudah dibaca (dengan catatan); USER tanpa tombol")
 def f_ack(b: Browser):
-    b.login("user"); b.go("/app#hari-ini", 3.5)
+    b.login("user"); b.go("/app#kondisi/kecamatan", 3.5)
     assert not b.js("document.querySelectorAll('[data-ack]').length"), "USER melihat tombol ack"
-    b.login("analyst"); b.go("/app#hari-ini", 3.5)
+    b.login("analyst"); b.go("/app#kondisi/kecamatan", 3.5)
     n = b.js("document.querySelectorAll('[data-ack]').length")
     if not n:
         return "tidak ada alert aktif (lewati)"
@@ -302,12 +320,17 @@ def f_disaster(b: Browser):
     return "buat → ubah (verifikasi) → hapus; " + str(len(errs)) + " pesan validasi klien"
 
 
-@flow("katalog: semua tab dataset UJI SINTETIS terbuka tanpa error")
+@flow("katalog: semua tab rincian dataset UJI SINTETIS terbuka tanpa error")
 def f_catalog(b: Browser):
-    b.login("data_engineer"); b.go("/app#katalog", 3.0)
-    tabs = b.js("Array.from(document.querySelectorAll('[role=tab]')).map(t => t.dataset.tab)")
+    b.login("data_engineer"); b.go("/app#data/daftar", 3.0)
+    # Selektor dibatasi ke tablist rincian di dalam halaman. Tanpa batas itu
+    # daftarnya ikut memuat tab tujuan "Data" (Dataset tersimpan / Buat dataset
+    # baru / Proses berjalan), dan klik pertama ke salah satunya meninggalkan
+    # Katalog sehingga tab sisanya tidak ada lagi.
+    sel = "#pageRoot .deck .tabs [role=tab]"
+    tabs = b.js(f"Array.from(document.querySelectorAll({sel!r})).map(t => t.dataset.tab)")
     for t in tabs:
-        b.click(f"[role=tab][data-tab='{t}']", 2.0)
+        b.click(f"#pageRoot .deck .tabs [role=tab][data-tab='{t}']", 2.0)
         assert "GAGAL MEMUAT" not in b.text("#ctPanel"), t
         if t in ("produk", "struktur"):
             b.shot("catalog-" + t)
@@ -316,7 +339,7 @@ def f_catalog(b: Browser):
 
 @flow("buat dataset: validasi langkah, konfigurasi sebelumnya, ringkasan (tanpa kirim)")
 def f_wizard(b: Browser):
-    b.login("data_engineer"); b.go("/app#buat-dataset", 3.0)
+    b.login("data_engineer"); b.go("/app#data/buat", 3.0)
     b.click("#cdNext", 0.6)
     assert "Pilih lokasi" in b.text("#cdErr"), b.text("#cdErr")
     b.click("#cdRois [data-roi]", 1.0)
@@ -346,7 +369,7 @@ def f_wizard(b: Browser):
 
 @flow("analitik: filter, rentang terbalik ditolak, ekspor CSV tercatat")
 def f_analytics(b: Browser):
-    b.login("analyst"); b.go("/app#analitik", 4.0)
+    b.login("analyst"); b.go("/app#riwayat/grafik", 4.0)
     b.set("#anFrom", "2024-01-07"); b.set("#anTo", "2024-01-01")
     b.click("#anApply", 0.8)
     assert "sebelum" in b.text("#anDateErr"), b.text("#anDateErr")
@@ -360,28 +383,40 @@ def f_analytics(b: Browser):
 
 @flow("laporan: unduh PDF (ANALYST) dan tab sesuai audiens")
 def f_reports(b: Browser):
-    b.login("analyst"); b.go("/app#laporan", 2.5)
+    b.login("analyst"); b.go("/app#riwayat/laporan", 2.5)
     tabs = b.js("Array.from(document.querySelectorAll('#rpTabs [role=tab]')).map(t => t.textContent)")
     assert tabs == ["Hidromet"], tabs
     if b.js("document.querySelectorAll('[data-dl]').length"):
         b.click("[data-dl]", 2.5)
         assert not b.dialog_text(), b.dialog_text()
-    b.login("data_engineer"); b.go("/app#laporan", 2.5)
+    b.login("data_engineer"); b.go("/app#riwayat/laporan", 2.5)
     tabs2 = b.js("Array.from(document.querySelectorAll('#rpTabs [role=tab]')).map(t => t.textContent)")
     assert tabs2 == ["Kesehatan Data"], tabs2
     return f"ANALYST {tabs}, DATA_ENGINEER {tabs2}"
 
 
-@flow("admin: 12 tab terbuka tanpa error; buat akun + validasi + CANNOT_MODIFY_SELF")
+@flow("pengaturan: 5 kelompok + semua bagiannya terbuka tanpa error; buat akun + validasi + CANNOT_MODIFY_SELF")
 def f_admin(b: Browser):
-    b.login("admin"); b.go("/app#admin", 2.5)
-    tabs = b.js("Array.from(document.querySelectorAll('#adTabs [role=tab]')).map(t => t.dataset.tab)")
-    for t in tabs:
-        b.click(f"#adTabs [data-tab='{t}']", 2.5)
-        txt = b.text("#adPanel")
-        assert "GAGAL MEMUAT" not in txt, t
-        b.shot("admin-" + t)
-    b.click("#adTabs [data-tab='users']", 2.0)
+    b.login("admin"); b.go("/app#pengaturan", 2.5)
+    # Kelompoknya tab router (#pageWindow .tabs); bagian di dalamnya segmen
+    # ketiga hash, dengan baris tabnya sendiri (#adSub).
+    groups = b.js("Array.from(document.querySelectorAll('#pageWindow .tabs [role=tab]')).map(t => t.dataset.tab)")
+    assert groups == ["ringkasan", "operasi", "konfigurasi", "akses", "jejak"], groups
+    seen = []
+    for g in groups:
+        b.click(f"#pageWindow .tabs [data-tab='{g}']", 2.5)
+        subs = b.js("Array.from(document.querySelectorAll('#adSub .sub-row [role=tab]')).map(t => t.dataset.tab)") or []
+        for t in subs or [g]:
+            if subs:
+                b.click(f"#adSub .sub-row [data-tab='{t}']", 2.5)
+                h = b.js("location.hash")
+                assert h == f"#pengaturan/{g}/{t}", (h, g, t)
+            txt = b.text("#adPanel")
+            assert "GAGAL MEMUAT" not in txt, (g, t)
+            seen.append(t)
+            b.shot("admin-" + t)
+    assert "penyimpanan" in seen, seen
+    b.click("#pageWindow .tabs [data-tab='akses']", 2.5)
     b.click("#auNew", 1.0)
     b.set("#af_username", "Bukan Valid!")
     b.click(".dialog-backdrop .btn-row.end button.default", 0.6)
@@ -398,7 +433,56 @@ def f_admin(b: Browser):
     b.click(".dialog-backdrop .btn-row.end button.default", 1.5)
     d = b.dialog_text()
     assert "akun sendiri" in d, d
-    return f"{len(tabs)} tab; akun {uname} dibuat; CANNOT_MODIFY_SELF diterjemahkan"
+    return f"{len(groups)} kelompok / {len(seen)} bagian; akun {uname} dibuat; CANNOT_MODIFY_SELF diterjemahkan"
+
+
+@flow("data → proses berjalan: daftar lintas dataset terbuka; kosong pun menyebut jadwal")
+def f_process(b: Browser):
+    b.login("data_engineer"); b.go("/app#data/proses", 3.0)
+    assert b.js("location.hash") == "#data/proses", b.js("location.hash")
+    txt = b.text("#pcList")
+    assert "GAGAL MEMUAT" not in txt, txt[:200]
+    # Keadaan kosong adalah keadaan normal di sistem ini, jadi teksnya wajib
+    # menyebut kapan proses berikutnya jalan — bukan hanya "tidak ada data".
+    if "TIDAK ADA PROSES" in txt:
+        assert "WIB" in txt, txt[:200]
+    ro = b.text("#pcReadouts")
+    for lbl in ("SEDANG BERJALAN", "ANTRE", "DIJEDA", "GAGAL"):
+        assert lbl in ro, (lbl, ro[:200])
+    # Mencentang "tampilkan juga yang sudah selesai" tidak boleh menimbulkan error.
+    b.set("#pcAll", True, wait=2.5)
+    assert "GAGAL MEMUAT" not in b.text("#pcList")
+    b.shot("process-running")
+    return "readout + daftar proses terbuka; kosong menyebut jadwal siklus"
+
+
+@flow("deep-link: bagian Pengaturan dibuka langsung dari alamat, tanpa klik")
+def f_deeplink(b: Browser):
+    # Inti perubahan susunan: 13 bagian Pengaturan punya alamat sendiri, jadi
+    # bisa dibagikan dan selamat dari refresh.
+    b.login("admin")
+    for path, want_tab, want_sub, probe in [
+        ("/app#pengaturan/jejak/audit", "jejak", "audit", "#adPanel"),
+        ("/app#pengaturan/operasi/penyimpanan", "operasi", "penyimpanan", "#adPanel"),
+    ]:
+        b.go(path, 3.0)
+        assert b.js("location.hash") == f"#pengaturan/{want_tab}/{want_sub}", b.js("location.hash")
+        grp = b.js("document.querySelector('#pageWindow .tabs [aria-selected=true]').dataset.tab")
+        sub = b.js("document.querySelector('#adSub .sub-row [aria-selected=true]').dataset.tab")
+        assert (grp, sub) == (want_tab, want_sub), (grp, sub, want_tab, want_sub)
+        assert "GAGAL MEMUAT" not in b.text(probe), path
+    b.shot("deeplink-penyimpanan")
+    # Sub yang tidak dikenal jatuh ke bagian pertama kelompoknya, bukan ke panel kosong.
+    b.go("/app#pengaturan/jejak/bukan-bagian", 3.0)
+    sub = b.js("document.querySelector('#adSub .sub-row [aria-selected=true]').dataset.tab")
+    assert sub == "masuk", sub
+    # Hash lama tetap mendarat.
+    b.go("/app#admin", 2.5)
+    assert b.js("location.hash") == "#pengaturan/ringkasan", b.js("location.hash")
+    # Peran tanpa izin tetap ditolak, bukan dapat halaman kosong.
+    b.login("analyst"); b.go("/app#pengaturan/jejak/audit", 2.0)
+    assert "Akses ditolak" in b.text("#main")
+    return "bagian Pengaturan bisa dibuka dari alamat; sub tak dikenal & hash lama aman; 403 tetap berlaku"
 
 
 @flow("error 404/500: halaman fragmen hilang & API error menampilkan dialog, bukan layar putih")
@@ -425,7 +509,8 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv)
     OUT.mkdir(parents=True, exist_ok=True)
     b = Browser(args.base, os.environ[args.password_env])
-    flows = [f_login, f_guard, f_rbac, f_keyboard, f_token, f_ack, f_disaster, f_catalog, f_wizard, f_analytics, f_reports, f_admin, f_errors]
+    flows = [f_login, f_guard, f_rbac, f_keyboard, f_token, f_ack, f_disaster, f_catalog, f_process, f_wizard,
+             f_analytics, f_reports, f_admin, f_deeplink, f_errors]
     try:
         for f in flows:
             if not args.only or args.only in f.__name__:

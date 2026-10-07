@@ -32,7 +32,7 @@ from api.security import hash_password, password_policy_error
 router = APIRouter()
 
 _USER_SELECT = """
-    SELECT u.user_id, u.username, u.full_name, u.organization, r.role_code, u.is_active,
+    SELECT u.user_id, u.username, u.full_name, u.organization, u.email, r.role_code, u.is_active,
            (u.locked_until IS NOT NULL AND u.locked_until > now()) AS is_locked,
            u.locked_until, u.last_login_at, u.created_by, u.created_at, u.updated_at
     FROM users u JOIN roles r ON r.role_id = u.role_id
@@ -71,7 +71,7 @@ def list_users(sess: Session = Depends(get_session),
                limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0)) -> AdminUserListResponse:
     where, params = ["true"], {}
     if q:
-        where.append("(u.username ILIKE :q OR u.full_name ILIKE :q)")
+        where.append("(u.username ILIKE :q OR u.full_name ILIKE :q OR u.email ILIKE :q)")
         params["q"] = f"%{q}%"
     if role_code:
         where.append("r.role_code = :role")
@@ -192,7 +192,7 @@ def _activity_filters(user_id, date_from, date_to, time_col="logged_at"):
 @router.get("/logs/login", response_model=LogListResponse, summary="Sign-in log (v_log_login)")
 def login_log(sess: Session = Depends(get_session), user_id: int | None = None,
               date_from: date | None = None, date_to: date | None = None,
-              action: str | None = Query(None, pattern=r"^(LOGIN_SUCCESS|LOGIN_FAILED|LOGOUT)$"),
+              action: str | None = Query(None, pattern=r"^(LOGIN_SUCCESS|LOGIN_FAILED|LOGOUT|REGISTER)$"),
               page: int | None = Query(None, ge=1), limit: int = Query(50, ge=1, le=500),
               offset: int = Query(0, ge=0)) -> LogListResponse:
     where, params = _activity_filters(user_id, date_from, date_to)

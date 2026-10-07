@@ -38,17 +38,20 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "tests" / "screenshots"
 
 # (nama berkas, URL, role yang dipakai untuk tangkapan utama)
+# Alamat mengikuti susunan M53: lima tujuan, sebagian bertab (#tujuan/tab).
 PAGES = [
-    ("home-public", "/", None),
+    ("landing", "/", None),
+    ("home-public", "/kondisi", None),
     ("login", "/masuk", None),
-    ("monitoring", "/app#pantauan", "user"),
-    ("statistics", "/app#hari-ini", "analyst"),
-    ("analytics", "/app#analitik", "analyst"),
+    ("home", "/app#beranda", "user"),
+    ("monitoring", "/app#kondisi/citra", "user"),
+    ("statistics", "/app#kondisi/kecamatan", "analyst"),
+    ("analytics", "/app#riwayat/grafik", "analyst"),
+    ("reports", "/app#riwayat/laporan", "admin"),
     ("disasters", "/app#kejadian", "analyst"),
-    ("catalog", "/app#katalog", "data_engineer"),
-    ("create-dataset", "/app#buat-dataset", "data_engineer"),
-    ("reports", "/app#laporan", "admin"),
-    ("admin", "/app#admin", "admin"),
+    ("catalog", "/app#data/daftar", "data_engineer"),
+    ("create-dataset", "/app#data/buat", "data_engineer"),
+    ("admin", "/app#pengaturan", "admin"),
     ("account", "/app#akun", "user"),
 ]
 WIDTH_NAME = {320: "mobile", 768: "tablet", 1920: "desktop"}

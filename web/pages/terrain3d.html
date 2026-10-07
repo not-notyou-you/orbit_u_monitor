@@ -1,0 +1,52 @@
+<!-- pages/terrain3d.html — Relief 3D (opsi "drape"): pratinjau Live ditempel
+     sebagai tekstur di atas DEM, kamera 3D MapLibre. Tidak ada data baru di
+     sini; yang dibaca persis PNG dan georeferensi scene yang sama dengan
+     Kondisi › Citra.
+
+     SATU fragmen untuk DUA halaman: /app#kondisi/relief (masuk) dan /relief
+     (publik). js/terrain3d.js menyembunyikan pemilih tanggal di mode publik --
+     publik hanya boleh melihat scene TERBARU, jadi tidak ada yang bisa dipilih
+     di situ. Lihat SOURCES di terrain3d.js. -->
+<div class="layout">
+  <div class="control-panel">
+    <fieldset>
+      <legend>Live Area</legend>
+      <div class="field"><label for="t3Area">Area</label><select id="t3Area"></select></div>
+      <div class="field" id="t3DateField"><label for="t3Date">Tanggal scene</label><select id="t3Date"></select></div>
+      <p class="mut" id="t3ScopeNote" style="margin:4px 0 0;font-size:11px" hidden></p>
+    </fieldset>
+    <fieldset>
+      <legend>Lapisan yang ditempel</legend>
+      <div class="field"><label for="t3Layer">Lapisan</label><select id="t3Layer"></select></div>
+      <div class="field">
+        <label for="t3Opacity">Opasitas citra <span class="num" id="t3OpacityVal">100%</span></label>
+        <input type="range" id="t3Opacity" min="0" max="100" step="5" value="100">
+        <span class="hint">Turunkan untuk membandingkan citra dengan relief di bawahnya.</span>
+      </div>
+      <div class="legend-box" id="t3Legend"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Relief</legend>
+      <div class="field">
+        <label for="t3Exag">Pelebihan tinggi <span class="num" id="t3ExagVal">1.5×</span></label>
+        <input type="range" id="t3Exag" min="0" max="5" step="0.1" value="1.5">
+        <span class="hint">1× = skala sebenarnya. Di dataran rendah relief asli nyaris tak terlihat, jadi nilai di atas 1 melebih-lebihkan tinggi secara sengaja.</span>
+      </div>
+      <div class="field">
+        <label for="t3Pitch">Sudut kamera <span class="num" id="t3PitchVal">60°</span></label>
+        <input type="range" id="t3Pitch" min="0" max="80" step="5" value="60">
+      </div>
+      <div class="btn-row">
+        <button type="button" class="small" id="t3Reset">Pas ke area</button>
+        <button type="button" class="small" id="t3North">Hadap utara</button>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Sumber tinggi</legend>
+      <p class="mut" style="margin:0;font-size:11px" id="t3DemNote"></p>
+    </fieldset>
+  </div>
+  <div class="deck" id="t3Deck">
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">SYS</span><div class="scr-empty" role="status">MEMUAT DATA…</div></div></div>
+  </div>
+</div>

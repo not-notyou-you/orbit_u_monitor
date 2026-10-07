@@ -4,6 +4,10 @@ Pages['disasters'] = (() => {
   const SOURCES = { GMLS: 'GMLS', BPBD_LEBAK: 'BPBD Lebak', BNPB_DIBI: 'BNPB (DIBI)', MEDIA: 'Media', LAINNYA: 'Lainnya' };
   const LIMIT = 50;
   let st = null;
+  // API mengembalikan `location: {lat, lon}` (etl.disasters.event_dict);
+  // perender di bawah membaca e.lat/e.lon. Dulu tidak pernah diterjemahkan,
+  // sehingga titik peta dan prefill formulir selalu kosong.
+  const flat = e => Object.assign(e, { lat: e.location ? e.location.lat : null, lon: e.location ? e.location.lon : null });
 
   async function init(root, ctx) {
     st = { root, ctx, types: [], regions: [], page: 1, map: null, layer: null, items: [] };
@@ -31,14 +35,14 @@ Pages['disasters'] = (() => {
   async function load() {
     const $ = s => UI.$(s, st.root);
     const from = $('#dzFrom').value, to = $('#dzTo').value;
-    if (from && to && from > to) { UI.showError('Filter', { code: 'INVALID_DATE_RANGE' }); return; }
+    if (from && to && from > to) { UI.showError('Saring daftar kejadian', { code: 'INVALID_DATE_RANGE' }); return; }
     st.ctx.setStatus('Memuat…');
     let r;
     try {
       r = await API.get('/api/disasters' + API.qs({ date_from: from, date_to: to, type_code: $('#dzType').value,
         region_id: $('#dzRegion').value, is_verified: $('#dzVer').value, limit: LIMIT, offset: (st.page - 1) * LIMIT }));
     } catch (e) { $('#dzTable').innerHTML = UI.emptyHTML('GAGAL MEMUAT'); UI.showError('Kejadian Bencana', e); return; }
-    st.items = r.items;
+    st.items = r.items.map(flat);
     $('#dzCount').textContent = UI.int(r.total) + ' KEJADIAN';
     $('#dzTable').innerHTML = UI.tableHTML([
       { label: 'Tanggal', get: e => UI.date(e.event_date) + (e.event_end_date && e.event_end_date !== e.event_date ? ' – ' + UI.date(e.event_end_date) : '') },
@@ -47,7 +51,7 @@ Pages['disasters'] = (() => {
       { label: 'Verifikasi', html: true, get: e => e.is_verified ? 'TERVERIFIKASI' : '<span class="v-amber">BELUM</span>' },
       { label: 'Titik', get: e => e.lat !== null && e.lat !== undefined ? 'ADA' : '' },
       { label: 'Aksi', html: true, get: e => '<button type="button" class="small" data-open="' + e.event_id + '" aria-label="Detail kejadian ' + e.event_id + '">Properti…</button>' },
-    ], r.items, { empty: 'BELUM ADA KEJADIAN TERCATAT. GUNAKAN "CATAT KEJADIAN BARU" ATAU IMPOR EXCEL.', caption: 'Daftar kejadian bencana' }) +
+    ], st.items, { empty: 'BELUM ADA KEJADIAN TERCATAT. GUNAKAN "CATAT KEJADIAN BARU" ATAU IMPOR EXCEL.', caption: 'Daftar kejadian bencana' }) +
       UI.pagerHTML(r.total, LIMIT, (st.page - 1) * LIMIT);
     UI.$$('[data-open]', st.root).forEach(b => b.addEventListener('click', () => openDetail(Number(b.dataset.open))));
     UI.$$('#dzTable [data-page]', st.root).forEach(b => b.addEventListener('click', () => { st.page = Number(b.dataset.page); load(); }));
@@ -69,7 +73,7 @@ Pages['disasters'] = (() => {
 
   async function openDetail(id) {
     let e;
-    try { e = await API.get('/api/disasters/' + id); } catch (err) { UI.showError('Detail kejadian', err); return; }
+    try { e = flat(await API.get('/api/disasters/' + id)); } catch (err) { UI.showError('Detail kejadian', err); return; }
     const kv = [['JENIS', e.disaster_type_name], ['TANGGAL', UI.date(e.event_date) + (e.event_end_date ? ' – ' + UI.date(e.event_end_date) : '')],
       ['KECAMATAN', e.region_name], ['DESA', e.village_name], ['TITIK', e.lat !== null && e.lat !== undefined ? UI.num(e.lat, 5) + ', ' + UI.num(e.lon, 5) : null],
       ['SUMBER', (SOURCES[e.info_source] || e.info_source) + (e.source_reference ? ' · ' + e.source_reference : '')],

@@ -94,8 +94,9 @@ import numpy as np
 import rasterio
 from affine import Affine
 from rasterio.enums import Resampling
-from rasterio.warp import reproject
+from rasterio.warp import reproject, transform as warp_transform
 
+from etl import admin_overlay
 from etl import folder_manager as fm
 from etl import module7_modis_download as m7
 from etl import module8_gpm_download as m8
@@ -544,6 +545,35 @@ def _preview_grid(path: Path, max_side: int = MAX_SIDE) -> _PreviewGrid:
         out_w, out_h = _preview_shape(src.width, src.height, max_side)
         transform = src.transform * Affine.scale(src.width / out_w, src.height / out_h)
         return _PreviewGrid(transform, src.crs, out_w, out_h)
+
+
+def grid_corners_wgs84(grid: _PreviewGrid) -> list[list[float]]:
+    """Empat sudut PNG grid `grid` dalam lon/lat WGS84, urut kiri-atas →
+    kanan-atas → kanan-bawah → kiri-bawah.
+
+    Empat sudut, bukan bbox (west/south/east/north), karena dua hal berbeda:
+
+    1. Extent grid ini milik SCENE itu, bukan milik AOI. Scene yang cuma satu
+       frame menutupi AOI lebih sempit daripada scene mosaik beberapa frame,
+       jadi bbox daerah bukan pengganti yang sah untuk salah satu pun.
+    2. Grid preview hidup di CRS raster sumbernya. Kalau itu CRS proyeksi
+       (UTM), persegi di sana bukan persegi di lon/lat dan tepinya miring;
+       kalau sumbernya sudah EPSG:4326 keempat sudut ini memang sejajar sumbu.
+       Empat sudut benar untuk KEDUA kasus tanpa pemanggil perlu tahu yang mana.
+
+    Urutannya sengaja sama dengan `coordinates` image source MapLibre/Mapbox,
+    yang jadi konsumen pertamanya.
+
+    Dibulatkan 7 desimal (~1 cm): presisi float penuh cuma menggelembungkan
+    JSON sidecar tanpa arti -- piksel preview sendiri puluhan meter.
+    """
+    t = grid.transform
+    cols = (0, grid.width, grid.width, 0)
+    rows = (0, 0, grid.height, grid.height)
+    xy = [t * (c, r) for c, r in zip(cols, rows)]
+    lon, lat = warp_transform(grid.crs, "EPSG:4326",
+                              [p[0] for p in xy], [p[1] for p in xy])
+    return [[round(x, 7), round(y, 7)] for x, y in zip(lon, lat)]
 
 
 def _read_downsampled(
@@ -1082,6 +1112,22 @@ def generate_previews(
         processing_level=level,
     )
 
+    # Varian "garis wilayah" tiap PNG (lihat etl/admin_overlay.py). Hanya
+    # mungkin kalau ada grid bersama S1 -- itu satu-satunya sumber transform
+    # affine + CRS di tahap ini; tanpa S1, lapisan aux diperbesar kelipatan
+    # bulat dan tidak ada georeferensi yang dipegang di sini.
+    regions = admin_overlay.load_regions()
+
+    def _adm_variant(path: Path, entry: dict) -> None:
+        """Tulis {stem}_adm.png dan catat namanya di `entry["file_adm"]`."""
+        if not regions or grid is None:
+            return
+        if (entry.get("width"), entry.get("height")) != (grid.width, grid.height):
+            return   # PNG di grid lain: batas wilayah akan meleset dari piksel
+        name = admin_overlay.write_variant(path, grid.transform, grid.crs, regions)
+        if name:
+            entry["file_adm"] = name
+
     gray_entries: list[dict] = []
     color_entries: list[dict] = []
     written: list[Path] = []
@@ -1170,7 +1216,7 @@ def generate_previews(
             if gray_path is not None:
                 _render_grayscale(layer, gray_path, spec)
                 g_lo, g_hi = _gray_range(layer, spec)
-                gray_entries.append({
+                gray_entry = {
                     **common,
                     "file": gray_path.name,
                     "colormap": "gray",
@@ -1180,7 +1226,9 @@ def generate_previews(
                         else f"percentile {PCT_LOW}-{PCT_HIGH}"
                     ),
                     "size_bytes": gray_path.stat().st_size,
-                })
+                }
+                _adm_variant(gray_path, gray_entry)
+                gray_entries.append(gray_entry)
                 written.append(gray_path)
 
             if color_path is not None:
@@ -1210,6 +1258,7 @@ def generate_previews(
                         "(no rain)" if spec.transparent_below is not None
                         else "No class can be displayed"
                     )
+                _adm_variant(color_path, entry)
                 color_entries.append(entry)
                 written.append(color_path)
         except Exception as exc:
@@ -1227,7 +1276,7 @@ def generate_previews(
         rgb_path = composite_dir / fm.dated_filename(date_key, f"{S1_RGB_KEY}.png")
         try:
             if _render_s1_rgb(layers["s1_vv"], layers["s1_vh"], rgb_path) is not None:
-                composite_entries.append({
+                rgb_entry = {
                     "key": S1_RGB_KEY,
                     "source": "sentinel1",
                     "band": "VV+VH",
@@ -1241,7 +1290,9 @@ def generate_previews(
                     "height": layers["s1_vv"].height,
                     "interpretation": S1_RGB_INTERPRETATION,
                     "size_bytes": rgb_path.stat().st_size,
-                })
+                }
+                _adm_variant(rgb_path, rgb_entry)
+                composite_entries.append(rgb_entry)
                 written.append(rgb_path)
         except Exception as exc:
             logger.exception("[M10] gagal render komposit RGB")
@@ -1287,6 +1338,7 @@ def generate_previews(
                         {"value": v, "color": c, "alpha": a, "label": lbl}
                         for v, c, a, lbl in spec.categories
                     ]
+                _adm_variant(out_path, entry)
                 composite_entries.append(entry)
                 written.append(out_path)
             except Exception as exc:
@@ -1310,13 +1362,16 @@ def generate_previews(
             fm.dated_filename(date_key, overlay_filename(spec.key))
             for spec in PREVIEW_SPECS if spec.source != "sentinel1"
         }
+        # Varian garis wilayah ikut dibersihkan: namanya turunan nama PNG-nya,
+        # jadi berkas basinya juga akan tetap terdaftar kalau dibiarkan.
+        known |= {admin_overlay.adm_name(n) for n in known}
         for kind_dir, entries in (
             (gray_dir, gray_entries), (color_dir, color_entries),
             (composite_dir, composite_entries),
         ):
             if kind_dir is None:
                 continue
-            current = {e["file"] for e in entries}
+            current = {e["file"] for e in entries} | {e["file_adm"] for e in entries if e.get("file_adm")}
             for stale in kind_dir.glob("*.png"):
                 if stale.name in known and stale.name not in current:
                     stale.unlink()

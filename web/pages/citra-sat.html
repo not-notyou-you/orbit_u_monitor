@@ -1,0 +1,33 @@
+<!-- pages/citra-sat.html — Citra Satelit › Sentinel-1 / MODIS / GPM (INTERFACE.md §2
+     halaman 3.2–3.4). Satu fragmen untuk ketiganya; satelitnya dari tab router
+     (ctx.tab.source). Isi: penjelasan satelit, daftar tanggal, gambar PNG,
+     informasi yang bisa diambil, dan perbandingan dua tanggal. -->
+<div class="layout">
+  <div class="control-panel">
+    <fieldset>
+      <legend id="csAboutLegend">Tentang satelit</legend>
+      <p id="csAbout" style="margin:0 0 6px"></p>
+      <dl class="kv kv-light" id="csSpec"></dl>
+    </fieldset>
+    <fieldset>
+      <legend>Tanggal</legend>
+      <div class="field"><label for="csArea">Live Area</label><select id="csArea"></select></div>
+      <p id="csWindow" class="mut" style="font-size:11px;margin:0 0 6px"></p>
+      <div class="listbox tall" id="csDates" role="listbox" aria-label="Tanggal scene"></div>
+      <label class="check" style="margin-top:6px"><input type="checkbox" id="csCmpOn"> Bandingkan dengan tanggal lain</label>
+      <div class="field" id="csCmpBox" hidden><label for="csCmp">Tanggal pembanding</label><select id="csCmp"></select></div>
+    </fieldset>
+    <fieldset>
+      <legend>Informasi yang bisa diambil</legend>
+      <ul class="facts" id="csExtract"></ul>
+      <p class="mut" id="csLimits" style="font-size:11px;margin:6px 0 0"></p>
+    </fieldset>
+  </div>
+  <div class="deck">
+    <div id="csTiles"></div>
+    <div id="csSentences"></div>
+    <div id="csMetrics"></div>
+    <div id="csBands"></div>
+    <div id="csExtra"></div>
+  </div>
+</div>

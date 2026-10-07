@@ -1,0 +1,41 @@
+<!-- pages/data-source.html — Data › Sentinel-1 / GPM / MODIS (INTERFACE.md §2
+     halaman 6.2–6.4). Satu fragmen untuk ketiganya; satelitnya dari tab router.
+     Isi: daftar data yang ada, backfill dengan progres + log yang terlihat,
+     dan ubah (proses ulang) / hapus (nonaktifkan, soft delete) per item. -->
+<div class="layout">
+  <div class="control-panel">
+    <form id="dsBackfill" novalidate>
+      <fieldset>
+        <legend>Backfill</legend>
+        <p class="mut" id="dsBfHelp" style="font-size:11px;margin:0 0 6px"></p>
+        <div class="field-row">
+          <div class="field"><label for="dsBfFrom">Dari</label><input type="date" id="dsBfFrom" required></div>
+          <div class="field"><label for="dsBfTo">Sampai</label><input type="date" id="dsBfTo" required></div>
+        </div>
+        <span class="err" id="dsBfErr" aria-live="polite"></span>
+        <div class="btn-row end"><button type="submit" class="default" id="dsBfGo">Jalankan backfill…</button></div>
+      </fieldset>
+    </form>
+    <form id="dsFilter" novalidate>
+      <fieldset>
+        <legend>Saring daftar</legend>
+        <div class="field-row">
+          <div class="field"><label for="dsFrom">Dari</label><input type="date" id="dsFrom"></div>
+          <div class="field"><label for="dsTo">Sampai</label><input type="date" id="dsTo"></div>
+        </div>
+        <div class="field"><label for="dsStatus">Status</label>
+          <select id="dsStatus"><option value="all">Semua</option><option value="valid">Aktif</option><option value="invalid">Nonaktif</option></select></div>
+        <div class="field"><label for="dsQ">Nama produk berisi</label><input type="search" id="dsQ" maxlength="100"></div>
+        <div class="btn-row end"><button type="submit" id="dsApply">Terapkan</button></div>
+      </fieldset>
+    </form>
+  </div>
+  <div class="deck">
+    <div class="screen"><div class="screen-inner"><span class="scr-ch" id="dsRunCh">CH-01 · PROSES BACKFILL</span><span class="scr-rec off" id="dsRunRec"></span>
+      <div id="dsRun"></div></div></div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch" id="dsHistCh">CH-02 · RIWAYAT</span>
+      <div id="dsHist"></div></div></div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-03 · DATA TERSIMPAN</span><span class="scr-rec off" id="dsCount"></span>
+      <div id="dsTable"></div></div></div>
+  </div>
+</div>

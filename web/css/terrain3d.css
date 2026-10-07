@@ -1,0 +1,35 @@
+/* css/terrain3d.css — Relief 3D (Kondisi › Relief 3D).
+   Dimuat hanya saat tab ini dibuka (ROUTES: css: true), seperti catalog.css. */
+
+.t3-wrap { display: flex; flex-direction: column; gap: 0; min-height: 0; }
+
+/* Tinggi eksplisit: kanvas WebGL tidak punya ukuran intrinsik, jadi tanpa ini
+   peta runtuh jadi 0 px. vh dibatasi agar panel kiri tetap terlihat di layar
+   pendek, tapi cukup tinggi supaya relief miring tidak terpotong. */
+.t3-map {
+  width: 100%;
+  height: clamp(320px, 62vh, 760px);
+  background: #05070a;
+}
+
+/* Kontrol MapLibre disikukan: bawaannya membulat, sedangkan tema ini bersudut
+   siku di mana-mana (dijaga tests/test_web_ui.py). */
+.t3-map .maplibregl-ctrl-group,
+.t3-map .maplibregl-ctrl-group button { border-radius: 0; }
+.t3-map .maplibregl-ctrl-attrib,
+.t3-map .maplibregl-ctrl-scale { font-size: 10px; }
+
+.t3-caption {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: .85;
+}
+
+/* Legenda lapisan di panel kiri: pakai gaya .legend yang sama dengan tile 2D
+   (live-tiles.js menghasilkan markup identik), cuma diberi jarak atas. */
+.legend-box:not(:empty) { margin-top: 8px; }
+
+/* Slider di panel kontrol: lebar penuh kolom, bukan lebar bawaan peramban. */
+.control-panel input[type="range"] { width: 100%; }

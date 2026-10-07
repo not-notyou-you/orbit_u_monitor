@@ -1,0 +1,29 @@
+<!-- pages/process.html — Proses berjalan (#data/proses).
+     Progres pipeline dulu hanya ada per dataset yang terpilih di Katalog, dan
+     tabel per-scene-nya terkubur di tab bernama "Log". Halaman ini menjawab
+     satu pertanyaan saja: apa yang sedang diunduh dan diproses sekarang, di
+     seluruh dataset. Hanya memantau dan mengendalikan job yang sudah jalan —
+     dataset baru tetap dibuat di "Buat dataset baru". -->
+<div class="layout">
+  <div class="control-panel">
+    <fieldset>
+      <legend>Tampilan</legend>
+      <label class="check"><input type="checkbox" id="pcAll"> Tampilkan juga yang sudah selesai</label>
+      <span class="hint">Tanpa ini, hanya dataset yang masih bergerak (antre, mengunduh, memproses, dijeda, membersihkan, menghapus) yang muncul.</span>
+      <div class="btn-row end"><button type="button" id="pcRefresh">Muat ulang</button></div>
+    </fieldset>
+    <fieldset>
+      <legend>Jadwal otomatis</legend>
+      <p style="margin:0">Siklus Live berjalan 01:00, 07:00, 13:00, dan 19:00 WIB; hidromet harian 02:00 WIB. Satu scene Sentinel-1 butuh sekitar 15–60 menit, jadi halaman kosong di luar jam itu adalah keadaan normal.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Pembaruan</legend>
+      <p style="margin:0" id="pcTick">Angka diperbarui sendiri tiap 10 detik selama masih ada proses yang bergerak.</p>
+    </fieldset>
+  </div>
+  <div class="deck">
+    <div class="readouts" id="pcReadouts"></div>
+    <div id="pcList" aria-live="polite"></div>
+    <div id="pcRail"></div>
+  </div>
+</div>

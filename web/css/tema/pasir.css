@@ -1,0 +1,101 @@
+/* web/css/tema/pasir.css — tema "Mika Pasir" (M57), dari DOCS/design tambahan/konsep41.
+   Krem dan emas bergaya Windows 11: permukaan kaca buram (mica), garis tipis
+   pasir, sudut 10px, bayangan lembut, tombol title bar — ☐ ✕ tanpa bingkai,
+   dan taskbar mengambang di tengah bawah dengan logo empat kotak.
+   Struktur komponen ada di umum.css; berkas ini hanya nilai dan hiasan. */
+
+html[data-theme="pasir"] {
+  /* palet konsep41 */
+  --p-bg: #f6eedb; --p-card: #fdf8ec; --p-line: #d9c49a; --p-tx: #4a3222;
+  --p-mut: #8a6a4e; --p-acc: #c9a24a; --p-glow: #f1dfae;
+
+  --desk: var(--p-bg); --face: var(--p-card); --hilite: #ffffff; --light: #f3e7cc;
+  --shadow: var(--p-line); --dark: var(--p-tx); --select: var(--p-tx);
+  --text: var(--p-tx); --text-mut: var(--p-mut); --field: #fffdf7;
+  --crt: #fffbf2; --crt-grid: #eee0c2; --phos: #4a3222; --phos-dim: #8a6a4e;
+  --amber: #a5590b; --alert: #b3261e; --cyan: #2a6c8c;
+  --font-ui: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-data: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --taskbar-h: 52px;
+
+  --t-bg: radial-gradient(ellipse at 20% 0, var(--p-glow), transparent 50%),
+          radial-gradient(ellipse at 100% 100%, #e6d3b8, transparent 55%), var(--p-bg);
+  --t-card: rgba(253, 248, 236, .85); --t-card-solid: var(--p-card); --t-sub: #f6edd9; --t-field: #fffdf7;
+  --t-fieldset-bg: rgba(255, 255, 255, .35); --t-thumb: #2b2016;
+  --t-line: var(--p-line); --t-line-soft: #e7d8b6;
+  --t-tx: var(--p-tx); --t-mut: var(--p-mut); --t-link: #7a5a1c;
+  --t-acc: var(--p-acc); --t-acc-tx: #2b2016; --t-acc-soft: #f1e2bb;
+  --t-sel: rgba(201, 162, 74, .22); --t-sel-tx: var(--p-tx); --t-hover: rgba(201, 162, 74, .12);
+  --t-focus: var(--p-tx); --t-ok: #3c8d4f; --t-invalid: #fdecea;
+  --t-bw: 2px; --t-bw-ctl: 1px; --t-r: 10px; --t-r2: 6px; --t-r-check: 4px; --t-r-radio: 50%;
+  --t-shadow: 0 8px 24px rgba(74, 50, 34, .08);
+  --t-shadow-btn: 0 1px 2px rgba(74, 50, 34, .08); --t-shadow-hover: 0 6px 16px rgba(74, 50, 34, .12);
+  --t-shadow-press: none; --t-shadow-field: inset 0 -1px 0 var(--p-mut);
+  --t-press-move: none; --t-hover-move: translateY(-1px);
+  --t-btn-bg: #fffdf7; --t-btn-tx: var(--p-tx); --t-btn-hover: #f6edd9; --t-btn-tf: none;
+  --t-def-bg: var(--p-tx); --t-def-tx: var(--p-glow); --t-def-hover: #6b4a30; --t-def-shadow: none;
+  --t-title-bg: transparent; --t-title-tx: var(--p-tx); --t-title-line: transparent;
+  --t-title-h: 34px; --t-title-w: 400; --t-head-tf: none; --t-head-ls: 0;
+  --t-legend-bg: transparent; --t-legend-tx: var(--p-mut); --t-legend-bd: 0;
+  --t-blur: blur(30px);
+  --t-taskbar-bg: rgba(253, 248, 236, .9); --t-taskbar-shadow: 0 8px 24px rgba(74, 50, 34, .12);
+  --t-backdrop: rgba(74, 50, 34, .18);
+  --t-tile-filter: sepia(.45) saturate(.85) brightness(1.03) contrast(.95);
+}
+html[data-theme="pasir"] body { background-attachment: fixed; }
+
+/* Title bar Windows 11: ikon kecil, judul biasa, tombol — ☐ ✕ lebar tanpa
+   bingkai; ✕ memerah saat disorot. */
+html[data-theme="pasir"] .titlebar { padding: 0 0 0 14px; border-bottom: 0; }
+html[data-theme="pasir"] .ttl-btn, html[data-theme="pasir"] .ttl-btn:active {
+  width: 40px; height: 32px; min-height: 0; padding: 0; color: var(--p-mut); border-radius: 0;
+}
+html[data-theme="pasir"] .ttl-btn svg { width: 10px; height: 9px; }
+html[data-theme="pasir"] .ttl-btn:hover:not(:disabled) { background: var(--t-hover); }
+html[data-theme="pasir"] .ttl-btn:last-child { border-top-right-radius: 8px; }
+html[data-theme="pasir"] .ttl-btn:last-child:hover:not(:disabled) { background: #c42b1c; color: #fff; }
+html[data-theme="pasir"] .titlebar h1, html[data-theme="pasir"] .titlebar h2 { font-weight: 600; }
+html[data-theme="pasir"] .ttl-icon { color: var(--p-acc); }
+html[data-theme="pasir"] .menubar { border-bottom-color: var(--t-line-soft); padding-top: 0; }
+html[data-theme="pasir"] .menubar [aria-current="page"] { box-shadow: inset 0 -3px 0 var(--p-acc); }
+
+html[data-theme="pasir"] .page-lede { border-left-color: var(--p-acc); background: rgba(241, 223, 174, .45); }
+html[data-theme="pasir"] legend { font-weight: 600; }
+html[data-theme="pasir"] button, html[data-theme="pasir"] .btn { font-weight: 500; }
+html[data-theme="pasir"] .tabs [role=tab][aria-selected="true"] { box-shadow: inset 0 3px 0 var(--p-acc); }
+html[data-theme="pasir"] .screen-inner { font-weight: 500; }
+html[data-theme="pasir"] .readout .r-val { font-weight: 600; }
+html[data-theme="pasir"] .hero .hero-logo { border: 0; border-radius: 10px; }
+
+/* Taskbar mengambang seperti ".foot" konsep: kapsul di tengah bawah, logo
+   empat kotak menggantikan ikon satelit di tombol Mulai. */
+html[data-theme="pasir"] .taskbar {
+  left: 12px; right: 12px; bottom: 8px; max-width: 1200px; margin: 0 auto; height: calc(var(--taskbar-h) - 12px);
+  border: 2px solid var(--p-line); border-radius: 12px; padding: 4px 8px;
+}
+html[data-theme="pasir"] .taskbar .start, html[data-theme="pasir"] .taskbar .start:active:not(:disabled),
+html[data-theme="pasir"] .taskbar .start[aria-expanded="true"] {
+  background: transparent; color: var(--p-tx); border-color: transparent; gap: 8px;
+}
+html[data-theme="pasir"] .taskbar .start:hover, html[data-theme="pasir"] .taskbar .start[aria-expanded="true"] { background: var(--t-hover); }
+html[data-theme="pasir"] .taskbar .start svg { display: none; }
+html[data-theme="pasir"] .taskbar .start::before {
+  content: ""; width: 20px; height: 20px; flex: none; border-radius: 2px;
+  background: linear-gradient(var(--p-tx), var(--p-tx)) 0 0 / 9px 9px no-repeat,
+              linear-gradient(var(--p-acc), var(--p-acc)) 11px 0 / 9px 9px no-repeat,
+              linear-gradient(var(--p-acc), var(--p-acc)) 0 11px / 9px 9px no-repeat,
+              linear-gradient(var(--p-tx), var(--p-tx)) 11px 11px / 9px 9px no-repeat;
+}
+html[data-theme="pasir"] .tb-check, html[data-theme="pasir"] .tray { background: transparent; border-color: transparent; height: 28px; }
+html[data-theme="pasir"] .task-buttons button { background: transparent; border-color: transparent; min-height: 28px; }
+html[data-theme="pasir"] .task-buttons button[aria-pressed="true"] { box-shadow: inset 0 -3px 0 var(--p-acc); }
+html[data-theme="pasir"] .start-menu {
+  left: max(12px, calc(50% - 600px)); bottom: var(--taskbar-h);
+  -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px); background: rgba(253, 248, 236, .94);
+}
+html[data-theme="pasir"] .start-menu .side { display: none; }
+html[data-theme="pasir"] .desk-icon svg { box-shadow: var(--t-shadow); }
+
+@media (max-width: 799px) {
+  html[data-theme="pasir"] .taskbar { left: 6px; right: 6px; bottom: 6px; }
+}

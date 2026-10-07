@@ -91,6 +91,13 @@ GRANT SELECT ON v_public_live_latest TO monitor_public;
 GRANT SELECT (area_id, name, location_label, status, enabled, last_checked_at, deleted_at)
     ON live_areas TO monitor_public;                                   -- kolom publik
 GRANT INSERT ON user_activity_logs TO monitor_public;                  -- I (login gagal, dsb.)
+-- Susunan halaman v2 (M56): Beranda, Citra, dan Kejadian terbuka untuk
+-- pengunjung. Batas waktu (30 hari citra, 365 hari kejadian) ada di VIEW.
+GRANT SELECT ON v_public_kejadian, v_citra_scenes, v_citra_metrics, v_citra_obs_aoi TO monitor_public;
+-- Master yang dibutuhkan halaman publik: peta kecamatan AOI, nama jenis
+-- bencana, dan daftar satelit/band untuk penjelasan halaman Citra. Semuanya
+-- data rujukan terbuka (COD-AB BPS, daftar jenis, spesifikasi sensor).
+GRANT SELECT ON administrative_regions, disaster_types, satellite_sources, spectral_bands TO monitor_public;
 
 -- USER (dan semua role login di atasnya) --------------------------------------
 GRANT SELECT ON v_live_scenes_recent, v_hujan_harian_kecamatan,
@@ -103,12 +110,15 @@ GRANT SELECT ON satellite_sources, spectral_bands, administrative_regions,
 GRANT SELECT ON alert_events, region_observations TO monitor_user;
 GRANT SELECT ON live_areas, live_scenes, live_events, live_scene_metrics TO monitor_user;
 GRANT SELECT, INSERT, UPDATE ON api_tokens TO monitor_user;           -- milik sendiri (RLS)
+-- Kejadian: semua role login melihat seluruh riwayat (M56); tulis tetap ANALYST.
+GRANT SELECT ON disaster_events TO monitor_user;
 
 -- ANALYST ---------------------------------------------------------------------
 GRANT UPDATE (acknowledged_by, acknowledged_at, ack_note) ON alert_events TO monitor_analyst;
 GRANT SELECT, INSERT, UPDATE ON disaster_events TO monitor_analyst;
 GRANT SELECT ON v_kejadian_dan_hujan, v_evaluasi_alert TO monitor_analyst;
 GRANT SELECT ON generated_reports TO monitor_analyst;                  -- + RLS
+GRANT SELECT ON v_log_kejadian TO monitor_analyst;                     -- log halaman Kejadian (M56)
 
 -- DATA_ENGINEER ---------------------------------------------------------------
 GRANT SELECT, INSERT, UPDATE ON datasets, dataset_source_config, dataset_jobs,
@@ -119,11 +129,14 @@ GRANT SELECT ON data_products, data_lineage, quality_metrics, quality_alerts,
                 cleanup_operations TO monitor_data_engineer;
 GRANT SELECT ON v_ringkasan_kualitas, v_kelengkapan_data, v_unduhan_per_role TO monitor_data_engineer;
 GRANT SELECT ON generated_reports TO monitor_data_engineer;            -- + RLS
+GRANT SELECT ON v_log_data TO monitor_data_engineer;                   -- log halaman Data (M56)
+-- Halaman Data per satelit (M56): ubah/nonaktifkan scene (soft delete,
+-- M23/M24) pindah dari ADMIN ke DATA_ENGINEER. Tetap tanpa D.
+GRANT UPDATE ON satellite_scenes, nasa_scenes TO monitor_data_engineer;
 
 -- ADMIN (mewarisi ANALYST + DATA_ENGINEER) ------------------------------------
 GRANT SELECT, INSERT, UPDATE, DELETE ON alert_events TO monitor_admin;
 GRANT DELETE ON datasets, dataset_source_config, dataset_jobs, scene_job_state TO monitor_admin;
-GRANT UPDATE ON satellite_scenes, nasa_scenes TO monitor_admin;         -- soft delete
 GRANT SELECT, INSERT, UPDATE ON generated_reports TO monitor_admin;
 GRANT SELECT, INSERT, UPDATE ON users, roles TO monitor_admin;          -- tanpa D
 GRANT SELECT, INSERT, UPDATE ON alert_rules, quality_thresholds, disaster_types,
@@ -285,16 +298,44 @@ BEGIN
 END $$;
 COMMENT ON FUNCTION auth_change_own_password(text) IS 'Ubah kata sandi sendiri: mengganti password_hash baris users milik app.user_id sesi (hash bcrypt dihitung aplikasi).';
 
+-- Registrasi mandiri (M56): pengunjung membuat akun USER sendiri. Role
+-- dikunci di dalam fungsi, bukan argumen, jadi monitor_public tidak pernah
+-- bisa membuat ANALYST/DATA_ENGINEER/ADMIN. Username/email ganda ->
+-- unique_violation (23505), dipetakan API ke USERNAME_TAKEN/EMAIL_TAKEN.
+CREATE FUNCTION auth_register_user(p_username text, p_email text, p_hash text) RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE uid int;
+BEGIN
+    IF p_hash !~ '^\$2[aby]\$\d\d\$.{53}$' THEN
+        RAISE EXCEPTION 'password hash must be bcrypt' USING ERRCODE = 'check_violation';
+    END IF;
+    IF EXISTS (SELECT 1 FROM users WHERE username = lower(p_username)) THEN
+        RAISE EXCEPTION 'username taken' USING ERRCODE = 'unique_violation', CONSTRAINT = 'users_username_key';
+    END IF;
+    IF EXISTS (SELECT 1 FROM users WHERE lower(email) = lower(p_email)) THEN
+        RAISE EXCEPTION 'email taken' USING ERRCODE = 'unique_violation', CONSTRAINT = 'uq_users_email';
+    END IF;
+    INSERT INTO users (role_id, username, email, password_hash, full_name)
+    SELECT role_id, lower(p_username), lower(p_email), p_hash, lower(p_username)
+    FROM roles WHERE role_code = 'USER'
+    RETURNING user_id INTO uid;
+    RETURN uid;
+END $$;
+COMMENT ON FUNCTION auth_register_user(text, text, text) IS 'Registrasi mandiri: membuat akun role USER (dikunci di fungsi) dengan full_name = username. Satu-satunya jalan monitor_public menulis users (M56).';
+
 ALTER FUNCTION auth_get_user(text)              OWNER TO monitor_admin;
 ALTER FUNCTION auth_record_login(int, boolean)  OWNER TO monitor_admin;
 ALTER FUNCTION auth_session_user(int)           OWNER TO monitor_admin;
 ALTER FUNCTION auth_get_token(text)             OWNER TO monitor_admin;
 ALTER FUNCTION auth_change_own_password(text)   OWNER TO monitor_admin;
+ALTER FUNCTION auth_register_user(text, text, text) OWNER TO monitor_admin;
 REVOKE ALL ON FUNCTION auth_get_user(text), auth_record_login(int, boolean),
                        auth_session_user(int), auth_get_token(text),
-                       auth_change_own_password(text) FROM PUBLIC;
+                       auth_change_own_password(text),
+                       auth_register_user(text, text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION auth_get_user(text), auth_record_login(int, boolean),
-                          auth_session_user(int), auth_get_token(text) TO monitor_public;
+                          auth_session_user(int), auth_get_token(text),
+                          auth_register_user(text, text, text) TO monitor_public;
 GRANT EXECUTE ON FUNCTION auth_change_own_password(text) TO monitor_user;
 
 -- =============================================================================

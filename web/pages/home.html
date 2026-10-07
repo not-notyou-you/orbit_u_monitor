@@ -1,0 +1,89 @@
+<!-- pages/home.html — Beranda (INTERFACE.md §2, halaman 1). Untuk SEMUA peran,
+     termasuk pengunjung: 1.1 sambutan, 1.2 penjelasan aplikasi, 1.3 navigasi
+     halaman yang tersedia untuk peran itu, 1.4 peta AOI + daftar kecamatan,
+     ditambah pilihan tema tampilan di antara 1.3 dan 1.4 (M57, js/theme.js).
+     Pengguna yang sudah masuk juga melihat alert hujan yang masih aktif. -->
+
+<!-- 1.1 sambutan -->
+<div class="hero">
+  <img class="hero-logo" src="assets/img/logo.svg" alt="Logo Orbit-U: The Monitor" width="64" height="64">
+  <div class="hero-text">
+    <p class="hero-name">Orbit-U: The Monitor</p>
+    <p class="hero-tag">Pantauan Hidrometeorologi Lebak Selatan</p>
+    <p class="hero-lede" id="hoGreeting">
+      Selamat datang. Orbit-U membaca tiga sumber satelit — <b>Sentinel-1</b>, <b>MODIS</b>, dan
+      <b>GPM IMERG</b> — lalu merangkumnya menjadi gambar, angka, dan kalimat kondisi untuk wilayah
+      Lebak Selatan. Dibuat untuk relawan dan analis Gugus Mitigasi Lebak Selatan (GMLS).
+    </p>
+    <div class="btn-row" id="hoHeroBtns"></div>
+  </div>
+</div>
+
+<div class="hero-strip screen" id="hoStrip">
+  <div class="screen-inner" role="status" aria-label="Ringkasan kondisi terkini">
+    <p class="hs-line"><span class="lbl">STATUS AREA:</span> <span class="v-dim">MEMUAT…</span></p>
+  </div>
+</div>
+
+<div id="hoAlerts"></div>
+
+<!-- 1.2 penjelasan -->
+<div class="cols-2" style="margin-top:8px">
+  <fieldset>
+    <legend>Apa ini</legend>
+    <p>Satu tempat untuk menjawab <b>“bagaimana kondisinya sekarang, dan bagaimana sebelumnya?”</b>
+      tanpa harus mengolah citra satelit sendiri. Pipeline mengunduh scene terbaru, menghitung indeks
+      (NDVI, NDWI, perubahan air, curah hujan), lalu menyajikannya sebagai gambar beserta kalimat penjelasannya.</p>
+    <p>Pengunjung dapat melihat citra satelit 30 hari terakhir dan kejadian bencana setahun terakhir.
+      Dengan akun Relawan (gratis, daftar sendiri) Anda melihat citra setahun ke belakang, relief 3D AOI,
+      seluruh riwayat kejadian, dan angka hujan per kecamatan.</p>
+    <p style="margin:0">Data dasar: ESA Copernicus (Sentinel-1), NASA MODIS, NASA GPM IMERG.</p>
+  </fieldset>
+  <fieldset>
+    <legend>Yang perlu diketahui lebih dulu</legend>
+    <ul class="facts">
+      <li><b>Ini bukan peringatan dini resmi.</b> Untuk keputusan evakuasi, ikuti BMKG dan BPBD.</li>
+      <li><b>Satelit tidak melihat puncak banjir bandang.</b> Sentinel-1 melewati wilayah ini ±6–12 hari sekali.</li>
+      <li><b>Angka hujan adalah perkiraan satelit</b> (petak ±10 km), belum dikalibrasi penakar hujan lapangan.</li>
+      <li><b>MODIS terhalang awan.</b> Tile optik sering kosong saat musim hujan; radar Sentinel-1 tetap menembus awan.</li>
+      <li><b>Tile kosong = data belum ada</b>, bukan berarti kondisi aman.</li>
+    </ul>
+  </fieldset>
+</div>
+
+<!-- 1.3 navigasi per peran -->
+<fieldset>
+  <legend id="hoNavLegend">Halaman yang tersedia</legend>
+  <p class="mut" id="hoNavIntro" style="font-size:11px;margin:0 0 6px">Memuat daftar halaman…</p>
+  <div class="navcards" id="hoNav"></div>
+</fieldset>
+
+<!-- tema tampilan (M57): empat pilihan, Orbital 95 bawaan -->
+<fieldset id="hoTheme">
+  <legend id="hoThemeLegend">Tema tampilan</legend>
+  <div class="tema-pick" id="hoThemes" role="radiogroup" aria-labelledby="hoThemeLegend"></div>
+  <p class="tema-pick-note">Hanya mengubah tampilan; isi, data, dan menu tetap sama.
+    Pilihan disimpan di peramban ini dan berlaku di semua halaman.</p>
+</fieldset>
+
+<!-- 1.4 AOI: peta + daftar kecamatan -->
+<div class="layout wide-left">
+  <div class="deck">
+    <div class="screen"><div class="screen-inner flush"><span class="scr-ch">CH-01 · AOI GMLS</span><span class="scr-rec off" id="hoMapRec"></span>
+      <div class="map" id="hoMap" role="img" aria-label="Peta kecamatan AOI; daftar nama ada di sebelahnya"></div></div></div>
+  </div>
+  <div class="control-panel">
+    <fieldset>
+      <legend>Kecamatan dalam AOI</legend>
+      <p class="mut" style="font-size:11px;margin:0 0 6px">Klik nama untuk menyorotnya di peta.</p>
+      <div class="listbox" id="hoRegions" role="listbox" aria-label="Kecamatan dalam AOI"></div>
+      <p class="mut" id="hoRegionsSum" style="font-size:11px;margin:6px 0 0"></p>
+    </fieldset>
+  </div>
+</div>
+
+<div class="banner sunken" role="note">
+  <span data-icon="warn32"></span>
+  <div class="b-body"><b>Ini bukan peringatan dini resmi.</b> Ikuti informasi BMKG dan BPBD.<br>
+    Kontak: Gugus Mitigasi Lebak Selatan (GMLS), sekretariat Panggarangan, Kabupaten Lebak.</div>
+</div>

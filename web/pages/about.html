@@ -1,0 +1,45 @@
+<!-- pages/about.html — Sistem › Tentang (INTERFACE.md §2 halaman 8.1). Semua peran. -->
+<div class="cols-2">
+  <fieldset>
+    <legend>Orbit-U: The Monitor</legend>
+    <p>Aplikasi pantauan hidrometeorologi untuk wilayah Lebak Selatan, Kabupaten Lebak, Banten. Tiga sumber
+      satelit — Sentinel-1 (radar), MODIS (optik), dan GPM IMERG (curah hujan) — diunduh dan diolah otomatis,
+      lalu disajikan sebagai gambar, angka per kecamatan, kalimat kondisi, alert hujan, dan laporan PDF.</p>
+    <p>Dibuat untuk relawan dan analis <b>Gugus Mitigasi Lebak Selatan (GMLS)</b>.</p>
+    <dl class="kv kv-light" id="abInfo"></dl>
+  </fieldset>
+  <fieldset>
+    <legend>Batasan</legend>
+    <ul class="facts">
+      <li><b>Bukan peringatan dini resmi.</b> Untuk keputusan evakuasi, ikuti BMKG dan BPBD.</li>
+      <li>Sentinel-1 melintas ±6–12 hari sekali; banjir yang naik-surut dalam beberapa jam bisa terlewat.</li>
+      <li>Angka hujan adalah perkiraan satelit (petak ±10 km), belum dikalibrasi penakar hujan lapangan.</li>
+      <li>MODIS tidak menembus awan. Tile kosong berarti data belum ada, bukan berarti aman.</li>
+      <li>Relief 3D berasal dari model elevasi (DEM), bukan dari radar.</li>
+    </ul>
+  </fieldset>
+</div>
+<fieldset>
+  <legend>Akses menurut peran</legend>
+  <div class="table-wrap">
+    <table class="roles">
+      <thead><tr><th scope="col">Peran</th><th scope="col">Cara mendapat akun</th><th scope="col">Halaman</th></tr></thead>
+      <tbody>
+        <tr><td>Pengunjung</td><td>Tanpa akun</td><td>Beranda, Citra Satelit (30 hari terakhir), Kejadian (1 tahun terakhir), Tentang.</td></tr>
+        <tr><td>Relawan (USER)</td><td>Daftar sendiri di halaman Daftar</td><td>Tambahan: 3D AOI, Citra 1 tahun terakhir, seluruh riwayat kejadian, hujan per kecamatan, akun sendiri.</td></tr>
+        <tr><td>Analis</td><td>Dibuat Administrator</td><td>Tambahan: Diagram, Citra semua tanggal, kelola kejadian, laporan Keadaan AOI, log halaman Kejadian.</td></tr>
+        <tr><td>Data Engineer</td><td>Dibuat Administrator</td><td>Tambahan: Data (per satelit, backfill, unduh, EDA), laporan Kesehatan Data, log halaman Data.</td></tr>
+        <tr><td>Administrator</td><td>Dibuat Administrator</td><td>Semua halaman, termasuk manajemen akun, pengaturan aplikasi, dan seluruh log (masuk/registrasi, unduhan, audit).</td></tr>
+      </tbody>
+    </table>
+  </div>
+</fieldset>
+<fieldset>
+  <legend>Sumber data</legend>
+  <ul class="facts">
+    <li>Sentinel-1 GRD IW — ESA Copernicus Data Space Ecosystem.</li>
+    <li>MODIS MCDWD, MOD09A1, MOD09GA — NASA LANCE / LAADS DAAC.</li>
+    <li>GPM IMERG Final / Late / Early — NASA GES DISC.</li>
+    <li>Batas kecamatan COD-AB (BPS/OCHA); peta dasar Esri World Street Map; DEM AWS Terrain Tiles (SRTM).</li>
+  </ul>
+</fieldset>

@@ -22,6 +22,13 @@ DEFAULTS: dict[str, Any] = {
     "live.default_area_name": "Lebak Selatan",
     "report.timezone": "Asia/Jakarta",
     "water.vh_threshold_db": -20,
+    # Porsi AOI yang WAJIB tertutup Sentinel-1 agar sebuah tanggal dipakai
+    # Daerah Live. Beda tujuan dengan MIN_S1_AOI_COVERAGE (module1_download),
+    # yang cuma penjaga pemborosan unduhan arsip: yang ini penjaga KELENGKAPAN
+    # -- scene yang lolos harus menggambarkan seluruh AOI, bukan sepotong.
+    # Orbit yang cuma menyerempet AOI menutup ~30%, yang melintas penuh ~99%,
+    # jadi nilai mana pun di antaranya memisahkan keduanya.
+    "live.min_aoi_coverage": 0.90,
     "dataset.max_days": 366,
     "hydromet.min_valid_fraction": 0.1,
     "hydromet.waiting_max_days": 3,

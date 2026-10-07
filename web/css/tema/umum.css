@@ -1,0 +1,351 @@
+/* web/css/tema/umum.css — struktur bersama tema non-bawaan (M57): Kertas Mint,
+   Mika Pasir, Piksel Marun. Setiap aturan tercakup html.tema-alt (dipasang
+   js/theme.js), jadi Orbital 95 (main.css, DESIGN.md) tidak tersentuh.
+
+   Komponen di sini sama dengan main.css + pages.css — jendela, title bar, menu
+   bar, tombol, isian, tab, layar data, taskbar, menu Mulai, dialog, peta —
+   tetapi bentuknya diambil dari variabel --t-*. Nilai variabelnya, plus hiasan
+   yang khas satu tema (bulatan title bar, kaca mika, siluet gunung), ada di
+   mint.css / pasir.css / piksel.css.
+
+   Konsep di DOCS/design tambahan/ adalah satu dasbor contoh; yang dipakai dari
+   sana hanya bahasa visualnya. Rotasi kartu dan tata letak 12 kolom konsep
+   tidak dipakai di jendela berisi data (peta, tabel, formulir) supaya tetap
+   mudah dibaca dan diklik. */
+
+/* ------------------------------------------------------------------ dasar */
+html.tema-alt body {
+  background: var(--t-bg); color: var(--t-tx); font-family: var(--font-ui);
+  font-size: 13px; line-height: 1.45; -webkit-font-smoothing: auto;
+  padding-bottom: calc(var(--taskbar-h) + 24px);
+}
+html.tema-alt h1, html.tema-alt h2, html.tema-alt h3, html.tema-alt h4 { font-size: 13px; }
+html.tema-alt a { color: var(--t-link); }
+html.tema-alt ::selection { background: var(--t-acc); color: var(--t-acc-tx); }
+html.tema-alt .skip-link { background: var(--t-card-solid); border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2); }
+
+/* Kelas bevel dipakai langsung di markup (raised/sunken/pressed). */
+html.tema-alt .raised {
+  background: var(--t-card-solid); border: var(--t-bw-ctl) solid var(--t-line);
+  border-radius: var(--t-r2); box-shadow: none;
+}
+html.tema-alt .sunken, html.tema-alt .pressed { box-shadow: none; }
+html.tema-alt .groove { border: var(--t-bw-ctl) solid var(--t-line-soft); border-radius: var(--t-r2); }
+
+/* ------------------------------------------------------------------ jendela */
+html.tema-alt .window {
+  position: relative; background: var(--t-card); border: var(--t-bw) solid var(--t-line);
+  border-radius: var(--t-r); box-shadow: var(--t-shadow); padding: 0; margin-bottom: 24px;
+  -webkit-backdrop-filter: var(--t-blur); backdrop-filter: var(--t-blur);
+}
+html.tema-alt .titlebar {
+  min-height: var(--t-title-h); padding: 4px 8px 4px 12px; gap: 8px;
+  background: var(--t-title-bg); color: var(--t-title-tx);
+  border-bottom: var(--t-bw) solid var(--t-title-line);
+  border-radius: calc(var(--t-r) - var(--t-bw)) calc(var(--t-r) - var(--t-bw)) 0 0;
+  font-weight: var(--t-title-w); font-size: 13px;
+  text-transform: var(--t-head-tf); letter-spacing: var(--t-head-ls);
+}
+html.tema-alt .titlebar h1, html.tema-alt .titlebar h2 { font-size: 13px; font-weight: inherit; }
+html.tema-alt .window.inactive .titlebar { background: var(--t-sub); color: var(--t-mut); }
+html.tema-alt .ttl-btn, html.tema-alt .ttl-btn:active {
+  background: transparent; box-shadow: none; color: inherit; border: 0; border-radius: var(--t-r2);
+}
+/* Ikon SVG title bar ditulis dengan fill/stroke hitam; ikut warna teks tema. */
+html.tema-alt .ttl-btn svg [fill="#000"] { fill: currentColor; }
+html.tema-alt .ttl-btn svg [stroke="#000"] { stroke: currentColor; }
+
+html.tema-alt .menubar {
+  gap: 2px; padding: 6px 8px; border-bottom: 1px solid var(--t-line-soft);
+}
+html.tema-alt .menubar button, html.tema-alt .menubar a {
+  padding: 4px 10px; border-radius: var(--t-r2); color: var(--t-tx);
+  text-transform: var(--t-head-tf); letter-spacing: var(--t-head-ls);
+}
+html.tema-alt .menubar button:hover, html.tema-alt .menubar a:hover { background: var(--t-hover); color: var(--t-tx); }
+html.tema-alt .menubar [aria-current="page"] { background: var(--t-sel); color: var(--t-sel-tx); font-weight: 700; }
+html.tema-alt .window-body { padding: 14px; }
+html.tema-alt .page-lede {
+  margin-bottom: 12px; padding: 8px 12px; color: var(--t-mut); background: var(--t-sub);
+  border-left: 4px solid var(--t-acc); border-radius: var(--t-r2);
+}
+html.tema-alt .statusbar {
+  margin: 0; padding: 6px 10px; gap: 8px; border-top: 1px solid var(--t-line-soft); color: var(--t-mut);
+  border-radius: 0 0 calc(var(--t-r) - var(--t-bw)) calc(var(--t-r) - var(--t-bw));
+}
+html.tema-alt .statusbar > span { box-shadow: none; padding: 0 8px 0 0; border-right: 1px solid var(--t-line-soft); }
+html.tema-alt .statusbar > span:last-child { border-right: 0; }
+
+/* ------------------------------------------------------------------ tombol */
+html.tema-alt button, html.tema-alt .btn {
+  font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--t-btn-tx);
+  background: var(--t-btn-bg); border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
+  box-shadow: var(--t-shadow-btn); padding: 5px 14px; min-height: 30px; min-width: 0;
+  text-transform: var(--t-btn-tf); transition: transform .06s, box-shadow .06s, background .12s;
+}
+html.tema-alt button:hover:not(:disabled), html.tema-alt .btn:hover { background: var(--t-btn-hover); }
+html.tema-alt button:active:not(:disabled), html.tema-alt .btn:active,
+html.tema-alt button[aria-pressed="true"], html.tema-alt .btn.pressed {
+  padding: 5px 14px; box-shadow: var(--t-shadow-press); transform: var(--t-press-move);
+}
+html.tema-alt button.default, html.tema-alt .btn.default {
+  outline: 0; background: var(--t-def-bg); color: var(--t-def-tx); box-shadow: var(--t-def-shadow);
+}
+html.tema-alt button.default:hover:not(:disabled), html.tema-alt .btn.default:hover { background: var(--t-def-hover); }
+html.tema-alt button.default:focus-visible { box-shadow: var(--t-def-shadow); }
+html.tema-alt button:focus-visible, html.tema-alt .btn:focus-visible, html.tema-alt a:focus-visible,
+html.tema-alt .menubar button:focus-visible, html.tema-alt .navcard:focus-visible {
+  outline: 2px solid var(--t-focus); outline-offset: 2px;
+}
+html.tema-alt button:disabled, html.tema-alt .btn[aria-disabled="true"] { opacity: .5; text-shadow: none; color: var(--t-btn-tx); }
+html.tema-alt button.link {
+  background: none; border: 0; box-shadow: none; padding: 0; min-height: 0; color: var(--t-link); transform: none;
+}
+html.tema-alt button.small, html.tema-alt button.small:active:not(:disabled) { padding: 2px 10px; min-height: 24px; }
+html.tema-alt button[aria-busy="true"]::before { border-radius: 50%; background: currentColor; }
+
+/* ------------------------------------------------------------------ isian */
+html.tema-alt input[type=text], html.tema-alt input[type=password], html.tema-alt input[type=number],
+html.tema-alt input[type=date], html.tema-alt input[type=email], html.tema-alt input[type=search],
+html.tema-alt input[type=file], html.tema-alt select, html.tema-alt textarea {
+  font-family: var(--font-ui); font-size: 13px; color: var(--t-tx); background: var(--t-field);
+  border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2); box-shadow: var(--t-shadow-field);
+  padding: 4px 8px; min-height: 30px;
+}
+html.tema-alt input:disabled, html.tema-alt select:disabled, html.tema-alt textarea:disabled { background: var(--t-sub); color: var(--t-mut); }
+html.tema-alt input:focus-visible, html.tema-alt select:focus-visible, html.tema-alt textarea:focus-visible {
+  outline: 2px solid var(--t-focus); outline-offset: 1px;
+}
+html.tema-alt input[aria-invalid="true"], html.tema-alt select[aria-invalid="true"], html.tema-alt textarea[aria-invalid="true"] {
+  background: var(--t-invalid); border-color: var(--alert);
+}
+html.tema-alt input[type=checkbox], html.tema-alt input[type=radio] {
+  width: 16px; height: 16px; background: var(--t-field); box-shadow: none;
+  border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r-check);
+}
+html.tema-alt input[type=radio] { border-radius: var(--t-r-radio); }
+html.tema-alt input[type=checkbox]:checked { background: var(--t-acc); }
+html.tema-alt input[type=checkbox]:checked::after { background: var(--t-acc-tx); width: 9px; height: 9px; }
+html.tema-alt input[type=radio]:checked::after { width: 8px; height: 8px; background: var(--t-tx); border-radius: var(--t-r-radio); }
+html.tema-alt input[type=checkbox]:focus-visible, html.tema-alt input[type=radio]:focus-visible { outline: 2px solid var(--t-focus); outline-offset: 2px; }
+html.tema-alt input[type=range]::-webkit-slider-runnable-track {
+  height: 6px; background: var(--t-sub); border: 1px solid var(--t-line); border-radius: 99px; box-shadow: none;
+}
+html.tema-alt input[type=range]::-webkit-slider-thumb {
+  width: 16px; height: 16px; margin-top: -6px; background: var(--t-acc); border: var(--t-bw-ctl) solid var(--t-line);
+  border-radius: var(--t-r-radio); box-shadow: none;
+}
+html.tema-alt input[type=range]::-moz-range-track {
+  height: 6px; background: var(--t-sub); border: 1px solid var(--t-line); border-radius: 99px; box-shadow: none;
+}
+html.tema-alt input[type=range]::-moz-range-thumb {
+  width: 16px; height: 16px; background: var(--t-acc); border: var(--t-bw-ctl) solid var(--t-line);
+  border-radius: var(--t-r-radio); box-shadow: none;
+}
+html.tema-alt .field .hint { color: var(--t-mut); }
+html.tema-alt .field .err { color: var(--alert); }
+html.tema-alt fieldset {
+  border: var(--t-bw-ctl) solid var(--t-line-soft); border-radius: var(--t-r2);
+  margin-bottom: 12px; padding: 10px 12px; background: var(--t-fieldset-bg);
+}
+html.tema-alt legend {
+  background: var(--t-legend-bg); color: var(--t-legend-tx); padding: 1px 8px; font-weight: 700;
+  border-radius: var(--t-r2); border: var(--t-legend-bd);
+  text-transform: var(--t-head-tf); letter-spacing: var(--t-head-ls);
+}
+
+/* ------------------------------------------------------------------ layar data */
+/* Layar CRT Orbital 95 menjadi panel terang bertinta tema; warna data
+   (--phos, --amber, --alert, --cyan) diganti per tema, jadi grafik SVG,
+   tabel, readout, dan legenda ikut tanpa mengubah JavaScript. */
+html.tema-alt .screen {
+  padding: 0; background: var(--crt); box-shadow: none; overflow: hidden;
+  border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
+}
+html.tema-alt .screen-inner {
+  border: 0; background-color: var(--crt); color: var(--phos);
+  font-family: var(--font-data); font-size: 13px; font-weight: 600; padding: 28px 10px 10px;
+}
+html.tema-alt .screen-inner.flush { padding: 0; }
+html.tema-alt .hero-strip .screen-inner { padding: 8px 12px; min-height: 0; }
+html.tema-alt .screen-inner::after { display: none; }
+/* Label kanal di atas peta: kontrol zoom Leaflet digeser ke bawah labelnya. */
+html.tema-alt .screen-inner.flush .leaflet-top { top: 26px; }
+html.tema-alt .screen-inner.flush .scr-ch, html.tema-alt .screen-inner.flush .scr-rec {
+  background: var(--t-card-solid); border: 1px solid var(--t-line); border-radius: var(--t-r2); padding: 0 6px; top: 6px;
+}
+html.tema-alt .screen-inner.flush .scr-ch { left: 6px; }
+html.tema-alt .screen-inner.flush .scr-rec { right: 6px; }
+html.tema-alt .scr-ch, html.tema-alt .scr-rec { font-size: 11px; top: 6px; }
+html.tema-alt .scr-table td { font-size: 12px; }
+html.tema-alt .scr-table tbody tr:hover td { background: var(--t-hover); }
+html.tema-alt .scr-table tr.sel td { background: var(--t-acc-soft); }
+html.tema-alt .readout .screen-inner { padding: 10px 12px; }
+html.tema-alt .readout .r-val { font-weight: 800; }
+html.tema-alt .lamp {
+  width: 10px; height: 10px; box-shadow: none; border: 1px solid var(--t-line); border-radius: var(--t-r-radio);
+}
+html.tema-alt .lamp.ok { background: var(--t-ok); }
+html.tema-alt .tag { border-radius: var(--t-r2); padding: 0 6px; }
+html.tema-alt .kcard, html.tema-alt .bar-row .trk { border-radius: var(--t-r2); }
+html.tema-alt .bar-row .trk i { border-radius: var(--t-r2); }
+html.tema-alt .tile button.thumb, html.tema-alt .tile button.thumb:active:not(:disabled) {
+  background: var(--t-thumb); border: 1px solid var(--t-line); border-radius: var(--t-r2);
+  box-shadow: none; transform: none; padding: 0; min-height: 0;
+}
+html.tema-alt .tile .noimg { border-radius: var(--t-r2); }
+html.tema-alt .heat td { border-color: var(--crt); }
+
+/* ------------------------------------------------------------------ daftar & tab */
+html.tema-alt .listbox {
+  background: var(--t-field); padding: 4px; box-shadow: none;
+  border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
+}
+html.tema-alt .listbox button, html.tema-alt .listbox label,
+html.tema-alt .listbox button:active:not(:disabled) {
+  background: none; border: 0; box-shadow: none; transform: none; border-radius: var(--t-r2);
+  padding: 3px 8px; min-height: 0; font-weight: 400; text-transform: none; color: var(--t-tx);
+}
+html.tema-alt .listbox button:hover { background: var(--t-hover); color: var(--t-tx); }
+html.tema-alt .listbox button[aria-selected="true"] { background: var(--t-sel); color: var(--t-sel-tx); }
+
+html.tema-alt .tabs { padding-left: 10px; gap: 4px; }
+html.tema-alt .tabs [role=tab], html.tema-alt .tabs [role=tab]:active:not(:disabled) {
+  top: var(--t-bw-ctl); margin-right: 0; padding: 5px 12px; min-height: 0;
+  background: var(--t-sub); color: var(--t-mut); box-shadow: none; transform: none;
+  border: var(--t-bw-ctl) solid var(--t-line); border-bottom: 0;
+  border-radius: var(--t-r2) var(--t-r2) 0 0;
+}
+html.tema-alt .tabs [role=tab]:hover { background: var(--t-hover); color: var(--t-tx); }
+html.tema-alt .tabs [role=tab][aria-selected="true"] {
+  top: var(--t-bw-ctl); padding-bottom: 7px; margin-top: -2px; background: var(--t-card-solid); color: var(--t-tx);
+}
+html.tema-alt .tabpanel.raised { border-radius: var(--t-r2); padding: 12px; }
+html.tema-alt .subtabs .sub-row [role=tab][aria-selected="true"] {
+  background: var(--t-sel); color: var(--t-sel-tx); box-shadow: none; transform: none;
+}
+
+/* ------------------------------------------------------------------ taskbar */
+html.tema-alt .taskbar {
+  height: var(--taskbar-h); gap: 6px; padding: 6px 10px;
+  background: var(--t-taskbar-bg); box-shadow: var(--t-taskbar-shadow);
+  border-top: var(--t-bw) solid var(--t-line);
+  -webkit-backdrop-filter: var(--t-blur); backdrop-filter: var(--t-blur);
+}
+html.tema-alt .taskbar .start, html.tema-alt .taskbar .start:active:not(:disabled),
+html.tema-alt .taskbar .start[aria-expanded="true"] {
+  padding: 4px 12px; min-height: 30px; background: var(--t-def-bg); color: var(--t-def-tx);
+}
+html.tema-alt .tb-check, html.tema-alt .tray {
+  box-shadow: none; height: 30px; padding: 2px 10px; border: 1px solid var(--t-line-soft);
+  border-radius: var(--t-r2); background: var(--t-card-solid); color: var(--t-tx);
+}
+html.tema-alt .tb-check:focus-within { outline: 2px solid var(--t-focus); outline-offset: 1px; }
+html.tema-alt .tray a { color: var(--t-tx); }
+html.tema-alt .task-buttons { gap: 6px; }
+html.tema-alt .task-buttons button, html.tema-alt .task-buttons button:active:not(:disabled) {
+  padding: 2px 10px; min-height: 30px; box-shadow: none; transform: none; font-weight: 400;
+}
+html.tema-alt .task-buttons button[aria-pressed="true"] {
+  background: var(--t-sel); color: var(--t-sel-tx); font-weight: 700; padding: 2px 10px;
+}
+html.tema-alt .start-menu {
+  bottom: calc(var(--taskbar-h) + 6px); left: 10px; padding: 6px; gap: 6px;
+  background: var(--t-card-solid); border: var(--t-bw) solid var(--t-line);
+  border-radius: var(--t-r); box-shadow: var(--t-shadow);
+  max-height: calc(100vh - var(--taskbar-h) - 24px); overflow: auto;
+}
+html.tema-alt .start-menu .side {
+  background: var(--t-acc); color: var(--t-acc-tx); border-radius: var(--t-r2);
+  text-transform: uppercase;
+}
+html.tema-alt .start-menu li a, html.tema-alt .start-menu li button,
+html.tema-alt .start-menu li button:active:not(:disabled) {
+  border: 0; border-radius: var(--t-r2); box-shadow: none; transform: none;
+  color: var(--t-tx); font-weight: 400; text-transform: none; min-height: 28px;
+}
+html.tema-alt .start-menu li a:hover, html.tema-alt .start-menu li a:focus,
+html.tema-alt .start-menu li button:hover, html.tema-alt .start-menu li button:focus,
+html.tema-alt .start-menu li a[aria-current="page"] { background: var(--t-sel); color: var(--t-sel-tx); }
+html.tema-alt .start-menu hr { border-top: 1px solid var(--t-line-soft); border-bottom: 0; margin: 4px 0; }
+
+html.tema-alt .desk-icon { color: var(--t-tx); font-weight: 600; }
+html.tema-alt .desk-icon svg {
+  padding: 6px; width: 44px; height: 44px; background: var(--t-card-solid);
+  border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2); box-shadow: var(--t-shadow-btn);
+}
+html.tema-alt .desk-icon:focus-visible span { outline: 2px solid var(--t-focus); background: var(--t-sel); color: var(--t-sel-tx); }
+
+/* ------------------------------------------------------------------ dialog */
+html.tema-alt .dialog-backdrop { background: var(--t-backdrop); }
+html.tema-alt .dialog { background: var(--t-card-solid); }
+
+/* ------------------------------------------------------------------ progres */
+html.tema-alt .progress {
+  height: 18px; background: var(--t-field); box-shadow: none;
+  border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
+}
+html.tema-alt .progress > i {
+  border-radius: calc(var(--t-r2) - 2px);
+  background: repeating-linear-gradient(90deg, var(--t-acc) 0 10px, var(--t-acc-soft) 10px 12px);
+}
+
+/* ------------------------------------------------------------------ peta */
+html.tema-alt .leaflet-container { font-family: var(--font-ui); }
+html.tema-alt .leaflet-container .leaflet-tile-pane { filter: var(--t-tile-filter); }
+html.tema-alt .leaflet-control-attribution { background: var(--t-card-solid) !important; color: var(--t-mut) !important; }
+html.tema-alt .leaflet-control-attribution a { color: var(--t-mut) !important; }
+html.tema-alt .leaflet-bar a, html.tema-alt .leaflet-bar a:hover {
+  background: var(--t-btn-bg); color: var(--t-tx); box-shadow: none;
+  border: var(--t-bw-ctl) solid var(--t-line) !important; border-radius: var(--t-r2) !important; margin-bottom: 4px;
+}
+html.tema-alt .leaflet-tooltip, html.tema-alt .leaflet-popup-content-wrapper, html.tema-alt .leaflet-popup-tip {
+  background: var(--t-card-solid); color: var(--t-tx); border: var(--t-bw-ctl) solid var(--t-line);
+  border-radius: var(--t-r2); font-family: var(--font-ui);
+}
+/* Garis wilayah di peta ditulis berwarna fosfor oleh JS (home.js, admin.js,
+   statistics.js, disasters*.js). Hanya stroke yang ditukar: warna isian
+   kategori hujan BMKG tetap sama dengan legendanya. */
+html.tema-alt .leaflet-overlay-pane path[stroke="#33ff99"] { stroke: var(--phos); }
+html.tema-alt .leaflet-overlay-pane path[stroke="#1a9960"] { stroke: var(--phos-dim); }
+html.tema-alt .leaflet-overlay-pane path[stroke="#ffb000"] { stroke: var(--amber); }
+html.tema-alt .leaflet-overlay-pane path[stroke="#4de1ff"] { stroke: var(--cyan); }
+html.tema-alt .chart-tip { background: var(--t-card-solid); color: var(--t-tx); border: 1px solid var(--t-line); border-radius: var(--t-r2); }
+
+/* ------------------------------------------------------------------ kartu & spanduk */
+html.tema-alt .navcard {
+  color: var(--t-tx); background: var(--t-card-solid); padding: 10px 12px;
+  border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2); box-shadow: var(--t-shadow-btn);
+  transition: transform .08s, box-shadow .08s;
+}
+html.tema-alt .navcard:hover { transform: var(--t-hover-move); box-shadow: var(--t-shadow-hover); }
+html.tema-alt .navcard:active { padding: 10px 12px; box-shadow: var(--t-shadow-press); transform: var(--t-press-move); }
+html.tema-alt .navcard .nc-title { text-transform: var(--t-head-tf); letter-spacing: var(--t-head-ls); }
+html.tema-alt .navcard .nc-desc { color: var(--t-mut); }
+html.tema-alt .banner {
+  background: var(--t-sub); border: var(--t-bw-ctl) solid var(--t-line);
+  border-radius: var(--t-r2); padding: 10px 12px; box-shadow: none;
+}
+html.tema-alt .banner.raised { background: var(--t-card-solid); }
+html.tema-alt .hero .hero-logo, html.tema-alt .hero-logo {
+  box-shadow: var(--t-shadow-btn); border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
+  padding: 0; overflow: hidden;
+}
+html.tema-alt .hero .hero-name { font-weight: 800; text-transform: var(--t-head-tf); letter-spacing: var(--t-head-ls); }
+html.tema-alt .hero .hero-tag { color: var(--t-mut); }
+html.tema-alt .roles th, html.tema-alt .roles td { border-bottom-color: var(--t-line-soft); }
+html.tema-alt .roles th { color: var(--t-mut); }
+html.tema-alt .expl > summary {
+  background: var(--t-card-solid); box-shadow: none; border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
+}
+html.tema-alt .chip[aria-pressed="false"] { opacity: .55; }
+html.tema-alt .region-row input[type=color] { border-radius: var(--t-r2); }
+html.tema-alt .t3-map .maplibregl-ctrl-group, html.tema-alt .t3-map .maplibregl-ctrl-group button { border-radius: var(--t-r2); }
+
+@media (max-width: 799px) {
+  html.tema-alt body { padding: 10px 10px calc(var(--taskbar-h) + 16px); }
+  html.tema-alt .window-body { padding: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.tema-alt button, html.tema-alt .navcard { transition: none; }
+}

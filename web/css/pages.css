@@ -1,0 +1,72 @@
+/* web/css/pages.css — komponen halaman susunan v2 (M56): Beranda, Citra per
+   satelit, Diagram, Data, EDA, Log, Masuk/Daftar. Memakai token dan bevel
+   Orbital 95 dari main.css (DESIGN.md); tanpa sudut membulat, tanpa blur. */
+
+/* ---------------------------------------------------------------- hero (Beranda) */
+.hero { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.hero .hero-logo {
+  width: 64px; height: 64px; flex: none; display: block; image-rendering: pixelated; padding: 2px; background: var(--crt);
+  box-shadow: inset -1px -1px var(--hilite), inset 1px 1px var(--shadow), inset -2px -2px var(--light), inset 2px 2px var(--dark);
+}
+.hero .hero-text { flex: 1 1 320px; min-width: 0; }
+.hero .hero-name { font-size: 22px; line-height: 1.1; margin: 0 0 2px; }
+.hero .hero-tag { color: var(--text-mut); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 700; margin: 0 0 8px; }
+.hero .hero-lede { margin: 0 0 10px; line-height: 1.5; max-width: 70ch; }
+.hero-strip { margin-top: 8px; }
+.hero-strip .screen-inner { min-height: 0; padding: 8px 10px; }
+.hero-strip .hs-line { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin: 0; }
+.hero-strip .hs-more { margin-left: auto; }
+.facts { margin: 0; padding-left: 18px; }
+.facts li { margin-bottom: 6px; line-height: 1.5; }
+.facts li:last-child { margin-bottom: 0; }
+.roles { width: 100%; border-collapse: collapse; font-size: 11px; }
+.roles th, .roles td { text-align: left; padding: 3px 6px; vertical-align: top; border-bottom: 1px solid var(--shadow); }
+.roles th { color: var(--text-mut); text-transform: uppercase; letter-spacing: .08em; }
+
+/* ---------------------------------------------------------------- kartu satelit */
+.sat-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; margin-bottom: 8px; }
+.sat-card { padding: 8px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sat-card header { display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+.sat-card .sat-thumb { aspect-ratio: 4 / 3; display: grid; place-items: center; }
+.sat-card .sat-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.sat-card .sat-thumb .noimg { color: var(--phos-dim); }
+.sat-card .sat-sentence, .sat-card .sat-about { margin: 0; font-size: 11px; line-height: 1.45; }
+.kv.kv-light dt { color: var(--text-mut); }
+
+/* ---------------------------------------------------------------- citra per satelit */
+.listbox.tall { max-height: 320px; }
+.compare-grid { display: flex; flex-direction: column; gap: 8px; }
+.compare-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.legend-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.band-list { display: flex; flex-direction: column; gap: 8px; }
+.band-item { display: flex; gap: 8px; align-items: flex-start; }
+.swatch { display: inline-block; width: 12px; height: 12px; flex: none; border: 1px solid #000; vertical-align: -1px; }
+.band-item .swatch { margin-top: 3px; }
+
+/* ---------------------------------------------------------------- diagram */
+.band-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 6px; min-height: 0; min-width: 0; }
+.chip[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.chip.static { color: var(--phos); }
+.region-pick { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow: auto; }
+.region-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.region-row input[type=color] { width: 28px; height: 18px; padding: 0; border: 1px solid #000; background: none; }
+
+/* ---------------------------------------------------------------- EDA */
+.hist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.chart.hist svg { width: 100%; height: auto; }
+
+/* ---------------------------------------------------------------- log */
+.filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; padding: 6px; margin: 0 0 8px; }
+
+/* ---------------------------------------------------------------- masuk & daftar */
+.auth-pair { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: flex-start; margin-top: 6vh; }
+.auth-pair > .window.small { margin: 0; flex: 1 1 340px; }
+
+@media (max-width: 640px) {
+  .compare-row { grid-template-columns: 1fr; }
+  .hero .hero-name { font-size: 18px; }
+}
+
+/* Tabel panjang di dalam layar (riwayat backfill per tanggal). */
+.scroll-box { max-height: 300px; overflow: auto; }

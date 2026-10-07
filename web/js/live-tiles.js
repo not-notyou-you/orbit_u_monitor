@@ -71,7 +71,7 @@ const LiveTiles = (() => {
         return '<div class="tile">' +
           '<span class="tl"><span>' + UI.esc(LABEL[k]) + '</span>' + (cat ? '<span class="' + cat[1] + '">' + cat[0] + '</span>' : '') + '</span>' +
           (p ? '<button type="button" class="thumb" data-key="' + k + '" aria-label="' + UI.esc(LONG[k]) + ': buka legenda dan penjelasan">' +
-                '<img loading="lazy" src="' + UI.esc(p.url) + '" alt=""></button>'
+                '<img loading="lazy" ' + UI.imgAttrs(p) + ' alt=""></button>'
              : '<div class="noimg">NO DATA</div>') +
           (near ? '<span class="tl v-amber">TERDEKAT ' + UI.esc(UI.date(p.source_date, 'short')) + '</span>' : '') +
           '</div>';
@@ -82,15 +82,56 @@ const LiveTiles = (() => {
     }).join('');
   }
 
-  function bindLightbox(root, previews, interpretations, sceneDate) {
+  // opts.action = {label, onPick(item)} menambah tombol aksi di lightbox, mis.
+  // "Lihat 3D" di Pantauan Live. Beranda Publik tidak mengopernya, jadi
+  // tombolnya tidak muncul di sana -- halaman 3D butuh sesi masuk.
+  function bindLightbox(root, previews, interpretations, sceneDate, opts) {
+    opts = opts || {};
     const keys = ROWS.flatMap(r => r.keys).filter(k => previews[k]);
     const items = keys.map(k => ({
-      url: previews[k].url, title: LONG[k], channel: LONG[k] + ' · ' + UI.date(sceneDate),
+      key: k,
+      url: previews[k].url, url_boundaries: previews[k].url_boundaries,
+      title: LONG[k], channel: LONG[k] + ' · ' + UI.date(sceneDate),
       legend: legendHTML(previews[k].legend), note: sentenceHTML((interpretations || {})[k]),
     }));
-    UI.$$('button.thumb[data-key]', root).forEach(b => b.addEventListener('click', () => UI.lightbox(items, keys.indexOf(b.dataset.key))));
+    const action = opts.action ? { label: opts.action.label } : null;
+    UI.$$('button.thumb[data-key]', root).forEach(b => b.addEventListener('click', async () => {
+      const picked = await UI.lightbox(items, keys.indexOf(b.dataset.key), { action: action });
+      // Dialog resolve dengan item yang sedang dilihat kalau tombol aksi
+      // ditekan; nilai lain (true/'cancel') berarti dialog cuma ditutup.
+      if (picked && picked.key && opts.action && opts.action.onPick) opts.action.onPick(picked);
+    }));
   }
 
   return { ROWS, LABEL, LONG, CAT, levelInfo, sentenceHTML, legendHTML, rowsHTML, bindLightbox };
 })();
 window.LiveTiles = LiveTiles;
+
+// Titipan sekali-pakai dari lightbox Pantauan Live ke tab Relief 3D: area,
+// tanggal, dan lapisan yang sedang dilihat.
+//
+// Tinggal di sini, bukan di terrain3d.js, karena penulis (monitoring.js) dan
+// pembacanya (terrain3d.js) tidak pernah dimuat bersamaan -- router memuat
+// skrip halaman satu per satu. live-tiles.js sendiri dimuat app.html untuk
+// seluruh sesi, dan isi titipannya memang "tile preview mana yang dipilih".
+//
+// sessionStorage, bukan variabel modul: pengguna bisa saja mendarat di tab 3D
+// lewat muat-ulang halaman, dan pilihannya harus tetap terbawa. Dibaca SEKALI
+// lalu dihapus -- tanpa itu, membuka tab 3D langsung dari menu beberapa menit
+// kemudian akan melompat ke lapisan yang sudah tidak diminta siapa pun.
+const Terrain3DHandoff = (() => {
+  const KEY = 'orbit-u.relief3d';
+  function set(sel) {
+    try { sessionStorage.setItem(KEY, JSON.stringify(sel)); }
+    catch (e) { /* mode privat: tab 3D terbuka dengan pilihan bawaannya */ }
+  }
+  function take() {
+    try {
+      const raw = sessionStorage.getItem(KEY);
+      sessionStorage.removeItem(KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  return { set, take };
+})();
+window.Terrain3DHandoff = Terrain3DHandoff;

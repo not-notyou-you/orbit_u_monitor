@@ -228,6 +228,12 @@ JABODETABEK_BBOX = (106.4, -6.7, 107.2, -5.9)
 
 DST_CRS = "EPSG:4326"
 MAX_RETRIES = 3
+# Jatah + tangga jeda khusus download granule; alasannya sama dengan
+# DOWNLOAD_MAX_RETRIES di module8_gpm_download (dan module1 untuk CDSE):
+# SSL EOF / IncompleteRead = gangguan jaringan beberapa menit, dan 3 x 2-4 s
+# habis dalam <10 detik. Granule MODIS jauh lebih besar dari GPM, jadi resume
+# parsial di sini lebih berharga lagi.
+DOWNLOAD_MAX_RETRIES = int(os.getenv("MODIS_DOWNLOAD_MAX_RETRIES", "6"))
 # Di bawah porsi ini band dianggap degraded: file tetap ditulis (awan memang
 # data yang sah), tapi hari itu tidak boleh dilaporkan GOOD. Jakarta musim
 # hujan sering 100% tertutup awan menurut QA state MOD09.
@@ -454,27 +460,40 @@ def _download_with_retry(
     )
     last_exc: Exception | None = None
 
-    for attempt in range(1, MAX_RETRIES + 1):
+    resume_from = 0
+
+    for attempt in range(1, DOWNLOAD_MAX_RETRIES + 1):
         attempt_started = time.monotonic()
         retry_after = None
         _plog_event(
             plog, dataset_id, scene_id, "DOWNLOAD", "RUNNING",
-            f"{item_label}: downloading (attempt {attempt}/{MAX_RETRIES})",
-            {"item": item_label, "attempt": attempt, "max_retries": MAX_RETRIES, "url": url},
+            f"{item_label}: downloading (attempt {attempt}/{DOWNLOAD_MAX_RETRIES})"
+            + (f", resume dari {resume_from / 1e6:.0f} MB" if resume_from else ""),
+            {"item": item_label, "attempt": attempt, "max_retries": DOWNLOAD_MAX_RETRIES,
+             "url": url, "resume_from_bytes": resume_from},
         )
         try:
+            headers = dict(_auth_headers())
+            if resume_from:
+                headers["Range"] = f"bytes={resume_from}-"
             with dg.source_slot(dg.LAADS), requests.get(
-                url, headers=_auth_headers(), stream=True, timeout=dg.REQUEST_TIMEOUT
+                url, headers=headers, stream=True, timeout=dg.REQUEST_TIMEOUT
             ) as r:
                 # 401/403: token Earthdata bersama semua job -- gagal cepat.
                 dg.raise_for_nasa_auth(r, "LAADS", url)
                 if r.status_code in dg.THROTTLE_STATUSES:
                     retry_after = r.headers.get("Retry-After")
                 r.raise_for_status()
-                expected_size = int(r.headers.get("Content-Length", 0))
-                downloaded = 0
+                resumed = resume_from > 0 and r.status_code == 206
+                if resume_from and not resumed:
+                    logger.info("[M7] server mengabaikan Range, mulai dari awal: %s",
+                                out_path.name)
+                    resume_from = 0
+                body_size = int(r.headers.get("Content-Length", 0))
+                expected_size = (resume_from + body_size) if body_size else 0
+                downloaded = resume_from
                 guard = dg.StallGuard()
-                with open(tmp_path, "wb") as f:
+                with open(tmp_path, "ab" if resumed else "wb") as f:
                     for chunk in r.iter_content(chunk_size=dg.CHUNK_SIZE):
                         f.write(chunk)
                         downloaded += len(chunk)
@@ -498,6 +517,7 @@ def _download_with_retry(
             # gagal FileExistsError di Windows kalau proses lain menang duluan).
             os.replace(tmp_path, out_path)
             dg.clear_auth_failure("LAADS")
+            dg.record_connection_success(dg.LAADS)
             checksum = _md5(out_path)
             logger.info("[M7] downloaded %s (md5=%s...)", out_path.name, checksum[:12])
             _plog_event(
@@ -515,31 +535,54 @@ def _download_with_retry(
             last_exc = exc
             logger.warning(
                 "[M7] download gagal (attempt %d/%d) %s: %s",
-                attempt, MAX_RETRIES, out_path.name, exc,
+                attempt, DOWNLOAD_MAX_RETRIES, out_path.name, exc,
             )
-            tmp_path.unlink(missing_ok=True)
             auth_failed = isinstance(exc, dg.NasaAuthError)
-            is_final = auth_failed or attempt == MAX_RETRIES
+            conn_lost = (not auth_failed
+                         and isinstance(exc, (ConnectionError, TimeoutError, OSError)))
+            if conn_lost and tmp_path.exists():
+                resume_from = tmp_path.stat().st_size
+                logger.info("[M7] akan resume dari %.0f MB: %s",
+                            resume_from / 1e6, out_path.name)
+            else:
+                resume_from = 0
+                tmp_path.unlink(missing_ok=True)
+            is_final = auth_failed or attempt == DOWNLOAD_MAX_RETRIES
             _plog_event(
                 plog, dataset_id, scene_id, "DOWNLOAD", "FAILED" if is_final else "RUNNING",
-                f"{item_label}: attempt {attempt}/{MAX_RETRIES} failed ({exc})",
+                f"{item_label}: attempt {attempt}/{DOWNLOAD_MAX_RETRIES} failed ({exc})",
                 {
-                    "item": item_label, "attempt": attempt, "max_retries": MAX_RETRIES,
+                    "item": item_label, "attempt": attempt,
+                    "max_retries": DOWNLOAD_MAX_RETRIES,
                     "error_type": type(exc).__name__, "error_message": str(exc),
+                    "resume_from_bytes": resume_from,
                     "duration_seconds": round(time.monotonic() - attempt_started, 3),
                 },
             )
             if auth_failed:
                 raise
-            if attempt < MAX_RETRIES:
-                # Retry-After (429/503, dibatasi) atau backoff + jitter.
-                dg.backoff_wait(
-                dg.LAADS, attempt,
-                "server rate-limiting (429/503)" if retry_after else "failed, retrying",
-                retry_after=retry_after, max_attempts=MAX_RETRIES,
-            )
+            if attempt < DOWNLOAD_MAX_RETRIES:
+                if conn_lost and retry_after is None:
+                    dg.record_connection_failure(dg.LAADS)
+                    delay = dg.connection_retry_delay(attempt)
+                    dg.note_wait(dg.LAADS, delay, "connection lost",
+                                 attempt, DOWNLOAD_MAX_RETRIES)
+                    logger.info("[M7] menunggu %.0f s sebelum mencoba lagi "
+                                "(connection lost, attempt %d/%d)",
+                                delay, attempt, DOWNLOAD_MAX_RETRIES)
+                    dg.sleep_or_cancel(delay, None)
+                else:
+                    # Retry-After (429/503, dibatasi) atau backoff + jitter.
+                    dg.backoff_wait(
+                        dg.LAADS, attempt,
+                        "server rate-limiting (429/503)" if retry_after else "failed, retrying",
+                        retry_after=retry_after, max_attempts=DOWNLOAD_MAX_RETRIES,
+                    )
 
-    raise RuntimeError(f"download failed for {url} after {MAX_RETRIES} attempts: {last_exc}")
+    tmp_path.unlink(missing_ok=True)
+    raise RuntimeError(
+        f"download failed for {url} after {DOWNLOAD_MAX_RETRIES} attempts: {last_exc}"
+    )
 
 
 def modis_tiles_for_bbox(

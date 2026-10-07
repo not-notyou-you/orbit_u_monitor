@@ -1,0 +1,74 @@
+<!doctype html>
+<!-- web/relief.html — Relief 3D publik /relief (INTERFACE.md §2.3), tanpa login.
+     Isi panelnya dari pages/terrain3d.html + js/terrain3d.js — fragmen dan
+     skrip yang SAMA dengan /app#kondisi/relief. Yang membedakan keduanya hanya
+     data-requires-auth di <body>: terrain3d.js memakainya untuk memilih sumber
+     data (/api/public/live, scene terbaru saja) dan menyembunyikan pemilih
+     tanggal.
+
+     Chrome jendela (titlebar, pintasan, penafian, statusbar) ada DI SINI, bukan
+     di fragmen: di /app fragmen itu sudah berada di dalam jendela milik shell,
+     jadi menaruhnya di fragmen akan menghasilkan jendela di dalam jendela.
+     Shell.mountPublic mengisi #pageRoot, sehingga chrome di sekelilingnya aman.
+
+     maps.js dimuat karena basemap-nya diambil dari Maps.TILE_URL. -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relief 3D — Orbit-U: The Monitor</title>
+<meta name="description" content="Citra Sentinel-1 Lebak Selatan di atas model elevasi, dengan kamera 3D. Relief berasal dari DEM, bukan dari radar. Bukan peringatan dini resmi.">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/main.css?v=5.2">
+<link rel="stylesheet" href="css/terrain3d.css?v=5.2">
+</head>
+<body data-requires-auth="false">
+<a class="skip-link" href="#pageRoot">Lompat ke isi</a>
+<main id="main" tabindex="-1">
+  <div class="desk-icons" aria-label="Pintasan">
+    <a class="desk-icon" href="/"><span aria-hidden="true" data-icon="globe"></span><span>Beranda</span></a>
+    <a class="desk-icon" href="/kondisi"><span aria-hidden="true" data-icon="monitor"></span><span>Kondisi</span></a>
+    <a class="desk-icon" href="/masuk" id="iconLogin"><span aria-hidden="true" data-icon="key"></span><span>Masuk</span></a>
+    <a class="desk-icon" href="/app" id="iconApp" hidden><span aria-hidden="true" data-icon="satellite"></span><span>Aplikasi</span></a>
+  </div>
+
+  <section class="window" aria-labelledby="reliefTitle">
+    <div class="titlebar">
+      <span class="ttl-icon" data-icon="satellite"></span>
+      <span class="ttl-text"><h1 id="reliefTitle">ORBIT-U · Relief 3D Lebak Selatan</h1></span>
+    </div>
+    <div class="window-body">
+      <p class="page-lede">Citra radar terbaru ditempel di atas model elevasi. Geser untuk memutar, tahan
+        tombol kanan (atau dua jari) untuk memiringkan. <b>Tinggi yang terlihat berasal dari model
+        elevasi (DEM), bukan dari Sentinel-1</b> — radar ini mengukur kekasaran dan kebasahan
+        permukaan, bukan ketinggian.</p>
+      <div id="pageRoot"></div>
+      <div class="banner sunken" role="note" style="margin-top:8px">
+        <span data-icon="warn32"></span>
+        <div class="b-body"><b>Ini bukan peringatan dini resmi.</b> Ikuti informasi BMKG dan BPBD.<br>
+          Kontak: Gugus Mitigasi Lebak Selatan (GMLS), sekretariat Panggarangan, Kabupaten Lebak.</div>
+      </div>
+    </div>
+    <div class="statusbar"><span id="pageStatus">Status: Memuat…</span><span class="fit">Data: ESA Copernicus · DEM: AWS Terrain Tiles (SRTM)</span></div>
+  </section>
+</main>
+<script src="js/ui.js?v=5.2"></script>
+<script src="js/api.js?v=5.2"></script>
+<script src="js/auth.js?v=5.2"></script>
+<script src="js/live-tiles.js?v=5.2"></script>
+<script src="js/maps.js?v=5.2"></script>
+<script src="js/app.js?v=5.2"></script>
+<script>
+// Ikon chrome diisi SEBELUM mount: chrome di halaman ini bukan bagian dari
+// fragmen, jadi kalau mount gagal (fragmen tidak terjangkau) pintasan di atas
+// tetap harus terbaca, bukan berubah jadi deret kotak kosong.
+UI.$$('[data-icon]').forEach(el => { el.innerHTML = UI.icon(el.dataset.icon); });
+Shell.mountPublic({ file: 'terrain3d' }).then(me => {
+  if (me) {
+    UI.$('#iconApp').hidden = false;
+    UI.$('#iconLogin').hidden = true;
+  }
+});
+</script>
+</body>
+</html>

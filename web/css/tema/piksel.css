@@ -1,0 +1,99 @@
+/* web/css/tema/piksel.css — tema "Piksel Marun" (M57), dari DOCS/design tambahan/konsep44.
+   Abu-abu dengan aksen marun ala 8-bit: garis tepi 4px, bevel dalam + bayangan
+   keras 6px, title bar marun dengan satu kotak tutup, huruf piksel kapital,
+   lampu status berkedip, dan siluet gunung di cakrawala latar.
+   Struktur komponen ada di umum.css; berkas ini hanya nilai dan hiasan. */
+
+html[data-theme="piksel"] {
+  /* palet konsep44 */
+  --x-bg: #e4e4e4; --x-ground: #c9c9c9; --x-card: #f2f2f2; --x-line: #2b2b2b;
+  --x-mut: #6a6a6a; --x-acc: #7a1f2b; --x-acc-dk: #4f121b; --x-acc-lt: #a8505c;
+
+  --desk: var(--x-bg); --face: var(--x-card); --hilite: #fafafa; --light: #e4e4e4;
+  --shadow: #c4c4c4; --dark: var(--x-line); --select: var(--x-acc);
+  --text: var(--x-line); --text-mut: var(--x-mut); --field: #fafafa;
+  --crt: #fafafa; --crt-grid: #d6d6d6; --phos: #2b2b2b; --phos-dim: #6a6a6a;
+  --amber: #8a5a00; --alert: #c0182b; --cyan: #1f4f7a;
+  --font-ui: "Pixelify Sans", "Silkscreen", "Courier New", monospace;
+  --font-data: Consolas, "Cascadia Mono", "Courier New", monospace;
+  --taskbar-h: 48px;
+
+  --t-bg: linear-gradient(180deg, var(--x-bg) 0 70%, var(--x-ground) 70%);
+  --t-card: var(--x-card); --t-card-solid: var(--x-card); --t-sub: #e4e4e4; --t-field: #fafafa;
+  --t-fieldset-bg: transparent; --t-thumb: #2b2b2b;
+  --t-line: var(--x-line); --t-line-soft: #9a9a9a;
+  --t-tx: var(--x-line); --t-mut: var(--x-mut); --t-link: var(--x-acc);
+  --t-acc: var(--x-acc); --t-acc-tx: var(--x-card); --t-acc-soft: #ecd3d6;
+  --t-sel: var(--x-line); --t-sel-tx: var(--x-card); --t-hover: #dcdcdc;
+  --t-focus: var(--x-acc); --t-ok: #2f8f3a; --t-invalid: #f6dfe1;
+  --t-bw: 4px; --t-bw-ctl: 3px; --t-r: 0; --t-r2: 0; --t-r-check: 0; --t-r-radio: 0;
+  --t-shadow: inset -4px -4px 0 #c4c4c4, inset 4px 4px 0 #fafafa, 6px 6px 0 var(--x-line);
+  --t-shadow-btn: inset -3px -3px 0 #c4c4c4, inset 3px 3px 0 #fafafa, 3px 3px 0 var(--x-line);
+  --t-shadow-hover: inset -3px -3px 0 #c4c4c4, inset 3px 3px 0 #fafafa, 5px 5px 0 var(--x-line);
+  --t-shadow-press: inset 3px 3px 0 #c4c4c4; --t-shadow-field: inset 3px 3px 0 #dcdcdc;
+  --t-press-move: translate(3px, 3px); --t-hover-move: translate(-1px, -1px);
+  --t-btn-bg: var(--x-card); --t-btn-tx: var(--x-line); --t-btn-hover: #fafafa; --t-btn-tf: uppercase;
+  --t-def-bg: var(--x-acc); --t-def-tx: var(--x-card); --t-def-hover: #8d2633;
+  --t-def-shadow: inset -4px -4px 0 var(--x-acc-dk), inset 4px 4px 0 var(--x-acc-lt), 3px 3px 0 var(--x-line);
+  --t-title-bg: var(--x-acc); --t-title-tx: var(--x-card); --t-title-line: var(--x-line);
+  --t-title-h: 30px; --t-title-w: 600; --t-head-tf: uppercase; --t-head-ls: .04em;
+  --t-legend-bg: var(--x-line); --t-legend-tx: var(--x-card); --t-legend-bd: 0;
+  --t-blur: none;
+  --t-taskbar-bg: var(--x-card); --t-taskbar-shadow: inset 0 4px 0 #fafafa;
+  --t-backdrop: rgba(43, 43, 43, .35);
+  --t-tile-filter: grayscale(1) contrast(1.08) brightness(1.06);
+}
+html[data-theme="piksel"] body { background-attachment: fixed; image-rendering: pixelated; }
+/* Siluet gunung marun di garis cakrawala (body::before konsep). */
+html[data-theme="piksel"] body::before {
+  content: ""; position: fixed; left: 6%; top: 70%; width: 220px; height: 60px; margin-top: -60px;
+  background: var(--x-acc); opacity: .5; z-index: -1; pointer-events: none;
+  clip-path: polygon(0 100%, 20% 30%, 35% 60%, 55% 0, 75% 50%, 100% 100%);
+}
+html[data-theme="piksel"] body::after {
+  content: ""; position: fixed; right: 8%; top: 70%; width: 150px; height: 40px; margin-top: -40px;
+  background: var(--x-acc); opacity: .3; z-index: -1; pointer-events: none;
+  clip-path: polygon(0 100%, 30% 20%, 50% 55%, 70% 0, 100% 100%);
+}
+
+/* Title bar: satu kotak tutup putih bergaris hitam (min/max disembunyikan). */
+html[data-theme="piksel"] .ttl-btn, html[data-theme="piksel"] .ttl-btn:active {
+  width: 20px; height: 20px; min-height: 0; padding: 0; color: var(--x-line);
+  background: var(--x-card); border: 2px solid var(--x-line); box-shadow: none; transform: none;
+}
+html[data-theme="piksel"] .ttl-btn:not(:last-child) { display: none; }
+html[data-theme="piksel"] .ttl-btn svg { width: 8px; height: 7px; }
+html[data-theme="piksel"] .ttl-btn:hover:not(:disabled) { background: #fafafa; }
+
+html[data-theme="piksel"] .page-lede { border-left: 4px solid var(--x-acc); background: #e8e8e8; }
+html[data-theme="piksel"] legend { text-transform: uppercase; font-size: 12px; }
+html[data-theme="piksel"] fieldset { border-style: dashed; }
+html[data-theme="piksel"] .menubar [aria-current="page"] { background: var(--x-acc); }
+html[data-theme="piksel"] .navcard .nc-title, html[data-theme="piksel"] .hero .hero-name { font-weight: 700; }
+html[data-theme="piksel"] .hero .hero-name { font-size: 24px; }
+html[data-theme="piksel"] .hero .hero-logo { border-width: 4px; }
+
+/* Layar data: bingkai tebal hitam, label kanal di pita gelap. */
+html[data-theme="piksel"] .screen { border-width: 4px; }
+html[data-theme="piksel"] .screen-inner.flush .scr-ch, html[data-theme="piksel"] .screen-inner.flush .scr-rec {
+  background: var(--x-line); color: var(--x-card); border: 0;
+}
+html[data-theme="piksel"] .readout.screen { box-shadow: 4px 4px 0 var(--x-line); }
+html[data-theme="piksel"] .readout .r-lbl, html[data-theme="piksel"] .scr-ch,
+html[data-theme="piksel"] .scr-rec { font-family: var(--font-ui); }
+html[data-theme="piksel"] .scr-table th { font-family: var(--font-ui); }
+
+/* Lampu tautan berkedip seperti ".dot" konsep; checkbox dan radio kotak. */
+html[data-theme="piksel"] #linkLamp .lamp { width: 12px; height: 12px; border-width: 2px; animation: pikselKedip 1s steps(2) infinite; }
+@keyframes pikselKedip { 50% { background: var(--x-card); } }
+html[data-theme="piksel"] input[type=radio]:checked::after { background: var(--x-acc); }
+
+html[data-theme="piksel"] .taskbar { border-top-width: 4px; }
+html[data-theme="piksel"] .taskbar .start { text-transform: uppercase; }
+html[data-theme="piksel"] .tb-check, html[data-theme="piksel"] .tray { border: 3px solid var(--x-line); background: #fafafa; }
+html[data-theme="piksel"] .start-menu .side { background: var(--x-acc); border: 3px solid var(--x-line); }
+html[data-theme="piksel"] .progress > i { background: repeating-linear-gradient(90deg, var(--x-acc) 0 8px, transparent 8px 10px); }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="piksel"] #linkLamp .lamp { animation: none; }
+}

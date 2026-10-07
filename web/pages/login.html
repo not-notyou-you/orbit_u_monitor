@@ -1,13 +1,17 @@
-<!-- pages/login.html — fragmen /masuk (INTERFACE.md §2). -->
+<!-- pages/login.html — fragmen /masuk (INTERFACE.md §2 halaman 0). Nama pengguna +
+     kata sandi, dan penjelasan manfaat akun Relawan (USER) saja — fitur
+     Analis/Data Engineer/Administrator tidak dipromosikan di sini. -->
 <div class="desk-icons" aria-label="Pintasan">
-  <a class="desk-icon" href="/"><span aria-hidden="true" data-icon="globe"></span><span>Beranda</span></a>
+  <a class="desk-icon" href="/app#beranda"><span aria-hidden="true" data-icon="globe"></span><span>Beranda</span></a>
+  <a class="desk-icon" href="/daftar"><span aria-hidden="true" data-icon="user"></span><span>Daftar</span></a>
   <a class="desk-icon" href="/docs" target="_blank" rel="noopener"><span aria-hidden="true" data-icon="help"></span><span>Dok. API</span></a>
 </div>
-<section class="window small" aria-labelledby="loginTitle" style="margin-top:8vh">
+<div class="auth-pair">
+<section class="window small" aria-labelledby="loginTitle">
   <div class="titlebar"><span class="ttl-icon" data-icon="key"></span><span class="ttl-text"><h1 id="loginTitle">Masuk ke Orbit-U</h1></span></div>
   <div class="window-body">
     <div class="dialog-msg"><span data-icon="sat32"></span>
-      <div class="txt">Pantauan Hidrometeorologi Lebak Selatan.<br>Gunakan akun yang diberikan Admin GMLS.</div></div>
+      <div class="txt">Pantauan Hidrometeorologi Lebak Selatan.<br>Masuk dengan nama pengguna dan kata sandi Anda.</div></div>
     <div id="loginNotice" class="banner sunken hidden" role="status"></div>
     <form id="loginForm" novalidate>
       <fieldset>
@@ -27,9 +31,25 @@
       </fieldset>
       <div class="btn-row end">
         <button type="submit" class="default" id="loginBtn">Masuk</button>
-        <a class="btn" href="/">Batal</a>
+        <a class="btn" href="/app#beranda">Batal</a>
       </div>
     </form>
+    <p style="margin:8px 0 0">Belum punya akun? <a href="/daftar">Daftar sebagai Relawan</a>.</p>
   </div>
   <div class="statusbar"><span id="loginStatus">Status: Siap</span><span class="fit">Sesi 8 jam</span></div>
 </section>
+<section class="window small" aria-labelledby="benefitTitle">
+  <div class="titlebar"><span class="ttl-icon" data-icon="user"></span><span class="ttl-text"><h2 id="benefitTitle">Kenapa membuat akun?</h2></span></div>
+  <div class="window-body">
+    <p style="margin-top:0">Akun <b>Relawan</b> gratis dan dibuat sendiri dalam satu menit. Dengan akun Relawan Anda mendapat:</p>
+    <ul class="facts">
+      <li><b>Citra satelit setahun ke belakang</b> — pengunjung hanya 30 hari terakhir.</li>
+      <li><b>3D AOI</b> — citra ditempel di atas relief wilayah, bisa dimiringkan dan diputar.</li>
+      <li><b>Seluruh riwayat kejadian bencana</b> — pengunjung hanya setahun terakhir.</li>
+      <li><b>Angka hujan per kecamatan</b> hari ini dengan kategori BMKG, dan daftar alert hujan yang aktif.</li>
+      <li><b>Token API pribadi</b> untuk membaca data dari skrip atau aplikasi Anda sendiri.</li>
+    </ul>
+    <div class="btn-row end"><a class="btn default" href="/daftar">Daftar sekarang</a></div>
+  </div>
+</section>
+</div>

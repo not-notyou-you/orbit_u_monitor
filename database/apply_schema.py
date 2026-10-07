@@ -17,6 +17,8 @@ Setara dengan:
 Pakai:
     python database/apply_schema.py           # terapkan ketiga berkas
     python database/apply_schema.py --check   # cek koneksi saja
+    python database/apply_schema.py --migrate m56_susunan_halaman_v2.sql
+                                              # migrasi DB yang sudah berjalan
 
 Berkas skema mengasumsikan database kosong; skrip ini berhenti di berkas
 pertama yang gagal. tests/conftest.py memakai apply_files() yang sama untuk
@@ -124,6 +126,17 @@ def main(argv: list[str]) -> int:
         with engine.connect() as conn:
             ver = conn.scalar(text("SELECT version()"))
         print(f"[OK] connected — {str(ver).split(',')[0]}")
+        return 0
+    if argv[:1] == ["--migrate"] and len(argv) == 2:
+        # Migrasi DB yang sudah berjalan (database/migrations/*.sql, idempoten).
+        raw = engine.raw_connection()
+        try:
+            apply_files(raw.driver_connection, (f"migrations/{argv[1]}",))
+        except Exception as exc:
+            print(f"[FAIL] {exc}")
+            return 1
+        finally:
+            raw.close()
         return 0
     if argv:
         print(__doc__)

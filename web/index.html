@@ -1,23 +1,26 @@
 <!doctype html>
-<!-- web/index.html — Beranda Publik (INTERFACE.md §2.1), tanpa login.
-     Isi dari pages/home-public.html + js/home-public.js. -->
+<!-- web/index.html — Beranda publik (INTERFACE.md §2.1), tanpa login: sambutan,
+     penjelasan aplikasi, dan navigasi halaman per peran. Isi dari
+     pages/landing.html + js/landing.js. Kondisi terkini (tile satelit) ada di
+     "/kondisi" (§2.2, web/kondisi.html). -->
 <html lang="id">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Orbit-U: The Monitor — Pantauan Hidrometeorologi Lebak Selatan</title>
-<meta name="description" content="Kondisi terbaru Lebak Selatan dari Sentinel-1, MODIS, dan GPM. Bukan peringatan dini resmi.">
+<meta name="description" content="Pantauan hidrometeorologi Lebak Selatan dari Sentinel-1, MODIS, dan GPM untuk relawan dan analis GMLS. Bukan peringatan dini resmi.">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="css/main.css?v=4.0">
+<link rel="stylesheet" href="css/main.css?v=5.2">
+<link rel="stylesheet" href="css/landing.css?v=5.2">
 </head>
 <body data-requires-auth="false">
 <a class="skip-link" href="#pageRoot">Lompat ke isi</a>
 <main id="pageRoot" tabindex="-1"></main>
-<script src="js/ui.js?v=4.0"></script>
-<script src="js/api.js?v=4.0"></script>
-<script src="js/auth.js?v=4.0"></script>
-<script src="js/live-tiles.js?v=4.0"></script>
-<script src="js/app.js?v=4.0"></script>
-<script>Shell.mountPublic({ file: 'home-public' });</script>
+<script src="js/ui.js?v=5.2"></script>
+<script src="js/api.js?v=5.2"></script>
+<script src="js/auth.js?v=5.2"></script>
+<script src="js/live-tiles.js?v=5.2"></script>
+<script src="js/app.js?v=5.2"></script>
+<script>Shell.mountPublic({ file: 'landing' });</script>
 </body>
 </html>

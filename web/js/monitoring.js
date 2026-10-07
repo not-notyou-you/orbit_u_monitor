@@ -140,7 +140,16 @@ Pages['monitoring'] = (() => {
     html += UI.screenHTML({ channel: 'CATATAN PRAKIRAAN', body: '<p class="scr-text v-amber" style="margin:0">GARIS PUTUS-PUTUS DAN PITA = PRAKIRAAN STATISTIK, BUKAN PERINGATAN' +
       (method ? ' (' + UI.esc(method.toUpperCase()) + ', ' + UI.int(forecast.n_scenes) + ' SCENE)' : '') + '. NILAI AKTUAL = GARIS/BATANG HIJAU.</p>' });
     deck.innerHTML = html;
-    LiveTiles.bindLightbox(deck, sc.previews || {}, sc.interpretations || {}, sc.date);
+    // "Lihat 3D" di lightbox: pilihan area/tanggal/lapisan dititipkan ke tab
+    // Relief 3D lewat sessionStorage, bukan parameter hash -- router
+    // menormalkan hash (history.replaceState) sehingga query akan terhapus
+    // sebelum halaman tujuan init.
+    LiveTiles.bindLightbox(deck, sc.previews || {}, sc.interpretations || {}, sc.date, {
+      action: { label: 'Lihat 3D', onPick: item => {
+        Terrain3DHandoff.set({ area_id: st.areaId, date: sc.date, key: item.key });
+        st.ctx.go('#aoi-3d');
+      } },
+    });
   }
 
   async function adminAction(btn, kind) {

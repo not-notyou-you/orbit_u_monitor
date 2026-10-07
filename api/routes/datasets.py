@@ -31,6 +31,7 @@ from api.schemas import (
     SourceStorageItem,
     TierStorageItem,
 )
+from etl import admin_overlay
 from etl import folder_manager as fm
 from api.deps import Principal, current_principal, get_db, get_etl_db, mark_download, require_role
 from api.errors import ApiError
@@ -418,7 +419,14 @@ def _preview_level_payload(
             # milik tanggal ini tidak boleh ikut ditampilkan di sini.
             if not _belongs_to_scene(filename, scene):
                 continue
-            images.append({**entry, "url": f"{base_url}/{kind}/{filename}"})
+            img = {**entry, "url": f"{base_url}/{kind}/{filename}"}
+            # Varian garis wilayah (etl/admin_overlay.py) dikirim sebagai URL
+            # kedua pada gambar yang sama, bukan sebagai gambar tersendiri:
+            # galeri menukar src-nya saat checkbox "Garis wilayah" aktif.
+            adm = entry.get("file_adm")
+            if adm and (kind_dir / adm).exists():
+                img["url_boundaries"] = f"{base_url}/{kind}/{adm}"
+            images.append(img)
         # Cadangan kalau sidecar tidak terbaca: listing PNG tanggal ini apa
         # adanya, supaya galeri tetap terisi walau tanpa keterangan.
         if not images:
@@ -427,7 +435,7 @@ def _preview_level_payload(
                  "url": f"{base_url}/{kind}/{f.name}",
                  "size_bytes": f.stat().st_size}
                 for f in sorted(kind_dir.glob("*.png"))
-                if _belongs_to_scene(f.name, scene)
+                if _belongs_to_scene(f.name, scene) and not admin_overlay.is_adm_file(f.name)
             ]
         kinds[kind] = {
             "count": len(images),

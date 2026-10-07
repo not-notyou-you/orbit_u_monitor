@@ -1,0 +1,62 @@
+/* web/css/landing.css — halaman publik `/` (Orbital 95): hero sambutan, strip
+   status satu baris, dan penjelasan tambahan yang dapat dilipat. Hanya dimuat
+   index.html. Kartu navigasi (.navcards/.navcard) ada di main.css karena
+   Beranda aplikasi memakainya juga. */
+
+/* ---------------------------------------------------------------- hero */
+.hero { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.hero .hero-logo {
+  width: 64px; height: 64px; flex: none; display: block;
+  image-rendering: pixelated;
+  box-shadow: inset -1px -1px var(--hilite), inset 1px 1px var(--shadow),
+              inset -2px -2px var(--light), inset 2px 2px var(--dark);
+  padding: 2px; background: var(--crt);
+}
+.hero .hero-text { flex: 1 1 320px; min-width: 0; }
+.hero .hero-name { font-size: 22px; line-height: 1.1; margin: 0 0 2px; letter-spacing: .01em; }
+.hero .hero-tag {
+  color: var(--text-mut); text-transform: uppercase; letter-spacing: .08em;
+  font-size: 11px; font-weight: 700; margin: 0 0 8px;
+}
+.hero .hero-lede { margin: 0 0 10px; line-height: 1.5; max-width: 62ch; }
+.hero .btn-row { margin-top: 2px; }
+
+/* Strip status satu baris di bawah hero: bukan monitor, hanya pengantar ke
+   bagian "Kondisi terkini" di bagian bawah halaman. */
+.hero-strip { margin-top: 8px; }
+.hero-strip .screen-inner { min-height: 0; padding: 8px 10px; }
+.hero-strip .hs-line { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin: 0; }
+.hero-strip .hs-line .lbl { flex: none; }
+.hero-strip .hs-more { margin-left: auto; }
+
+/* --------------------------------------------- penjelasan yang dapat dilipat */
+/* Penyangkalan panjang tidak lagi menghalangi data. Summary tetap terlihat dan
+   dapat difokus dengan papan tombol; isinya tertutup secara bawaan. */
+.expl { margin: 8px 0; }
+.expl > summary {
+  padding: 4px 8px; cursor: pointer; font-weight: 700; list-style: none;
+  background: var(--face);
+  box-shadow: inset -1px -1px var(--dark), inset 1px 1px var(--hilite),
+              inset -2px -2px var(--shadow), inset 2px 2px var(--light);
+}
+.expl > summary::-webkit-details-marker { display: none; }
+.expl > summary::before { content: '\25B8  '; }
+.expl[open] > summary::before { content: '\25BE  '; }
+.expl > summary:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
+.expl[open] > summary { margin-bottom: 8px; }
+
+/* Tabel ringkas "peran dan aksesnya". */
+.roles { width: 100%; border-collapse: collapse; font-size: 11px; }
+.roles th, .roles td { text-align: left; padding: 3px 6px; vertical-align: top; border-bottom: 1px solid var(--shadow); }
+.roles th { color: var(--text-mut); text-transform: uppercase; letter-spacing: .08em; }
+.roles tr:last-child td { border-bottom: 0; }
+
+/* Daftar "yang perlu diketahui" */
+.facts { margin: 0; padding-left: 18px; }
+.facts li { margin-bottom: 6px; line-height: 1.5; }
+.facts li:last-child { margin-bottom: 0; }
+
+@media (max-width: 420px) {
+  .hero .hero-name { font-size: 18px; }
+  .hero .hero-logo { width: 48px; height: 48px; }
+}
