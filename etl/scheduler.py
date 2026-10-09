@@ -8,6 +8,7 @@
 | Siklus Live               | 01:00, 07:00, 13:00, 19:00   | live           |
 | Laporan mingguan          | Senin 03:00 / 03:15          | report         |
 | Laporan bulanan           | tanggal 1, 03:30 / 03:45     | report         |
+| Forecast tersimpan (M62)  | 00:30, 06:30, 12:30, 18:30   | forecast       |
 
 Setiap job memegang ``pg_try_advisory_lock`` selama berjalan. Gagal ->
 worker lain sedang menjalankannya -> job dilewati dan dicatat sebagai baris
@@ -15,6 +16,10 @@ worker lain sedang menjalankannya -> job dilewati dan dicatat sebagai baris
 laporan lebih dulu menunggu kunci ``hydromet`` maksimal
 ``app_settings.report.wait_hydromet_minutes`` (60) lalu tetap jalan dengan
 catatan "data hari terakhir belum lengkap" (§6.1).
+
+Forecast tersimpan juga dihitung di akhir job hidromet dan setiap siklus Live
+(etl/forecast_store.py); job ``forecast_refresh`` hanya jaring pengaman, dan
+murah karena deret yang datanya tidak berubah dilewati.
 
 Backup ``pg_dump`` 01:30 di luar APScheduler (cron OS).
 """
@@ -56,6 +61,7 @@ JOBS = (
             {"day_of_week": "mon", "hour": 3, "minute": 15}),
     JobSpec("report_HYDROMET_MONTHLY", "Laporan Hidromet bulanan", "report", {"day": 1, "hour": 3, "minute": 30}),
     JobSpec("report_DATAHEALTH_MONTHLY", "Laporan Kesehatan Data bulanan", "report", {"day": 1, "hour": 3, "minute": 45}),
+    JobSpec("forecast_refresh", "Forecast tersimpan", "forecast", {"hour": "0,6,12,18", "minute": 30}),
 )
 
 
@@ -92,15 +98,35 @@ def run_locked(db, spec_id: str, lock: str, fn: Callable[[], object]) -> dict:
 # --- isi job -------------------------------------------------------------------------
 
 def job_hydromet_daily(db) -> dict:
+    from etl import forecast_store as fs
     from etl import hydromet_job as hj
-    return run_locked(db, "hydromet_daily", "hydromet",
-                      lambda: [(str(r.obs_date), r.status) for r in hj.run_daily(db)])
+    out = run_locked(db, "hydromet_daily", "hydromet",
+                     lambda: [(str(r.obs_date), r.status) for r in hj.run_daily(db)])
+    fs.refresh_quietly(db)
+    return out
 
 
 def job_hydromet_final(db) -> dict:
+    from etl import forecast_store as fs
     from etl import hydromet_job as hj
-    return run_locked(db, "hydromet_final", "hydromet",
-                      lambda: [(str(r.obs_date), r.status) for r in hj.refresh_late_to_final(db)])
+    out = run_locked(db, "hydromet_final", "hydromet",
+                     lambda: [(str(r.obs_date), r.status) for r in hj.refresh_late_to_final(db)])
+    fs.refresh_quietly(db)
+    return out
+
+
+def job_forecast(db) -> dict:
+    """refresh() memegang kunci 'forecast' sendiri, jadi tidak lewat run_locked."""
+    from etl import forecast_store as fs
+    try:
+        res = fs.refresh(db)
+    except Exception as exc:
+        logger.exception("[SCHED] forecast_refresh gagal")
+        return {"status": "FAILED", "error": str(exc)}
+    if res["locked"]:
+        record_skip(db, "forecast_refresh", "forecast")
+        return {"status": "SKIPPED_LOCKED"}
+    return {"status": "OK", "result": res}
 
 
 def job_live(db) -> dict:
@@ -147,6 +173,8 @@ def runner_for(spec: JobSpec, db) -> Callable[[], dict]:
         return lambda: job_hydromet_final(db)
     if spec.job_id == "live_cycle":
         return lambda: job_live(db)
+    if spec.job_id == "forecast_refresh":
+        return lambda: job_forecast(db)
     code = spec.job_id.removeprefix("report_")
     return lambda: job_report(db, code)
 

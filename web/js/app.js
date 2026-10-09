@@ -15,7 +15,7 @@
 'use strict';
 
 window.Pages = window.Pages || {};
-const ASSET_V = '6.15';
+const ASSET_V = '6.16';
 
 // `lede` = keterangan halaman; tidak lagi ditampilkan di jendela (dihapus atas
 // permintaan pemilik proyek), disimpan sebagai dokumentasi rute.

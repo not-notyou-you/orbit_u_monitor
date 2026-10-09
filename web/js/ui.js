@@ -565,7 +565,8 @@ const UI = (() => {
     return q;
   }
   const forecastDesc = f => !f ? 'menghitung…' : f.error ? 'gagal: ' + f.notes.join(' ') : !f.points.length ? (f.notes[0] || 'data kurang') :
-    f.model_label + ' · keyakinan ' + f.confidence + (f.backtest ? ' (skill ' + num(f.backtest.skill, 2) + ')' : '');
+    f.model_label + ' · keyakinan ' + f.confidence + (f.backtest ? ' (skill ' + num(f.backtest.skill, 2) + ')' : '') +
+    (f.stored && f.computed_at ? ' · dihitung ' + dateTime(f.computed_at) : '');
   const forecastToggleHTML = (attr, on) => '<label class="check fc-toggle"><input type="checkbox" ' + attr + (on ? ' checked' : '') +
     '> Tampilkan forecast 15 hari</label>';
 

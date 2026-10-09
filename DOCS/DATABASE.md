@@ -133,6 +133,7 @@ diisi dari kode.
 | Mutu | `quality_metrics`, `quality_alerts` |
 | Live | `live_areas`, `live_scenes`, `live_scene_metrics`, `live_events` |
 | Observasi & peringatan | `region_observations`, `alert_events` |
+| Forecast | `band_forecasts`, `band_forecast_points`, `band_forecast_scores` |
 | Kejadian & laporan | `disaster_events`, `generated_reports` |
 | Akses & jejak | `api_tokens`, `user_activity_logs`, `audit_log` |
 
@@ -188,6 +189,7 @@ Semua tabel memakai **PK surrogate** (`SERIAL`/`BIGSERIAL`/`SMALLSERIAL`). Kunci
 | `nasa_scenes` | (`source`, `tile_id`, `product_short_name`, `acquisition_date`) |
 | `region_observations` | (`region_id`, `band_id`, `obs_date`) |
 | `alert_events` | (`rule_id`, `region_id`, `observation_date`) |
+| `band_forecasts` | (`band_id`, `COALESCE(region_id, 0)`, `data_stamp`) (indeks unik ekspresi; `region_id` NULL = rerata AOI) |
 | `data_lineage` | (`parent_product_id`, `child_product_id`) |
 | `api_tokens` | `token_prefix` |
 
@@ -341,6 +343,20 @@ Token API pribadi (M33). Yang disimpan hanya `token_prefix` (8 karakter) dan `to
 utuh ditampilkan sekali saat dibuat. Umur paling lama 180 hari (`chk_token_max_lifetime`). Scope `READ` atau
 `READ_DOWNLOAD`. Dibatasi RLS ke pemiliknya (§8.4).
 
+#### 4.2.9 `band_forecasts`, `band_forecast_points`, `band_forecast_scores`
+Forecast 15 hari halaman Forecast (M62). Dihitung saat data baru masuk oleh `etl/forecast_store.py`, lalu
+dibaca API tanpa menghitung ulang. Rumus dan jadwalnya ada di PIPELINE.md §14.
+
+- `band_forecasts`: satu baris per deret (band × rerata AOI atau band × kecamatan) per **cap data**
+  (`data_stamp`). Berisi model terpilih, keyakinan, MAE, MAE naive, skill, jumlah asal backtest, catatan,
+  dan lama hitung. Forecast tersimpan dianggap basi bila cap data band sekarang berbeda.
+- `band_forecast_points`: 15 titik per forecast (`step`, `target_date`, `mean`, `lo`, `hi`).
+  `CHECK (lo <= mean <= hi)`.
+- `band_forecast_scores`: MAE backtest **setiap** model kandidat. Ini bukti mengapa model terpilih menang.
+
+Riwayat 365 hari disimpan, jadi model yang dipakai pada tanggal tertentu tetap bisa dilacak. Anak tabel
+terhapus bersama induknya (`ON DELETE CASCADE`).
+
 ### 4.3 Perkiraan volume
 
 `region_observations` tumbuh sebesar:
@@ -353,6 +369,17 @@ baris/hari ≈ jumlah kecamatan in_aoi × (7 band GPM/MODIS)            -- haria
 Backfill dataset utama mencakup `storage.raster_retention_days` (365 hari) ke belakang. Angka per kecamatan
 tidak ikut dihapus, jadi tabel ini terus tumbuh secara linear. `benchmark/generate.py` meniru bentuk dan
 volume ini dengan data sintetis untuk uji DBMS. Jumlah baris aktual diambil dengan `db_manifest.sql`.
+
+Forecast tersimpan bertambah hanya untuk deret yang datanya berubah. Paling banyak, per perubahan data:
+
+```
+band_forecasts       ≤ 10 band × (1 + jumlah kecamatan in_aoi)        -- 110 untuk 10 kecamatan
+band_forecast_points ≤ 15 × band_forecasts
+band_forecast_scores ≤ 5  × band_forecasts
+```
+
+Dengan satu Job Hidromet per hari ditambah 4 siklus Live, angkanya tetap terbatas karena riwayat lebih dari
+365 hari dihapus.
 
 ---
 
@@ -372,6 +399,8 @@ ada beberapa entitas yang **eksistensinya bergantung** pada induknya. Ketergantu
 | `data_lineage` | `data_products` (dua kali) | produk 1 : 0..* anak, 1 : 0..* induk |
 | `quality_metrics` | `satellite_scenes`, `data_products` | 1 : 0..* per band |
 | `live_scene_metrics` | `live_scenes` | 1 : 0..* per band × metrik |
+| `band_forecast_points` | `band_forecasts` | 1 : 0..15 |
+| `band_forecast_scores` | `band_forecasts` | 1 : 0..5 (satu per model kandidat) |
 
 Relasi kunci lainnya:
 
@@ -382,6 +411,8 @@ Relasi kunci lainnya:
 | `administrative_regions` – `region_observations` | 1 : 0..* |
 | `spectral_bands` – `region_observations` | 1 : 0..* |
 | `region_observations` – `alert_events` | 1 : 0..* (satu observasi bisa memicu beberapa aturan) |
+| `spectral_bands` – `band_forecasts` | 1 : 0..* |
+| `administrative_regions` – `band_forecasts` | 0..1 : 0..* (NULL = rerata AOI) |
 | `alert_rules` – `alert_events` | 1 : 0..* |
 | `users` – `alert_events` (acknowledge) | 0..1 : 0..* |
 | `disaster_types` – `disaster_events` | 1 : 0..* |
@@ -416,6 +447,14 @@ Tabel inti diperiksa sampai 3NF:
 **`data_lineage`**
 - Satu baris per sisi graf (induk, anak). Parameter transformasi berupa JSONB karena isinya berbeda per tahap.
   Isi ini dibaca utuh sebagai dokumen jejak, tidak pernah di-query per kunci untuk kebutuhan relasional.
+
+**`band_forecasts`** (`band_id`, `region_id`, `data_stamp` → model, skill, …)
+- 1NF: titik forecast dan skor per model disimpan sebagai baris di `band_forecast_points` dan
+  `band_forecast_scores`, bukan JSON (alasan yang sama dengan M31). Dengan begitu skor model bisa di-query,
+  misalnya "berapa kali model musiman menang untuk hujan bulan ini".
+- `notes` berupa satu teks dengan satu catatan per baris. Isinya hanya dibaca utuh untuk ditampilkan.
+- `mae`, `mae_naive`, dan `skill` sengaja disimpan walau `mae` bisa diambil dari `band_forecast_scores`. Ini
+  ringkasan saat dihitung yang dibaca API setiap request, sama seperti salinan historis di `alert_events`.
 
 Pengecualian 1NF yang disengaja (M32): `datasets.required_tiers`, `datasets.preview_options`, dan
 `dataset_source_config.processing_levels` berupa `TEXT[]` dengan paling banyak 7 elemen. Ketiganya
@@ -472,6 +511,7 @@ Setiap tabel, kolom, dan VIEW **wajib** punya `COMMENT` (M34). Aturan ini diuji
 | Baris "aktif" saja | Indeks parsial: `idx_alerts_active` (`WHERE acknowledged_at IS NULL`), `idx_datasets_status` (`<> 'DELETED'`), `idx_disasters_date_region` (`deleted_at IS NULL`) |
 | Pencarian tidak peka huruf | Indeks ekspresi `lower(name)`, `lower(email)` |
 | Lineage dua arah | `idx_lineage_parent_id`, `idx_lineage_child_id` |
+| Forecast terbaru per deret | `idx_band_forecasts_latest` (`band_id`, `region_id`, `computed_at DESC`) |
 
 Rencana eksekusi aktual untuk kueri benchmark disimpan di `benchmark/results/explain_*.txt`.
 
@@ -580,6 +620,7 @@ peran di atasnya.
 | `api_tokens` | | SIU (RLS) | | | | |
 | `user_activity_logs` | I | | | | S | I |
 | `audit_log` | | | | | S | |
+| `band_forecasts`, `band_forecast_points`, `band_forecast_scores` | | | S | | | SID |
 
 ¹ ADMIN hanya mendapat SIU pada `alert_rules`, `quality_thresholds`, `disaster_types`, `app_settings`,
 `administrative_regions`, dan `regions_of_interest`.

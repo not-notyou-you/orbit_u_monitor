@@ -1,8 +1,8 @@
 # Kamus Data — Orbit-U: The Monitor
 
-> Dibangkitkan otomatis oleh `tools/data_dictionary.py` dari katalog PostgreSQL (database `themonitor`, 2026-10-08 06:51 UTC). Jangan disunting manual; ubah `database/monitor_schema.sql` (termasuk `COMMENT ON`) lalu bangkitkan ulang.
+> Dibangkitkan otomatis oleh `tools/data_dictionary.py` dari katalog PostgreSQL (database `themonitor`, 2026-10-09 06:20 UTC). Jangan disunting manual; ubah `database/monitor_schema.sql` (termasuk `COMMENT ON`) lalu bangkitkan ulang.
 
-Jumlah: **38 tabel**, **19 VIEW**.
+Jumlah: **41 tabel**, **19 VIEW**.
 
 ## Daftar tabel
 
@@ -14,6 +14,9 @@ Jumlah: **38 tabel**, **19 VIEW**.
 | [`api_tokens`](#api_tokens) | Token API pribadi untuk skrip/sistem lain (M33). Hanya hash yang disimpan; token utuh ditampilkan sekali. |
 | [`app_settings`](#app_settings) | Pengaturan key-value yang boleh diubah ADMIN tanpa restart (PIPELINE.md §11). |
 | [`audit_log`](#audit_log) | Jejak perubahan data yang diisi trigger audit_row (append-only, M15). Trigger dipasang di monitor_security.sql. |
+| [`band_forecast_points`](#band_forecast_points) | Titik forecast harian satu band_forecasts (M62). |
+| [`band_forecast_scores`](#band_forecast_scores) | MAE backtest setiap model kandidat untuk satu band_forecasts (M62): bukti kenapa model terpilih menang. |
+| [`band_forecasts`](#band_forecasts) | Forecast 15 hari per deret (band × AOI/kecamatan), dihitung saat data baru masuk dari seluruh riwayat region_observations (M62). Riwayat 365 hari disimpan supaya model yang dipakai pada tanggal tertentu bisa dilacak. |
 | [`cleanup_operations`](#cleanup_operations) | Progres penghapusan berkas per dataset (cleanup tier akhir job atau hapus dataset). Sengaja tanpa FK ke datasets agar progres tetap terbaca setelah dataset dihapus. |
 | [`data_lineage`](#data_lineage) | Graf asiklik (DAG) transformasi produk: induk -> anak dengan checksum input/output (RM2). |
 | [`data_products`](#data_products) | Registri setiap berkas keluaran pipeline (COG, TIFF, HDF5) dengan checksum SHA-256. |
@@ -194,6 +197,77 @@ Jejak perubahan data yang diisi trigger audit_row (append-only, M15). Trigger di
 
 - `audit_log_operation_check` (CHECK): `CHECK ((operation = ANY (ARRAY['I'::bpchar, 'U'::bpchar, 'D'::bpchar])))`
 - `audit_log_pkey` (PK): `PRIMARY KEY (audit_id)`
+
+## band_forecast_points
+
+Titik forecast harian satu band_forecasts (M62).
+
+| Kolom | Tipe | Null | Default | Kunci | Keterangan |
+|---|---|---|---|---|---|
+| `forecast_id` | `bigint` | NOT NULL |  | FK→band_forecasts, PK | FK -> band_forecasts. |
+| `step` | `smallint` | NOT NULL |  | PK | Langkah ke-k (1 = sehari sesudah last_obs_date). |
+| `target_date` | `date` | NOT NULL |  |  | Tanggal yang diramal. |
+| `mean` | `numeric(12,4)` | NOT NULL |  |  | Nilai forecast (satuan band). |
+| `lo` | `numeric(12,4)` | NOT NULL |  |  | Batas bawah pita 80%. |
+| `hi` | `numeric(12,4)` | NOT NULL |  |  | Batas atas pita 80%. |
+
+**Constraint**
+
+- `band_forecast_points_check` (CHECK): `CHECK (((lo <= mean) AND (mean <= hi)))`
+- `band_forecast_points_step_check` (CHECK): `CHECK (((step >= 1) AND (step <= 30)))`
+- `band_forecast_points_forecast_id_fkey` (FK): `FOREIGN KEY (forecast_id) REFERENCES band_forecasts(forecast_id) ON DELETE CASCADE`
+- `band_forecast_points_pkey` (PK): `PRIMARY KEY (forecast_id, step)`
+
+## band_forecast_scores
+
+MAE backtest setiap model kandidat untuk satu band_forecasts (M62): bukti kenapa model terpilih menang.
+
+| Kolom | Tipe | Null | Default | Kunci | Keterangan |
+|---|---|---|---|---|---|
+| `forecast_id` | `bigint` | NOT NULL |  | FK→band_forecasts, PK | FK -> band_forecasts. |
+| `model` | `character varying(10)` | NOT NULL |  | PK | Model kandidat. |
+| `mae` | `numeric(14,6)` | NOT NULL |  |  | MAE backtest model itu (satuan band). |
+
+**Constraint**
+
+- `band_forecast_scores_model_check` (CHECK): `CHECK (((model)::text = ANY ((ARRAY['naive'::character varying, 'ses'::character varying, 'holt'::character varying, 'clim'::character varying, 'clim_ar1'::character varying])::text[])))`
+- `band_forecast_scores_forecast_id_fkey` (FK): `FOREIGN KEY (forecast_id) REFERENCES band_forecasts(forecast_id) ON DELETE CASCADE`
+- `band_forecast_scores_pkey` (PK): `PRIMARY KEY (forecast_id, model)`
+
+## band_forecasts
+
+Forecast 15 hari per deret (band × AOI/kecamatan), dihitung saat data baru masuk dari seluruh riwayat region_observations (M62). Riwayat 365 hari disimpan supaya model yang dipakai pada tanggal tertentu bisa dilacak.
+
+| Kolom | Tipe | Null | Default | Kunci | Keterangan |
+|---|---|---|---|---|---|
+| `forecast_id` | `bigint` | NOT NULL | `nextval('band_forecasts_forecast_id_seq'::regclass)` | PK | PK surrogate. |
+| `band_id` | `smallint` | NOT NULL |  | FK→spectral_bands | FK -> spectral_bands: band yang diramal. |
+| `region_id` | `integer` | NULL |  | FK→administrative_regions | FK -> administrative_regions (kecamatan). NULL = rerata AOI. |
+| `data_stamp` | `timestamp with time zone` | NOT NULL |  |  | Cap data band saat dihitung: max(region_observations.computed_at) band itu dan max(live_scenes.updated_at). Forecast basi bila cap sekarang berbeda. |
+| `end_date` | `date` | NOT NULL |  |  | Data dipakai s.d. tanggal ini (hari UTC saat dihitung). |
+| `history_from` | `date` | NULL |  |  | Tanggal observasi pertama yang dipakai. |
+| `last_obs_date` | `date` | NULL |  |  | Tanggal observasi terakhir; titik forecast mulai sehari sesudahnya. |
+| `n_obs` | `integer` | NOT NULL |  |  | Jumlah hari berdata yang dipakai. |
+| `horizon` | `smallint` | NOT NULL |  |  | Jumlah hari yang diramal (15). |
+| `model` | `character varying(10)` | NULL |  |  | Model terpilih backtest: naive \| ses \| holt \| clim \| clim_ar1. NULL bila data < 10 titik. |
+| `confidence` | `character varying(6)` | NULL |  |  | Keyakinan dari skill backtest: rendah \| sedang \| tinggi. |
+| `backtest_origins` | `smallint` | NULL |  |  | Jumlah titik asal backtest yang dinilai (maks. 12). NULL bila riwayat terlalu pendek. |
+| `mae` | `numeric(14,6)` | NULL |  |  | MAE backtest model terpilih (satuan band). |
+| `mae_naive` | `numeric(14,6)` | NULL |  |  | MAE backtest model naive (pembanding). |
+| `skill` | `numeric(8,4)` | NULL |  |  | Skill = 1 - mae / mae_naive. |
+| `notes` | `text` | NULL |  |  | Catatan untuk pengguna (celah data, tidak mengalahkan naive), satu per baris. |
+| `duration_ms` | `integer` | NOT NULL | `0` |  | Lama perhitungan deret ini (ms). |
+| `computed_at` | `timestamp with time zone` | NOT NULL | `now()` |  | Waktu dihitung. |
+
+**Constraint**
+
+- `band_forecasts_confidence_check` (CHECK): `CHECK (((confidence)::text = ANY ((ARRAY['rendah'::character varying, 'sedang'::character varying, 'tinggi'::character varying])::text[])))`
+- `band_forecasts_horizon_check` (CHECK): `CHECK (((horizon >= 1) AND (horizon <= 30)))`
+- `band_forecasts_model_check` (CHECK): `CHECK (((model)::text = ANY ((ARRAY['naive'::character varying, 'ses'::character varying, 'holt'::character varying, 'clim'::character varying, 'clim_ar1'::character varying])::text[])))`
+- `band_forecasts_n_obs_check` (CHECK): `CHECK ((n_obs >= 0))`
+- `band_forecasts_band_id_fkey` (FK): `FOREIGN KEY (band_id) REFERENCES spectral_bands(band_id)`
+- `band_forecasts_region_id_fkey` (FK): `FOREIGN KEY (region_id) REFERENCES administrative_regions(region_id)`
+- `band_forecasts_pkey` (PK): `PRIMARY KEY (forecast_id)`
 
 ## cleanup_operations
 

@@ -72,6 +72,10 @@ INSERT INTO gm_expected VALUES
     ('v_kejadian_dan_hujan',     '',  '',    'S',   '',    'S',    'S'),
     ('v_evaluasi_alert',         '',  '',    'S',   '',    'S',    'S'),
     ('region_observations',      '',  'S',   'S',   'S',   'S',    'SIU'),
+    -- forecast tersimpan (M62): dibaca ANALYST+, ditulis ETL (+D untuk retensi 365 hari)
+    ('band_forecasts',           '',  '',    'S',   '',    'S',    'SID'),
+    ('band_forecast_points',     '',  '',    'S',   '',    'S',    'SID'),
+    ('band_forecast_scores',     '',  '',    'S',   '',    'S',    'SID'),
     -- katalog dataset; D etl = penghapusan fisik dataset (Tahap 2 S1)
     ('datasets',                 '',  '',    '',    'SIU', 'SIUD', 'SIUD'),
     ('dataset_source_config',    '',  '',    '',    'SIU', 'SIUD', 'SIU'),

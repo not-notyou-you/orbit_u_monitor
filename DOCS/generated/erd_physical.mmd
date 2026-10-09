@@ -68,6 +68,39 @@ erDiagram
         name db_user
         timestamptz changed_at
     }
+    band_forecast_points {
+        bigint forecast_id PK,FK
+        smallint step PK
+        date target_date
+        numeric mean
+        numeric lo
+        numeric hi
+    }
+    band_forecast_scores {
+        bigint forecast_id PK,FK
+        varchar model PK
+        numeric mae
+    }
+    band_forecasts {
+        bigint forecast_id PK
+        smallint band_id FK
+        integer region_id FK
+        timestamptz data_stamp
+        date end_date
+        date history_from
+        date last_obs_date
+        integer n_obs
+        smallint horizon
+        varchar model
+        varchar confidence
+        smallint backtest_origins
+        numeric mae
+        numeric mae_naive
+        numeric skill
+        text notes
+        integer duration_ms
+        timestamptz computed_at
+    }
     cleanup_operations {
         bigint id PK
         integer dataset_id
@@ -574,6 +607,10 @@ erDiagram
     users ||--o{ alert_rules : "updated_by"
     users ||--|{ api_tokens : "user_id"
     users ||--o{ app_settings : "updated_by"
+    band_forecasts ||--|{ band_forecast_points : "forecast_id"
+    band_forecasts ||--|{ band_forecast_scores : "forecast_id"
+    spectral_bands ||--|{ band_forecasts : "band_id"
+    administrative_regions ||--o{ band_forecasts : "region_id"
     dataset_jobs ||--o{ cleanup_operations : "job_id"
     data_products ||--|{ data_lineage : "child_product_id"
     processing_jobs ||--|{ data_lineage : "job_id"

@@ -179,6 +179,10 @@ GRANT SELECT ON disaster_events, v_kejadian_dan_hujan, v_evaluasi_alert,
 
 -- Sequence: nextval untuk tabel yang boleh di-INSERT. USAGE saja tidak
 -- memberi hak menulis tabel mana pun.
+-- Forecast tersimpan (M62): dibaca halaman Forecast (ANALYST+), ditulis ETL.
+GRANT SELECT ON band_forecasts, band_forecast_points, band_forecast_scores TO monitor_analyst;
+GRANT SELECT, INSERT, DELETE ON band_forecasts, band_forecast_points, band_forecast_scores TO monitor_etl;
+
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO monitor_public, monitor_etl;
 
 -- =============================================================================

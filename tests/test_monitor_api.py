@@ -336,7 +336,7 @@ class TestSchedulerLock:
         assert cron["report_DATAHEALTH_WEEKLY"]["minute"] == 15
         assert cron["report_HYDROMET_MONTHLY"] == {"day": 1, "hour": 3, "minute": 30}
         assert cron["report_DATAHEALTH_MONTHLY"]["minute"] == 45
-        assert {j.lock for j in JOBS} == {"hydromet", "live", "report"}
+        assert {j.lock for j in JOBS} == {"hydromet", "live", "report", "forecast"}
 
     def test_report_waits_for_hydromet_then_notes(self, etl_db_client, monkeypatch, tmp_path):
         from etl import report_periodic, scheduler

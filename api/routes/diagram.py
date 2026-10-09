@@ -8,7 +8,9 @@
   dipakai UI untuk memperbarui grafik otomatis saat data baru masuk.
 * ``/regions`` — analisa daerah: kecamatan × band × rentang tanggal bebas.
 * ``/forecast`` — forecast 15 hari satu band (rerata AOI, satu kecamatan,
-  atau rerata beberapa kecamatan) dari seluruh riwayatnya (``etl.band_forecast``).
+  atau rerata beberapa kecamatan) dari seluruh riwayatnya. Dibaca dari
+  ``band_forecasts`` bila masih berlaku (``etl.forecast_store``, M62), selain
+  itu dihitung di tempat (``etl.band_forecast``).
 * ``/report.pdf`` — PDF analisa daerah: daerah & tanggal pilihan pengguna,
   isinya SEMUA band per kecamatan.
 
@@ -32,6 +34,7 @@ from api.deps import get_session, mark_download, require_role
 from api.errors import ApiError
 from etl import band_catalog as bc
 from etl import band_forecast as bf
+from etl import forecast_store as fs
 
 router = APIRouter()
 
@@ -201,43 +204,12 @@ def latest(sess: Session = Depends(get_session), days: int = Query(30, ge=7, le=
             "last_obs_date": sess.scalar(text("SELECT max(obs_date) FROM region_observations")), "bands": out}
 
 
+# Forecast yang tidak tersimpan (rentang di masa lalu, rerata beberapa
+# kecamatan, horizon selain 15) dihitung di tempat dan disimpan di memori
+# sampai cap data band berubah.
 _FC_CACHE: OrderedDict[tuple, dict] = OrderedDict()
-_FC_CACHE_MAX = 512
+_FC_CACHE_MAX = 256
 _FC_LOCK = threading.Lock()
-
-
-def _data_stamp(sess: Session):
-    return sess.scalar(text("""SELECT greatest(
-        (SELECT max(computed_at) FROM region_observations),
-        (SELECT max(updated_at) FROM live_scenes))"""))
-
-
-def _aoi_points(sess: Session, band: str, end: date) -> list[tuple[date, float | None]]:
-    """Seluruh riwayat rerata AOI satu band, sumbernya sama dengan /latest:
-    angka harian per kecamatan, dan rerata scene Live untuk hari tanpa angka harian."""
-    vals = {d: _num(v) for d, v in sess.execute(text("""
-        SELECT s.scene_date, avg(m.value)
-        FROM live_scene_metrics m
-        JOIN live_scenes s ON s.live_scene_id = m.live_scene_id
-        JOIN live_areas a ON a.area_id = s.area_id AND a.deleted_at IS NULL
-        JOIN spectral_bands b ON b.band_id = m.band_id
-        WHERE m.metric_name = 'mean' AND b.band_code = :b AND s.scene_date <= :t
-          AND s.status IN ('READY', 'PARTIAL', 'DELETED')
-        GROUP BY 1"""), {"b": band, "t": end}).all()}
-    vals.update({d: _num(v) for d, v in sess.execute(text("""
-        SELECT o.obs_date, avg(o.value)
-        FROM region_observations o JOIN spectral_bands b USING (band_id)
-        JOIN administrative_regions r ON r.region_id = o.region_id AND r.in_aoi
-        WHERE b.band_code = :b AND o.obs_date <= :t GROUP BY 1"""), {"b": band, "t": end}).all()})
-    return list(vals.items())
-
-
-def _region_points(sess: Session, band: str, ids: list[int], end: date) -> list[tuple[date, float | None]]:
-    """Seluruh riwayat satu band untuk satu kecamatan, atau rerata harian beberapa kecamatan."""
-    return [(d, _num(v)) for d, v in sess.execute(text("""
-        SELECT o.obs_date, avg(o.value) FROM region_observations o JOIN spectral_bands b USING (band_id)
-        WHERE b.band_code = :b AND o.region_id = ANY(:r) AND o.obs_date <= :t GROUP BY 1"""),
-        {"b": band, "r": ids, "t": end}).all()]
 
 
 @router.get("/forecast", summary="Forecast of one band (AOI mean, one kecamatan, or the mean of several) from its full history")
@@ -248,9 +220,11 @@ def forecast(sess: Session = Depends(get_session),
              end: date | None = Query(None, description="Use data up to this day; default today (UTC)"),
              horizon: int = Query(bf.HORIZON, ge=1, le=30)) -> dict:
     """Satu deret per request supaya UI bisa menampilkan progres per deret.
-    Model dipilih per deret oleh backtest (etl/band_forecast.py). Hasil
-    disimpan di memori sampai data baru masuk (cap waktu sama dengan
-    `updated_at` /latest)."""
+
+    Jalur cepat (M62): forecast tersimpan di band_forecasts, dihitung saat data
+    baru masuk (etl/forecast_store.py). Dipakai bila cap data band sama dengan
+    saat dihitung dan `end` tidak memotong data yang dipakainya (end >=
+    observasi terakhir). Selain itu dihitung di tempat (etl/band_forecast.py)."""
     code = band.strip().upper()
     ids = _parse_ids(region_ids, "region_ids") if region_ids else [region_id] if region_id is not None else None
     if ids and len(ids) > MAX_REGIONS:
@@ -262,15 +236,23 @@ def forecast(sess: Session = Depends(get_session),
         _aoi_regions(sess, ids)
         ids = sorted(ids)
     end = end or _today()
-    key = (code, tuple(ids or ()), end, horizon, _data_stamp(sess))
+    single = ids[0] if ids and len(ids) == 1 else None
+    stamp = fs.band_stamp(sess, code)
+    meta = {"region_id": single, "region_ids": ids, "end": end}
+
+    if horizon == bf.HORIZON and (not ids or single is not None):
+        row = fs.latest(sess, code, single)
+        if row and row["data_stamp"] == stamp and end >= date.fromisoformat(row["last_obs_date"] or row["end_date"].isoformat()):
+            return {**row, **meta}
+
+    key = (code, tuple(ids or ()), end, horizon, stamp)
     with _FC_LOCK:
         hit = _FC_CACHE.get(key)
         if hit is not None:
             _FC_CACHE.move_to_end(key)
             return hit
-    pts = _aoi_points(sess, code, end) if not ids else _region_points(sess, code, ids, end)
-    out = {**bf.forecast(pts, code, horizon), "region_id": ids[0] if ids and len(ids) == 1 else None,
-           "region_ids": ids, "end": end}
+    pts = fs.aoi_points(sess, code, end) if not ids else fs.region_points(sess, code, ids, end)
+    out = {**bf.forecast(pts, code, horizon), **meta, "stored": False}
     with _FC_LOCK:
         _FC_CACHE[key] = out
         while len(_FC_CACHE) > _FC_CACHE_MAX:

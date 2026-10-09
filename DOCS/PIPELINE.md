@@ -276,6 +276,7 @@ baris FAILED beserta pesannya.
 | Siklus Live | 01:00, 07:00, 13:00, 19:00 | `live` |
 | Laporan mingguan | Senin 03:00 / 03:15 | `report` |
 | Laporan bulanan | tanggal 1, 03:30 / 03:45 | `report` |
+| Forecast tersimpan (jaring pengaman, §14.1) | 00:30, 06:30, 12:30, 18:30 | `forecast` |
 
 Ada dua lapis penguncian:
 
@@ -314,6 +315,7 @@ Uji: `tests/recovery/kill_and_resume.sh` dan `recovery_backfill.py`.
 | `region_observations`, `live_scene_metrics`, baris `live_scenes` | **Selamanya** |
 | Baris `nasa_scenes`, `data_products` | Selamanya. Produk yang berkasnya dihapus ditandai `is_valid = false` supaya lineage tetap terbaca |
 | Dataset Katalog | Sampai dihapus pemiliknya |
+| `band_forecasts` (+ titik dan skor) | 365 hari, dihapus di akhir `forecast_store.refresh` (§14) |
 
 Retensi hanya menghapus berkas di dalam root dataset miliknya sendiri, sehingga berkas dataset lain tidak
 pernah tersentuh.
@@ -395,3 +397,192 @@ dengan seed).
 - **Backup produksi:** `etl/scheduler.py` menyebut `pg_dump` pukul 01:30 lewat cron OS, di luar APScheduler.
   **Skrip dan jadwal cron-nya belum ada di repo.** Ini harus dibuat terpisah, misalnya Task Scheduler
   Windows yang memanggil `pg_dump -Fc`.
+
+---
+
+## 14. Forecast 15 Hari
+
+Halaman Forecast (M61) menampilkan forecast 15 hari di setiap grafik garis. Algoritmanya ada di
+`etl/band_forecast.py` (murni numpy, tanpa DB). Penyimpanan dan penjadwalannya ada di
+`etl/forecast_store.py` (M62).
+
+### 14.1 Kapan dihitung
+
+Forecast dihitung **saat data baru masuk**, bukan saat halaman dibuka, lalu disimpan di `band_forecasts`
+(DATABASE.md §4.2.9). Halaman hanya membacanya.
+
+| Pemicu | Tempat |
+|---|---|
+| Job Hidromet harian dan Late → Final selesai | `scheduler.job_hydromet_daily`, `job_hydromet_final` |
+| Backfill hidromet selesai (skrip atau halaman Data) | akhir `hydromet_job.backfill` |
+| Setiap siklus Live (Sentinel-1) selesai, termasuk backfill S1 | akhir `live_cycle.run_cycle` |
+| Jaring pengaman | job `forecast_refresh` 00:30, 06:30, 12:30, 18:30 |
+| Manual | `python -m etl.forecast_store [--force]` |
+
+Deret yang dihitung: 10 band per kecamatan × (rerata AOI + setiap kecamatan AOI) = 110 deret untuk 10
+kecamatan. Supaya pemicu yang sering tetap murah, setiap band punya **cap data**:
+
+```
+cap(band) = max( max(region_observations.computed_at  untuk band itu),
+                 max(live_scenes.updated_at) )
+```
+
+Deret dihitung ulang hanya bila `cap` sekarang berbeda dari `data_stamp` forecast tersimpan terakhirnya.
+Band yang datanya tidak berubah dilewati. Satu pekerja sekaligus dijamin oleh advisory lock `forecast`
+(§7). Kegagalan forecast tidak pernah menggagalkan job data yang memicunya.
+
+API `GET /api/diagram/forecast` memakai forecast tersimpan bila tiga syarat terpenuhi: horizon = 15, deretnya
+rerata AOI atau satu kecamatan, dan `cap` masih sama serta `end` ≥ tanggal observasi terakhir yang dipakai
+(artinya `end` tidak memotong data). Selain itu, misalnya rentang di masa lalu atau rerata beberapa
+kecamatan, forecast dihitung di tempat lalu disimpan di memori proses sampai `cap` berubah.
+
+Ukuran nyata (data Jan 2024 – Okt 2026, 10 kecamatan, 9 Okt 2026):
+
+| Kegiatan | Waktu |
+|---|---|
+| Hitung semua 110 deret pertama kali | 5,6 s |
+| Panggilan ulang tanpa data baru (110 dilewati) | 0,1 s |
+| API, forecast tersimpan | 2–17 ms per deret |
+| API, dihitung di tempat | 25–66 ms per deret |
+
+### 14.2 Deret masukan
+
+Notasi: `y_t` = nilai hari `t`, `T` = hari observasi terakhir, `h` = 1…15 langkah ke depan.
+
+- **Satu kecamatan**: `y_t` = `region_observations.value`.
+- **Rerata AOI**: `y_t = (1/|R_t|) Σ_{r ∈ R_t} y_{r,t}`, dengan `R_t` = kecamatan AOI yang punya nilai hari `t`.
+  Hari tanpa angka harian diisi rerata metrik `mean` scene Live (sumber yang sama dengan grafik).
+- **Rerata beberapa kecamatan** (Tren & evaluasi alert, CH-03): rumus yang sama dengan `R_t` terbatas pada
+  kecamatan pilihan.
+- Seluruh riwayat sampai `end` dipakai. Hari kosong diisi **interpolasi linier** supaya model bekerja pada
+  grid harian, tetapi hari hasil interpolasi **tidak ikut dinilai** di backtest.
+- **Hujan** (`RAIN_24H`, `RAIN_72H`, `RAIN_7D`, `RAIN_30D`) dimodelkan di ruang log karena distribusinya miring
+  dan banyak nol: `z_t = ln(1 + y_t)`, dan hasil dikembalikan dengan `y = e^z − 1`.
+
+### 14.3 Lima model kandidat
+
+| Model | Rumus forecast | Parameter |
+|---|---|---|
+| **Naive** | `ŷ_{T+h} = y_T` | — |
+| **SES** (simple exponential smoothing) | `ℓ_t = ℓ_{t−1} + α (y_t − ℓ_{t−1})`; `ŷ_{T+h} = ℓ_T` | `α ∈ {0,05; 0,10; …; 0,95}` |
+| **Holt tren teredam** | lihat di bawah | `α ∈ {0,1; 0,2; 0,3; 0,5; 0,7}`, `β ∈ {0,05; 0,1; 0,2}`, `φ = 0,9` |
+| **Musiman (klimatologi)** | `ŷ_{T+h} = c(d_{T+h})` | jendela ±15 hari |
+| **Musiman + anomali AR(1)** | `ŷ_{T+h} = c(d_{T+h}) + φ^h · a_T` | `φ` dari data |
+
+**Holt tren teredam**, dengan galat satu langkah `e_t`:
+
+```
+ŷ_{t|t−1} = ℓ_{t−1} + φ·b_{t−1}
+e_t       = y_t − ŷ_{t|t−1}
+ℓ_t       = ŷ_{t|t−1} + α·e_t
+b_t       = φ·b_{t−1} + α·β·e_t
+ŷ_{T+h}   = ℓ_T + (φ + φ² + … + φ^h)·b_T
+```
+
+Redaman `φ` membuat tren melandai, tidak diteruskan lurus tanpa batas.
+
+**Klimatologi.** `d_t` = hari ke berapa dalam tahun (0…365). `S(d)` = jumlah nilai pada hari-dalam-tahun
+`d` dari semua tahun, `N(d)` = banyaknya. Rerata dihaluskan jendela melingkar ±15 hari (31 Desember
+bertetangga dengan 1 Januari):
+
+```
+c(d) = Σ_{|d'−d| ≤ 15} S(d')  /  Σ_{|d'−d| ≤ 15} N(d')
+```
+
+**Anomali AR(1).** Anomali = selisih dari klimatologi, `a_t = y_t − c(d_t)`. Koefisien persistensi:
+
+```
+φ = corr(a_{t−1}, a_t),  dijepit ke [0; 0,99]
+```
+
+Anomali hari terakhir meluruh `φ^h` menuju klimatologi. Artinya, kalau hari ini lebih basah dari biasanya,
+beberapa hari ke depan diramal tetap lebih basah tetapi makin mendekati kebiasaan musimnya.
+
+SES dan Holt dilatih pada 365 hari terakhir saja (data lebih tua praktis tidak berpengaruh untuk `α ≥ 0,05`).
+Parameter `α`, `β` dipilih dari grid dengan meminimalkan jumlah kuadrat galat satu langkah `Σ e_t²`.
+Klimatologi dan AR(1) memakai seluruh riwayat.
+
+### 14.4 Pemilihan model: backtest rolling-origin
+
+Untuk deret dengan `n` hari, titik asal backtest:
+
+```
+o_j = n − 15 − 30·j,   j = 0, 1, …, 11,   hanya bila o_j ≥ 30
+```
+
+Jadi asalnya tersebar setiap 30 hari sepanjang setahun terakhir (semua musim). Pada setiap asal, setiap
+model dilatih dengan `y_1 … y_{o_j}` lalu meramal 15 hari berikutnya. Galatnya dihitung dalam satuan asli,
+hanya pada hari yang benar-benar teramati (`O`):
+
+```
+MAE_m = (1/|O|) Σ_{(j,h) ∈ O} | y_{o_j+h} − ŷ^{(m)}_{o_j+h} |
+
+model terpilih   m* = argmin_m MAE_m
+skill            = 1 − MAE_{m*} / MAE_naive
+```
+
+Model musiman hanya ikut bila asal paling awal masih punya ≥ 395 hari riwayat
+(`n − 15 − 330 ≥ 395`). Karena itu Sentinel-1, yang riwayatnya kurang dari setahun, hanya memakai naive, SES,
+dan Holt. `skill` dibaca sebagai "berapa persen lebih kecil galatnya dibanding menebak nilai terakhir
+berlanjut". `skill = 0` berarti naive sendiri yang terbaik.
+
+| Keyakinan | Syarat |
+|---|---|
+| tinggi | `skill ≥ 0,20` dan ≥ 8 asal backtest |
+| sedang | selain itu, `skill ≥ 0,05` dan ≥ 4 asal |
+| rendah | `skill < 0,05`, < 4 asal, atau riwayat terlalu pendek untuk backtest (dipakai SES) |
+
+Deret dengan kurang dari 10 hari berdata tidak diramal.
+
+### 14.5 Pita ketidakpastian 80%
+
+Pita diambil dari **galat backtest model terpilih**, bukan dari asumsi distribusi normal. Galat
+`e_{j,k} = y − ŷ` dihitung di ruang model (log untuk hujan). Untuk langkah `h`, galat langkah tetangga
+`|k − h| ≤ 2` dikumpulkan menjadi `P_h`:
+
+```
+bila |P_h| ≥ 8 :  L_h = min(Q_0,10(P_h), 0),   U_h = max(Q_0,90(P_h), 0)
+selain itu      :  L_h = −1,2816·σ_h,           U_h = +1,2816·σ_h
+```
+
+`Q_p` adalah kuantil ke-`p`. `σ_h` adalah simpangan baku galat dalam sampel model itu:
+
+| Model | `σ_h` |
+|---|---|
+| Naive | `σ·√h` (σ dari selisih harian) |
+| SES | `σ·√(1 + (h−1)·α²)` |
+| Holt | `σ·√(1 + (h−1)·α²·(1+β)²)` |
+| Musiman | `σ` (tetap) |
+| Musiman + AR(1) | `σ_a·√(1 − φ^{2h})` |
+
+Pita dibuat tidak menyempit ke depan (`L_h = min_{k≤h} L_k`, `U_h = max_{k≤h} U_k`), lalu:
+
+```
+mean_h = back(ŷ_{T+h}),   lo_h = back(ŷ_{T+h} + L_h),   hi_h = back(ŷ_{T+h} + U_h)
+```
+
+`back` adalah `e^z − 1` untuk hujan dan identitas untuk band lain. Hasilnya dijepit ke rentang fisik:
+
+| Band | Rentang |
+|---|---|
+| Hujan (`RAIN_*`) | ≥ 0 mm |
+| `FLOOD`, `WATER_PCT` | 0–100 % |
+| `NDVI`, `NDWI` | −1…1 |
+| `VV`, `VH` | −40…10 dB |
+
+### 14.6 Hasil pada data nyata
+
+Rerata AOI, backtest setahun (9 Okt 2026):
+
+| Band | Model terpilih | Skill |
+|---|---|---|
+| Hujan 72 jam | musiman + AR(1) | 0,32 |
+| Hujan 7 hari | musiman + AR(1) | 0,29 |
+| Genangan MODIS | musiman | 0,24 |
+| Hujan 24 jam | musiman + AR(1) | 0,12 |
+| NDVI, NDWI | SES | ≈ 0 |
+| VV, VH | naive | 0 |
+
+Akumulasi hujan dan genangan punya pola musim yang kuat, jadi model musiman menang jelas. NDVI, NDWI, dan
+backscatter Sentinel-1 berubah sangat lambat dalam 15 hari, sehingga "nilai terakhir berlanjut" sulit
+dikalahkan. Halaman menampilkannya sebagai keyakinan rendah, bukan menyembunyikannya.

@@ -75,6 +75,8 @@ def main(argv: list[str]) -> int:
         area_ids = args.area or [a["area_id"] for a in mon.list_areas() if a["enabled"]]
         if args.aggregate_only:
             print(f"[DONE] {aggregate_only(db, mon, area_ids)} rows written")
+            from etl import forecast_store
+            print(f"[FORECAST] {forecast_store.refresh(db)}")
             return 0
         from etl.live_cycle import backfill_s1
         print(f"[DONE] {backfill_s1(mon, area_ids, max_cycles=args.max_cycles)}")

@@ -496,4 +496,7 @@ def backfill(db, date_from: date, date_to: date, *, modis: bool = True, fetchers
                 logger.error("[HYDROMET] backfill dihentikan: %d FAILED berurutan, "
                              "sisa %d tanggal", consecutive_failed, remaining)
                 break
+    if not summary["locked"] and not dry_run and summary["COMPLETED"]:
+        from etl import forecast_store
+        forecast_store.refresh_quietly(db)
     return summary

@@ -196,3 +196,41 @@ def test_forecast_mean_of_several_kecamatan(make_client, diagram_obs, synthetic_
     assert single["region_id"] == a
     r = c.get("/api/diagram/forecast?band=RAIN_24H&region_ids=" + ",".join(str(a) for _ in range(1)) + ",x")
     assert (r.status_code, r.json()["code"]) == (400, "BAD_REQUEST")
+
+
+# -- forecast tersimpan (M62) ---------------------------------------------------
+
+def test_forecast_store_refresh_skips_unchanged_and_api_reads_it(make_client, db_client, diagram_obs, synthetic_aoi):
+    from etl import forecast_store as fs
+    from etl import hydromet_aggregate as ha
+
+    bands = ("RAIN_24H", "RAIN_30D")
+    first = fs.refresh(db_client, bands=bands)
+    assert first["failed"] == 0 and first["computed"] + first["skipped"] > 0
+    again = fs.refresh(db_client, bands=bands)
+    assert again["computed"] == 0 and again["skipped"] > 0            # data tidak berubah -> tidak dihitung ulang
+
+    c = make_client("ANALYST")
+    rid = synthetic_aoi["TST001"]
+    body = c.get(f"/api/diagram/forecast?band=RAIN_24H&region_id={rid}").json()
+    assert body["stored"] is True and body["computed_at"] and len(body["points"]) == 15
+    with db_client.session() as sess:
+        n_pts, _ = sess.execute(text("""
+            SELECT (SELECT count(*) FROM band_forecast_points p WHERE p.forecast_id = f.forecast_id),
+                   (SELECT count(*) FROM band_forecast_scores s WHERE s.forecast_id = f.forecast_id)
+            FROM band_forecasts f JOIN spectral_bands b USING (band_id)
+            WHERE b.band_code = 'RAIN_24H' AND f.region_id = :r ORDER BY f.computed_at DESC LIMIT 1"""), {"r": rid}).one()
+    assert n_pts == 15
+
+    # Rentang yang memotong data (end sebelum observasi terakhir) dihitung di tempat.
+    past = c.get(f"/api/diagram/forecast?band=RAIN_24H&region_id={rid}&end={diagram_obs[3].isoformat()}").json()
+    assert past["stored"] is False and past["last_obs_date"] == diagram_obs[3].isoformat()
+
+    # Data baru masuk -> cap band berubah -> forecast tersimpan basi sampai refresh berikutnya.
+    with db_client.session() as sess:
+        ha.upsert_observations(sess, "RAIN_30D", _today() - timedelta(days=400), {rid: ha.ZonalResult(5.0, 1.0, 1)})
+    stale = c.get(f"/api/diagram/forecast?band=RAIN_30D&region_id={rid}").json()
+    assert stale["stored"] is False
+    redo = fs.refresh(db_client, bands=("RAIN_30D",))
+    assert redo["computed"] > 0
+    assert c.get(f"/api/diagram/forecast?band=RAIN_30D&region_id={rid}").json()["stored"] is True

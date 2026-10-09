@@ -187,14 +187,13 @@ diubah M56; endpoint lain tidak berubah.
 | GET | `/diagram/latest?days=30&end=` | satu titik per hari per band (`y` null bila kosong, `source` daily/scene), `range` rentang biasa 365 hari, `n_daily`, `last_obs_date`, `updated_at` |
 | GET | `/diagram/regions?region_ids&bands&date_from&date_to` | ≤ 12 kecamatan, band per kecamatan saja, satu titik per hari |
 | GET | `/diagram/report.pdf?region_ids&date_from&date_to&colors` | unduhan; semua band per kecamatan |
-| GET | `/diagram/forecast?band&region_id&region_ids&end&horizon=15` | forecast satu band dari seluruh riwayatnya s.d. `end`: rerata AOI (tanpa `region_id`/`region_ids`, sumber sama dengan `/latest`), satu kecamatan, atau rerata harian ≤ 12 kecamatan (`region_ids`). `points[{x, mean, lo, hi}]` (pita 80%), `model`, `model_label`, `confidence` (rendah/sedang/tinggi), `backtest` (MAE per model, skill vs naive), `notes`. Disimpan di memori sampai data baru masuk |
+| GET | `/diagram/forecast?band&region_id&region_ids&end&horizon=15` | forecast satu band dari seluruh riwayatnya s.d. `end`: rerata AOI (tanpa `region_id`/`region_ids`, sumber sama dengan `/latest`), satu kecamatan, atau rerata harian ≤ 12 kecamatan (`region_ids`). `points[{x, mean, lo, hi}]` (pita 80%), `model`, `model_label`, `confidence` (rendah/sedang/tinggi), `backtest` (MAE per model, skill vs naive), `notes`. `stored` = true bila dari `band_forecasts` (+ `computed_at`), false bila dihitung di tempat (disimpan di memori sampai cap data band berubah) |
 
 Forecast (`etl/band_forecast.py`, M61): lima model bersaing per deret (naive, SES, Holt teredam,
-klimatologi hari-dalam-tahun ±15 hari, klimatologi + anomali AR(1)); yang dipakai adalah MAE terkecil
-pada backtest rolling-origin 12 asal × 30 hari (setahun), horizon 15 hari, dinilai hanya di hari
-teramati. Model musiman ikut bila riwayat cukup (≥ 395 hari pada asal paling awal), jadi Sentinel-1
-hanya memakai naive/SES/Holt. Pita 80% = kuantil 10–90% error backtest per langkah. Hujan di ruang
-log1p; hasil dijepit ke rentang fisik band. UI meminta satu deret per request (3 paralel, antrean
+klimatologi, klimatologi + anomali AR(1)), dipilih lewat backtest setahun. Sejak M62 forecast rerata AOI
+dan per kecamatan dihitung saat data baru masuk (`etl/forecast_store.py`) dan disimpan di
+`band_forecasts`; endpoint membacanya bila masih berlaku dan hanya menghitung di tempat untuk rentang di
+masa lalu atau rerata beberapa kecamatan. Rumus lengkap, jadwal, dan ukuran waktu: PIPELINE.md §14. UI meminta satu deret per request (3 paralel, antrean
 `UI.forecastQueue` dipakai bersama tab Forecast dan Tren & evaluasi alert) dan menampilkan palang
 progres + perkiraan sisa waktu; grafik data tampil lebih dulu.
 

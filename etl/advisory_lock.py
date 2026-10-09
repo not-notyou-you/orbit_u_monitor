@@ -19,7 +19,7 @@ from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
-KEYS = ("hydromet", "live", "report")
+KEYS = ("hydromet", "live", "report", "forecast")
 
 
 @contextmanager

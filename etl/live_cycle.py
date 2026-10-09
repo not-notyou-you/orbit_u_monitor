@@ -93,8 +93,8 @@ def run_cycle(mon: LiveMonitor, area_id: int, date_range: tuple[date, date] | No
             started = time.time()
             try:
                 _recover_interrupted_ingest(mon, area_id)
-                return _run_cycle_locked(mon, area_id, date_range, echo,
-                                         batch=BACKFILL_BATCH if backfill else INGEST_BATCH)
+                res = _run_cycle_locked(mon, area_id, date_range, echo,
+                                        batch=BACKFILL_BATCH if backfill else INGEST_BATCH)
             finally:
                 _report_auth_failures(mon, area_id, started)
                 # Jalur keluar awal (daerah nonaktif/terhapus) tidak menulis
@@ -102,6 +102,10 @@ def run_cycle(mon: LiveMonitor, area_id: int, date_range: tuple[date, date] | No
                 _restore_if_waiting(mon, area_id, prev_status)
     finally:
         lock.release()
+    # Scene/angka S1 baru -> forecast tersimpan (M62); di luar kunci siklus.
+    from etl import forecast_store
+    forecast_store.refresh_quietly(getattr(mon, "_db", None))
+    return res
 
 
 def _history_incomplete(mon: LiveMonitor, area_id: int) -> bool:
