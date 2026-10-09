@@ -309,7 +309,7 @@ Pages['admin'] = (() => {
     panel().innerHTML = '<div class="btn-row" style="margin-bottom:8px"><button type="button" class="default" id="alNew"' + (areas.length >= (maxA || 5) ? ' disabled' : '') + '>Tambah Live Area…</button>' +
       '<span class="mut">' + UI.int(areas.length) + ' dari maksimal ' + UI.int(maxA || 5) + ' area.</span></div>' +
       UI.screenHTML({ channel: 'CH-01 · LIVE AREA', body: UI.tableHTML([
-        { label: 'Nama', key: 'name' }, { label: 'Lokasi', key: 'location_label' }, { label: 'Retensi', cls: 'r', get: a => a.retention + ' scene' },
+        { label: 'Nama', key: 'name' }, { label: 'Lokasi', key: 'location_label' }, { label: 'Scene di kartu', cls: 'r', get: a => a.retention + ' scene' },
         { label: 'Scene', cls: 'r', key: 'scene_count' }, { label: 'Terbaru', get: a => UI.date(a.latest_scene_date) },
         { label: 'Status', get: a => (a.enabled ? '' : 'NONAKTIF · ') + a.status + (a.running ? ' (berjalan)' : '') }, { label: 'Ukuran', cls: 'r', get: a => UI.bytes(a.total_size_bytes) },
         { label: 'Aksi', html: true, get: a => btn('data-ed="' + a.area_id + '"', 'Ubah…') + ' ' + btn('data-del="' + a.area_id + '"', 'Hapus…') },
@@ -319,7 +319,7 @@ Pages['admin'] = (() => {
     UI.$$('[data-ed]', panel()).forEach(b => b.addEventListener('click', async () => {
       const a = find(b.dataset.ed);
       const r = await formDialog('Ubah Live Area', [{ id: 'name', label: 'Nama', required: true, value: a.name, maxlength: 200 },
-        { id: 'retention', label: 'Retensi scene (1–60)', type: 'number', min: 1, max: 60, required: true, value: a.retention, hint: 'Menurunkan retensi menghapus scene tertua secara permanen.' },
+        { id: 'retention', label: 'Scene di kartu & prakiraan (1–60)', type: 'number', min: 1, max: 60, required: true, value: a.retention, hint: 'Hanya tampilan. Berkas scene disimpan 1 tahun lalu dihapus otomatis; angkanya tetap.' },
         { id: 'enabled', label: 'Aktif (dipantau penjadwal)', type: 'checkbox', value: a.enabled }],
         v => API.patch('/api/live/areas/' + a.area_id, v));
       if (r) tabLive();
@@ -334,7 +334,7 @@ Pages['admin'] = (() => {
     const rois = (await API.get('/api/rois')).items;
     const r = await formDialog('Tambah Live Area', [
       { id: 'region_id', label: 'Lokasi (ROI sistem)', type: 'select', options: rois.map(x => [x.region_id, x.name]), value: rois[0] && rois[0].region_id },
-      { id: 'name', label: 'Nama area (opsional)', maxlength: 200 }, { id: 'retention', label: 'Retensi scene (1–60)', type: 'number', min: 1, max: 60, value: 6, required: true }],
+      { id: 'name', label: 'Nama area (opsional)', maxlength: 200 }, { id: 'retention', label: 'Scene di kartu & prakiraan (1–60)', type: 'number', min: 1, max: 60, value: 6, required: true }],
       v => API.post('/api/live/areas', { region_id: Number(v.region_id), name: v.name, retention: v.retention }),
       { ok: 'Simpan & mulai', message: 'Sistem akan langsung mengunduh scene Sentinel-1 terbaru beserta MODIS/GPM untuk area ini.' });
     if (r) tabLive();
@@ -442,12 +442,13 @@ Pages['admin'] = (() => {
   // ================================================================ 6. Pipeline
   async function tabPipeline() {
     const s = await API.get('/api/admin/pipeline/status');
+    const main = await API.get('/api/data/activity').catch(() => null);
     const areas = s.live_areas || [];
     const logs = (await Promise.all(areas.map(a => API.get('/api/live/areas/' + a.area_id + '/activity?limit=50').catch(() => []))))
       .flatMap((l, i) => l.map(x => Object.assign({ area: areas[i].name }, x))).sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1)).slice(0, 50);
     const cred = s.credentials || {};
     const warn = Object.entries(cred).filter(([, ok]) => !ok).map(([k]) => k);
-    panel().innerHTML = (warn.length ? '<div class="banner raised" role="alert">' + UI.icon('warn32') + '<div class="b-body"><b>Kredensial belum diisi:</b> ' + UI.esc(warn.join(', ')) + '. Job yang membutuhkannya akan gagal.</div></div>' : '') +
+    panel().innerHTML = UI.mainActivityHTML(main) + (warn.length ? '<div class="banner raised" role="alert">' + UI.icon('warn32') + '<div class="b-body"><b>Kredensial belum diisi:</b> ' + UI.esc(warn.join(', ')) + '. Job yang membutuhkannya akan gagal.</div></div>' : '') +
       '<div class="readouts" style="margin-bottom:8px">' +
         UI.readoutHTML('HIDROMET TERAKHIR', UI.esc(UI.date(s.hydromet && s.hydromet.last_completed)), 'WAITING ' + UI.int(s.hydromet && s.hydromet.waiting) + ' · GAGAL ' + UI.int(s.hydromet && s.hydromet.failed), s.hydromet && s.hydromet.failed ? 'v-amber' : '') +
         UI.readoutHTML('ANTREAN DATASET', UI.int((s.queue || {}).dataset_jobs_queued), 'JOB MENUNGGU') +
@@ -667,10 +668,11 @@ Pages['admin'] = (() => {
   // tautan ke bagian yang menanganinya. Tiap sumber gagal sendiri-sendiri.
   async function tabSummary() {
     const p = panel();
-    const [pipe, alerts, userList] = await Promise.all([
+    const [pipe, alerts, userList, main] = await Promise.all([
       API.get('/api/admin/pipeline/status').catch(() => null),
       API.get('/api/alerts?status=active&limit=200').then(r => r.items || []).catch(() => null),
       users().catch(() => null),
+      API.get('/api/data/activity').catch(() => null),
     ]);
 
     const hy = (pipe && pipe.hydromet) || {};
@@ -700,7 +702,7 @@ Pages['admin'] = (() => {
     if (!areas.length) findings.push(['', 'Belum ada Live Area.',
       'Tanpa Live Area, halaman publik dan Kondisi tidak punya scene untuk ditampilkan.', 'live']);
 
-    p.innerHTML =
+    p.innerHTML = UI.mainActivityHTML(main) +
       '<div class="readouts" style="margin-bottom:8px">' +
         UI.readoutHTML('PERLU PERHATIAN', UI.int(findings.length),
           findings.length ? 'LIHAT DAFTAR DI BAWAH' : 'TIDAK ADA', findings.length ? 'v-amber' : '') +

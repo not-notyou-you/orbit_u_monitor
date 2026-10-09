@@ -22,8 +22,8 @@
     { key: 'pasir', name: 'Mika Pasir',
       desc: 'Krem dan emas, kaca buram ala Windows 11, taskbar mengambang.' },
     { key: 'piksel', name: 'Piksel Marun',
-      desc: 'Abu-abu dan marun, huruf piksel, garis tepi tebal ala 8-bit.',
-      font: 'Pixelify+Sans:wght@400;600;700' },
+      desc: 'Abu-abu dan marun, garis tepi tebal ala 8-bit.',
+      font: 'Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400' },
   ];
   const known = k => LIST.some(t => t.key === k);
 

@@ -1,5 +1,5 @@
 -- database/db_manifest.sql — sidik jari isi database, untuk membuktikan dua
--- mesin punya database yang identik (DOCS/SETUP_LAPTOP_BARU.md §1a, §6).
+-- mesin punya database yang identik (DATABASE.md §10).
 --
 -- Kueri inventarisnya sama dengan tests/recovery/backup_restore.sh langkah 4,
 -- tetapi dipisah sebagai berkas BACA-SAJA: skrip uji itu menghapus database

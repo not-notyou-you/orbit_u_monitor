@@ -126,6 +126,7 @@ const UI = (() => {
     INVALID_PAGES: 'Pilih minimal satu halaman laporan: Ringkasan, Sentinel-1, MODIS, atau GPM.',
     INVALID_BAND: 'Band ini tidak dihitung per kecamatan (Sentinel-1 hanya tingkat AOI).',
     BACKFILL_RUNNING: 'Backfill GPM/MODIS lain masih berjalan. Tunggu sampai selesai, lalu coba lagi.',
+    OUTSIDE_RASTER_WINDOW: 'Rentang ini seluruhnya lebih tua dari 1 tahun, di luar jendela citra Sentinel-1 yang disimpan. Untuk riwayat lebih lama, buat dataset lewat Data › Unduh.',
     REASON_REQUIRED: 'Alasan wajib diisi saat menonaktifkan scene.',
     NOT_REPROCESSABLE: 'Scene ini milik dataset Katalog dan tidak dapat diproses ulang dari sini.',
     INVALID_THRESHOLD: 'Nilai ambang tidak valid.',
@@ -379,15 +380,16 @@ const UI = (() => {
   }
 
   // ------------------------------------------------------------------ grafik SVG di screen
-  // series: [{label, cls, color?, points:[{x:'YYYY-MM-DD', y}]}]; opts: {bar, thresholds:{name:v}, forecast:{points:[{x,mean,lo,hi}]}, unit, selected}
-  // `color` (opsional) mewarnai garis satu seri — dipakai Diagram, tempat setiap
-  // band/kecamatan punya warna tetap.
+  // series: [{label, cls, color?, forecast?:[{x,mean,lo,hi}], points:[{x:'YYYY-MM-DD', y}]}];
+  // opts: {bar, thresholds:{name:v}, forecast:{points:[{x,mean,lo,hi}]}, unit, selected}
+  // `color` (opsional) mewarnai garis satu seri — dipakai Forecast, tempat setiap
+  // band/kecamatan punya warna tetap. `forecast` per seri digambar dengan warna seri itu.
   function chartSVG(series, opts) {
     opts = opts || {};
     const W = opts.width || 560, H = opts.height || 190, L = 44, R = 12, T = 14, B = 24;
     const t = d => (parseDate(d) || new Date()).getTime();
     const all = series.flatMap(s => s.points.filter(p => p.y !== null && p.y !== undefined));
-    const fc = (opts.forecast && opts.forecast.points) || [];
+    const fc = ((opts.forecast && opts.forecast.points) || []).concat(series.flatMap(s => s.forecast || []));
     if (!all.length) return emptyHTML('NO DATA');
     const xs = all.map(p => t(p.x)).concat(fc.map(p => t(p.x)));
     let x0 = Math.min(...xs), x1 = Math.max(...xs);
@@ -410,7 +412,8 @@ const UI = (() => {
     }
     const dates = Array.from(new Set(all.map(p => p.x).concat(fc.map(p => p.x)))).sort();
     const step = Math.max(1, Math.ceil(dates.length / 6));
-    dates.forEach((d, k) => { if (k % step === 0 || k === dates.length - 1)
+    // Label terakhir selalu tampil; label kelipatan step yang terlalu dekat dengannya dilewati supaya tidak bertumpuk.
+    dates.forEach((d, k) => { if (k === dates.length - 1 || (k % step === 0 && dates.length - 1 - k >= step * 0.6))
       g += '<text class="axis" x="' + X(t(d)) + '" y="' + (H - 6) + '" text-anchor="middle">' + date(d, 'short') + '</text>'; });
     if (opts.selected) g += '<line class="sel" x1="' + X(t(opts.selected)) + '" x2="' + X(t(opts.selected)) + '" y1="' + T + '" y2="' + (H - B) + '"/>';
     Object.entries(thr).forEach(([name, v]) => {
@@ -448,16 +451,18 @@ const UI = (() => {
       }
       pts.forEach(p => hits.push({ x: X(t(p.x)), y: Y(p.y), tip: (series.length > 1 ? s.label + ' · ' : '') + date(p.x) + ': ' + num(p.y, 1) + unit }));
     });
-    if (fc.length) {
-      const lastS = series[0].points.filter(p => p.y !== null && p.y !== undefined);
+    const drawFc = (s, pts, color) => {
+      const lastS = s.points.filter(p => p.y !== null && p.y !== undefined);
       const last = lastS[lastS.length - 1];
       const start = last ? [[X(t(last.x)), Y(last.y)]] : [];
-      const band = start.concat(fc.map(p => [X(t(p.x)), Y(p.hi)])).concat(fc.slice().reverse().map(p => [X(t(p.x)), Y(p.lo)]));
-      g += '<polygon class="band" points="' + band.map(q => q.join(',')).join(' ') + '"/>';
-      g += '<polyline class="fc" points="' + start.concat(fc.map(p => [X(t(p.x)), Y(p.mean)])).map(q => q.join(',')).join(' ') + '"/>';
-      g += '<text class="fc-lbl" x="' + (W - R) + '" y="' + (T - 3) + '" text-anchor="end">PRAKIRAAN STATISTIK, BUKAN PERINGATAN</text>';
-      fc.forEach(p => hits.push({ x: X(t(p.x)), y: Y(p.mean), tip: 'Prakiraan ' + date(p.x) + ': ' + num(p.mean, 1) + unit + ' (rentang ' + num(p.lo, 1) + '–' + num(p.hi, 1) + ')' }));
-    }
+      const band = start.concat(pts.map(p => [X(t(p.x)), Y(p.hi)])).concat(pts.slice().reverse().map(p => [X(t(p.x)), Y(p.lo)]));
+      g += '<polygon class="band"' + (color ? ' style="fill:' + esc(color) + ';fill-opacity:.14"' : '') + ' points="' + band.map(q => q.join(',')).join(' ') + '"/>';
+      g += '<polyline class="fc"' + (color ? ' style="stroke:' + esc(color) + '"' : '') + ' points="' + start.concat(pts.map(p => [X(t(p.x)), Y(p.mean)])).map(q => q.join(',')).join(' ') + '"/>';
+      pts.forEach(p => hits.push({ x: X(t(p.x)), y: Y(p.mean), tip: (series.length > 1 ? s.label + ' · ' : '') + 'Prakiraan ' + date(p.x) + ': ' + num(p.mean, 1) + unit + ' (rentang ' + num(p.lo, 1) + '–' + num(p.hi, 1) + ')' }));
+    };
+    if (opts.forecast && opts.forecast.points && opts.forecast.points.length) drawFc(series[0], opts.forecast.points, null);
+    series.forEach(s => { if (s.forecast && s.forecast.length) drawFc(s, s.forecast, s.color); });
+    if (fc.length) g += '<text class="fc-lbl" x="' + (W - R) + '" y="' + (T - 3) + '" text-anchor="end">PRAKIRAAN STATISTIK, BUKAN PERINGATAN</text>';
     hits.forEach(h => { g += '<rect class="hit" x="' + (h.x - 8) + '" y="' + (h.y - 8) + '" width="16" height="16" data-tip="' + esc(h.tip) + '"><title>' + esc(h.tip) + '</title></rect>'; });
     return '<div class="chart" style="position:relative"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(opts.label || 'Grafik') + '">' + g + '</svg></div>';
   }
@@ -516,6 +521,78 @@ const UI = (() => {
       v.toFixed(0) + '" aria-label="' + esc(label || 'Progres') + '"><i style="width:' + Math.max(1, v).toFixed(1) + '%"></i></div>';
   }
 
+  // Antrean forecast GET /api/diagram/forecast (M61), dipakai halaman Forecast:
+  // `parallel` request sekaligus, hasil di `cache` per kunci deret (sakelar
+  // mati-nyala tidak menghitung ulang). run() baru membatalkan antrean lama.
+  // Progres + sisa waktu (rata-rata lama deret yang selesai × sisa deret)
+  // digambar ke elemen dari progEl().
+  function forecastQueue(progEl, parallel) {
+    const q = { cache: {}, gen: 0 };
+    const render = p => {
+      const el = progEl();
+      if (!el) return;
+      if (!p || p.done >= p.total) { el.hidden = true; el.innerHTML = ''; return; }
+      const elapsed = (performance.now() - p.t0) / 1000;
+      const left = p.done ? Math.max(1, Math.round(elapsed / p.done * (p.total - p.done))) : null;
+      el.hidden = false;
+      el.innerHTML = progressHTML(p.done / p.total * 100, 'Progres forecast') +
+        '<p class="scr-text v-dim fc-prog-text">MENGHITUNG FORECAST 15 HARI · ' + p.done + ' DARI ' + p.total + ' DERET · ' +
+        (left === null ? 'MEMPERKIRAKAN WAKTU…' : '± ' + left + ' DETIK LAGI') + '</p>';
+    };
+    q.run = async (jobs, onDone) => {
+      const gen = ++q.gen;
+      const todo = jobs.filter(j => !(j.key in q.cache));
+      const prog = { done: 0, total: todo.length, t0: performance.now() };
+      render(prog);
+      let next = 0;
+      const worker = async () => {
+        while (next < todo.length) {
+          const j = todo[next++];
+          let r;
+          try { r = await API.get('/api/diagram/forecast' + API.qs(j.q)); }
+          catch (e) { r = { error: true, points: [], notes: [(e && (e.message || e.code)) || 'gagal'] }; }
+          if (q.gen !== gen) return;
+          q.cache[j.key] = r;
+          prog.done++;
+          render(prog);
+          onDone(j);
+        }
+      };
+      await Promise.all(Array.from({ length: parallel || 3 }, worker));
+    };
+    q.stop = () => { q.gen++; render(null); };
+    q.reset = () => { q.stop(); q.cache = {}; };
+    return q;
+  }
+  const forecastDesc = f => !f ? 'menghitung…' : f.error ? 'gagal: ' + f.notes.join(' ') : !f.points.length ? (f.notes[0] || 'data kurang') :
+    f.model_label + ' · keyakinan ' + f.confidence + (f.backtest ? ' (skill ' + num(f.backtest.skill, 2) + ')' : '');
+  const forecastToggleHTML = (attr, on) => '<label class="check fc-toggle"><input type="checkbox" ' + attr + (on ? ' checked' : '') +
+    '> Tampilkan forecast 15 hari</label>';
+
+  // Banner pekerjaan dataset utama (M58) dari GET /api/data/activity: backfill
+  // Sentinel-1 (siklus Live) dan Job Hidromet. Dipakai Data › Ringkasan dan
+  // Sistem › Pengaturan supaya backfill yang berjalan di proses mana pun terlihat.
+  // Kosong bila tidak ada yang berjalan.
+  function mainActivityHTML(a) {
+    if (!a || !a.running) return '';
+    const rows = [];
+    (a.live || []).filter(l => l.running).forEach(l => {
+      const p = l.progress || {}, c = p.current;
+      rows.push('<b>Backfill Sentinel-1 (' + esc(l.name) + ')</b>: ' +
+        (p.frames_total ? int(p.frames_done) + '/' + int(p.frames_total) + ' frame (' + num(p.percent, 1) + '%), ' +
+          int(p.dates_done) + '/' + int(p.dates_total) + ' tanggal lintasan' : esc(l.status_message || '')) +
+        (c ? '. Sedang: ' + esc((c.date ? date(c.date) + ', ' : '') + (c.stage || '') + (c.percent != null && c.stage === 'DOWNLOAD' ? ' ' + num(c.percent, 0) + '%' : '')) : '') +
+        (p.eta ? '. <b>Perkiraan selesai ' + esc(dateTime(p.eta)) + ' WIB</b>' : '') + '.' +
+        (p.frames_total ? progressHTML(p.percent, 'Progres backfill Sentinel-1') : ''));
+    });
+    const h = a.hydromet || {};
+    if (h.locked) rows.push('<b>Job Hidromet (GPM + MODIS)</b>: sedang mengerjakan ' + esc(h.current_date ? date(h.current_date) : 'tanggal berikutnya') +
+      ', ' + int(h.done_last_hour) + ' tanggal selesai dalam 1 jam terakhir.');
+    return '<div class="banner raised" role="status">' + icon('info32') + '<div class="b-body">' +
+      '<b class="v-cyan">● BACKFILL DATASET UTAMA SEDANG BERJALAN</b><br>' + rows.join('<br>') +
+      '<br><a href="#data/proses">Rincian di Data › Proses berjalan →</a></div></div>';
+  }
+
   // Unduh berkas (Blob) dengan nama dari Content-Disposition.
   function saveBlob(blob, name) {
     const a = document.createElement('a');
@@ -529,6 +606,7 @@ const UI = (() => {
     boundaries, setBoundaries, applyBoundaries, imgSrc, imgAttrs,
     emptyHTML, loadingHTML, tableHTML, pagerHTML, bindTabs, lightbox, chartSVG, BMKG, bmkgCategory, bmkgClass,
     SEVERITY, ROLE_LABEL, LEVEL, saveBlob,
-    DATASET_STATUS, DATASET_ACTIVE, SOURCE_LABEL, datasetStatus, barHTML, progressHTML };
+    DATASET_STATUS, DATASET_ACTIVE, SOURCE_LABEL, datasetStatus, barHTML, progressHTML, mainActivityHTML,
+    forecastQueue, forecastDesc, forecastToggleHTML };
 })();
 window.UI = UI;

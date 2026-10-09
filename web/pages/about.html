@@ -19,7 +19,8 @@
     </ul>
   </fieldset>
 </div>
-<fieldset>
+<!-- Hanya Administrator; js/about.js membuka bagian ini untuk peran ADMIN. -->
+<fieldset id="abRoles" hidden>
   <legend>Akses menurut peran</legend>
   <div class="table-wrap">
     <table class="roles">
@@ -27,7 +28,7 @@
       <tbody>
         <tr><td>Pengunjung</td><td>Tanpa akun</td><td>Beranda, Citra Satelit (30 hari terakhir), Kejadian (1 tahun terakhir), Tentang.</td></tr>
         <tr><td>Relawan (USER)</td><td>Daftar sendiri di halaman Daftar</td><td>Tambahan: 3D AOI, Citra 1 tahun terakhir, seluruh riwayat kejadian, hujan per kecamatan, akun sendiri.</td></tr>
-        <tr><td>Analis</td><td>Dibuat Administrator</td><td>Tambahan: Diagram, Citra semua tanggal, kelola kejadian, laporan Keadaan AOI, log halaman Kejadian.</td></tr>
+        <tr><td>Analis</td><td>Dibuat Administrator</td><td>Tambahan: Forecast, Citra semua tanggal, kelola kejadian, laporan Keadaan AOI, log halaman Kejadian.</td></tr>
         <tr><td>Data Engineer</td><td>Dibuat Administrator</td><td>Tambahan: Data (per satelit, backfill, unduh, EDA), laporan Kesehatan Data, log halaman Data.</td></tr>
         <tr><td>Administrator</td><td>Dibuat Administrator</td><td>Semua halaman, termasuk manajemen akun, pengaturan aplikasi, dan seluruh log (masuk/registrasi, unduhan, audit).</td></tr>
       </tbody>

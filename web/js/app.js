@@ -1,7 +1,7 @@
 // web/js/app.js — kerangka "desktop" Orbital 95: router hash, jendela utama, taskbar.
 //
 // Susunan halaman mengikuti INTERFACE.md §2 (M56, rancangan pemilik proyek):
-// Beranda → 3D AOI → Citra Satelit → Diagram → Kejadian → Data → Laporan →
+// Beranda → 3D AOI → Citra Satelit → Forecast → Kejadian → Data → Laporan →
 // Sistem, ditambah Masuk (/masuk) dan Registrasi (/daftar) di luar aplikasi.
 // Aplikasi terbuka untuk pengunjung: menu disusun dari izin di
 // GET /api/auth/session, jadi pengunjung hanya melihat Beranda, Citra
@@ -15,9 +15,10 @@
 'use strict';
 
 window.Pages = window.Pages || {};
-const ASSET_V = '6.3';
+const ASSET_V = '6.15';
 
-// `lede` = satu baris instruksi yang selalu tampil di bawah title bar.
+// `lede` = keterangan halaman; tidak lagi ditampilkan di jendela (dihapus atas
+// permintaan pemilik proyek), disimpan sebagai dokumentasi rute.
 const ROUTES = [
   {
     hash: 'beranda', file: 'home', title: 'Beranda', icon: 'globe', perm: ['home.view'],
@@ -56,20 +57,20 @@ const ROUTES = [
     ],
   },
   {
-    hash: 'diagram', title: 'Diagram', icon: 'chart', perm: ['diagram.view'],
-    desc: 'Grafik semua band 30 hari terakhir dan analisa per kecamatan dengan laporan PDF.',
+    hash: 'forecast', title: 'Forecast', icon: 'chart', perm: ['diagram.view'],
+    desc: 'Grafik semua band 30 hari terakhir dengan forecast 15 hari, dan analisa per kecamatan dengan laporan PDF.',
     tabs: [
       {
         key: 'terbaru', file: 'diagram', mode: 'latest', title: 'Keadaan terbaru', perm: ['diagram.view'],
-        lede: 'Semua band dalam satu grafik, 30 hari terakhir, diperbarui otomatis. Klik nama band untuk menyembunyikan atau membaca penjelasannya.',
+        lede: 'Semua band dalam satu grafik, 30 hari terakhir plus forecast 15 hari, diperbarui otomatis. Klik nama band untuk menyembunyikan atau membaca penjelasannya.',
       },
       {
         key: 'analisa-daerah', file: 'diagram', mode: 'regions', title: 'Analisa daerah', perm: ['diagram.view'],
-        lede: 'Pilih kecamatan (dan warnanya), rentang tanggal, dan band, lalu tekan Tampilkan. PDF memuat semua band.',
+        lede: 'Pilih kecamatan (dan warnanya), rentang tanggal, dan band, lalu tekan Tampilkan. Forecast 15 hari dihitung dari data s.d. tanggal akhir. PDF memuat semua band.',
       },
       {
         key: 'evaluasi', file: 'analytics', title: 'Tren & evaluasi alert', perm: ['analytics.view'],
-        lede: 'Tren per kecamatan dengan penanda kejadian, dan evaluasi alert terhadap kejadian terverifikasi.',
+        lede: 'Tren per kecamatan dengan penanda kejadian dan forecast 15 hari (dari data s.d. tanggal akhir), dan evaluasi alert terhadap kejadian terverifikasi.',
       },
     ],
   },
@@ -172,13 +173,15 @@ const ROUTES = [
 // Dicocokkan dari awalan terpanjang, jadi "pengaturan/operasi/live" ikut
 // pindah dengan sisa segmennya.
 const ALIASES = {
+  // M61: halaman Diagram berganti nama menjadi Forecast
+  'diagram': 'forecast',
   // susunan M53
   'kondisi': 'citra',
   'kondisi/citra': 'citra/sentinel-1',
   'kondisi/kecamatan': 'citra/gpm',
   'kondisi/relief': 'aoi-3d',
-  'riwayat': 'diagram',
-  'riwayat/grafik': 'diagram/evaluasi',
+  'riwayat': 'forecast',
+  'riwayat/grafik': 'forecast/evaluasi',
   'riwayat/laporan': 'laporan',
   'data/daftar': 'data/tersimpan',
   'data/buat': 'data/unduh',
@@ -193,7 +196,7 @@ const ALIASES = {
   'pantauan': 'citra/sentinel-1',
   'hari-ini': 'citra/gpm',
   'statistik': 'citra/gpm',
-  'analitik': 'diagram/evaluasi',
+  'analitik': 'forecast/evaluasi',
   'katalog': 'data/tersimpan',
   'buat-dataset': 'data/unduh',
   'admin': 'sistem/pengaturan',
@@ -270,7 +273,8 @@ const Shell = (() => {
 
   function bindTaskbar(me) {
     const btn = UI.$('#startBtn'), menu = UI.$('#startMenu'), list = UI.$('#startList');
-    list.innerHTML = menuItems(me).map(it => it.sep ? '<li role="separator"><hr></li>' :
+    // Menu Mulai hanya memuat halaman utama; sub-halaman dibuka lewat tab di jendela.
+    list.innerHTML = menuItems(me).filter(it => !it.tabHash).map(it => it.sep ? '<li role="separator"><hr></li>' :
       '<li role="none">' + (it.action
         ? '<button type="button" role="menuitem" data-action="' + it.action + '">' + UI.icon(it.icon) + '<span>' + UI.esc(it.label) + '</span></button>'
         : '<a role="menuitem" class="' + (it.tabHash ? 'mi-sub' : 'mi-top') + '" href="' + it.href + '"' + (it.ext ? ' target="_blank" rel="noopener"' : '') +
@@ -476,15 +480,12 @@ const Shell = (() => {
       });
       const ttl = UI.$('#pageWindow .ttl-text h1');
       if (ttl) ttl.textContent = windowTitle(route, tab);
-      const lede = UI.$('#pageWindow .page-lede');
-      if (lede) lede.textContent = (tab && tab.lede) || route.lede || '';
       UI.$('#pageWindow .panel-host').innerHTML = panelHTML();
     } else {
       UI.$('#main').innerHTML = UI.windowHTML({
         title: windowTitle(route, tab), icon: route.icon, h: 'h1', id: 'pageWindow',
         menu: menubarHTML(route),
-        body: '<p class="page-lede">' + UI.esc((tab && tab.lede) || route.lede || '') + '</p>' +
-          subtabsHTML(route, tab) +
+        body: subtabsHTML(route, tab) +
           '<div class="' + (ts.length > 1 ? 'raised tabpanel ' : '') + 'panel-host"' + (ts.length > 1 ? ' role="tabpanel"' : '') + '>' + panelHTML() + '</div>',
         status: '<span id="pageStatus">Status: Memuat…</span><span class="fit" id="pageRole">' + UI.esc(UI.ROLE_LABEL[Auth.role()] || '') + '</span>',
       });

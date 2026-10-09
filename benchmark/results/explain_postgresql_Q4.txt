@@ -1,54 +1,54 @@
-Append  (cost=96.32..113.78 rows=3 width=40) (actual time=0.990..1.200 rows=3.00 loops=1)
+Append  (cost=96.32..113.78 rows=3 width=40) (actual time=0.456..0.562 rows=3.00 loops=1)
   Buffers: shared hit=22
   CTE strong
-    ->  Seq Scan on alert_events  (cost=0.00..33.45 rows=245 width=44) (actual time=0.026..0.284 rows=245.00 loops=1)
+    ->  Seq Scan on alert_events  (cost=0.00..33.45 rows=245 width=44) (actual time=0.010..0.135 rows=245.00 loops=1)
           Filter: ((severity)::text = ANY ('{WARNING,CRITICAL}'::text[]))
           Rows Removed by Filter: 831
           Buffers: shared hit=20
   CTE ev
-    ->  Seq Scan on disaster_events  (cost=0.00..3.88 rows=79 width=25) (actual time=0.035..0.071 rows=82.00 loops=1)
+    ->  Seq Scan on disaster_events  (cost=0.00..3.88 rows=79 width=25) (actual time=0.006..0.021 rows=82.00 loops=1)
           Filter: (is_verified AND ((type_code)::text = ANY ('{BANJIR,BANJIR_BANDANG}'::text[])))
           Rows Removed by Filter: 68
           Buffers: shared hit=2
   CTE pairs
-    ->  Hash Join  (cost=2.57..45.22 rows=216 width=16) (actual time=0.198..0.898 rows=112.00 loops=1)
+    ->  Hash Join  (cost=2.57..45.22 rows=216 width=16) (actual time=0.067..0.414 rows=112.00 loops=1)
           Hash Cond: (a.region_id = e.region_id)
           Join Filter: ((e.event_date >= a.observation_date) AND (e.event_date <= (a.observation_date + 3)))
           Rows Removed by Join Filter: 1999
           Buffers: shared hit=22
-          ->  CTE Scan on strong a  (cost=0.00..4.90 rows=245 width=16) (actual time=0.029..0.350 rows=245.00 loops=1)
+          ->  CTE Scan on strong a  (cost=0.00..4.90 rows=245 width=16) (actual time=0.011..0.169 rows=245.00 loops=1)
                 Storage: Memory  Maximum Storage: 34kB
                 Buffers: shared hit=20
-          ->  Hash  (cost=1.58..1.58 rows=79 width=16) (actual time=0.143..0.143 rows=82.00 loops=1)
+          ->  Hash  (cost=1.58..1.58 rows=79 width=16) (actual time=0.047..0.047 rows=82.00 loops=1)
                 Buckets: 1024  Batches: 1  Memory Usage: 12kB
                 Buffers: shared hit=2
-                ->  CTE Scan on ev e  (cost=0.00..1.58 rows=79 width=16) (actual time=0.047..0.113 rows=82.00 loops=1)
+                ->  CTE Scan on ev e  (cost=0.00..1.58 rows=79 width=16) (actual time=0.010..0.037 rows=82.00 loops=1)
                       Storage: Memory  Maximum Storage: 21kB
                       Buffers: shared hit=2
-  ->  Aggregate  (cost=13.78..13.79 rows=1 width=40) (actual time=0.989..0.989 rows=1.00 loops=1)
+  ->  Aggregate  (cost=13.78..13.79 rows=1 width=40) (actual time=0.455..0.456 rows=1.00 loops=1)
         Buffers: shared hit=22
-        ->  Sort  (cost=12.70..13.24 rows=216 width=8) (actual time=0.967..0.975 rows=112.00 loops=1)
+        ->  Sort  (cost=12.70..13.24 rows=216 width=8) (actual time=0.445..0.448 rows=112.00 loops=1)
               Sort Key: pairs.event_id
               Sort Method: quicksort  Memory: 25kB
               Buffers: shared hit=22
-              ->  CTE Scan on pairs  (cost=0.00..4.32 rows=216 width=8) (actual time=0.200..0.935 rows=112.00 loops=1)
+              ->  CTE Scan on pairs  (cost=0.00..4.32 rows=216 width=8) (actual time=0.068..0.432 rows=112.00 loops=1)
                     Storage: Memory  Maximum Storage: 21kB
                     Buffers: shared hit=22
-  ->  Aggregate  (cost=6.74..6.75 rows=1 width=40) (actual time=0.078..0.078 rows=1.00 loops=1)
-        ->  CTE Scan on ev  (cost=4.86..6.64 rows=40 width=0) (actual time=0.071..0.075 rows=14.00 loops=1)
+  ->  Aggregate  (cost=6.74..6.75 rows=1 width=40) (actual time=0.038..0.038 rows=1.00 loops=1)
+        ->  CTE Scan on ev  (cost=4.86..6.64 rows=40 width=0) (actual time=0.034..0.037 rows=14.00 loops=1)
               Filter: (NOT (ANY (event_id = (hashed SubPlan 4).col1)))
               Rows Removed by Filter: 68
               Storage: Memory  Maximum Storage: 21kB
               SubPlan 4
-                ->  CTE Scan on pairs pairs_1  (cost=0.00..4.32 rows=216 width=8) (actual time=0.001..0.018 rows=112.00 loops=1)
+                ->  CTE Scan on pairs pairs_1  (cost=0.00..4.32 rows=216 width=8) (actual time=0.000..0.008 rows=112.00 loops=1)
                       Storage: Memory  Maximum Storage: 21kB
-  ->  Aggregate  (cost=10.68..10.69 rows=1 width=40) (actual time=0.129..0.129 rows=1.00 loops=1)
-        ->  CTE Scan on strong  (cost=4.86..10.37 rows=122 width=0) (actual time=0.051..0.116 rows=147.00 loops=1)
+  ->  Aggregate  (cost=10.68..10.69 rows=1 width=40) (actual time=0.067..0.067 rows=1.00 loops=1)
+        ->  CTE Scan on strong  (cost=4.86..10.37 rows=122 width=0) (actual time=0.027..0.060 rows=147.00 loops=1)
               Filter: (NOT (ANY (alert_id = (hashed SubPlan 5).col1)))
               Rows Removed by Filter: 98
               Storage: Memory  Maximum Storage: 34kB
               SubPlan 5
-                ->  CTE Scan on pairs pairs_2  (cost=0.00..4.32 rows=216 width=8) (actual time=0.000..0.018 rows=112.00 loops=1)
+                ->  CTE Scan on pairs pairs_2  (cost=0.00..4.32 rows=216 width=8) (actual time=0.000..0.008 rows=112.00 loops=1)
                       Storage: Memory  Maximum Storage: 21kB
-Planning Time: 0.391 ms
-Execution Time: 1.419 ms
+Planning Time: 0.159 ms
+Execution Time: 0.632 ms

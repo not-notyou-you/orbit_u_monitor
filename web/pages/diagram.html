@@ -1,18 +1,22 @@
-<!-- pages/diagram.html — Diagram (INTERFACE.md §2 halaman 4). Satu fragmen untuk
-     dua tab: "Keadaan terbaru" (semua band, 30 hari, satu grafik) dan
-     "Analisa daerah" (kecamatan × tanggal × band + PDF). Bagian yang tidak
-     dipakai tab aktif disembunyikan oleh js/diagram.js. ANALYST & ADMIN. -->
+<!-- pages/diagram.html — Forecast (dulu Diagram; INTERFACE.md §2 halaman 4, M61).
+     Satu fragmen untuk dua tab: "Keadaan terbaru" (semua band, 30 hari +
+     forecast 15 hari, satu grafik) dan "Analisa daerah" (kecamatan × tanggal ×
+     band + forecast + PDF). Bagian yang tidak dipakai tab aktif disembunyikan
+     oleh js/diagram.js. ANALYST & ADMIN. -->
 
 <!-- 4.1 keadaan terbaru -->
 <section id="dgLatest" hidden>
   <div class="screen"><div class="screen-inner">
-    <span class="scr-ch">CH-01 · SEMUA BAND · 30 HARI</span><span class="scr-rec live" id="dgRec">● AUTO</span>
+    <span class="scr-ch">CH-01 · SEMUA BAND · 30 HARI + FORECAST 15 HARI</span><span class="scr-rec live" id="dgRec">● AUTO</span>
     <div id="dgChart"></div>
+    <label class="check fc-toggle"><input type="checkbox" id="dgFcOn" checked> Tampilkan forecast 15 hari</label>
+    <div id="dgFcProg" class="fc-prog" aria-live="polite" hidden></div>
     <div class="band-chips" id="dgChips" role="group" aria-label="Band yang ditampilkan"></div>
-    <p class="scr-text v-dim" style="margin:6px 0 0">Satuan tiap band berbeda (dB, %, mm, indeks), jadi setiap garis diskalakan ke rentang biasanya dalam setahun (0 = rendah biasa, 1 = tinggi biasa). Satu titik per tanggal; garis terputus di hari tanpa data. Arahkan kursor ke titik untuk nilai aslinya. Garis putus berwarna = ambang band itu.</p>
+    <p class="scr-text v-dim" style="margin:6px 0 0">Satuan tiap band berbeda (dB, %, mm, indeks), jadi setiap garis diskalakan ke rentang biasanya dalam setahun (0 = rendah biasa, 1 = tinggi biasa). Satu titik per tanggal; garis terputus di hari tanpa data. Arahkan kursor ke titik untuk nilai aslinya. Garis putus tipis berwarna = ambang band itu.</p>
+    <p class="scr-text v-dim" style="margin:6px 0 0">Forecast = garis putus tebal dan pita (rentang 80%) sesudah data terakhir tiap band, dihitung dari seluruh riwayat band itu di database. Modelnya dipilih otomatis per band dari lima kandidat (naive, exponential smoothing, Holt, musiman, musiman + anomali) lewat uji mundur 12 kali sepanjang setahun terakhir. "Keyakinan" menunjukkan seberapa jauh model itu mengalahkan tebakan "nilai terakhir berlanjut". Prakiraan statistik, bukan peringatan.</p>
     <p class="scr-text v-amber" id="dgStale" style="margin:6px 0 0" hidden></p>
   </div></div>
-  <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-02 · NILAI TERAKHIR & PENJELASAN</span>
+  <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-02 · NILAI TERAKHIR, FORECAST & PENJELASAN</span>
     <div id="dgExplain"></div></div></div>
 </section>
 
@@ -49,6 +53,9 @@
         </div>
       </form>
     </div>
-    <div class="deck" id="dgRegionCharts"></div>
+    <div class="deck">
+      <div id="dgRegFcProg" class="fc-prog" aria-live="polite" hidden></div>
+      <div class="deck" id="dgRegionCharts"></div>
+    </div>
   </div>
 </section>

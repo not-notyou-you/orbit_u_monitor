@@ -1,14 +1,14 @@
-Sort  (cost=193.81..193.82 rows=5 width=25) (actual time=1.662..1.665 rows=12.00 loops=1)
+Sort  (cost=193.81..193.82 rows=5 width=25) (actual time=0.828..0.829 rows=12.00 loops=1)
   Sort Key: ((st_area((st_intersection(geom, '0103000020E610000001000000050000000000000000805A40CDCCCCCCCCCC1BC03333333333935A40CDCCCCCCCCCC1BC03333333333935A403333333333331BC00000000000805A403333333333331BC00000000000805A40CDCCCCCCCCCC1BC0'::geometry, '-1'::double precision))::geography, true) / '1000000'::double precision)) DESC
   Sort Method: quicksort  Memory: 25kB
   Buffers: shared hit=3
-  ->  Bitmap Heap Scan on regions  (cost=4.17..193.75 rows=5 width=25) (actual time=0.232..1.639 rows=12.00 loops=1)
+  ->  Bitmap Heap Scan on regions  (cost=4.17..193.75 rows=5 width=25) (actual time=0.091..0.820 rows=12.00 loops=1)
         Filter: st_intersects(geom, '0103000020E610000001000000050000000000000000805A40CDCCCCCCCCCC1BC03333333333935A40CDCCCCCCCCCC1BC03333333333935A403333333333331BC00000000000805A403333333333331BC00000000000805A40CDCCCCCCCCCC1BC0'::geometry)
         Heap Blocks: exact=2
         Buffers: shared hit=3
-        ->  Bitmap Index Scan on regions_geom_gist  (cost=0.00..4.17 rows=5 width=0) (actual time=0.009..0.009 rows=12.00 loops=1)
+        ->  Bitmap Index Scan on regions_geom_gist  (cost=0.00..4.17 rows=5 width=0) (actual time=0.005..0.005 rows=12.00 loops=1)
               Index Cond: (geom && '0103000020E610000001000000050000000000000000805A40CDCCCCCCCCCC1BC03333333333935A40CDCCCCCCCCCC1BC03333333333935A403333333333331BC00000000000805A403333333333331BC00000000000805A40CDCCCCCCCCCC1BC0'::geometry)
               Index Searches: 1
               Buffers: shared hit=1
-Planning Time: 0.153 ms
-Execution Time: 1.716 ms
+Planning Time: 0.090 ms
+Execution Time: 0.844 ms

@@ -1,0 +1,202 @@
+D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\pytest_asyncio\plugin.py:208: PytestDeprecationWarning: The configuration option "asyncio_default_fixture_loop_scope" is unset.
+The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
+
+  warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
+........................................................................ [  6%]
+........................................................................ [ 12%]
+........................................................................ [ 18%]
+........................................................................ [ 25%]
+........................................................................ [ 31%]
+........................................................................ [ 37%]
+...........ss........................................................... [ 44%]
+........................................................................ [ 50%]
+........................................................................ [ 56%]
+........................................................................ [ 63%]
+........................................................................ [ 69%]
+........................................................................ [ 75%]
+........................................................................ [ 81%]
+........................................................................ [ 88%]
+........................................................................ [ 94%]
+..............................................................           [100%]
+============================== warnings summary ===============================
+venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:64
+  D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:64: PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'
+    prop = Group((name + Suppress("=") + comma_separated(value)) | oneOf(_CONSTANTS))
+
+venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:85
+venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:85
+venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:85
+venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:85
+venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:85
+venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:85
+  D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:85: PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'
+    parse = parser.parseString(pattern)
+
+venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:89
+venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:89
+venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:89
+venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:89
+venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:89
+venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:89
+  D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:89: PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'
+    parser.resetCache()
+
+venv\lib\site-packages\matplotlib\_mathtext.py:45
+  D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\matplotlib\_mathtext.py:45: PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'
+    ParserElement.enablePackrat()
+
+tests/test_admin_api.py::test_create_list_update_user
+  D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\starlette\testclient.py:40: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = typing.Callable[[], typing.ContextManager[anyio.abc.BlockingPortal]]
+
+tests/test_alert_engine.py: 28 warnings
+tests/test_aoi_coverage_gate.py: 6 warnings
+tests/test_fusion_grid.py: 19 warnings
+tests/test_fusion_grid_pinned.py: 16 warnings
+tests/test_gpm_native_resolution.py: 6 warnings
+tests/test_hydromet_aggregate.py: 8 warnings
+tests/test_live_preview_geo.py: 4 warnings
+tests/test_modis_quality_bands.py: 8 warnings
+tests/test_module10_preview.py: 26 warnings
+tests/test_per_satellite_config.py: 1030 warnings
+tests/test_preview_gallery.py: 6 warnings
+tests/test_quality_metrics.py: 5 warnings
+tests/test_s1_mosaic.py: 19 warnings
+tests/test_s1_observations_retention.py: 6 warnings
+tests/test_try8_regressions.py: 4 warnings
+tests/test_water_change.py: 10 warnings
+  D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\rasterio\transform.py:178: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    return Affine.translation(west, north) * Affine.scale(xsize, -ysize)
+
+tests/test_aoi_coverage_gate.py::TestSceneCoverage::test_full_scene_covers_the_whole_aoi
+tests/test_aoi_coverage_gate.py::TestSceneCoverage::test_half_scene_is_reported_as_half
+tests/test_aoi_coverage_gate.py::TestSceneCoverage::test_two_partial_frames_are_counted_together
+tests/test_aoi_coverage_gate.py::TestSceneCoverage::test_two_partial_frames_are_counted_together
+tests/test_aoi_coverage_gate.py::TestSceneCoverage::test_linear_zeros_are_outside_the_swath_not_data
+tests/test_aoi_coverage_gate.py::TestSceneCoverage::test_nodata_does_not_count_as_coverage
+  D:\NOT-NOTYOU-YOU\themonitor\etl\aoi_coverage.py:99: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    tf = src.transform * Affine.scale(src.width / out_w, src.height / out_h)
+
+tests/test_aoi_coverage_gate.py::TestPreviewGrid::test_grid_covers_the_entire_aoi
+  D:\NOT-NOTYOU-YOU\themonitor\tests\test_aoi_coverage_gate.py:115: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    west, north = g.transform * (0, 0)
+
+tests/test_aoi_coverage_gate.py::TestPreviewGrid::test_grid_covers_the_entire_aoi
+  D:\NOT-NOTYOU-YOU\themonitor\tests\test_aoi_coverage_gate.py:116: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    east, south = g.transform * (g.width, g.height)
+
+tests/test_fusion_grid.py::TestExtent::test_covers_the_whole_aoi_not_the_scene_footprint
+  D:\NOT-NOTYOU-YOU\themonitor\tests\test_fusion_grid.py:60: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    west, north = transform * (0, 0)
+
+tests/test_fusion_grid.py::TestExtent::test_covers_the_whole_aoi_not_the_scene_footprint
+  D:\NOT-NOTYOU-YOU\themonitor\tests\test_fusion_grid.py:61: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    east, south = transform * (width, height)
+
+tests/test_fusion_grid_pinned.py::TestPinning::test_shape_still_spans_the_whole_aoi
+  D:\NOT-NOTYOU-YOU\themonitor\tests\test_fusion_grid_pinned.py:125: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    west, north = transform * (0, 0)
+
+tests/test_fusion_grid_pinned.py::TestPinning::test_shape_still_spans_the_whole_aoi
+  D:\NOT-NOTYOU-YOU\themonitor\tests\test_fusion_grid_pinned.py:126: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    east, south = transform * (width, height)
+
+tests/test_gpm_native_resolution.py::TestResolution::test_keeps_the_native_imerg_resolution
+tests/test_gpm_native_resolution.py::TestResolution::test_pixel_count_matches_the_cells_that_touch_the_aoi
+tests/test_gpm_native_resolution.py::TestResolution::test_file_is_kilobytes_not_megabytes
+tests/test_gpm_native_resolution.py::TestCoverage::test_covers_the_whole_aoi
+tests/test_gpm_native_resolution.py::TestCoverage::test_values_are_preserved_not_resampled
+tests/test_gpm_native_resolution.py::TestCoverage::test_georeferencing_stays_epsg4326
+tests/test_try8_regressions.py::TestImergGridSnap::test_aoi_crop_is_8x8_without_nodata
+tests/test_try8_regressions.py::TestImergGridSnap::test_unaligned_aoi_still_includes_every_touched_cell
+tests/test_try8_regressions.py::TestImergGridSnap::test_window_tags_describe_the_utc_span
+  D:\NOT-NOTYOU-YOU\themonitor\etl\module8_gpm_download.py:691: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    col_a, row_a = inv * (min_lon, max_lat)
+
+tests/test_gpm_native_resolution.py::TestResolution::test_keeps_the_native_imerg_resolution
+tests/test_gpm_native_resolution.py::TestResolution::test_pixel_count_matches_the_cells_that_touch_the_aoi
+tests/test_gpm_native_resolution.py::TestResolution::test_file_is_kilobytes_not_megabytes
+tests/test_gpm_native_resolution.py::TestCoverage::test_covers_the_whole_aoi
+tests/test_gpm_native_resolution.py::TestCoverage::test_values_are_preserved_not_resampled
+tests/test_gpm_native_resolution.py::TestCoverage::test_georeferencing_stays_epsg4326
+tests/test_try8_regressions.py::TestImergGridSnap::test_aoi_crop_is_8x8_without_nodata
+tests/test_try8_regressions.py::TestImergGridSnap::test_unaligned_aoi_still_includes_every_touched_cell
+tests/test_try8_regressions.py::TestImergGridSnap::test_window_tags_describe_the_utc_span
+  D:\NOT-NOTYOU-YOU\themonitor\etl\module8_gpm_download.py:692: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    col_b, row_b = inv * (max_lon, min_lat)
+
+tests/test_gpm_native_resolution.py: 6 warnings
+tests/test_s1_mosaic.py: 8 warnings
+tests/test_try8_regressions.py: 3 warnings
+  D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\rasterio\windows.py:360: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    x, y = transform * (window.col_off or 0.0, window.row_off or 0.0)
+
+tests/test_gpm_native_resolution.py: 6 warnings
+tests/test_s1_mosaic.py: 8 warnings
+tests/test_try8_regressions.py: 3 warnings
+  D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\rasterio\windows.py:361: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    return Affine.translation(
+
+tests/test_live_preview_geo.py: 24 warnings
+  D:\NOT-NOTYOU-YOU\themonitor\etl\module10_generate_preview.py:573: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    xy = [t * (c, r) for c, r in zip(cols, rows)]
+
+tests/test_live_preview_geo.py: 7 warnings
+tests/test_module10_preview.py: 24 warnings
+tests/test_per_satellite_config.py: 11 warnings
+tests/test_preview_gallery.py: 6 warnings
+  D:\NOT-NOTYOU-YOU\themonitor\etl\module10_generate_preview.py:546: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    transform = src.transform * Affine.scale(src.width / out_w, src.height / out_h)
+
+tests/test_modis_quality_bands.py::TestFloodGapFill::test_two_day_wins_and_one_day_cs_fills_gaps
+tests/test_modis_quality_bands.py::TestFloodGapFill::test_nrt_granule_without_the_fill_field
+  D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\rasterio\transform.py:189: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    return Affine.translation(west, north) * Affine.scale(
+
+tests/test_modis_quality_bands.py::TestStaleFilesAreRebuilt::test_single_band_file_is_not_current
+  D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\rasterio\__init__.py:378: NotGeoreferencedWarning: The given matrix is equal to Affine.identity or its flipped counterpart. GDAL may ignore this matrix and save no geotransform without raising an error. This behavior is somewhat driver-specific.
+    dataset = writer(
+
+tests/test_per_satellite_config.py: 90 warnings
+  D:\NOT-NOTYOU-YOU\themonitor\etl\module9_fusion.py:619: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    west, north = transform * (0, 0)
+
+tests/test_per_satellite_config.py: 90 warnings
+  D:\NOT-NOTYOU-YOU\themonitor\etl\module9_fusion.py:620: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    east, south = transform * (width, height)
+
+tests/test_s1_mosaic.py::TestComplementaryFrames::test_two_halves_become_one_full_coverage_raster
+tests/test_s1_mosaic.py::TestComplementaryFrames::test_result_does_not_depend_on_input_order
+tests/test_s1_mosaic.py::TestComplementaryFrames::test_result_does_not_depend_on_input_order
+tests/test_s1_mosaic.py::TestComplementaryFrames::test_overlap_goes_to_the_frame_with_more_data
+tests/test_s1_mosaic.py::TestComplementaryFrames::test_each_band_mosaicked_independently
+tests/test_s1_mosaic.py::TestComplementaryFrames::test_each_band_mosaicked_independently
+tests/test_s1_mosaic.py::TestComplementaryFrames::test_differing_resolution_keeps_the_finest
+tests/test_s1_mosaic.py::TestDegenerateInput::test_band_present_in_only_one_frame_still_survives
+  D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\rasterio\merge.py:335: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    output_transform = Affine.translation(dst_w, dst_n) * Affine.scale(
+
+tests/test_s1_mosaic.py: 16 warnings
+  D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\rasterio\windows.py:387: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    left, bottom = transform * (col_min, row_max)
+
+tests/test_s1_mosaic.py: 16 warnings
+  D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\rasterio\windows.py:388: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    right, top = transform * (col_max, row_min)
+
+tests/test_water_change.py::TestClassify::test_classes_and_areas
+tests/test_water_change.py::TestClassify::test_threshold_is_respected
+tests/test_water_change.py::TestClassify::test_downsampling_averages_in_linear_space
+tests/test_water_change.py::TestClassify::test_db_input_is_detected
+tests/test_water_change.py::TestPngAndMetrics::test_png_colors_and_orbit_label
+  D:\NOT-NOTYOU-YOU\themonitor\etl\water_change.py:179: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    dst_tf = cur_tf * cur_tf.scale(cur.shape[1] / w, cur.shape[0] / h)
+
+tests/test_water_change.py::TestPngAndMetrics::test_png_colors_and_orbit_label
+  D:\NOT-NOTYOU-YOU\themonitor\etl\water_change.py:333: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    tf = wc.transform * Affine.scale(wc.classes.shape[1] / w, wc.classes.shape[0] / h)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: D:\NOT-NOTYOU-YOU\themonitor\DOCS\hasil_uji\pytest.xml --
+1140 passed, 2 skipped, 1581 warnings in 137.61s (0:02:17)
+exit=0

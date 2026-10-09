@@ -170,7 +170,7 @@ class CleanupOperationStatusEnum(str, PyEnum):
 class ProcessingLevelEnum(str, PyEnum):
     """Level pemrosesan yang diminta user untuk SATU sumber.
 
-    Artinya berbeda per satelit (DOCS/ARCHITECTURE.md, tabel "What RAW vs
+    Artinya berbeda per satelit (PIPELINE.md §2, tabel "What RAW vs
     PROCESSED means per satellite"): untuk S1 RAW = kalibrasi + crop tanpa
     Lee filter, untuk GPM RAW = curah hujan harian tanpa akumulasi. Yang
     sama di semua sumber: RAW berhenti di BRONZE, PROCESSED lanjut ke
@@ -818,7 +818,7 @@ class Dataset(Base):
     bbox_wkt = Column(Text, nullable=False)
     date_start = Column(Date, nullable=False)
     date_end = Column(Date, nullable=False)
-    # Diturunkan dari source_configs, bukan diisi user (DOCS/ARCHITECTURE.md).
+    # Diturunkan dari source_configs, bukan diisi user (PIPELINE.md §2).
     required_tiers = Column(ARRAY(String), nullable=False)
     # NULL = dataset satu sumber, tidak ada yang perlu difusikan. Aturan
     # "harus NULL kalau sumbernya cuma 1" tidak bisa jadi CHECK (jumlah sumber
@@ -1058,7 +1058,7 @@ class ProcessingLog(Base):
 
 
 class LiveArea(Base):
-    """Daerah Live (migrasi 025, LIVE_MONITORING.md). Datanya diproses lewat
+    """Daerah Live (migrasi 025, PIPELINE.md §4). Datanya diproses lewat
     satu baris `datasets` berjenis LIVE_AREA; baris ini memegang retensi dan
     forecast, dan tetap ada (deleted_at terisi) setelah daerahnya dihapus."""
 

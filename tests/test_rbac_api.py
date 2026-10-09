@@ -127,9 +127,11 @@ EXPECTED: dict[tuple[str, str], tuple] = {
     ("GET", "/api/diagram/bands"): (AN,),
     ("GET", "/api/diagram/latest"): (AN,),
     ("GET", "/api/diagram/regions"): (AN,),
+    ("GET", "/api/diagram/forecast"): (AN,),
     ("GET", "/api/diagram/report.pdf"): (AN, DL),
     # halaman Data (M56)
     ("GET", "/api/data/summary"): (DE,),
+    ("GET", "/api/data/activity"): (DE,),
     ("GET", "/api/data/{source}/items"): (DE,),
     ("PATCH", "/api/data/{source}/items/{item_id}"): (DE,),
     ("POST", "/api/data/{source}/items/{item_id}/reprocess"): (DE,),

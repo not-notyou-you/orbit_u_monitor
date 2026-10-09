@@ -1,5 +1,5 @@
 # etl/live_preview.py
-"""8 preview Live Monitoring per scene (LIVE_MONITORING.md 4.1).
+"""8 preview Live Monitoring per scene (PIPELINE.md §4).
 
     Baris 1  s1_vv, s1_vh                      grayscale, tanpa overlay
     Baris 2  modis_flood, modis_ndvi, modis_ndwi   warna di atas S1 VH, 40%

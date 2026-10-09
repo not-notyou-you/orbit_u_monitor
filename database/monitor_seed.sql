@@ -127,17 +127,20 @@ JOIN roles r ON r.role_code = t.role_code;
 -- app_settings ----------------------------------------------------------------
 INSERT INTO app_settings (setting_key, setting_value, description) VALUES
     ('live.max_areas',        '5',              'Jumlah maksimum Live Area aktif.'),
-    ('live.retention_max',    '60',             'Batas atas retensi scene per Live Area (M11).'),
+    ('live.retention_max',    '60',             'Batas atas jumlah scene yang ditampilkan kartu Live dan dipakai prakiraan (M11, M58).'),
     ('report.timezone',       '"Asia/Jakarta"', 'Zona waktu periode laporan (WIB).'),
     ('water.vh_threshold_db', '-20',            'Ambang air VH (dB) untuk peta perubahan air dan kalimat Live.'),
     ('dataset.max_days',      '366',            'Rentang tanggal maksimum satu dataset (hari).'),
     -- Tahap 3 (IMPLEMENTATION_NOTES "Tahap 3"): angka yang PIPELINE.md sebut
     -- sebagai default/batas operasional, dipindah dari konstanta kode.
-    ('live.retention_default',          '6',               'Retensi scene default Live Area baru (1..live.retention_max).'),
+    ('live.retention_default',          '6',               'Jumlah scene default yang ditampilkan kartu Live Area baru (1..live.retention_max, M58).'),
     ('live.default_area_name',          '"Lebak Selatan"', 'Nama Live Area default yang dibuat dari ROI AOI GMLS (PIPELINE §4).'),
     ('hydromet.min_valid_fraction',     '0.1',             'Di bawah fraksi piksel valid ini nilai zonal kecamatan = NULL (PIPELINE §3.3).'),
     ('hydromet.waiting_max_days',       '3',               'Berapa hari tanggal hidromet boleh WAITING_UPSTREAM sebelum FAILED (PIPELINE §8).'),
     ('report.wait_hydromet_minutes',    '60',              'Lama job laporan menunggu advisory lock hidromet sebelum tetap jalan (PIPELINE §6.1).'),
-    ('live.min_aoi_coverage',           '0.90',            'Porsi AOI yang wajib tertutup Sentinel-1 agar sebuah tanggal dipakai Live; di bawah ini scene ditolak sebagai INCOMPLETE.');
+    ('live.min_aoi_coverage',           '0.90',            'Porsi AOI yang wajib tertutup Sentinel-1 agar sebuah tanggal dipakai Live; di bawah ini scene ditolak sebagai INCOMPLETE.'),
+    -- M58: jendela berkas raster bergulir. Angka per kecamatan (region_observations)
+    -- dan metrik scene tidak pernah dihapus; hanya berkas raster yang dibuang.
+    ('storage.raster_retention_days',   '365',             'Umur maksimum berkas raster dataset utama (GPM/MODIS/S1) dalam hari; yang lebih tua dihapus, angkanya tetap (M58).');
 
 COMMIT;

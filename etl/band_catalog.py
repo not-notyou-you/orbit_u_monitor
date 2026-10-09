@@ -139,10 +139,12 @@ def metric_unit(metric_name: str, band_unit: str | None) -> str:
     return (band_unit or "") if unit is None else unit
 
 
-# Band per kecamatan (region_observations, Job Hidromet) vs band tingkat AOI
-# (live_scene_metrics, siklus Live). Sentinel-1 tidak dihitung per kecamatan.
-REGION_BANDS = ("RAIN_24H", "RAIN_72H", "RAIN_7D", "RAIN_30D", "FLOOD", "NDVI", "NDWI")
-AOI_BANDS = ("VV", "VH")
+# Band per kecamatan di region_observations: GPM/MODIS harian (Job Hidromet)
+# dan Sentinel-1 per lintasan (etl/s1_observations.py, M58). AOI_BANDS = band
+# yang hanya ada pada tanggal lintasan S1 (titik jarang, garis disambung).
+REGION_BANDS = ("RAIN_24H", "RAIN_72H", "RAIN_7D", "RAIN_30D", "FLOOD", "NDVI", "NDWI",
+                "VV", "VH", "WATER_PCT")
+AOI_BANDS = ("VV", "VH", "WATER_PCT")
 
 
 def thresholds(band_code: str) -> list[dict]:

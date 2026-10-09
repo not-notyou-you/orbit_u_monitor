@@ -1,0 +1,138 @@
+A. Alur Penelitian Skripsi
+ Analisis sistem yang sedang berjalan (As-Is System Analysis)
+ Identifikasi Masalah
+ Database Planning
+Perencanaan basis data adalah kegiatan yang memungkinkan tahapan siklus hidup pengembangan sistem basis data
+diwujudkan se-efisien dan se-efektif mungkin. Berikut 2 kegiatan penting yang dilakukan dalam perencanaan basis data,
+yaitu :
+a. Mission Statement
+Mission Statement mendefinisikan tujuan utama dari sistem basis data. Sebuah mission statement membantu untuk
+memperjelas tujuan sistem basis data dan memberikan langkah yang lebih jelas menuju pembuatan sistem basis data
+yang efisien dan efektif.
+b. Mission Objective
+Mission Objective ditentukan setelah mission statement dibuat. Hal ini dilakukan untuk mendefinisikan tugas tertentu
+yang harus didukung oleh sistem basis data.
+ System Definition
+System definition menjelaskan mengenai ruang lingkup dan batas-batas sistem (system boundary) basis data dari
+pandangan pengguna (user views). Pandangan pengguna dalam hal ini digunakan untuk menentukan apa yang dibutuhkan
+oleh sebuah sistem basis data dari perspektif peran pekerjaan tertentu (seperti Manajer atau Supervisor) atau area aplikasi
+perusahaan (seperti pemasaran, personalia, atau pengendalian stok). Pandangan pengguna juga sangat membantu dalam
+pengembangan sistem basis data yang relatif kompleks dengan memungkinkan persyaratan dipecah menjadi bagianbagian yang dapat dikelola.
+ Requirement Collection and Analysis
+Versi: 1.1 © Program Studi Sistem Informasi - UMN
+Requirement collection and analysis merupakan proses mengumpulkan dan menganalisis informasi tentang bagian dari
+organisasi yang akan didukung oleh sistem basis data, dan menggunakan informasi ini untuk mengidentifikasi persyaratan
+untuk sistem yang baru. Dalam proses pengumpulan informasi tahapan ini menggunakan teknik pencarian fakta atau
+dikenal dengan sebutan fact-finding techniques:
+1) Examining documentation (Pemeriksaan Dokumen)
+2) Interviewing (Wawancara)
+3) Observing the enterprise in operation (Pengamatan terhadap Perusahaan)
+4) Research (Penelitian)
+5) Questionnaires (Kuisioner)
+ Database Design, terbagi menjadi 3 fase yaitu:
+a) Conceptual Database Design
+Conceptual database design merupakan proses membangun model data yang digunakan dalam suatu perusahaan,
+terlepas dari semua pertimbangan fisik. Model data konseptual menggambarkan struktur data dari suatu sistem dalam
+bentuk ER Diagram dan dokumentasi. Jika terdapat anomali data maka perlu dilakukan perubahan dan pengulangan
+dari Langkah-langkah sebelumnya. Berikut tahapan dalam perancangan conceptual database design:
+ Identifikasi tipe entitas
+ Identifikasi tipe hubungan antar entitas
+ Identifikasi atribut pada entitas atau hubungan
+ Menentukan Domain dari setiap atribut
+ Menentukan candidate, primary dan alternate key
+ Mempertimbangkan kegunaan Enhance Modeling (optional)
+ Memeriksa redundansi
+ Validasi model data konseptual terhadap transaksi pengguna
+ Meninjau kembali model data dengan pengguna
+b) Logical Database Design
+Logical database design merupakan proses membangun model data yang digunakan dalam suatu perusahaan
+berdasarkan pada model data tertentu, tetapi tidak tergantung pada DBMS dan pertimbangan fisik lainnya. Berikut
+adalah tahapan dalam perancangan logical database design:
+Versi: 1.1 © Program Studi Sistem Informasi - UMN
+ Identifikasi jenis entitas (strong atau weak) dan multiplicity
+ Normalisasi
+ Memeriksa batasan integritas (constraint)
+ Meninjau kembali model data logikal dengan pengguna
+ Menggabungkan model data logical ke dalam model data global (opsional)
+c) Physical Database Design
+Physical database design merupakan proses yang menghasilkan deskripsi implementasi basis data pada suatu
+penyimpanan sekunder yang menggambarkan hubungan dasar, organisasi file, dan indeks yang digunakan untuk
+mencapai akses efisien ke data, serta segala kendala integritas terkait dan langkah-langkah keamanan. Terdapat 6
+tahapan dalam perancangan physical database design, antara lain:
+ Menerjemahkan model data logikal untuk target DBMS
+ Merancang berkas organisasi dan indeks
+ Merancang pandangan pengguna
+ Merancang mekanisme keamanan
+ Mempertimbangkan pengenalan redundansi terkendali
+ Memantau dan menyelaraskan sistem operasional
+ DBMS Selection
+DBMS selection merupakan tahapan untuk melakukan pemilihan DBMS yang tepat agar dapat mendukung sistem basis
+data. Terdapat beberapa langkah utama dalam DBMS selection, antara lain :
+a) Menetapkan kerangka acuan studi
+b) Pemilihan daftar pendek dua atau tiga produk
+c) Evaluasi produk
+d) Merekomendasikan seleksi dan menghasilkan laporan
+ Pemodelan Sistem
+Pada tahap ini dilakukan pemodelan fungsional dari sistem dalam bentuk use case diagram, activity diagram, dan class
+diagram (optional jika sudah ada ERD).
+Versi: 1.1 © Program Studi Sistem Informasi - UMN
+ Desain Antarmuka
+Pada tahap ini dilakukan perancangan tampilan dari sistem yang akan digunakan oleh pengguna untuk memproses suatu
+basis data
+ Prototyping
+Prototyping merupakan tahapan untuk membuat model kerja yang biasanya tidak memiliki semua fitur yang diperlukan
+atau menyediakan semua fungsionalitas sistem akhir. Tujuan utama pengembangan sistem basis data prototipe adalah
+untuk memungkinkan pengguna dalam mengidentifikasi fitur-fitur sistem apakah bekerja dengan baik atau tidak, dan
+jika memungkinkan disarankan untuk melakukan perbaikan atau bahkan penambahan fitur-fitur baru pada sistem basis
+data.
+ Implementation
+Implementation merupakan tahapan untuk melakukan realisasi fisik dari sistem basis data dan desain aplikasi atau
+sistem.
+ Data Conversion and Loading
+Data conversion and loading merupakan tahapan untuk mentransfer semua data yang ada ke dalam basis data baru dan
+mengonversi aplikasi yang ada untuk dijalankan pada basis data yang baru. Tahapan ini hanya diperlukan ketika sistem
+basis data yang baru mengganti sistem basis data yang lama.
+ Testing
+Testing merupakan proses untuk menjalankan sistem basis data dengan maksud menemukan kesalahan karena sebelum
+digunakan sistem basis data yang baru dikembangkan harus diuji secara menyeluruh. Contoh kriteria yang dapat
+digunakan untuk melakukan evaluasi meliputi hal-hal berikut :
+a) Dapat dipelajari (Learnability)
+b) Kinerja sistem dengan praktik kerja pengguna (Performance)
+c) Toleransi sistem terhadap kesalahan pengguna (Robustness)
+d) Dapat dipulihkan (Recoverability)
+e) Mudah beradaptasi (Adaptability)
+Versi: 1.1 © Program Studi Sistem Informasi - UMN
+B. Metode Penelitian
+ Metode Pengumpulan Data
+a) Observasi
+b) Studi Pustaka
+c) Pemeriksaan Dokumen
+ Metode Identifikasi Masalah
+a) 5W1H (What/Who/When/Why/Where/How)
+b) Entity-Relationship Diagram (ERD)
+ Metode Perancangan Aplikasi
+a) Metodologi DBSDLC (Database System Development Life Cycle)
+Perancangan database pada sistem informasi menggunakan metodologi DBSDLC (Database System Development Life
+Cycle) yang terdiri dari 11 tahapan utama yang telah dijelaskan pada bagian alur penelitian.
+b) Unified Modeling Language (UML)
+UML adalah bahasa pemodelan yang standar yang memiliki sintak dan semantik. UML merupakan bahasa pemodelan
+untuk sistem atau perangkat lunak yang berparadigma berorientasi objek. Pada penulisan laporan skripsi digunakan
+beberapa diagram UML seperti use case diagram, activity diagram, dan class diagram.
+C. Prasyarat
+1. studi kasus (objek penelitian) yang digunakan harus memiliki legalitas yang diakui pemerintah dan sudah beroperasi
+minimal 2 tahun
+2. Ketentuan Database Terstruktur:
+a. Jumlah master table minimal 10
+b. Jumlah record minimal 100 pada tabel transaksi
+c. Jika master table tidak sampai 10 masih diperbolehkan dengan kondisi terdapat jumlah transaksi minimal 300 record
+d. Jumlah master table harus dapat menangani pertumbuhan data tanpa mengorbankan kinerja dan integritas data.
+3. Ketentuan Database Tidak Terstruktur: mengikuti ketentuan pada peminatan big data analytics
+Versi: 1.1 © Program Studi Sistem Informasi - UMN
+D. Hasil Akhir Penelitian
+ Rancangan Database – Rekomendasi DBMS
+ Rancangan Sistem atau Aplikasi (optional)
+ Middleware atau API Database (API Developer)
+E. Alternatif Penelitian Skripsi Peminatan Database
+ Topik tentang komparasi teknologi database
+ Ada objek studi kasus
+ Harus ada acuan dari penelitian terdahulu

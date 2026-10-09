@@ -1,0 +1,9 @@
+engine,clients,seconds,queries,qps,median_ms,p95_ms,errors
+PostgreSQL,1,10,23973,2397.3,0.433,0.602,0
+PostgreSQL,4,10,73960,7396.0,0.51,0.799,0
+PostgreSQL,8,10,85226,8522.6,0.896,1.369,0
+PostgreSQL,16,10,81264,8126.4,1.724,3.58,0
+MySQL 8.0 (mysqlclient),1,10,19067,1906.7,0.529,0.766,0
+MySQL 8.0 (mysqlclient),4,10,63393,6339.3,0.619,0.94,0
+MySQL 8.0 (mysqlclient),8,10,70262,7026.2,1.09,1.699,0
+MySQL 8.0 (mysqlclient),16,10,71612,7161.2,2.041,4.012,0

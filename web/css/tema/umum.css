@@ -338,9 +338,28 @@ html.tema-alt .roles th { color: var(--t-mut); }
 html.tema-alt .expl > summary {
   background: var(--t-card-solid); box-shadow: none; border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
 }
-html.tema-alt .chip[aria-pressed="false"] { opacity: .55; }
+html.tema-alt .chip[aria-pressed="false"] { opacity: .7; }
+/* Ikon desktop: teks putih hanya terbaca di desktop biru Orbital 95. */
+html.tema-alt .desk-icon { color: var(--t-tx); }
+html.tema-alt .desk-icon:focus-visible span { outline-color: var(--t-tx); color: var(--t-sel-tx); }
 html.tema-alt .region-row input[type=color] { border-radius: var(--t-r2); }
-html.tema-alt .t3-map .maplibregl-ctrl-group, html.tema-alt .t3-map .maplibregl-ctrl-group button { border-radius: var(--t-r2); }
+/* Kontrol peta 3D (zoom, kompas): gaya tombol tema tidak boleh menimpa
+   tombol MapLibre — ukuran 29px, ikonnya ada di latar <span> di dalamnya. */
+html.tema-alt .t3-map .maplibregl-ctrl-group {
+  background: #fff; border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
+  box-shadow: var(--t-shadow-btn); overflow: hidden;
+}
+html.tema-alt .t3-map .maplibregl-ctrl-group button,
+html.tema-alt .t3-map .maplibregl-ctrl-group button:is(:hover, :active, [aria-pressed="true"]):not(:disabled) {
+  width: 29px; height: 29px; min-width: 29px; min-height: 29px; padding: 0; margin: 0;
+  background-color: #fff; color: #333; border: 0; border-radius: 0; box-shadow: none;
+  transform: none; text-transform: none; outline: 0;
+  display: block;
+}
+html.tema-alt .t3-map .maplibregl-ctrl-group button + button { border-top: 1px solid #ddd; }
+html.tema-alt .t3-map .maplibregl-ctrl-group button:hover:not(:disabled) { background-color: #f0f0f0; }
+html.tema-alt .t3-map .maplibregl-ctrl-group button:focus-visible { box-shadow: inset 0 0 0 2px var(--t-line); }
+html.tema-alt .t3-map .maplibregl-ctrl-group button .maplibregl-ctrl-icon { display: block; width: 100%; height: 100%; }
 
 @media (max-width: 799px) {
   html.tema-alt body { padding: 10px 10px calc(var(--taskbar-h) + 16px); }

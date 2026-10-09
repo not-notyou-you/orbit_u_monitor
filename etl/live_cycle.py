@@ -1,16 +1,19 @@
 # etl/live_cycle.py
-"""Siklus otomatis satu Daerah Live (LIVE_MONITORING.md 3.3).
+"""Siklus otomatis satu Daerah Live (PIPELINE.md §4).
 
     1. cek scene Sentinel-1 baru (discover_scenes)
     2. unduh + proses S1/MODIS/GPM lewat run_dataset_job (pipeline biasa)
     3. per scene: metrik -> 8 preview -> peta perubahan air (preview ke-9,
        PIPELINE §4.1) -> kalimat kondisi
     4. hitung ulang forecast
-    5. retensi: hapus scene paling lama yang melebihi batas
+    5. retensi: hapus berkas scene yang lebih tua dari jendela raster (M58)
     6. semua langkah dicatat ke live_events
 
-Backfill awal adalah siklus yang sama: selama scene tersimpan < retensi,
-discovery melihat mundur cukup jauh untuk mengisi kekurangannya.
+Backfill adalah siklus yang sama (M58): discovery selalu melihat seluruh
+jendela ``storage.raster_retention_days`` (1 tahun), jadi tanggal S1 mana pun
+di jendela itu yang belum diproses ikut dikerjakan, terbaru lebih dulu, per
+``INGEST_BATCH`` tanggal supaya kemajuan tersimpan bertahap. Setiap scene yang
+lolos juga ditulis per kecamatan ke region_observations (s1_observations).
 
 Kegagalan satu sumber tidak menggagalkan scene: MODIS/GPM yang berkasnya tidak
 ada ditandai FAILED di source_status, scene tetap PARTIAL (tampil), dan tiap
@@ -34,8 +37,6 @@ from etl.job_lock import JobLock
 from etl.live_monitor import (
     _CYCLE_LOCK,
     BACKFILL_MARGIN_DAYS,
-    MAX_LOOKBACK_DAYS,
-    S1_REVISIT_DAYS,
     LiveMonitor,
     _jsonable,
     _LiveFiles,
@@ -46,20 +47,27 @@ logger = logging.getLogger(__name__)
 # Scene yang S1-nya gagal diproses dicoba ulang sampai sekian kali (siklus
 # berbeda), lalu dibiarkan FAILED -- tetap di log, tidak tampil di kartu.
 MAX_S1_ATTEMPTS = 3
-# Jendela discovery minimum di siklus rutin: menangkap scene yang terbit
-# terlambat di katalog Copernicus.
-ROUTINE_LOOKBACK_DAYS = 10
 # Peta perubahan air dihitung di grid preview yang diperhalus WC_REFINE kali:
 # luas km2 dari piksel 768-an terlalu kasar, sedangkan PNG-nya tetap harus
 # seukuran preview lain. 3 menjaga kehalusannya setara MAX_SIDE lama (2048).
 WC_REFINE = 3
+# Tanggal per run_dataset_job. Backfill setahun = puluhan tanggal; satu job
+# raksasa yang mati di tengah membuang semua kerjanya, satu job per beberapa
+# tanggal hanya kehilangan batch yang sedang jalan.
+INGEST_BATCH = 3
+# Backfill (scripts/backfill_s1.py, halaman Data) berjalan berprioritas normal:
+# 3 unduhan CDSE paralel (S1_PARALLEL_DOWNLOADS) alih-alih 1, dan batch lebih
+# besar supaya ketiga jalur unduh tetap terisi. CDSE membatasi ±1 MB/s per
+# koneksi, jadi unduhan serial membuat backfill setahun ±3 hari (8 Okt 2026).
+BACKFILL_BATCH = 6
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def run_cycle(mon: LiveMonitor, area_id: int) -> dict:
+def run_cycle(mon: LiveMonitor, area_id: int, date_range: tuple[date, date] | None = None,
+              echo=None, backfill: bool = False) -> dict:
     """Satu siklus, terkunci dua lapis: _CYCLE_LOCK menyerialkan daerah DI
     DALAM proses ini; JobLock mencegah dua PROSES (mis. uvicorn --reload lama
     yang belum benar-benar berhenti + proses baru, lihat etl/job_lock.py)
@@ -77,11 +85,16 @@ def run_cycle(mon: LiveMonitor, area_id: int) -> dict:
             _set_area(mon, area_id, status="WAITING", status_message="Waiting its turn")
         # Seluruh siklus (termasuk retry MODIS/GPM di luar run_dataset_job)
         # mengalah ke unduhan Dataset Saya di slot koneksi download_guard.
-        with _CYCLE_LOCK.hold(key), dg.low_priority():
+        # Selama riwayat jendela raster belum lengkap, siklus mana pun (penjadwal,
+        # pemulihan setelah restart server, skrip) adalah backfill: unduhan
+        # paralel dan batch besar, bukan mode rutin yang mengalah (M58).
+        backfill = backfill or _history_incomplete(mon, area_id)
+        with _CYCLE_LOCK.hold(key), dg.low_priority(not backfill):
             started = time.time()
             try:
                 _recover_interrupted_ingest(mon, area_id)
-                return _run_cycle_locked(mon, area_id)
+                return _run_cycle_locked(mon, area_id, date_range, echo,
+                                         batch=BACKFILL_BATCH if backfill else INGEST_BATCH)
             finally:
                 _report_auth_failures(mon, area_id, started)
                 # Jalur keluar awal (daerah nonaktif/terhapus) tidak menulis
@@ -89,6 +102,37 @@ def run_cycle(mon: LiveMonitor, area_id: int) -> dict:
                 _restore_if_waiting(mon, area_id, prev_status)
     finally:
         lock.release()
+
+
+def _history_incomplete(mon: LiveMonitor, area_id: int) -> bool:
+    with mon._db.session() as sess:
+        oldest = sess.scalar(select(LiveScene.scene_date).where(LiveScene.area_id == area_id)
+                             .order_by(LiveScene.scene_date).limit(1))
+    return oldest is None or oldest > mon.window_start() + timedelta(days=BACKFILL_MARGIN_DAYS)
+
+
+def backfill_s1(mon: LiveMonitor, area_ids: list[int] | None = None,
+                date_range: tuple[date, date] | None = None, echo=print, max_cycles: int = 20) -> dict:
+    """Backfill Sentinel-1 dataset utama (M58): siklus Live diulang sampai
+    tidak ada tanggal baru di rentang/jendela. Dipakai scripts/backfill_s1.py
+    dan halaman Data. Ringkasan berbentuk sama dengan hydromet_job.backfill
+    supaya etl.backfill_runs bisa menilai statusnya."""
+    if area_ids is None:
+        area_ids = [a["area_id"] for a in mon.list_areas() if a["enabled"]]
+    summary = {"COMPLETED": 0, "FAILED": 0, "locked": False, "cycles": 0}
+    for area_id in area_ids:
+        for cycle in range(1, max_cycles + 1):
+            res = mon.run_cycle(area_id, date_range=date_range, echo=echo, backfill=True)
+            summary["cycles"] += 1
+            echo(f"[CYCLE {cycle}] area={area_id} {res}")
+            if res.get("skipped") == "locked_by_other_process":
+                summary["locked"] = True
+            if res.get("error"):
+                summary["FAILED"] += 1
+            summary["COMPLETED"] += len(res.get("new_scenes") or [])
+            if res.get("skipped") or res.get("error") or not res.get("new_scenes"):
+                break
+    return summary
 
 
 def retry_scene_locked(mon: LiveMonitor, area_id: int, scene_date: date) -> None:
@@ -146,8 +190,11 @@ def _recover_interrupted_ingest(mon: LiveMonitor, area_id: int) -> None:
     ingest daerah ini yang sedang berjalan: setiap scene yang masih PROCESSING
     pasti yatim. Tanpa ini scene itu macet selamanya -- _discover_new_dates
     menganggap PROCESSING sudah "dikenal" sehingga tidak diunduh ulang, dan
-    tidak pernah difinalisasi sehingga tidak tampil. Dijadikan FAILED dengan
-    attempts +1 supaya ikut jalur coba-ulang MAX_S1_ATTEMPTS yang sudah ada.
+    tidak pernah difinalisasi sehingga tidak tampil. Dijadikan FAILED supaya
+    ditemukan ulang, TANPA menambah attempts: proses yang dihentikan/restart
+    bukan kegagalan data, dan tiga restart tidak boleh membuat tanggal yang
+    sehat ditinggalkan selamanya (MAX_S1_ATTEMPTS). Frame yang COG-nya sudah
+    jadi tidak diunduh ulang (module5_orchestrator._keep_live_target_dates).
     Job LIVE_INGEST-nya yang tertinggal DOWNLOADING/PROCESSING ditutup FAILED.
     """
     from etl.module5_orchestrator import LIVE_JOB_TYPE
@@ -164,7 +211,7 @@ def _recover_interrupted_ingest(mon: LiveMonitor, area_id: int) -> None:
         for r in stuck:
             src = dict(r.source_status or {})
             s1 = dict(src.get("sentinel1") or {})
-            s1["attempts"] = int(s1.get("attempts") or 0) + 1
+            s1["interrupted"] = int(s1.get("interrupted") or 0) + 1
             s1["status"] = "FAILED"
             s1["reason"] = "Ingest interrupted (process stopped)"
             src["sentinel1"] = s1
@@ -191,7 +238,11 @@ def _recover_interrupted_ingest(mon: LiveMonitor, area_id: int) -> None:
                 f"Interrupted ingest job(s) closed: {', '.join(map(str, job_ids))}", job_ids=job_ids)
 
 
-def _run_cycle_locked(mon: LiveMonitor, area_id: int) -> dict:
+def _run_cycle_locked(mon: LiveMonitor, area_id: int, date_range: tuple[date, date] | None = None,
+                      echo=None, batch: int = INGEST_BATCH) -> dict:
+    """`date_range` membatasi discovery ke rentang itu (backfill dari halaman
+    Data, M58); tetap dipotong ke jendela raster. `echo(msg)` menerima baris
+    progres "[i/n] ..." untuk log backfill."""
     with mon._db.session() as sess:
         a = sess.get(LiveArea, area_id)
         if a is None or a.deleted_at is not None:
@@ -199,7 +250,7 @@ def _run_cycle_locked(mon: LiveMonitor, area_id: int) -> dict:
         if not a.enabled:
             mon.log(area_id, "CYCLE", "SKIPPED", "Area is disabled, cycle skipped")
             return {"skipped": "disabled"}
-        retention, bbox_wkt, dataset_id = a.retention, a.bbox_wkt, a.dataset_id
+        bbox_wkt, dataset_id = a.bbox_wkt, a.dataset_id
         prev_status = a.status
         rows = sess.scalars(select(LiveScene).where(LiveScene.area_id == area_id)).all()
         scenes = {r.scene_date: (r.status, r.source_status or {}) for r in rows}
@@ -210,17 +261,32 @@ def _run_cycle_locked(mon: LiveMonitor, area_id: int) -> dict:
         dataset_name = dataset.name
 
     kept = sorted((d for d, (st, _) in scenes.items() if st in ("READY", "PARTIAL")), reverse=True)
-    filling = len(kept) < retention
+    window_start = mon.window_start()
+    filling = not scenes or min(scenes) > window_start + timedelta(days=BACKFILL_MARGIN_DAYS)
     _set_area(mon, area_id, status="BACKFILLING" if filling else "RUNNING",
-              status_message="Backfilling initial scenes" if filling else "Checking for new scenes")
+              status_message="Backfilling Sentinel-1 history" if filling else "Checking for new scenes")
     mon.log(area_id, "CYCLE", "STARTED",
-            f"Cycle started ({len(kept)}/{retention} scenes stored)")
+            f"Cycle started ({len(kept)} scenes stored since {window_start})")
 
     try:
-        new_dates = _discover_new_dates(mon, area_id, bbox_wkt, retention, kept, scenes)
+        new_dates = _discover_new_dates(mon, area_id, bbox_wkt, window_start, scenes, date_range)
+        if echo:
+            echo(f"[INFO] {len(new_dates)} Sentinel-1 date(s) to process")
         processed: list[date] = []
-        if new_dates:
-            processed = _ingest(mon, area_id, dataset_id, new_dates)
+        # Terbaru lebih dulu: scene baru tidak menunggu backfill selesai.
+        step = batch
+        for i in range(0, len(new_dates), step):
+            batch = sorted(new_dates[i:i + step])
+            if filling or date_range:
+                _set_area(mon, area_id, status_message=(
+                    f"Backfilling Sentinel-1 history: {i}/{len(new_dates)} dates done, "
+                    f"now {batch[0]}..{batch[-1]}"))
+            t0 = time.monotonic()
+            done = _ingest(mon, area_id, dataset_id, batch)
+            processed += done
+            if echo:
+                echo(f"[{i + len(batch)}/{len(new_dates)}] {batch[0]}..{batch[-1]}: "
+                     f"{len(done)}/{len(batch)} scene(s) ready ({time.monotonic() - t0:.0f}s)")
         # Sumber yang gagal di scene lama dicoba ulang tiap siklus.
         retry_failed_sources(mon, area_id, skip=set(processed))
         reinterpret_all(mon, area_id)
@@ -239,21 +305,19 @@ def _run_cycle_locked(mon: LiveMonitor, area_id: int) -> dict:
         n = len(sess.scalars(select(LiveScene).where(
             LiveScene.area_id == area_id, LiveScene.deleted_at.is_(None),
             LiveScene.status.in_(("READY", "PARTIAL")))).all())
-    msg = (f"{n}/{retention} scenes stored"
-           + ("" if n >= retention else " — not enough Sentinel-1 scenes available yet"))
+    msg = f"{n} scenes stored since {window_start}"
     _set_area(mon, area_id, status="ACTIVE", status_message=msg, last_checked_at=_now())
     mon.log(area_id, "CYCLE", "COMPLETED",
             f"Cycle completed: {len(processed)} new scene(s), {msg}",
             new_scenes=[d.isoformat() for d in processed], previous_status=prev_status,
-            result=_cycle_result(mon, area_id, new_dates, n, retention))
+            result=_cycle_result(mon, area_id, new_dates, n))
     return {"new_scenes": [d.isoformat() for d in processed], "stored": n}
 
 
 _SOURCE_NAMES = {"sentinel1": "Sentinel-1", "modis": "MODIS", "gpm": "GPM"}
 
 
-def _cycle_result(mon: LiveMonitor, area_id: int, targets: list[date],
-                  stored: int, retention: int) -> dict:
+def _cycle_result(mon: LiveMonitor, area_id: int, targets: list[date], stored: int) -> dict:
     """Ringkasan hasil siklus untuk kartu: {level: ok|warn, text}.
     Dibedakan lengkap / sebagian (sumber mana yang gagal) / gagal, supaya
     siklus yang tidak mulus tidak terlihat sama dengan yang mulus."""
@@ -277,7 +341,7 @@ def _cycle_result(mon: LiveMonitor, area_id: int, targets: list[date],
                     incomplete += 1
     parts = []
     if not targets:
-        parts.append(f"no new scenes ({stored}/{retention} stored)")
+        parts.append(f"no new scenes ({stored} stored)")
     else:
         parts.append(f"{len(targets)} new scene(s)")
         detail = []
@@ -303,24 +367,28 @@ def _cycle_result(mon: LiveMonitor, area_id: int, targets: list[date],
 # 1. discovery
 # ---------------------------------------------------------------------------
 
-def _discover_new_dates(mon, area_id, bbox_wkt, retention, kept, scenes) -> list[date]:
+def _discover_new_dates(mon, area_id, bbox_wkt, window_start: date, scenes,
+                        date_range: tuple[date, date] | None = None) -> list[date]:
+    """Tanggal S1 di jendela raster yang belum diproses, TERBARU LEBIH DULU."""
     from etl import aoi_coverage as aoi_cov
     from etl.module1_download import discover_scenes
     from etl.module5_orchestrator import _drop_dates_barely_covering_aoi, _scene_date
 
-    today = _now().date()
-    if len(kept) < retention:
-        lookback = min(MAX_LOOKBACK_DAYS, retention * S1_REVISIT_DAYS + BACKFILL_MARGIN_DAYS)
-        date_from = today - timedelta(days=lookback)
-    else:
-        date_from = min(kept[0] - timedelta(days=1), today - timedelta(days=ROUTINE_LOOKBACK_DAYS))
+    # Seluruh jendela setiap siklus: satu kueri katalog (<1000 produk untuk 2
+    # tahun AOI ini), dan tanggal yang terlewat/gagal di tengah jendela ikut
+    # tertangkap tanpa status backfill terpisah.
+    date_from = window_start
     date_to = _now() + timedelta(days=1)
+    if date_range:
+        date_from = max(window_start, date_range[0])
+        date_to = min(date_to, datetime.combine(date_range[1] + timedelta(days=1), datetime.min.time(),
+                                                tzinfo=timezone.utc))
 
     try:
         found = discover_scenes(
             bbox_wkt=bbox_wkt,
             date_from=datetime.combine(date_from, datetime.min.time(), tzinfo=timezone.utc),
-            date_to=date_to, max_results=200,
+            date_to=date_to, max_results=1000,
         )
     except Exception as exc:
         mon.log(area_id, "DISCOVER", "FAILED", f"Failed to check for Sentinel-1 scenes: {exc}")
@@ -345,11 +413,8 @@ def _discover_new_dates(mon, area_id, bbox_wkt, retention, kept, scenes) -> list
             return int((src.get("sentinel1") or {}).get("attempts") or 0) >= MAX_S1_ATTEMPTS
         return True  # READY/PARTIAL/PROCESSING/DELETED
 
-    candidates = [d for d in dates if not known(d)]
-    # Hanya yang akan masuk `retensi` terbaru; scene yang lebih tua dari yang
-    # sudah tersimpan akan langsung terhapus lagi, jadi tidak diunduh.
-    top = sorted(set(kept) | set(candidates), reverse=True)[:retention]
-    targets = sorted(d for d in top if d in candidates)
+    targets = [d for d in dates if d >= date_from and not known(d)  # sudah urut terbaru dulu
+               and (date_range is None or d <= date_range[1])]
     mon.log(area_id, "DISCOVER", "OK",
             f"{len(dates)} S1 date(s) found since {date_from}, {len(targets)} newly processed",
             found=[d.isoformat() for d in dates], targets=[d.isoformat() for d in targets])
@@ -383,8 +448,10 @@ def _ingest(mon: LiveMonitor, area_id: int, dataset_id: int, dates: list[date]) 
         sess.flush()
         job_id = job.job_id
 
+    adopted = adopt_main_aux(mon, dataset_id, dates)
     mon.log(area_id, "INGEST", "STARTED",
-            f"Downloading & processing {len(dates)} scene(s) ({dates[0]} to {dates[-1]}), job {job_id}",
+            f"Downloading & processing {len(dates)} scene(s) ({dates[0]} to {dates[-1]}), job {job_id}"
+            + (f"; {adopted} GPM/MODIS file(s) taken from the main dataset" if adopted else ""),
             job_id=job_id)
     try:
         run_dataset_job(mon._db, job_id)
@@ -402,6 +469,43 @@ def _ingest(mon: LiveMonitor, area_id: int, dataset_id: int, dates: list[date]) 
         if finalize_scene(mon, area_id, d) in ("READY", "PARTIAL"):
             done.append(d)
     return done
+
+
+def adopt_main_aux(mon: LiveMonitor, dataset_id: int, dates: list[date]) -> int:
+    """GPM/MODIS dari dataset utama (M58): hasil olahan Job Hidromet untuk
+    tanggal scene dan D-1 di-hardlink ke _work dataset Live, sehingga module8/
+    module7 melihat "output sudah ada" dan tidak mengunduh atau mengolah ulang.
+    Grid-nya sama (bbox AOI yang sama). Tanggal yang belum diolah Job Hidromet
+    tetap diunduh seperti biasa. Hardlink: menghapus salinan Live tidak
+    menyentuh berkas dataset utama."""
+    from etl import regions as rg
+    from etl.module9_fusion import AUX_DAY_OFFSETS
+
+    with mon._db.session() as sess:
+        main = rg.hydromet_dataset(sess)
+        live = sess.get(Dataset, dataset_id)
+        live_name = live.name if live else None
+    if main is None or live_name is None or main["dataset_id"] == dataset_id:
+        return 0
+    src_root = fm.get_dataset_root(main["dataset_id"], main["name"]) / fm.SCRATCH_DIRNAME
+    dst_root = fm.get_dataset_root(dataset_id, live_name) / fm.SCRATCH_DIRNAME
+    n = 0
+    for d in {d + timedelta(days=off) for d in dates for off in AUX_DAY_OFFSETS}:
+        dk = d.strftime("%Y%m%d")
+        for sub in (("accumulated", "gpm"), ("indices", "modis")):
+            src_dir = src_root.joinpath(dk, *sub)
+            if not src_dir.is_dir():
+                continue
+            for src in src_dir.glob("*.tif"):
+                dst = dst_root.joinpath(dk, *sub, src.name)
+                if dst.exists():
+                    continue
+                try:
+                    dg.adopt_file(src, dst)
+                    n += 1
+                except OSError:
+                    logger.warning("[LIVE] gagal mengambil %s dari dataset utama", src)
+    return n
 
 
 def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
@@ -504,6 +608,7 @@ def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
                 row.status = "INCOMPLETE"
                 row.source_status = _jsonable(status)
     if scene_status in ("READY", "PARTIAL"):
+        record_s1_observations(mon, area_id, scene_date, inputs.get("s1") or [])
         try:
             water_change_stage(mon, area_id, scene_date, files, inputs)
         except Exception as exc:
@@ -512,6 +617,21 @@ def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
             mon.log(area_id, "WATER_CHANGE", "FAILED", f"Water change map for {scene_date} failed: {exc}",
                     scene_date=scene_date)
     return scene_status
+
+
+def record_s1_observations(mon: LiveMonitor, area_id: int, scene_date: date, frames: list) -> None:
+    """VV/VH/WATER_PCT per kecamatan ke deret waktu dataset utama (M58).
+    Tidak fatal: scene tetap tampil walau agregasinya gagal."""
+    from etl import s1_observations
+
+    try:
+        n = s1_observations.record_scene(mon._db, scene_date, frames)
+        mon.log(area_id, "S1_AGGREGATE", "OK",
+                f"Sentinel-1 {scene_date}: {n} per-kecamatan value(s) written", scene_date=scene_date)
+    except Exception as exc:
+        logger.exception("[LIVE] agregasi S1 per kecamatan %s gagal", scene_date)
+        mon.log(area_id, "S1_AGGREGATE", "FAILED",
+                f"Sentinel-1 {scene_date} per-kecamatan aggregation failed: {exc}", scene_date=scene_date)
 
 
 def _drop_water_change(mon: LiveMonitor, area_id: int, scene_date: date,
@@ -667,6 +787,7 @@ def retry_failed_sources(mon: LiveMonitor, area_id: int, skip: set[date] | None 
     dg.set_context(ds_id)  # jeda retry MODIS/GPM tampil di bar daerah ini
     redone = []
     for d, st in todo:
+        adopt_main_aux(mon, ds_id, [d])
         for src, fn in (("modis", ensure_modis_inputs_for_date), ("gpm", ensure_gpm_inputs_for_date)):
             if (st.get(src) or {}).get("status") != "FAILED" and only is None:
                 continue
@@ -715,9 +836,13 @@ def refresh_forecast(mon: LiveMonitor, area_id: int) -> None:
     from etl.live_metrics import load_scene_metrics
 
     with mon._db.session() as sess:
+        # Prakiraan dari N scene terbaru saja (live_areas.retention, M58):
+        # riwayat setahun membuat SES/Holt mengikuti musim lalu, bukan kondisi kini.
+        n = sess.get(LiveArea, area_id).retention
         rows = sess.scalars(select(LiveScene).where(
             LiveScene.area_id == area_id, LiveScene.deleted_at.is_(None),
-            LiveScene.status.in_(("READY", "PARTIAL"))).order_by(LiveScene.scene_date)).all()
+            LiveScene.status.in_(("READY", "PARTIAL"))).order_by(LiveScene.scene_date.desc()).limit(n)).all()
+        rows = rows[::-1]
         metrics = load_scene_metrics(sess, rows)
         series = [(r.scene_date, metrics[r.live_scene_id]) for r in rows]
     fc = build_area_forecast(series)

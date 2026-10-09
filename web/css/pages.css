@@ -46,8 +46,14 @@
 /* ---------------------------------------------------------------- diagram */
 .band-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 6px; min-height: 0; min-width: 0; }
-.chip[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.chip[aria-pressed="false"] { opacity: .7; text-decoration: line-through; }
 .chip.static { color: var(--phos); }
+/* Diagram › Keadaan terbaru: daftar band di bawah grafik sebagai kisi rata,
+   bukan deretan tombol selebar teksnya masing-masing. */
+#dgChips { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 6px; margin-top: 8px; }
+#dgChips .chip { justify-content: flex-start; width: 100%; padding: 3px 8px; text-align: left; }
+#dgChips .chip .swatch { flex: none; }
+#dgChips .chip .v-dim { margin-left: auto; padding-left: 6px; white-space: nowrap; }
 .region-pick { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow: auto; }
 .region-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .region-row input[type=color] { width: 28px; height: 18px; padding: 0; border: 1px solid #000; background: none; }
@@ -70,3 +76,16 @@
 
 /* Tabel panjang di dalam layar (riwayat backfill per tanggal). */
 .scroll-box { max-height: 300px; overflow: auto; }
+
+/* Forecast: sakelar di bawah grafik, palang progres, daftar model per kecamatan. */
+.fc-toggle { margin: 6px 0 0; font-size: 12px; font-weight: 700; color: var(--phos); }
+.fc-prog { margin: 6px 0 0; }
+.fc-prog .fc-prog-text { margin: 4px 0 0; font-size: 11px; }
+.fc-models { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 4px 0 0; font-size: 11px; }
+.chart .fc-zone { fill: var(--amber); fill-opacity: .06; }
+
+/* Forecast › Keadaan terbaru: tooltip titik berlatar warna band (diatur js/diagram.js). */
+.dg-chart { position: relative; }
+.dg-chart .hit:focus { outline: none; stroke: currentColor; stroke-width: 1; }
+.chart-tip.dg-tip { border: 1px solid rgba(0, 0, 0, .55); line-height: 1.35;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, .45); text-shadow: none; font-family: var(--font-data); }

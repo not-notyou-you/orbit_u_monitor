@@ -1,5 +1,5 @@
 # etl/live_interpret.py
-"""Kalimat kondisi Live Monitoring (LIVE_MONITORING.md 4.2), rule-based.
+"""Kalimat kondisi Live Monitoring (PIPELINE.md §4, kalimat kondisi), rule-based.
 
 Format wajib (Bahasa Indonesia, PIPELINE §4):
     Menampilkan [apa] dalam kondisi [kategori] karena [angka].

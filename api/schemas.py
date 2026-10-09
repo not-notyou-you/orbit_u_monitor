@@ -591,7 +591,7 @@ class RegionListResponse(BaseModel):
     total: int = 0
 
 
-# --- Live Monitoring (LIVE_MONITORING.md) -----------------------------------
+# --- Live Monitoring (PIPELINE.md §4) -----------------------------------
 
 class LiveAreaCreateRequest(BaseModel):
     region_id: int

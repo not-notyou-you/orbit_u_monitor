@@ -3,7 +3,9 @@
 // Katalog menjawab "apa isi dataset ini"; halaman ini menjawab "apa yang
 // sedang jalan sekarang" tanpa harus memilih dataset satu per satu. Sumber
 // datanya sama (/api/datasets + /api/datasets/{id}/status), hanya dibaca
-// lintas dataset dan hanya untuk status yang masih bergerak.
+// lintas dataset dan hanya untuk status yang masih bergerak. Di atasnya,
+// pekerjaan dataset utama (M58) dari GET /api/data/activity: Job Hidromet
+// dan siklus Live Sentinel-1, termasuk backfill yang dijalankan skrip.
 //
 // Label status dan nama satelit diambil dari UI (UI.datasetStatus,
 // UI.DATASET_ACTIVE, UI.SOURCE_LABEL) supaya tidak jadi salinan kedua dari
@@ -23,7 +25,7 @@ Pages['process'] = (() => {
     await load();
     // Timer dipasang sekali dan memeriksa sendiri apakah masih ada yang
     // bergerak, jadi halaman yang menganggur tidak menembaki API.
-    st.timer = setInterval(() => { if (st && st.items.some(d => ACTIVE.has(d.status))) load(true); }, 10000);
+    st.timer = setInterval(() => { if (st && (st.mainRunning || st.items.some(d => ACTIVE.has(d.status)))) load(true); }, 10000);
   }
   function destroy() { if (st && st.timer) clearInterval(st.timer); st = null; }
 
@@ -42,14 +44,93 @@ Pages['process'] = (() => {
     if (!st) return;
     shown.forEach((d, i) => { st.prog[d.dataset_id] = progs[i]; });
     st.rail = await API.get('/api/pipeline/status/current').catch(() => null);
+    const main = await API.get('/api/data/activity').catch(() => null);
     if (!st) return;
+    st.main = main;
+    st.mainRunning = !!(main && main.running);
+    renderMain(main);
 
     renderReadouts(list);
     renderList(shown);
     renderRail();
     const moving = list.filter(d => ACTIVE.has(d.status)).length;
     st.ctx.setStatus((quiet ? 'Diperbarui · ' : 'Siap · ') +
-      (moving ? moving + ' proses berjalan' : 'tidak ada proses berjalan'));
+      (moving ? moving + ' proses berjalan' : 'tidak ada proses berjalan') +
+      (st.mainRunning ? ' · dataset utama sedang diisi' : ''));
+  }
+
+  const LIVE_STATUS = { BACKFILLING: ['MENGISI RIWAYAT', ''], RUNNING: ['MEMERIKSA SCENE BARU', ''], WAITING: ['MENUNGGU GILIRAN', 'off'],
+    ACTIVE: ['SIAGA', 'off'], ERROR: ['GALAT', 'off'] };
+
+  // Dataset utama (M58): bukan dataset Katalog, jadi tidak ada di /api/datasets.
+  function renderMain(a) {
+    const box = UI.$('#pcMain', st.root);
+    if (!a) { box.innerHTML = ''; return; }
+    const h = a.hydromet || {};
+    const run = (h.runs || [])[0];
+    const hyd = UI.screenHTML({
+      channel: 'DATASET UTAMA · JOB HIDROMET (GPM + MODIS)',
+      rec: h.locked ? 'BERJALAN' : 'SIAGA', recCls: h.locked ? '' : 'off',
+      body: (run && run.total ? UI.progressHTML(run.done / run.total * 100, 'Progres backfill hidromet') : '') +
+        '<p class="scr-text" style="margin:6px 0 0">' +
+        (h.locked ? '<span class="lbl">SEDANG DIKERJAKAN:</span> ' + UI.esc(h.current_date ? UI.date(h.current_date) : UI.NA) +
+          (run && run.total ? ' · tanggal ' + UI.int(run.done) + ' dari ' + UI.int(run.total) : '') + '\n'
+          : 'Tidak berjalan. Job harian 02.00 WIB.\n') +
+        '<span class="lbl">SELESAI 1 JAM TERAKHIR:</span> ' + UI.int(h.done_last_hour) + ' tanggal · ' +
+        '<span class="lbl">TERAKHIR SELESAI:</span> ' + UI.esc(h.last_completed_date ? UI.date(h.last_completed_date) : UI.NA) + '</p>' +
+        '<p class="v-dim" style="margin:6px 0 0">Log rinci: Data › GPM atau Data › MODIS.</p>',
+    });
+    const live = (a.live || []).map(liveHTML).join('<div style="height:8px"></div>');
+    box.innerHTML = live + '<div style="height:8px"></div>' + hyd + '<div style="height:8px"></div>';
+  }
+
+  // Sisa waktu yang dibaca manusia: "±2 hari 19 jam".
+  function remaining(iso) {
+    const min = Math.max(0, Math.round((new Date(iso) - new Date()) / 60000));
+    const d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60;
+    return '±' + (d ? d + ' hari ' : '') + (d || h ? h + ' jam' : m + ' menit');
+  }
+
+  // Backfill Sentinel-1 dataset utama: rencana, posisi sekarang, perkiraan, log.
+  function liveHTML(l) {
+    const s = LIVE_STATUS[l.status] || [l.status, 'off'];
+    const p = l.progress;
+    const head = '<p class="scr-text" style="margin:0">' + UI.esc(l.status_message || UI.NA) + '</p>';
+    if (!p || !p.dates_total) {
+      return UI.screenHTML({ channel: 'DATASET UTAMA · SENTINEL-1 (' + (l.name || '').toUpperCase() + ')', rec: s[0], recCls: l.running ? '' : s[1],
+        body: head + '<p class="scr-text" style="margin:6px 0 0"><span class="lbl">SCENE TERSIMPAN:</span> ' + UI.int(l.n_ready) +
+          ' · <span class="lbl">DIPERIKSA TERAKHIR:</span> ' + UI.esc(l.last_checked_at ? UI.dateTime(l.last_checked_at) : UI.NA) + '</p>' });
+    }
+    const c = p.current;
+    const readouts = '<div class="readouts" style="margin:8px 0">' +
+      UI.readoutHTML('TANGGAL SELESAI', UI.int(p.dates_done) + '/' + UI.int(p.dates_total),
+        p.dates_failed ? UI.int(p.dates_failed) + ' TIDAK LOLOS' : 'DIHITUNG PER BATCH 3 TANGGAL', p.dates_failed ? 'v-amber' : '') +
+      UI.readoutHTML('FRAME SELESAI', UI.int(p.frames_done) + '/' + UI.int(p.frames_total), '±' + UI.num(p.minutes_per_frame || 0, 0) + ' MENIT/FRAME') +
+      UI.readoutHTML('KECEPATAN UNDUH', p.download_mb_per_min ? UI.num(p.download_mb_per_min, 0) : UI.NA, 'MB PER MENIT') +
+      UI.readoutHTML('PERKIRAAN SELESAI', p.running ? (p.eta ? UI.esc(UI.date(p.eta, 'short')) : 'MENGHITUNG…') : 'SELESAI',
+        p.running && p.eta ? 'PUKUL ' + UI.esc(new Date(p.eta).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })) +
+          ' WIB · SISA ' + remaining(p.eta) : (p.cycle_finished_at ? UI.esc(UI.dateTime(p.cycle_finished_at)) : ''), p.running ? 'v-cyan' : '') +
+      '</div>';
+    const now = c ? '<p class="scr-text" style="margin:6px 0 0"><span class="lbl">SEDANG DIKERJAKAN:</span> lintasan ' +
+      UI.esc(c.date ? UI.date(c.date) : UI.NA) + ' · tahap ' + UI.esc(c.stage || UI.NA) + ' · ' + UI.esc(c.message || '') +
+      ' <span class="v-dim">(' + UI.esc(UI.dateTime(c.at)) + ')</span></p>' +
+      (c.stage === 'DOWNLOAD' && c.percent != null ? UI.barHTML('Frame ini', c.percent, 100, UI.num(c.percent, 0) + '%') : '') : '';
+    const plan = '<p class="scr-text" style="margin:6px 0 0"><span class="lbl">RENCANA:</span> ' + UI.int(p.dates_total) +
+      ' tanggal lintasan, dari ' + UI.esc(UI.date(p.last_date)) + ' mundur ke ' + UI.esc(UI.date(p.first_date)) +
+      ' (terbaru dulu, 3 tanggal per batch)\n<span class="lbl">BATCH SEKARANG:</span> ' +
+      UI.esc(p.current_dates.length ? p.current_dates.map(d => UI.date(d)).join(', ') : UI.NA) +
+      ' · <span class="lbl">MULAI:</span> ' + UI.esc(UI.dateTime(p.cycle_started_at)) +
+      ' · <span class="lbl">SCENE TERSIMPAN:</span> ' + UI.int(l.n_ready) + '</p>';
+    const log = '<details style="margin-top:8px" open><summary class="v-dim" style="cursor:pointer">Log terbaru (' + UI.int(p.recent.length) + ' baris)</summary>' +
+      '<div class="scr-log" style="max-height:220px;margin-top:6px" role="log">' + p.recent.map(r =>
+        '<div><span class="v-dim">' + UI.esc(UI.dateTime(r.at)) + '</span> ' + UI.esc(r.stage || '') + ' <span class="' +
+        stageCls(r.status) + '">' + UI.esc(r.status || '') + '</span> ' + UI.esc(r.message || '') + '</div>').join('') + '</div></details>';
+    return UI.screenHTML({
+      channel: 'DATASET UTAMA · BACKFILL SENTINEL-1 (' + (l.name || '').toUpperCase() + ')',
+      rec: p.running ? 'BERJALAN' : s[0], recCls: p.running ? '' : 'off',
+      body: UI.progressHTML(p.percent, 'Progres backfill Sentinel-1') + readouts + now + plan + log +
+        '<p class="v-dim" style="margin:6px 0 0">Perkiraan dihitung dari rata-rata waktu per frame yang sudah selesai dan diperbarui tiap 10 detik. Riwayat per tanggal: Data › Sentinel-1.</p>',
+    });
   }
 
   function renderReadouts(list) {
@@ -57,8 +138,11 @@ Pages['process'] = (() => {
     const queued = list.filter(d => d.status === 'QUEUED').length;
     const paused = list.filter(d => d.status === 'PAUSED').length;
     const failed = list.filter(d => d.status === 'FAILED').length;
+    // Pekerjaan dataset utama (backfill/job harian) ikut dihitung sebagai proses berjalan.
+    const main = st.main ? (st.main.hydromet && st.main.hydromet.locked ? 1 : 0) + (st.main.live || []).filter(l => l.running).length : 0;
     UI.$('#pcReadouts', st.root).innerHTML =
-      UI.readoutHTML('SEDANG BERJALAN', UI.int(moving.length), 'DARI ' + UI.int(list.length) + ' DATASET', moving.length ? 'v-amber' : '') +
+      UI.readoutHTML('SEDANG BERJALAN', UI.int(moving.length + main), main ? UI.int(main) + ' DATASET UTAMA · ' + UI.int(moving.length) + ' KATALOG'
+        : 'DARI ' + UI.int(list.length) + ' DATASET KATALOG', moving.length + main ? 'v-amber' : '') +
       UI.readoutHTML('ANTRE', UI.int(queued), 'MENUNGGU GILIRAN') +
       UI.readoutHTML('DIJEDA', UI.int(paused), 'PERLU DILANJUTKAN', paused ? 'v-amber' : '') +
       UI.readoutHTML('GAGAL', UI.int(failed), 'PERLU DICOBA ULANG', failed ? 'v-alert' : '');
@@ -69,7 +153,7 @@ Pages['process'] = (() => {
     if (!shown.length) {
       box.innerHTML = UI.screenHTML({ channel: 'PROSES BERJALAN', body: UI.emptyHTML(
         st.items.length
-          ? 'TIDAK ADA PROSES YANG BERJALAN. SIKLUS LIVE JALAN 01, 07, 13, DAN 19 WIB; HIDROMET HARIAN 02 WIB.'
+          ? 'TIDAK ADA DATASET KATALOG YANG BERJALAN. SIKLUS LIVE JALAN 01, 07, 13, DAN 19 WIB; HIDROMET HARIAN 02 WIB.'
           : 'BELUM ADA DATASET. BUAT LEWAT "BUAT DATASET BARU".') });
       return;
     }

@@ -1,5 +1,5 @@
 # etl/live_monitor.py
-"""Live Monitoring: pemantauan otomatis per Daerah Live (LIVE_MONITORING.md).
+"""Live Monitoring: pemantauan otomatis per Daerah Live (PIPELINE.md §4).
 
 BENTUK DATA
     Satu Daerah Live = satu baris `datasets` (dataset_kind='LIVE_AREA') + satu
@@ -66,12 +66,10 @@ LIVE_SOURCES = {"SENTINEL1": ["PROCESSED"], "MODIS": ["PROCESSED"], "GPM": ["PRO
 LIVE_REQUIRED_TIERS = ["COG"]
 LIVE_FUSION_STRATEGY = "CO_OCCURRENCE"
 
-# Revisit S1 ~6-12 hari. Backfill mencari mundur retensi x ini (+ cadangan),
-# dibatasi supaya discovery tidak menjelajah bertahun-tahun di AOI yang
-# jarang dilewati.
+# Revisit S1 ~6-12 hari. Siklus masih dianggap backfill selama scene tertua
+# lebih muda dari awal jendela raster + cadangan ini (M58).
 S1_REVISIT_DAYS = 12
 BACKFILL_MARGIN_DAYS = 14
-MAX_LOOKBACK_DAYS = 730  # PIPELINE.md §4: min(730, retention x 12 + 14)
 
 LIVE_DIRNAME = "live"
 
@@ -396,11 +394,9 @@ class LiveMonitor:
         return self.get_area(area_id)
 
     def _apply_retention(self, area_id: int, retention: int, grew: bool) -> None:
-        """Turun: kelebihan langsung dihapus. Naik: isi kekurangannya."""
-        self.enforce_retention(area_id, reason=f"retensi diturunkan ke {retention}")
+        """`retention` hanya jumlah scene di kartu & prakiraan (M58); berkas
+        tidak dihapus karenanya, jadi cukup hitung ulang prakiraan."""
         self.refresh_forecast(area_id)
-        if grew:
-            self.start_cycle(area_id)
 
     def delete_area(self, area_id: int) -> dict:
         """Hapus daerah: semua berkas scene-nya dihapus permanen, lalu baris
@@ -454,27 +450,39 @@ class LiveMonitor:
 
     # --- retensi ------------------------------------------------------------
 
-    def enforce_retention(self, area_id: int, reason: str = "exceeds retention") -> int:
-        """Hapus scene tertua sampai jumlah scene tersimpan <= retensi."""
+    def window_start(self) -> date:
+        """Tanggal tertua yang berkas rasternya masih disimpan (M58)."""
+        from etl.settings import read_setting
+        days = int(read_setting(self._db, "storage.raster_retention_days"))
+        return _now().date() - timedelta(days=days)
+
+    def enforce_retention(self, area_id: int, reason: str = "older than raster window") -> int:
+        """Hapus berkas scene yang lebih tua dari jendela raster (M58).
+        Metrik scene (live_scene_metrics) dan angka per kecamatan
+        (region_observations) tidak disentuh."""
+        keep_from = self.window_start()
         with self._db.session() as sess:
-            a = sess.get(LiveArea, area_id)
-            if a is None:
+            if sess.get(LiveArea, area_id) is None:
                 return 0
-            retention = a.retention
-            kept = sess.scalars(
+            old = [s.scene_date for s in sess.scalars(
                 select(LiveScene).where(
                     LiveScene.area_id == area_id,
                     LiveScene.deleted_at.is_(None),
                     LiveScene.status.in_(("READY", "PARTIAL")),
-                ).order_by(LiveScene.scene_date.desc())
-            ).all()
-            excess = [s.scene_date for s in kept[retention:]]
-            keep_from = kept[min(retention, len(kept)) - 1].scene_date if kept else None
-        for d in excess:
+                    LiveScene.scene_date < keep_from,
+                )
+            ).all()]
+        for d in old:
             self.delete_scene(area_id, d, reason=reason)
-        if keep_from is not None:
-            self._prune_granules(area_id, keep_from)
-        return len(excess)
+        # Granule cache: hanya yang dibutuhkan scene paling baru. Scene lama
+        # sudah selesai diproses; granulenya bisa diunduh ulang bila perlu.
+        with self._db.session() as sess:
+            newest = sess.scalar(select(LiveScene.scene_date).where(
+                LiveScene.area_id == area_id, LiveScene.deleted_at.is_(None),
+                LiveScene.status.in_(("READY", "PARTIAL"))).order_by(LiveScene.scene_date.desc()).limit(1))
+        if newest is not None:
+            self._prune_granules(area_id, newest)
+        return len(old)
 
     def delete_scene(self, area_id: int, scene_date: date, reason: str) -> int:
         """Hard delete berkas satu scene + tandai log-nya. Mengembalikan byte."""
@@ -558,9 +566,9 @@ class LiveMonitor:
         t = _area_threads.get(area_id)
         return t is not None and t.is_alive()
 
-    def run_cycle(self, area_id: int) -> dict:
+    def run_cycle(self, area_id: int, date_range=None, echo=None, backfill: bool = False) -> dict:
         from etl.live_cycle import run_cycle
-        return run_cycle(self, area_id)
+        return run_cycle(self, area_id, date_range, echo, backfill)
 
     def refresh_forecast(self, area_id: int) -> None:
         from etl.live_cycle import refresh_forecast
@@ -574,11 +582,13 @@ class LiveMonitor:
         siklus."""
         area = self.get_area(area_id)
         with self._db.session() as sess:
+            a = sess.get(LiveArea, area_id)
+            # Kartu menampilkan N scene terbaru (live_areas.retention, M58);
+            # riwayat lengkap ada di halaman Citra dan deret kecamatan.
             rows = sess.scalars(select(LiveScene).where(
                 LiveScene.area_id == area_id, LiveScene.deleted_at.is_(None),
                 LiveScene.status.in_(("READY", "PARTIAL")),
-            ).order_by(LiveScene.scene_date.desc())).all()
-            a = sess.get(LiveArea, area_id)
+            ).order_by(LiveScene.scene_date.desc()).limit(a.retention)).all()
             forecast = a.forecast or {}
             forecast_at = a.forecast_updated_at
             dates = [{"date": r.scene_date.isoformat(), "status": r.status,

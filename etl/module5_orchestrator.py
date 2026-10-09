@@ -2,7 +2,7 @@
 """
 Orchestrator dataset: menyusun DAG pemrosesan dari konfigurasi per-satelit.
 
-Sejak model per-satelit (DOCS/ARCHITECTURE.md: dataset_source_config), pipeline
+Sejak model per-satelit (PIPELINE.md §2: dataset_source_config), pipeline
 sebuah dataset bukan lagi satu rantai tetap. Setiap sumber punya cabangnya
 sendiri, dan level (RAW/PROCESSED) sumber itulah yang menentukan sampai mana
 cabangnya jalan:
@@ -44,7 +44,7 @@ from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
 import rasterio
 from shapely import wkt as shapely_wkt
-from etl.database_client import DatabaseClient, DatasetJob
+from etl.database_client import Dataset, DatabaseClient, DatasetJob, LiveScene
 from etl.dataset_manager import (
     DatasetManager,
     compute_skip_stages,
@@ -1599,6 +1599,44 @@ def _cleanup_worker(jc: _JobContext, cleanup_queue: Queue) -> None:
             _record_worker_failure(jc, pid, "CLEANUP", exc)
 
 
+def _keep_live_target_dates(db, job_id: int, dataset_id: int, scenes: list[dict]) -> list[dict]:
+    """Job LIVE_INGEST hanya untuk tanggal yang dipilih siklus Live (baris
+    live_scenes PROCESSING), bukan setiap scene di rentang [awal, akhir].
+
+    Siklus Live memproses tanggal yang tidak berurutan (backfill setahun,
+    terbaru dulu, M58); tanpa saringan ini rentang job ikut menyapu tanggal
+    yang sudah READY dan lintasan yang hanya menyerempet AOI (~30%, ditolak
+    gerbang Live 90%), masing-masing ±1,6 GB unduhan sia-sia."""
+    with db.session() as sess:
+        job = sess.get(DatasetJob, job_id)
+        if job is None or job.job_type != LIVE_JOB_TYPE:
+            return scenes
+        wanted = {r.scene_date for r in sess.query(LiveScene.scene_date).filter(
+            LiveScene.dataset_id == dataset_id, LiveScene.status == "PROCESSING")}
+        ds = sess.get(Dataset, dataset_id)
+        root = fm.get_dataset_root(dataset_id, ds.name) if ds else None
+    kept = [s for s in scenes if _scene_date(s) in wanted] if wanted else list(scenes)
+    if len(kept) != len(scenes):
+        logger.info("[ORCH] job_id=%d Live: %d -> %d scene (hanya tanggal target %s)",
+                    job_id, len(scenes), len(kept), sorted(d.isoformat() for d in wanted))
+    # Frame yang COG VV+VH-nya sudah jadi (batch sebelumnya terputus setelah
+    # frame ini selesai) tidak diunduh ulang: ±1,8 GB dan ±40 menit per frame.
+    done_dir = root / fm.SOURCE_DIR_NAMES["sentinel1"] / "PROCESSED" if root else None
+    if done_dir is not None and done_dir.is_dir():
+        names = {p.name for p in done_dir.glob("*_lee.tif")}
+
+        def has_cogs(pid: str) -> bool:
+            stem = pid[:35]   # S1X_IW_GRDH_1SDV_YYYYMMDDTHHMMSS_20 = prefix nama COG
+            return all(any(n.startswith(stem) and n.endswith(f"_{b}_lee.tif") for n in names)
+                       for b in ("VV", "VH"))
+        before = len(kept)
+        kept = [s for s in kept if not has_cogs(s["product_identifier"])]
+        if len(kept) != before:
+            logger.info("[ORCH] job_id=%d Live: %d frame sudah punya COG, tidak diunduh ulang",
+                        job_id, before - len(kept))
+    return kept
+
+
 def _drop_dates_barely_covering_aoi(
     scenes: list[dict], bbox_wkt: str, job_id: int,
     min_fraction: float = MIN_S1_AOI_COVERAGE,
@@ -1801,10 +1839,13 @@ def _run_aux_only(jc: _JobContext, date_from: date, date_to: date) -> None:
 def run_dataset_job(db: DatabaseClient, job_id: int) -> None:
     with db.session() as sess:
         job = sess.get(DatasetJob, job_id)
-        low = job is not None and job.job_type == LIVE_JOB_TYPE
+        live = job is not None and job.job_type == LIVE_JOB_TYPE
         ds_id = job.dataset_id if job is not None else None
     # Thread pemanggil ikut prioritas dan konteks jeda-nya: pra-lintasan
     # MODIS/GPM berjalan di sini, bukan di worker.
+    # Job Live mengikuti prioritas siklus pemanggilnya: siklus rutin rendah
+    # (mengalah ke Dataset Saya), backfill S1 normal (live_cycle.backfill_s1, M58).
+    low = live and dg.is_low_priority()
     prev_ctx = dg.current_context()
     dg.set_context(ds_id)
     try:
@@ -1883,7 +1924,7 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
             "(generate_preview=false)", job_id,
         )
     #   3. user mencentang "Buat Preview" tapi tidak memilih satu varian pun.
-    # preview_options KOSONG berarti persis itu (DOCS/ARCHITECTURE.md); dibedakan
+    # preview_options KOSONG berarti persis itu (PIPELINE.md §2); dibedakan
     # dari NULL, yang berarti "tidak dinyatakan" dan tetap merender ketiganya.
     # Migrasi 018 mem-backfill NULL jadi ketiga varian, jadi kolomnya sekarang
     # selalu menyatakan pilihan yang sebenarnya.
@@ -1973,6 +2014,7 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
             return
 
     scenes = _drop_dates_barely_covering_aoi(scenes, bbox_wkt, job_id)
+    scenes = _keep_live_target_dates(db, job_id, dataset_id, scenes)
     if not scenes:
         logger.info("[ORCH] semua tanggal S1 cuma menyerempet AOI job_id=%d", job_id)
         dsmgr.set_job_status(job_id, "COMPLETED", completed_at=_now())

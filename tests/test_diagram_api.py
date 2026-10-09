@@ -44,7 +44,7 @@ def test_bands_have_explanations_and_thresholds(make_client):
     assert {"VV", "VH", "RAIN_24H", "NDVI", "FLOOD"} <= set(codes)
     rain = next(b for b in items if b["band_code"] == "RAIN_24H")
     assert rain["about"] and rain["color"] and [t["label"] for t in rain["thresholds"]] == ["lebat", "sangat lebat"]
-    assert next(b for b in items if b["band_code"] == "VV")["per_region"] is False
+    assert next(b for b in items if b["band_code"] == "VV")["per_region"] is True   # M58: S1 per kecamatan
     assert len({b["color"] for b in items}) == len(items)          # satu warna per band
 
 
@@ -90,7 +90,7 @@ def test_regions_series_and_validation(make_client, diagram_obs, synthetic_aoi):
     # Satu titik per hari (10 hari), semuanya terisi untuk kedua kecamatan.
     assert [len(s["points"]) for s in rain["series"]] == [10, 10]
     assert all(p["y"] is not None for s in rain["series"] for p in s["points"])
-    r = c.get(f"/api/diagram/regions?region_ids={ids}&bands=VV&date_from={f}&date_to={t}")
+    r = c.get(f"/api/diagram/regions?region_ids={ids}&bands=WATER_CHANGE&date_from={f}&date_to={t}")
     assert (r.status_code, r.json()["code"]) == (400, "INVALID_BAND")
     r = c.get(f"/api/diagram/regions?region_ids={ids}&date_from={t}&date_to={f}")
     assert (r.status_code, r.json()["code"]) == (400, "INVALID_DATE_RANGE")
@@ -117,3 +117,82 @@ def test_printable_colours_are_darkened():
     assert _printable("#1f77b4") == "#1f77b4"
     r, g, b = (int(_printable("#33ff99")[i:i + 2], 16) for i in (1, 3, 5))
     assert (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 <= 0.56
+
+
+# -- forecast (M61) ----------------------------------------------------------
+
+def test_forecast_endpoint_aoi_and_region(make_client, diagram_obs, synthetic_aoi):
+    c = make_client("ANALYST")
+    body = c.get("/api/diagram/forecast?band=RAIN_24H").json()
+    assert body["band_code"] == "RAIN_24H" and body["region_id"] is None and body["horizon"] == 15
+    if body["points"]:
+        assert len(body["points"]) == 15 and all(p["lo"] <= p["mean"] <= p["hi"] and p["lo"] >= 0 for p in body["points"])
+    rid = synthetic_aoi["TST001"]
+    r = c.get(f"/api/diagram/forecast?band=NDVI&region_id={rid}&end={diagram_obs[0].isoformat()}&horizon=20").json()
+    # Uji ini hanya punya 10 hari NDVI untuk TST001: cukup untuk forecast, tapi
+    # terlalu pendek untuk backtest -> SES, keyakinan rendah.
+    assert r["region_id"] == rid and r["n_obs"] >= 10 and r["last_obs_date"] == diagram_obs[0].isoformat()
+    assert len(r["points"]) == 20 and r["points"][0]["x"] == (diagram_obs[0] + timedelta(days=1)).isoformat()
+    assert r["confidence"] == "rendah"
+
+
+def test_forecast_validation(make_client, synthetic_aoi):
+    c = make_client("ANALYST")
+    r = c.get(f"/api/diagram/forecast?band=WATER_CHANGE&region_id={synthetic_aoi['TST001']}")
+    assert (r.status_code, r.json()["code"]) == (400, "INVALID_BAND")
+    r = c.get("/api/diagram/forecast?band=RAIN_24H&region_id=999999")
+    assert (r.status_code, r.json()["code"]) == (400, "NOT_KECAMATAN")
+    assert c.get("/api/diagram/forecast?band=RAIN_24H&horizon=31").status_code == 422
+    assert make_client("USER").get("/api/diagram/forecast?band=RAIN_24H").status_code == 403
+
+
+def _synthetic(days: int, f, start=None):
+    from datetime import date
+    start = start or date(2023, 1, 1)
+    return [(start + timedelta(days=k), f(k)) for k in range(days)]
+
+
+def test_band_forecast_picks_seasonal_model_for_seasonal_series():
+    import math
+
+    import numpy as np
+
+    from etl import band_forecast as bf
+    rng = np.random.default_rng(1)
+    pts = _synthetic(3 * 365, lambda k: 0.5 + 0.3 * math.sin(2 * math.pi * k / 365.25) + rng.normal(0, 0.03))
+    r = bf.forecast(pts, "NDVI")
+    assert r["model"] in ("clim", "clim_ar1") and r["backtest"]["skill"] > 0
+    assert len(r["points"]) == 15 and all(-1 <= p["lo"] <= p["mean"] <= p["hi"] <= 1 for p in r["points"])
+    widths = [p["hi"] - p["lo"] for p in r["points"]]
+    assert all(b >= a - 1e-3 for a, b in zip(widths, widths[1:]))   # pita tidak menyempit ke depan
+
+
+def test_band_forecast_rain_bounds_and_short_series():
+    from etl import band_forecast as bf
+    pts = _synthetic(800, lambda k: 0.0 if k % 3 else 40.0)
+    r = bf.forecast(pts, "RAIN_24H")
+    assert r["points"] and all(p["lo"] >= 0 for p in r["points"])
+    # S1: < 1 tahun riwayat -> model musiman tidak ikut bersaing.
+    s1 = bf.forecast(_synthetic(300, lambda k: -12.0 + 0.01 * k)[::12], "VV")
+    assert s1["backtest"] and not {"clim", "clim_ar1"} & set(s1["backtest"]["mae_by_model"])
+    assert any("celah" in n for n in s1["notes"])
+    few = bf.forecast(_synthetic(5, lambda k: 1.0), "NDVI")
+    assert few["points"] == [] and few["model"] is None and few["notes"]
+    # Hari kosong (None) diabaikan, bukan dihitung nol.
+    gaps = bf.forecast([(d, None if i % 2 else v) for i, (d, v) in enumerate(_synthetic(60, lambda k: 5.0))], "FLOOD")
+    assert gaps["n_obs"] == 30 and all(abs(p["mean"] - 5.0) < 1e-6 for p in gaps["points"])
+
+
+def test_forecast_mean_of_several_kecamatan(make_client, diagram_obs, synthetic_aoi):
+    """Grafik rerata kecamatan terpilih (Tren & evaluasi alert, CH-03)."""
+    c = make_client("ANALYST")
+    a, b = synthetic_aoi["TST001"], synthetic_aoi["TST003"]
+    end = diagram_obs[0].isoformat()
+    body = c.get(f"/api/diagram/forecast?band=RAIN_24H&region_ids={b},{a}&end={end}").json()
+    assert body["region_ids"] == sorted([a, b]) and body["region_id"] is None and len(body["points"]) == 15
+    # Rerata TST001 (10 + i) dan TST003 (60 + i) = 35 + i: forecast di sekitar itu, bukan nol.
+    assert 20 < body["points"][0]["mean"] < 60
+    single = c.get(f"/api/diagram/forecast?band=RAIN_24H&region_ids={a}&end={end}").json()
+    assert single["region_id"] == a
+    r = c.get("/api/diagram/forecast?band=RAIN_24H&region_ids=" + ",".join(str(a) for _ in range(1)) + ",x")
+    assert (r.status_code, r.json()["code"]) == (400, "BAD_REQUEST")

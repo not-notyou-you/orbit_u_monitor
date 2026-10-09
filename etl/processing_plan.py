@@ -3,7 +3,7 @@
 Rencana pemrosesan per-satelit — terjemahan `dataset_source_config` menjadi
 keputusan konkret yang dipakai pipeline.
 
-Model per-satelit (DOCS/ARCHITECTURE.md, DOCS/PIPELINE.md) menyatakan setiap sumber punya
+Model per-satelit (PIPELINE.md §2) menyatakan setiap sumber punya
 definisi RAW/PROCESSED-nya sendiri:
 
     SENTINEL1  RAW        calibrate + reproject + crop            -> ALIGNED

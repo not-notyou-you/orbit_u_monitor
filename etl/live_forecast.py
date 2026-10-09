@@ -1,5 +1,5 @@
 # etl/live_forecast.py
-"""Forecast ringan per Daerah Live (LIVE_MONITORING.md bagian 5).
+"""Forecast ringan per Daerah Live (PIPELINE.md §4, prakiraan).
 
 Deret sangat pendek (1-12 scene), tanpa training:
 

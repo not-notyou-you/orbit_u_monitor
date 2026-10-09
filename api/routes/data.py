@@ -12,15 +12,17 @@
 
 ``source`` = s1 | modis | gpm. Backfill GPM/MODIS = Job Hidromet di thread
 latar (``etl.backfill_runs``, log terlihat langsung). Backfill Sentinel-1 =
-dataset Katalog khusus S1 atas AOI; progres dan lognya adalah progres dan log
-dataset itu (``/api/datasets/{id}/status|logs``). Tidak ada "tambah scene
-manual" (M24): data hanya masuk lewat API resmi.
+siklus Live yang dibatasi ke rentang itu (``live_cycle.backfill_s1``, M58):
+scene masuk ke dataset utama (Live Area) dan angka per kecamatan ke
+region_observations, dengan run + log yang sama seperti GPM/MODIS. Dataset
+S1 terpisah untuk keperluan lain dibuat di Katalog Dataset. Tidak ada "tambah
+scene manual" (M24): data hanya masuk lewat API resmi.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, model_validator
@@ -119,7 +121,9 @@ def summary(sess: Session = Depends(get_session)) -> dict:
         SELECT s.source_code, count(DISTINCT o.obs_date) AS obs_days, max(o.obs_date) AS last_obs_date
         FROM region_observations o JOIN spectral_bands b USING (band_id) JOIN satellite_sources s USING (source_id)
         GROUP BY s.source_code""")).mappings().all()}
-    activity = hydromet_activity(sess)
+    main = activity(sess)
+    s1_running = any(x["running"] for x in main["live"]) or bool(main["s1_runs"])
+    activity_h = main["hydromet"]
     items = []
     for key, code in SOURCES.items():
         base = dict(s1) if code == "S1" else dict(nasa.get(code) or {"n_total": 0, "n_valid": 0, "n_invalid": 0,
@@ -128,16 +132,45 @@ def summary(sess: Session = Depends(get_session)) -> dict:
         o = obs.get({"S1": "SENTINEL1"}.get(code, code)) or {}
         items.append({"key": key, "label": bc.SOURCES[key]["label"], **base,
                       "obs_days": o.get("obs_days", 0), "last_obs_date": o.get("last_obs_date"),
-                      "backfill_running": br.running(key) or (key != "s1" and activity["external"])})
+                      "backfill_running": s1_running if key == "s1" else (br.running(key) or activity_h["external"])})
     datasets = sess.execute(text("""
         SELECT count(*) FILTER (WHERE deleted_at IS NULL AND NOT is_system) AS n_datasets,
                count(*) FILTER (WHERE status IN ('QUEUED','PREPARING','DOWNLOADING','PROCESSING','CLEANUP')) AS n_active
         FROM datasets""")).mappings().one()
-    return {"sources": items, "datasets": dict(datasets), "hydromet": activity,
+    return {"sources": items, "datasets": dict(datasets), "hydromet": activity_h, "main": main,
             "recent_runs": [r.as_dict() for r in br.runs()[:10]]}
 
 
 # --- daftar & ubah ------------------------------------------------------------------
+
+@router.get("/activity", summary="Running work on the main dataset: Hydromet job and Live (Sentinel-1) cycles")
+def activity(sess: Session = Depends(get_session)) -> dict:
+    """Pekerjaan dataset utama (M58) yang tidak tampil sebagai dataset Katalog:
+    Job Hidromet (backfill/harian) dan siklus Live (S1, termasuk backfill
+    dari scripts/backfill_s1.py di proses lain). Dibaca dari basis data,
+    jadi terlihat dari proses mana pun pekerjaan itu dijalankan."""
+    hyd = hydromet_activity(sess)
+    hyd["runs"] = [r.as_dict() for r in br.runs() if r.source in ("gpm", "modis") and r.status == "RUNNING"]
+    live = []
+    for a in sess.execute(text("""
+        SELECT a.area_id, a.name, a.dataset_id, a.status, a.status_message, a.last_checked_at,
+               (SELECT count(*) FROM live_scenes s WHERE s.area_id = a.area_id AND s.deleted_at IS NULL
+                  AND s.status IN ('READY', 'PARTIAL')) AS n_ready
+        FROM live_areas a WHERE a.deleted_at IS NULL AND a.enabled ORDER BY a.area_id""")).mappings().all():
+        job = sess.execute(text("""
+            SELECT job_id, status, date_range_start, date_range_end, started_at, total_scenes,
+                   downloaded_count, processed_count, failed_count
+            FROM dataset_jobs WHERE dataset_id = :d AND job_type = 'LIVE_INGEST'
+              AND status IN ('QUEUED', 'PREPARING', 'DOWNLOADING', 'PROCESSING')
+            ORDER BY job_id DESC LIMIT 1"""), {"d": a["dataset_id"]}).mappings().first()
+        from api.backfill_progress import s1_progress
+        live.append({**a, "running": a["status"] in ("BACKFILLING", "RUNNING", "WAITING"),
+                     "job": dict(job) if job else None,
+                     "progress": s1_progress(sess, a["area_id"], a["dataset_id"])})
+    s1_runs = [r.as_dict() for r in br.runs("s1") if r.status == "RUNNING"]
+    return {"hydromet": hyd, "live": live, "s1_runs": s1_runs,
+            "running": bool(hyd["locked"] or any(x["running"] for x in live) or s1_runs)}
+
 
 @router.get("/{source}/items", summary="Scenes (S1) or granules (MODIS/GPM), including deactivated ones")
 def items(source: str, sess: Session = Depends(get_session),
@@ -222,20 +255,23 @@ def start_backfill(source: str, req: BackfillRequest, request: Request, sess: Se
         raise ApiError(409, "System dataset HYDROMET_AOI is missing; set the AOI first", "HYDROMET_NOT_READY")
     meta = request_meta(request)
     if code == "S1":
-        from etl.dataset_manager import DatasetManager
-        try:
-            result = DatasetManager(db, runner_db=etl).create_dataset(
-                created_by=principal.user_id, region_id=hyd["region_id"], date_start=req.date_from,
-                date_end=req.date_to, name=f"Backfill Sentinel-1 {req.date_from} s.d. {req.date_to}",
-                sources={"sentinel1": {"processing": ["PROCESSED"]}}, generate_preview=True,
-                description="Dibuat dari halaman Data > Sentinel-1 (backfill).")
-        except (ValueError, RuntimeError) as exc:
-            raise ApiError(400, str(exc), "BAD_REQUEST")
-        log_activity(sess, "BACKFILL_START", user_id=principal.user_id, target_type="datasets",
-                     target_id=result.get("dataset_id"), detail={"source": code, "date_from": str(req.date_from),
-                                                                   "date_to": str(req.date_to)}, **meta)
-        return {"accepted": True, "source": key, "kind": "DATASET", "dataset_id": result.get("dataset_id"),
-                "dataset": result}
+        from etl.live_cycle import backfill_s1
+        from etl.live_monitor import LiveMonitor
+        from etl.settings import get_setting
+
+        if br.running("s1"):
+            raise ApiError(409, "A Sentinel-1 backfill is already running", "BACKFILL_RUNNING")
+        days = int(get_setting(sess, "storage.raster_retention_days"))
+        if req.date_to < date.today() - timedelta(days=days):
+            raise ApiError(400, f"Sentinel-1 files are kept {days} days; the range is entirely older. "
+                                "Use the Dataset Catalog for older history.", "OUTSIDE_RASTER_WINDOW")
+        run = br.start(key, req.date_from, req.date_to, principal.user_id,
+                       lambda echo: backfill_s1(LiveMonitor(etl), date_range=(req.date_from, req.date_to),
+                                                echo=echo))
+        log_activity(sess, "BACKFILL_START", user_id=principal.user_id, target_type="live_scenes", target_id=None,
+                     detail={"source": code, "run_id": run.run_id, "date_from": str(req.date_from),
+                             "date_to": str(req.date_to)}, **meta)
+        return {"accepted": True, "source": key, "kind": "LIVE", "run": run.as_dict()}
     if br.running("gpm") or br.running("modis") or sess.scalar(_HYDROMET_LOCKED):
         # Kunci dipegang skrip/scheduler/worker lain: jalan baru akan langsung
         # SKIPPED, jadi tolak di sini dengan pesan yang jelas.
@@ -262,11 +298,16 @@ def backfill_status(source: str, sess: Session = Depends(get_session),
     key = source.lower()
     out = {"source": key, "runs": [r.as_dict() for r in br.runs(key)]}
     if code == "S1":
-        out["datasets"] = [dict(r) for r in sess.execute(text("""
-            SELECT d.dataset_id, d.name, d.status, d.date_start, d.date_end, d.total_scenes,
-                   d.completed_scenes, d.failed_scenes, d.created_at
-            FROM datasets d WHERE d.name LIKE 'Backfill Sentinel-1 %' AND d.deleted_at IS NULL
-            ORDER BY d.created_at DESC LIMIT 20""")).mappings().all()]
+        # Riwayat per tanggal lintasan: status scene Live + angka per kecamatan.
+        out["days"] = [dict(r) for r in sess.execute(text("""
+            SELECT s.scene_date AS date, s.status, s.updated_at AS completed_at,
+                   (s.status IN ('FAILED', 'INCOMPLETE'))::int AS failed_count,
+                   (SELECT count(*) FROM region_observations o JOIN spectral_bands b USING (band_id)
+                    JOIN satellite_sources x USING (source_id)
+                    WHERE o.obs_date = s.scene_date AND x.source_code = 'SENTINEL1') AS n_observations
+            FROM live_scenes s JOIN live_areas a ON a.area_id = s.area_id AND a.deleted_at IS NULL
+            ORDER BY s.scene_date DESC LIMIT :n"""), {"n": days}).mappings().all()]
+        out["stale_dates"] = []
         return out
     hyd = rg.hydromet_dataset(sess)
     if hyd is None:

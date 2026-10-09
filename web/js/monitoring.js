@@ -74,7 +74,7 @@ Pages['monitoring'] = (() => {
     const a = st.card.area, dates = st.card.dates || [], sel = st.card.scene && st.card.scene.date;
     $('#lmMeta').innerHTML = [
       ['Status', (AREA_STATUS[a.status] || a.status) + (a.running ? ' (siklus berjalan)' : '')],
-      ['Lokasi', a.location_label], ['Retensi', a.retention + ' scene'],
+      ['Lokasi', a.location_label], ['Scene di kartu', a.retention + ' scene'],
       ['Diperiksa', a.last_checked_at ? UI.dateTime(a.last_checked_at) : UI.NA],
     ].concat(['ADMIN', 'DATA_ENGINEER'].includes(st.ctx.me.role_code) ? [['Ukuran', UI.bytes(a.total_size_bytes)]] : []).map(([k, v]) => '<dt>' + k + '</dt><dd>' + UI.esc(v || UI.NA) + '</dd>').join('');
     $('#lmDates').innerHTML = dates.length ? dates.map(d => {
@@ -166,10 +166,9 @@ Pages['monitoring'] = (() => {
           UI.info('Coba ulang', r && r.started === false ? (r.message || 'Siklus area ini sedang berjalan.') : 'MODIS/GPM untuk scene ' + UI.date(d) + ' dicoba ulang.');
         } else {
           const n = Number(UI.$('#lmRetention', st.root).value);
-          if (!Number.isInteger(n) || n < 1 || n > 60) { UI.showError('Retensi', 'Retensi harus bilangan bulat 1–60.'); return; }
-          if (n < a.retention && !await UI.confirm('Ubah retensi', 'Retensi diturunkan dari ' + a.retention + ' ke ' + n + '. Scene tertua di luar batas akan dihapus permanen. Lanjutkan?', 'Simpan')) return;
+          if (!Number.isInteger(n) || n < 1 || n > 60) { UI.showError('Scene di kartu', 'Jumlah scene harus bilangan bulat 1–60.'); return; }
           await API.patch('/api/live/areas/' + a.area_id, { retention: n });
-          UI.info('Ubah retensi', 'Retensi disimpan: ' + n + ' scene.');
+          UI.info('Scene di kartu', 'Disimpan: kartu dan prakiraan memakai ' + n + ' scene terbaru.');
         }
         loadCard();
       } catch (e) { UI.showError('Aksi Administrator', e); }

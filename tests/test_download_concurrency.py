@@ -135,7 +135,7 @@ class _FakeSession:
         return SimpleNamespace(all=lambda: rows)
 
 
-def test_recover_interrupted_ingest_marks_failed_and_counts_attempt():
+def test_recover_interrupted_ingest_marks_failed_without_counting_attempt():
     from etl import live_cycle as lc
 
     stuck = SimpleNamespace(scene_date=date(2026, 9, 20), status="PROCESSING",
@@ -154,7 +154,9 @@ def test_recover_interrupted_ingest_marks_failed_and_counts_attempt():
     lc._recover_interrupted_ingest(mon, 1)
 
     assert stuck.status == "FAILED"
-    assert stuck.source_status["sentinel1"]["attempts"] == 2
+    # Interupsi (proses dihentikan) bukan kegagalan data: attempts tetap.
+    assert stuck.source_status["sentinel1"]["attempts"] == 1
+    assert stuck.source_status["sentinel1"]["interrupted"] == 1
     assert stuck.source_status["sentinel1"]["status"] == "FAILED"
     assert job.status == "FAILED" and job.completed_at is not None
     assert ("RECOVER", "WARNING") in logs
@@ -505,7 +507,7 @@ def test_cycle_result_distinguishes_full_partial_failed(monkeypatch):
         SimpleNamespace(status="FAILED", source_status={}),
     ]
     d = [date(2026, 9, i) for i in (1, 2, 3)]
-    r = lc._cycle_result(_result_mon(rows), 1, d, 5, 6)
+    r = lc._cycle_result(_result_mon(rows), 1, d, 5)
     assert r["level"] == "warn"
     assert r["text"] == ("Done: 3 new scene(s) \u2014 1 complete, 1 partial (GPM failed), "
                          "1 failed Sentinel-1")
@@ -516,8 +518,8 @@ def test_cycle_result_quiet_cycle_is_ok(monkeypatch):
 
     monkeypatch.setattr(dg, "_auth_failures", {})
 
-    r = lc._cycle_result(_result_mon([]), 1, [], 6, 6)
-    assert r == {"level": "ok", "text": "Done: no new scenes (6/6 stored)"}
+    r = lc._cycle_result(_result_mon([]), 1, [], 6)
+    assert r == {"level": "ok", "text": "Done: no new scenes (6 stored)"}
 
 
 # ---------------------------------------------------------------------------

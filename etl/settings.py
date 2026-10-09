@@ -33,6 +33,9 @@ DEFAULTS: dict[str, Any] = {
     "hydromet.min_valid_fraction": 0.1,
     "hydromet.waiting_max_days": 3,
     "report.wait_hydromet_minutes": 60,
+    # M58: berkas raster dataset utama dan scene Live yang lebih tua dari ini
+    # dihapus; angka per kecamatan dan metrik scene tetap disimpan.
+    "storage.raster_retention_days": 365,
 }
 
 

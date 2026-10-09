@@ -1,5 +1,5 @@
 <!-- pages/analytics.html — Analitik (INTERFACE.md §2.4): tren, heatmap, korelasi kejadian,
-     evaluasi alert, riwayat alert, ekspor CSV. ANALYST & ADMIN. -->
+     evaluasi alert, riwayat alert, ekspor CSV, forecast 15 hari di CH-01/CH-03 (M61). ANALYST & ADMIN. -->
 <div class="layout">
   <div class="control-panel">
     <form id="anForm" novalidate>
@@ -32,9 +32,10 @@
   </div>
   <div class="deck">
     <div class="readouts" id="anReadouts"></div>
-    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-01 · TREN PER KECAMATAN</span><span class="scr-rec off" id="anTrendRec"></span><div id="anTrend"></div></div></div>
+    <div id="anFcProg" class="fc-prog" aria-live="polite" hidden></div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-01 · TREN PER KECAMATAN + FORECAST 15 HARI</span><span class="scr-rec off" id="anTrendRec"></span><div id="anTrend"></div></div></div>
     <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-02 · HEATMAP HUJAN HARIAN (RERATA KECAMATAN TERPILIH, MM)</span><div id="anHeat" class="table-wrap"></div></div></div>
-    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-03 · KORELASI KEJADIAN × HUJAN 24 JAM / 72 JAM</span><div id="anCorr"></div></div></div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-03 · KORELASI KEJADIAN × HUJAN 24 JAM / 72 JAM + FORECAST 15 HARI</span><div id="anCorr"></div></div></div>
     <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-04 · EVALUASI ALERT (WARNING+ VS KEJADIAN TERVERIFIKASI)</span><div id="anEval"></div></div></div>
     <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-05 · RIWAYAT ALERT</span><span class="scr-rec off" id="anAlertRec"></span><div id="anAlerts"></div></div></div>
   </div>

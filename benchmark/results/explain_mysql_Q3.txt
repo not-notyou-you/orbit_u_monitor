@@ -1,0 +1,13 @@
+-> Sort: km2 DESC  (actual time=22.2..22.2 rows=12 loops=1)
+    -> Stream results  (cost=2.51 rows=5) (actual time=0.695..22.2 rows=12 loops=1)
+        -> Filter: st_intersects(regions.geom,<cache>(st_geomfromtext('POLYGON((106.00 -6.95,106.30 -6.95,106.30 -6.80,106.00 -6.80,106.00 -6.95))',4326,'axis-order=long-lat')))  (cost=2.51 rows=5) (actual time=0.171..1.34 rows=12 loops=1)
+            -> Index range scan on regions using geom over (geom unprintable_geometry_value)  (cost=2.51 rows=5) (actual time=0.0542..0.4 rows=12 loops=1)
+-> Select #2 (subquery in projection; dependent)
+    -> Aggregate: sum(st_area(st_geometryn(st_intersection(regions.geom,<cache>(st_geomfromtext('POLYGON((106.00 -6.95,106.30 -6.95,106.30 -6.80,106.00 -6.80,106.00 -6.95))',4326,'axis-order=long-lat'))),seq.k)))  (cost=2.74..2.74 rows=1) (actual time=2.81..2.81 rows=1 loops=6)
+        -> Filter: ((seq.k <= st_numgeometries(st_intersection(regions.geom,<cache>(st_geomfromtext('POLYGON((106.00 -6.95,106.30 -6.95,106.30 -6.80,106.00 -6.80,106.00 -6.95))',4326,'axis-order=long-lat'))))) and (st_geometrytype(st_geometryn(st_intersection(regions.geom,<cache>(st_geomfromtext('POLYGON((106.00 -6.95,106.30 -6.95,106.30 -6.80,106.00 -6.80,106.00 -6.95))',4326,'axis-order=long-lat'))),seq.k)) in ('POLYGON','MULTIPOLYGON')))  (cost=2.64..2.64 rows=1) (actual time=0.902..2.57 rows=1 loops=6)
+            -> Table scan on seq  (cost=4.19..5.45 rows=2) (actual time=0.00448..0.0078 rows=10 loops=6)
+                -> Materialize recursive CTE seq  (cost=2.93..2.93 rows=2) (actual time=0.023..0.023 rows=10 loops=1)
+                    -> Rows fetched before execution  (cost=0..0 rows=1) (actual time=0..0 rows=1 loops=1)
+                    -> Repeat until convergence
+                        -> Filter: (seq.k < 10)  (cost=2.73 rows=1) (actual time=0.002..0.0036 rows=4.5 loops=2)
+                            -> Scan new records on seq  (cost=2.73 rows=2) (actual time=0.00115..0.00135 rows=5 loops=2)

@@ -130,7 +130,7 @@ class _AuxLayer:
 
 # Lapisan aux per level. Level RAW hanya memuat artefak mentah sumbernya;
 # turunannya (NDVI/NDWI, akumulasi 72h/7d) tidak pernah dihitung di jalur RAW
-# jadi tidak ada berkasnya untuk dimasukkan (DOCS/ARCHITECTURE.md, tabel RAW vs
+# jadi tidak ada berkasnya untuk dimasukkan (PIPELINE.md §2, tabel RAW vs
 # PROCESSED per satelit).
 _FLOOD = _AuxLayer("FLOOD", "FLOOD", Resampling.nearest, categorical=True)
 # Asal tiap piksel FLOOD (1 = komposit 2 hari, 2 = pengisi 1 hari CS). Ikut di

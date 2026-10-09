@@ -1,0 +1,7 @@
+-> Sort: r.region_name  (actual time=0.32..0.321 rows=10 loops=1)
+    -> Table scan on <temporary>  (actual time=0.308..0.31 rows=10 loops=1)
+        -> Aggregate using temporary table  (actual time=0.307..0.307 rows=10 loops=1)
+            -> Nested loop inner join  (cost=49 rows=63) (actual time=0.09..0.191 rows=70 loops=1)
+                -> Index lookup on o using obs_date_band (obs_date=DATE'2024-12-15')  (cost=24.5 rows=70) (actual time=0.0846..0.101 rows=70 loops=1)
+                -> Filter: (0 <> r.in_aoi)  (cost=0.251 rows=0.9) (actual time=0.00108..0.00115 rows=1 loops=70)
+                    -> Single-row index lookup on r using PRIMARY (region_id=o.region_id)  (cost=0.251 rows=1) (actual time=963e-6..991e-6 rows=1 loops=70)

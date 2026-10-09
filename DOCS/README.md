@@ -12,7 +12,7 @@ Sistem basis data monitoring hidrometeorologi dan arsip kejadian bencana untuk *
 
 | Sumber | Produk | Resolusi | Temporal | Penyedia |
 |---|---|---|---|---|
-| Sentinel-1 (S1A, S1C) | GRD IW, VV + VH | ~10 m | per lintasan (6–12 hari, tergantung jumlah satelit aktif) | ESA / CDSE |
+| Sentinel-1 (S1A, S1C, S1D) | GRD IW, VV + VH | ~10 m | per lintasan (6–12 hari, tergantung jumlah satelit aktif) | ESA / CDSE |
 | MODIS Terra & Aqua | MCDWD (banjir), MOD09A1/MOD09GA (NDVI, NDWI) | 250–500 m | harian / komposit 8 hari | NASA LANCE NRT + LAADS DAAC |
 | GPM IMERG | Daily Final → Late → Early | ~10 km | harian | NASA GES DISC |
 
@@ -47,13 +47,13 @@ Orbit-U **tidak menggantikan** SIGAP DESA (PHP/MySQL milik GMLS). Data warga, KK
 
 ## 3. Pengguna dan Hak Akses
 
-Susunan halaman M56: Beranda → 3D AOI → Citra Satelit → Diagram → Kejadian → Data → Laporan → Sistem, plus Masuk (`/masuk`) dan Registrasi (`/daftar`).
+Susunan halaman M56: Beranda → 3D AOI → Citra Satelit → Forecast (dulu Diagram, M61) → Kejadian → Data → Laporan → Sistem, plus Masuk (`/masuk`) dan Registrasi (`/daftar`).
 
 | Role | Akun | Kebutuhan |
 |---|---|---|
 | `PUBLIC` | Tanpa akun | Beranda, Citra Satelit **30 hari terakhir** (termasuk PDF), Kejadian **365 hari terakhir**, Sistem › Tentang |
 | `USER` | Registrasi mandiri `/daftar` | Semua milik PUBLIC + 3D AOI, Citra **365 hari**, seluruh riwayat kejadian, hujan per kecamatan + alert aktif, akun & token API sendiri |
-| `ANALYST` | Dibuat ADMIN | Semua milik USER + Citra semua tanggal, Diagram (semua band 30 hari, analisa daerah + PDF, tren & evaluasi alert), kelola kejadian, acknowledge alert, Laporan Keadaan AOI, log halaman Kejadian |
+| `ANALYST` | Dibuat ADMIN | Semua milik USER + Citra semua tanggal, Forecast (semua band 30 hari + forecast 15 hari, analisa daerah + forecast + PDF, tren & evaluasi alert), kelola kejadian, acknowledge alert, Laporan Keadaan AOI, log halaman Kejadian |
 | `DATA_ENGINEER` | Dibuat ADMIN | Semua milik USER + Citra semua tanggal, Data (per satelit + backfill dengan log, unduh/fusion, dataset, proses, EDA), Laporan Kesehatan Data, log halaman Data |
 | `ADMIN` | Dibuat ADMIN | Semua akses + Sistem › Manajemen akun, Pengaturan aplikasi, seluruh log (masuk/registrasi, unduhan, audit) |
 
@@ -84,6 +84,16 @@ Matriks rinci per halaman dan endpoint: INTERFACE.md §3. Batas waktu per peran 
 ```
 
 **Prinsip pemisahan:** raster disimpan di filesystem; basis data hanya menyimpan metadata, path, checksum, dan nilai agregat per kecamatan. Karena itu sistem tetap tergolong **basis data terstruktur** (peminatan Database).
+
+### Tiga tempat data (M58)
+
+| | Isi | Diisi oleh | Umur |
+|---|---|---|---|
+| **Dataset utama** (`HYDROMET_AOI` + Live Area AOI) | Satu deret waktu per sumber: GPM & MODIS **harian**, Sentinel-1 **per lintasan** (VV, VH, WATER_PCT), semuanya per kecamatan di `region_observations`; raster COG + gambar scene di filesystem | Backfill dan operasi harian adalah job yang sama: Job Hidromet (GPM/MODIS) dan siklus Live (S1). Live mengambil GPM/MODIS dari Job Hidromet (hardlink), tidak mengunduh ulang | **Raster: 1 tahun bergulir** (`storage.raster_retention_days` = 365), lebih tua dihapus otomatis. **Angka per kecamatan dan metrik scene: disimpan selamanya** |
+| **Tampilan Live** | Kartu + prakiraan dari N scene S1 terbaru (`live_areas.retention`, 1–60) | Membaca dataset utama | Tidak menghapus apa pun |
+| **Dataset historis** (Katalog Dataset) | Dataset buatan DATA_ENGINEER: rentang, sumber, fusion bebas, termasuk lebih dari 1 tahun ke belakang | Wizard Katalog; granule yang sudah ada di dataset lain dipakai ulang (hardlink), selebihnya diunduh dari arsip resmi | Sampai dihapus pemiliknya |
+
+Grafik, statistik, alert, dan laporan hanya membaca dataset utama, sehingga rentang tanggal di semua halaman sama.
 
 ---
 
@@ -125,7 +135,7 @@ Autentikasi + 5 role + GRANT nyata, token API pribadi, audit trigger, log login/
 | Rancangan Database | `database/monitor_schema.sql`, `monitor_security.sql`, `monitor_seed.sql`; `tools/data_dictionary.py` → kamus data + ERD fisik |
 | Rekomendasi DBMS | `benchmark/` (skrip muat data, 5 kueri, 3 uji fitur keamanan) + `benchmark/results/*.csv` |
 | Rancangan Sistem/Aplikasi | Web `web/` + FastAPI `api/` |
-| Middleware / API Database (API Developer) | REST API + token API pribadi + OpenAPI `/docs` + `docs/api_examples.md` |
+| Middleware / API Database (API Developer) | REST API + token API pribadi + OpenAPI `/docs` |
 | Prasyarat master ≥ 10, transaksi ≥ 100 | 12 master; `region_observations` ±79.000 baris |
 | Testing 5 kriteria | `tests/`, `tests/security/grant_matrix.sql`, `tests/recovery/` |
 
@@ -160,7 +170,7 @@ Keputusan rancangan awal (D1–D24) yang masih berlaku dirangkum; keputusan baru
 | M8 | Batas wilayah dari COD-AB level 3; AOI = kecamatan `in_aoi` | Data resmi BPS ber-P-code; cakupan diubah lewat data |
 | M9 | Fusion + 3 strategi dipertahankan, dipakai DATA_ENGINEER lewat wizard Katalog (K4.A) | Kode sudah ada; ada konsumen nyata (engineer ML) |
 | M10 | Katalog Dataset + wizard DataLab diwariskan untuk DATA_ENGINEER/ADMIN | Konfigurasi data historis adalah kebutuhan role DATA_ENGINEER |
-| M11 | Live Monitoring diwariskan; retensi scene diatur Admin (1–60, default 6); maksimal 5 Live Area | Pengguna melihat beberapa scene + forecast; batas atas menjaga disk |
+| M11 | Live Monitoring diwariskan; retensi scene diatur Admin (1–60, default 6); maksimal 5 Live Area. **Diubah M58:** angka 1–60 kini hanya jumlah scene di kartu & prakiraan; berkas disimpan menurut umur | Pengguna melihat beberapa scene + forecast; batas atas menjaga disk |
 | M12 | Forecast DataLab (SES/Holt teredam, parameter tetap) **diterima** | Bukan ML, kode sudah ada, diminta untuk Pantauan Live. Ditampilkan dengan label "prakiraan statistik, bukan peringatan" |
 | M13 | 5 role: PUBLIC, USER, ANALYST, DATA_ENGINEER, ADMIN; masing-masing dipetakan ke role PostgreSQL | Requirement akses + RM4 |
 | M14 | `SET LOCAL ROLE` per request (K5) | GRANT/REVOKE benar-benar berlaku, bukan sekadar dokumentasi |
@@ -207,6 +217,10 @@ Keputusan rancangan awal (D1–D24) yang masih berlaku dirangkum; keputusan baru
 | M55 | **Relief 3D**: pratinjau scene Live ditempel sebagai tekstur di atas DEM dengan kamera 3D MapLibre (`pages/terrain3d.html` + `js/terrain3d.js` + `css/terrain3d.css`), sebagai tab `#kondisi/relief` **dan** halaman publik `/relief` — satu fragmen dan satu skrip, mode dipilih dari `body[data-requires-auth]`. DEM dari AWS Terrain Tiles (terrarium, turunan SRTM, ~30 m, tanpa kunci API); MapLibre dimuat dari CDN hanya saat halaman ini dibuka. Georeferensi preview disimpan sebagai **empat sudut lon/lat** di `live_scenes.previews.grid` (`module10.grid_corners_wgs84`) dan diekspos di kartu Live serta `/api/public/live`; scene lama diisi `scripts/backfill_preview_grid.py`, yang menolak menulis kalau ukuran grid tidak cocok dengan PNG di disk. Leaflet tidak dipakai di halaman ini | Relief menjawab "di mana air ini sebenarnya" lebih langsung daripada citra datar, dan Leaflet tidak punya kamera 3D. Empat sudut, bukan bbox: extent grid milik SCENE, bukan AOI — scene satu frame menutupi AOI jauh lebih sempit daripada scene mosaik (area 1: 27 Sep 2026 membentang 105,86–106,17°, 4 Okt 2026 105,86–106,53°), jadi bbox daerah menggeser citra puluhan kilometer. Tinggi berasal dari DEM, **bukan** dari Sentinel-1 — GRD tidak mengukur elevasi, dan itu dikatakan di halamannya supaya tidak dibaca sebagai hasil ukur radar |
 | M56 | **Susunan halaman v2 mengikuti rancangan pemilik proyek** (`DOCS/rancangan kasar.txt`, INTERFACE.md). Delapan halaman: Beranda, 3D AOI, Citra Satelit (ringkasan, Sentinel-1, MODIS, GPM, laporan PDF multi-halaman), Diagram (semua band 30 hari, analisa daerah + PDF semua band), Kejadian (lihat, kelola), Data (ringkasan, per satelit dengan backfill + log, unduh, tersimpan, proses, EDA), Laporan (otomatis + rentang bebas), Sistem (tentang, log per peran, akun, manajemen akun, pengaturan) + Masuk dan Registrasi. Aplikasi `/` = `/app` terbuka untuk pengunjung; menu dari `GET /api/auth/session`. **Registrasi mandiri** membuat USER lewat fungsi `auth_register_user` (peran dikunci di DB, `users.email` baru). Batas waktu: PUBLIC 30 hari citra / 365 hari kejadian, USER 365 hari, ANALYST/DATA_ENGINEER/ADMIN semua — ditegakkan di VIEW `v_citra_scenes`/`v_public_kejadian` dengan `pg_has_role(current_user, …)`. Kejadian: baca semua peran, tulis ANALYST (M16 tetap). Log per halaman lewat VIEW `v_log_data` (DATA_ENGINEER) dan `v_log_kejadian` (ANALYST). Soft delete scene pindah dari ADMIN ke DATA_ENGINEER. Hash dan halaman publik lama dialihkan; berkas halaman publik lama (`landing`, `home-public`, `kondisi.html`, `relief.html`, `index.html`) dan `monitoring` tidak lagi dirujuk. Migrasi DB berjalan: `database/migrations/m56_susunan_halaman_v2.sql` | Permintaan pemilik proyek. Batas M49 (selain ADMIN ≤ 30 hari) diganti; M53/M54 (susunan dan halaman publik) digantikan. Batas waktu di VIEW, bukan di API saja, supaya lapis 3 (M14) tetap berlaku untuk aturan baru |
 | M57 | **Empat tema tampilan, Orbital 95 tetap bawaan.** Tiga konsep di `DOCS/design tambahan/` dijadikan tema: konsep38 → **Kertas Mint** (`mint`), konsep41 → **Mika Pasir** (`pasir`), konsep44 → **Piksel Marun** (`piksel`). Dipilih di Beranda (bagian *Tema tampilan*, `pages/home.html` + `js/home.js`), diterapkan `web/js/theme.js` sebagai `data-theme` di `<html>` sebelum `<body>` diurai, dan disimpan di `localStorage` (`orbit-u.tema`) per peramban, bukan per akun. CSS ada di `web/css/tema/`: `umum.css` (struktur bersama, tercakup `html.tema-alt`) + satu berkas per tema (tercakup `html[data-theme="…"]`) + `pilihan.css` (kartu pemilih). Hanya bahasa visual konsep yang diambil; struktur halaman, router, dan data tidak berubah, layar CRT menjadi panel terang dengan token `--crt/--phos/--amber/--alert/--cyan` per tema, dan rotasi kartu konsep hanya dipakai di kartu navigasi. Aturan DESIGN.md (siku, tanpa blur) tetap berlaku untuk Orbital 95 dan `css/*.css`; `css/tema/` dikecualikan dan diuji tercakup selektornya (`tests/test_web_ui.py`) | Permintaan pemilik proyek: konsep tambahan dipakai sebagai pilihan, bukan pengganti, dan harus disesuaikan dengan halaman asli. Menyimpan di peramban cukup karena tema tidak memengaruhi data atau akses, dan pengunjung tanpa akun juga bisa memilih |
+| M58 | **Satu dataset utama, raster 1 tahun bergulir, angka selamanya** (8 Okt 2026). (1) Deret waktu per kecamatan `region_observations` memuat ketiga satelit: GPM/MODIS harian dari Job Hidromet, Sentinel-1 per lintasan (VV, VH dB rata-rata linear; WATER_PCT = % luas VH < `water.vh_threshold_db`) dari `etl/s1_observations.py` setiap kali scene Live lolos, di grid AOI ~100 m. (2) Siklus Live = backfill S1: discovery selalu melihat seluruh jendela raster (1 tahun), tanggal terbaru dulu, per 3 tanggal; GPM/MODIS tanggal scene diambil dari dataset utama (hardlink `_work`), bukan diunduh ulang. (3) `storage.raster_retention_days` = 365 (semula 730, diturunkan pemilik pada hari yang sama): COG/`_work` dataset utama dan berkas scene Live yang lebih tua dihapus (`etl/raster_retention.py` di akhir job harian, `LiveMonitor.enforce_retention`); `data_products.is_valid = false`, angka & metrik tetap. (4) `live_areas.retention` hanya jumlah scene di kartu & prakiraan. (5) Backfill S1 di halaman Data menjalankan siklus Live terbatas rentang (bukan lagi dataset Katalog); rentang yang seluruhnya > 1 tahun ditolak (`OUTSIDE_RASTER_WINDOW`) → pakai Katalog Dataset. Mempertegas M23: yang dihapus hanya berkas raster yang bisa diunduh ulang dari arsip resmi, bukan data historis. Skrip: `scripts/backfill_s1.py` | Sebelumnya chart (region_observations) berhenti di tanggal lain dari halaman Data (scene Live), S1 tidak punya riwayat, dan dua alur retensi saling tidak tahu. Angka per kecamatan berukuran beberapa MB per tahun, sedangkan raster S1 ±0,35 GB per lintasan |
+| M59 | **Tekstur 3D AOI di-pad ke batas tile Mercator** (8 Okt 2026): PNG pratinjau digambar lebih dulu ke kanvas yang extent-nya persis satu tile Mercator yang memuatnya (sisanya transparan, pemetaan piksel→Mercator afin dari tiga sudut agar grid bersudut miring ikut benar), dan kanvas itu — bukan extent citra — yang dipasang sebagai `image` source. `containingTile`/`tileAlignedCanvas` di `web/js/terrain3d.js`, diekspos sebagai `Pages.terrain3d._geo` dan diuji `tests/ui/tile_alignment.html` lewat `chrome --headless=new --dump-dom` (kasus AOI nyata + 400 extent acak, tanpa server/DB/jaringan) | MapLibre menggambar satu `image` source di dalam SATU tile, dipilih `getCoordinatesCenterTileID()`: zoom = `floor(-log2(sisi terpanjang citra))`, lalu tile yang memuat TITIK TENGAH citra. Tile sebesar citra tidak berarti memuat citra — untuk AOI Lebak (105,86–106,53°E) 46,6% lebar sisi barat jatuh di luar tile dan dipotong; dilaporkan pengguna sebagai "AOI hilang setengah saat di-zoom". Masih berlaku di MapLibre `main` (diperiksa Okt 2026) dan `loadTile()` hanya menerima tile itu, jadi bukan bug yang bisa ditunggu perbaikan hulunya. Pindah ke tile server raster juga menyelesaikannya, tapi menuntut backend baru; pad di klien tidak menyentuh PNG yang dipakai tile 2D sama sekali |
+| M60 | **DATABASE.md, PIPELINE.md, DESIGN.md ditulis ulang dari kode** (8 Okt 2026). Versi lama sengaja dihapus pemilik proyek karena sudah tidak sesuai kode. Nomor bagian disusun mengikuti rujukan `§` yang sudah ada di kode, supaya rujukan itu tetap benar. Kode adalah sumber kebenaran; bila berbeda, dokumen yang diperbaiki. Dua docstring usang ikut dibetulkan: `etl/raster_retention.py` (730 → 365 hari, sesuai M58) dan `tools/data_dictionary.py` (catatan `docs/generated/`) | Dokumen lama yang tidak sesuai kode membingungkan pengembangan; bagian skripsi butuh artefak tahap DBSDLC |
+| M61 | **Halaman Diagram menjadi Forecast** (9 Okt 2026). Semua fitur Diagram dipertahankan; setiap grafik garis (Keadaan terbaru, Analisa daerah, serta CH-01 tren per kecamatan dan CH-03 rerata hujan di Tren & evaluasi alert) kini juga menampilkan forecast 15 hari dengan pita 80%, menyala bawaannya dan bisa dimatikan lewat sakelar di bawah grafik. Forecast dihitung dari **seluruh riwayat** deret di database (bukan hanya 30 hari yang digambar) oleh `etl/band_forecast.py`: lima model numpy (naive, SES, Holt teredam, klimatologi, klimatologi + anomali AR(1)) dipilih per deret lewat backtest rolling-origin setahun. Dipilih atas ARIMA/Prophet karena: tanpa dependensi baru (Prophet sulit dipasang di Windows, statsmodels tidak terpasang), data harian GPM/MODIS sejak Jan 2024 cukup untuk pola musiman, dan backtest membuktikan per deret apakah model mengalahkan "nilai terakhir berlanjut" — hasil uji pada data nyata: model musiman menang untuk akumulasi hujan dan genangan MODIS (skill 0,2–0,3), sedangkan NDVI/NDWI/Sentinel-1 berubah terlalu lambat untuk dikalahkan naive dalam 15 hari, dan UI menyatakannya sebagai keyakinan rendah. Endpoint `GET /api/diagram/forecast` satu deret per request supaya palang progres jujur; grafik data tampil lebih dulu. Hash `#diagram/…` dialihkan ke `#forecast/…`; path API `/api/diagram/*` dan izin `diagram.view` tidak diganti supaya peran, token, dan GRANT yang ada tetap berlaku | Diminta pemilik proyek: fitur Diagram ditingkatkan menjadi forecasting tanpa membuang yang sudah ada |
 ---
 
 ## 8. Anti Over-Engineering
@@ -226,7 +240,7 @@ Usulan fitur baru dicatat di sini beserta alasan diterima atau ditolak.
 ### Kebutuhan
 
 - Python 3.10+, PostgreSQL 14+ dengan PostGIS 3+
-- RAM 8 GB (16 GB disarankan), disk 100 GB+ untuk arsip 3 tahun (lihat PIPELINE.md §9)
+- RAM 8 GB (16 GB disarankan), disk 100 GB+ (raster 1 tahun ±16 GB S1 + <1 GB GPM/MODIS; ruang kerja unduhan S1 ±2 GB per lintasan selama diproses)
 - Akun Copernicus Data Space + token NASA Earthdata
 
 ### Langkah
@@ -265,9 +279,12 @@ python scripts/create_admin.py --username admin
 #     users.email, VIEW per peran, GRANT baru, fungsi registrasi. Idempoten.
 python database/apply_schema.py --migrate m56_susunan_halaman_v2.sql
 
-# 6. Backfill hidromet harian 2023–2025 (GPM + MODIS → region_observations →
-#    alert_events). Bisa dihentikan dan dijalankan ulang (tanggal COMPLETED dilewati).
-python scripts/backfill_hydromet.py --from 2023-01-01 --to 2025-12-31
+# 6. Backfill dataset utama 1 tahun terakhir (M58). Keduanya bisa dihentikan
+#    dan dijalankan ulang; tanggal yang sudah selesai dilewati.
+#    GPM + MODIS harian → region_observations → alert_events:
+python scripts/backfill_hydromet.py --from <hari ini - 365> --to <kemarin>
+#    Sentinel-1 per lintasan (siklus Live; VV/VH/WATER_PCT per kecamatan):
+python scripts/backfill_s1.py
 
 # 6b. (opsional) Catatan kejadian dari CSV terstruktur
 python scripts/import_disasters.py kejadian.csv --username <analis>
@@ -285,11 +302,10 @@ Nama DB `sentinel1_flood` warisan DataLab **diganti** menjadi `themonitor` di `.
 | File | Isi |
 |---|---|
 | `README.md` | Dokumen ini |
-| `DATABASE.md` | DBMS selection, ERD, master & transaksi, DDL, normalisasi, index, VIEW, role & GRANT, audit |
-| `PIPELINE.md` | Job hidromet, siklus Live, job dataset, laporan, storage, scheduler, QC, lineage, initial loading |
+| `DATABASE.md` | Perencanaan (mission, user views, 5W1H), ERD konseptual, master & transaksi, normalisasi, index, VIEW, role & GRANT, RLS, audit (M60) |
+| `PIPELINE.md` | Tier, Job Hidromet, siklus Live, dataset & fusion, laporan, scheduler & kunci, pemulihan, retensi, setup, `app_settings`, backup (M60) |
 | `INTERFACE.md` | Susunan halaman M56, matriks akses per peran, endpoint baru/berubah, kode galat, pengujian |
 | `rancangan kasar.txt` | Rancangan halaman dari pemilik proyek (sumber M56) |
 | `DESIGN.md` | Design system Orbital 95 (token, bevel, komponen, layout) — sumber kebenaran visual tema bawaan (M50); tiga tema tambahan di `web/css/tema/` (M57) |
 | `design tambahan/` | Konsep visual sumber tema Kertas Mint (konsep38), Mika Pasir (konsep41), Piksel Marun (konsep44) — M57 |
-| `SETUP_LAPTOP_BARU.md` | Pindah ke mesin lain lewat `pg_dump`/`pg_restore`, lalu backfill dan benchmark MySQL 8 |
-| `PROMPT_LAPTOP_BARU.md` | Prompt siap pakai untuk Claude Code di laptop baru, menjalankan SETUP_LAPTOP_BARU.md dari awal sampai backfill |
+| `lampiran/` | Bukti penelitian untuk skripsi. `Instrumen_Lapangan_GMLS.pdf`: pitching, skrip wawancara, skenario UAT, kuesioner SUS (sumber yang bisa diedit: dokumen claude.ai). Hasil kunjungan (notulen, foto, legalitas, lembar terisi) disimpan di sini juga |

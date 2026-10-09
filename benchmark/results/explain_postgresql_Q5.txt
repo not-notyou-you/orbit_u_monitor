@@ -1,30 +1,30 @@
-Sort  (cost=421.21..421.29 rows=31 width=24) (actual time=1.166..1.169 rows=6.00 loops=1)
+Sort  (cost=421.21..421.29 rows=31 width=24) (actual time=1.102..1.105 rows=6.00 loops=1)
   Sort Key: a.depth
   Sort Method: quicksort  Memory: 25kB
   Buffers: shared hit=113
   CTE anc
-    ->  Recursive Union  (cost=0.00..251.87 rows=31 width=12) (actual time=0.002..0.044 rows=6.00 loops=1)
+    ->  Recursive Union  (cost=0.00..251.87 rows=31 width=12) (actual time=0.002..0.034 rows=6.00 loops=1)
           Storage: Memory  Maximum Storage: 33kB
           Buffers: shared hit=17
           ->  Result  (cost=0.00..0.01 rows=1 width=12) (actual time=0.001..0.001 rows=1.00 loops=1)
-          ->  Nested Loop  (cost=0.28..25.16 rows=3 width=12) (actual time=0.005..0.006 rows=0.83 loops=6)
+          ->  Nested Loop  (cost=0.28..25.16 rows=3 width=12) (actual time=0.004..0.005 rows=0.83 loops=6)
                 Buffers: shared hit=17
-                ->  WorkTable Scan on anc a_1  (cost=0.00..0.22 rows=3 width=12) (actual time=0.000..0.001 rows=1.00 loops=6)
+                ->  WorkTable Scan on anc a_1  (cost=0.00..0.22 rows=3 width=12) (actual time=0.000..0.000 rows=1.00 loops=6)
                       Filter: (depth < 6)
-                ->  Index Scan using lineage_child on data_lineage l  (cost=0.28..8.30 rows=1 width=16) (actual time=0.004..0.004 rows=0.83 loops=6)
+                ->  Index Scan using lineage_child on data_lineage l  (cost=0.28..8.30 rows=1 width=16) (actual time=0.003..0.003 rows=0.83 loops=6)
                       Index Cond: (child_product_id = a_1.product_id)
                       Index Searches: 6
                       Buffers: shared hit=17
-  ->  Hash Join  (cost=1.01..168.57 rows=31 width=24) (actual time=0.084..1.155 rows=6.00 loops=1)
+  ->  Hash Join  (cost=1.01..168.57 rows=31 width=24) (actual time=0.055..1.097 rows=6.00 loops=1)
         Hash Cond: (p.product_id = a.product_id)
         Buffers: shared hit=113
-        ->  Seq Scan on data_products p  (cost=0.00..147.82 rows=5182 width=20) (actual time=0.015..0.531 rows=5182.00 loops=1)
+        ->  Seq Scan on data_products p  (cost=0.00..147.82 rows=5182 width=20) (actual time=0.012..0.484 rows=5182.00 loops=1)
               Buffers: shared hit=96
-        ->  Hash  (cost=0.62..0.62 rows=31 width=12) (actual time=0.052..0.052 rows=6.00 loops=1)
+        ->  Hash  (cost=0.62..0.62 rows=31 width=12) (actual time=0.039..0.040 rows=6.00 loops=1)
               Buckets: 1024  Batches: 1  Memory Usage: 9kB
               Buffers: shared hit=17
-              ->  CTE Scan on anc a  (cost=0.00..0.62 rows=31 width=12) (actual time=0.004..0.049 rows=6.00 loops=1)
+              ->  CTE Scan on anc a  (cost=0.00..0.62 rows=31 width=12) (actual time=0.004..0.036 rows=6.00 loops=1)
                     Storage: Memory  Maximum Storage: 17kB
                     Buffers: shared hit=17
-Planning Time: 0.282 ms
-Execution Time: 1.236 ms
+Planning Time: 0.228 ms
+Execution Time: 1.143 ms

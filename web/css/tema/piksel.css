@@ -7,14 +7,15 @@
 html[data-theme="piksel"] {
   /* palet konsep44 */
   --x-bg: #e4e4e4; --x-ground: #c9c9c9; --x-card: #f2f2f2; --x-line: #2b2b2b;
-  --x-mut: #6a6a6a; --x-acc: #7a1f2b; --x-acc-dk: #4f121b; --x-acc-lt: #a8505c;
+  --x-mut: #575757; --x-acc: #7a1f2b; --x-acc-dk: #4f121b; --x-acc-lt: #a8505c;
 
   --desk: var(--x-bg); --face: var(--x-card); --hilite: #fafafa; --light: #e4e4e4;
   --shadow: #c4c4c4; --dark: var(--x-line); --select: var(--x-acc);
   --text: var(--x-line); --text-mut: var(--x-mut); --field: #fafafa;
-  --crt: #fafafa; --crt-grid: #d6d6d6; --phos: #2b2b2b; --phos-dim: #6a6a6a;
-  --amber: #8a5a00; --alert: #c0182b; --cyan: #1f4f7a;
-  --font-ui: "Pixelify Sans", "Silkscreen", "Courier New", monospace;
+  --crt: #fafafa; --crt-grid: #d6d6d6; --phos: #2b2b2b; --phos-dim: #575757;
+  --amber: #6e4700; --alert: #a3141f; --cyan: #1f4f7a;
+  /* Atkinson Hyperlegible menggantikan Pixelify Sans: huruf piksel sulit dibaca. */
+  --font-ui: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
   --font-data: Consolas, "Cascadia Mono", "Courier New", monospace;
   --taskbar-h: 48px;
 
@@ -25,7 +26,7 @@ html[data-theme="piksel"] {
   --t-tx: var(--x-line); --t-mut: var(--x-mut); --t-link: var(--x-acc);
   --t-acc: var(--x-acc); --t-acc-tx: var(--x-card); --t-acc-soft: #ecd3d6;
   --t-sel: var(--x-line); --t-sel-tx: var(--x-card); --t-hover: #dcdcdc;
-  --t-focus: var(--x-acc); --t-ok: #2f8f3a; --t-invalid: #f6dfe1;
+  --t-focus: var(--x-acc); --t-ok: #226b2b; --t-invalid: #f6dfe1;
   --t-bw: 4px; --t-bw-ctl: 3px; --t-r: 0; --t-r2: 0; --t-r-check: 0; --t-r-radio: 0;
   --t-shadow: inset -4px -4px 0 #c4c4c4, inset 4px 4px 0 #fafafa, 6px 6px 0 var(--x-line);
   --t-shadow-btn: inset -3px -3px 0 #c4c4c4, inset 3px 3px 0 #fafafa, 3px 3px 0 var(--x-line);
@@ -97,3 +98,4 @@ html[data-theme="piksel"] .progress > i { background: repeating-linear-gradient(
 @media (prefers-reduced-motion: reduce) {
   html[data-theme="piksel"] #linkLamp .lamp { animation: none; }
 }
+

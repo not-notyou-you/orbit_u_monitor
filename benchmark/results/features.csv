@@ -2,9 +2,9 @@ engine,feature,name,result,evidence
 PostgreSQL,F1,SET ROLE per transaksi,DIDUKUNG,"SET LOCAL ROLE: SELECT diizinkan, DELETE ditolak=True, role kembali 'postgres' setelah ROLLBACK"
 PostgreSQL,F2,Row-level security,DIDUKUNG,CREATE POLICY: role terbatas melihat 99 dari 150 baris (terverifikasi 99)
 PostgreSQL,F3,Trigger audit OLD/NEW sebagai JSON,DIDUKUNG,"to_jsonb(OLD)/to_jsonb(NEW) generik untuk semua tabel (satu fungsi, tanpa daftar kolom)"
-MySQL 8.0,F1,SET ROLE per transaksi,belum dijalankan,driver pymysql belum terpasang
-MySQL 8.0,F2,Row-level security,belum dijalankan,driver pymysql belum terpasang
-MySQL 8.0,F3,Trigger audit OLD/NEW sebagai JSON,belum dijalankan,driver pymysql belum terpasang
+MySQL 8.0,F1,SET ROLE per transaksi,SEBAGIAN,SET ROLE per sesi; DELETE ditolak=False (hak akun tetap berlaku); setelah ROLLBACK CURRENT_ROLE() masih `bench_reader`@`%` — aplikasi harus mereset manual
+MySQL 8.0,F2,Row-level security,TIDAK DIDUKUNG,MySQL 8.0 tidak punya CREATE POLICY; emulasi lewat VIEW SQL SECURITY DEFINER + GRANT pada VIEW
+MySQL 8.0,F3,Trigger audit OLD/NEW sebagai JSON,SEBAGIAN,JSON_OBJECT harus menyebut setiap kolom per tabel; tidak ada padanan to_jsonb(OLD)
 MongoDB 7 (fitur saja),F1,SET ROLE per transaksi,TIDAK DIDUKUNG,Hak akses per pengguna koneksi; tidak ada pergantian role di dalam transaksi
 MongoDB 7 (fitur saja),F2,Row-level security,TIDAK DIDUKUNG,Tidak ada policy per dokumen bawaan (hanya redaksi lewat $redact/VIEW agregasi)
 MongoDB 7 (fitur saja),F3,Trigger audit OLD/NEW sebagai JSON,SEBAGIAN,Change streams (pre/post image) di luar transaksi; audit log bawaan hanya edisi Enterprise

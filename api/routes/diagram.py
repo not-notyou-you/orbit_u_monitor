@@ -1,5 +1,5 @@
 # api/routes/diagram.py
-"""Halaman Diagram (INTERFACE.md §4.5, M56): ANALYST dan ADMIN.
+"""Halaman Forecast (dulu Diagram; INTERFACE.md §4.3, M56, M61): ANALYST dan ADMIN.
 
 * ``/latest``  — keadaan terbaru: SEMUA band dalam satu grafik, 30 hari
   terakhir, satu warna per band. Band per kecamatan (GPM, MODIS) dirata-rata
@@ -7,6 +7,8 @@
   (tingkat AOI, karena radar tidak dihitung per kecamatan). ``updated_at``
   dipakai UI untuk memperbarui grafik otomatis saat data baru masuk.
 * ``/regions`` — analisa daerah: kecamatan × band × rentang tanggal bebas.
+* ``/forecast`` — forecast 15 hari satu band (rerata AOI, satu kecamatan,
+  atau rerata beberapa kecamatan) dari seluruh riwayatnya (``etl.band_forecast``).
 * ``/report.pdf`` — PDF analisa daerah: daerah & tanggal pilihan pengguna,
   isinya SEMUA band per kecamatan.
 
@@ -16,6 +18,8 @@ Penjelasan, warna, dan garis ambang tiap band dari ``etl.band_catalog``.
 from __future__ import annotations
 
 import tempfile
+import threading
+from collections import OrderedDict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -27,6 +31,7 @@ from sqlalchemy.orm import Session
 from api.deps import get_session, mark_download, require_role
 from api.errors import ApiError
 from etl import band_catalog as bc
+from etl import band_forecast as bf
 
 router = APIRouter()
 
@@ -47,7 +52,7 @@ def _bands(sess: Session, codes: tuple[str, ...] | None = None) -> list[dict]:
         SELECT b.band_code, b.band_name, b.unit, s.source_code
         FROM spectral_bands b JOIN satellite_sources s USING (source_id)
         WHERE b.band_code = ANY(:codes) ORDER BY b.band_id"""),
-        {"codes": list(codes or (bc.AOI_BANDS + bc.REGION_BANDS))}).mappings().all()
+        {"codes": list(dict.fromkeys(codes or (bc.AOI_BANDS + bc.REGION_BANDS)))}).mappings().all()
     return [bc.band_info(r) for r in rows]
 
 
@@ -194,6 +199,83 @@ def latest(sess: Session = Depends(get_session), days: int = Query(30, ge=7, le=
         (SELECT max(updated_at) FROM live_scenes))"""))
     return {"date_from": start, "date_to": end, "updated_at": updated,
             "last_obs_date": sess.scalar(text("SELECT max(obs_date) FROM region_observations")), "bands": out}
+
+
+_FC_CACHE: OrderedDict[tuple, dict] = OrderedDict()
+_FC_CACHE_MAX = 512
+_FC_LOCK = threading.Lock()
+
+
+def _data_stamp(sess: Session):
+    return sess.scalar(text("""SELECT greatest(
+        (SELECT max(computed_at) FROM region_observations),
+        (SELECT max(updated_at) FROM live_scenes))"""))
+
+
+def _aoi_points(sess: Session, band: str, end: date) -> list[tuple[date, float | None]]:
+    """Seluruh riwayat rerata AOI satu band, sumbernya sama dengan /latest:
+    angka harian per kecamatan, dan rerata scene Live untuk hari tanpa angka harian."""
+    vals = {d: _num(v) for d, v in sess.execute(text("""
+        SELECT s.scene_date, avg(m.value)
+        FROM live_scene_metrics m
+        JOIN live_scenes s ON s.live_scene_id = m.live_scene_id
+        JOIN live_areas a ON a.area_id = s.area_id AND a.deleted_at IS NULL
+        JOIN spectral_bands b ON b.band_id = m.band_id
+        WHERE m.metric_name = 'mean' AND b.band_code = :b AND s.scene_date <= :t
+          AND s.status IN ('READY', 'PARTIAL', 'DELETED')
+        GROUP BY 1"""), {"b": band, "t": end}).all()}
+    vals.update({d: _num(v) for d, v in sess.execute(text("""
+        SELECT o.obs_date, avg(o.value)
+        FROM region_observations o JOIN spectral_bands b USING (band_id)
+        JOIN administrative_regions r ON r.region_id = o.region_id AND r.in_aoi
+        WHERE b.band_code = :b AND o.obs_date <= :t GROUP BY 1"""), {"b": band, "t": end}).all()})
+    return list(vals.items())
+
+
+def _region_points(sess: Session, band: str, ids: list[int], end: date) -> list[tuple[date, float | None]]:
+    """Seluruh riwayat satu band untuk satu kecamatan, atau rerata harian beberapa kecamatan."""
+    return [(d, _num(v)) for d, v in sess.execute(text("""
+        SELECT o.obs_date, avg(o.value) FROM region_observations o JOIN spectral_bands b USING (band_id)
+        WHERE b.band_code = :b AND o.region_id = ANY(:r) AND o.obs_date <= :t GROUP BY 1"""),
+        {"b": band, "r": ids, "t": end}).all()]
+
+
+@router.get("/forecast", summary="Forecast of one band (AOI mean, one kecamatan, or the mean of several) from its full history")
+def forecast(sess: Session = Depends(get_session),
+             band: str = Query(..., description="Band code"),
+             region_id: int | None = Query(None, description="Kecamatan; omit for the AOI mean"),
+             region_ids: str | None = Query(None, description="Comma-separated kecamatan (max 12): forecast of their daily mean"),
+             end: date | None = Query(None, description="Use data up to this day; default today (UTC)"),
+             horizon: int = Query(bf.HORIZON, ge=1, le=30)) -> dict:
+    """Satu deret per request supaya UI bisa menampilkan progres per deret.
+    Model dipilih per deret oleh backtest (etl/band_forecast.py). Hasil
+    disimpan di memori sampai data baru masuk (cap waktu sama dengan
+    `updated_at` /latest)."""
+    code = band.strip().upper()
+    ids = _parse_ids(region_ids, "region_ids") if region_ids else [region_id] if region_id is not None else None
+    if ids and len(ids) > MAX_REGIONS:
+        raise ApiError(400, f"At most {MAX_REGIONS} kecamatan at once", "BAD_REQUEST")
+    allowed = bc.REGION_BANDS if ids else bc.AOI_BANDS + bc.REGION_BANDS
+    if code not in allowed:
+        raise ApiError(400, f"Band not available{' per kecamatan' if ids else ''}: {code}", "INVALID_BAND")
+    if ids:
+        _aoi_regions(sess, ids)
+        ids = sorted(ids)
+    end = end or _today()
+    key = (code, tuple(ids or ()), end, horizon, _data_stamp(sess))
+    with _FC_LOCK:
+        hit = _FC_CACHE.get(key)
+        if hit is not None:
+            _FC_CACHE.move_to_end(key)
+            return hit
+    pts = _aoi_points(sess, code, end) if not ids else _region_points(sess, code, ids, end)
+    out = {**bf.forecast(pts, code, horizon), "region_id": ids[0] if ids and len(ids) == 1 else None,
+           "region_ids": ids, "end": end}
+    with _FC_LOCK:
+        _FC_CACHE[key] = out
+        while len(_FC_CACHE) > _FC_CACHE_MAX:
+            _FC_CACHE.popitem(last=False)
+    return out
 
 
 @router.get("/regions", summary="Per-kecamatan series for chosen regions, bands and dates")

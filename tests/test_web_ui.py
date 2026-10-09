@@ -4,7 +4,7 @@ Tidak menjalankan browser (lihat tests/ui/screenshots.py untuk itu). Yang diuji:
 * setiap tujuan dan tab router (js/app.js) punya fragmen pages/*.html dan skrip
   js/*.js, dan keduanya tersaji lewat FastAPI;
 * susunan halaman = rancangan pemilik proyek (M56): Beranda, 3D AOI, Citra,
-  Diagram, Kejadian, Data, Laporan, Sistem;
+  Forecast (dulu Diagram, M61), Kejadian, Data, Laporan, Sistem;
 * hash susunan lama (M53 dan sebelumnya) masih dipetakan ALIASES;
 * setiap kode error yang dilempar API punya terjemahan Indonesia di js/ui.js (M21);
 * fragmen tidak memuat border-radius / blur / emoji (DESIGN.md §2, §6, §8);
@@ -27,9 +27,9 @@ WEB = ROOT / "web"
 # Halaman entry di luar aplikasi: Masuk dan Daftar (INTERFACE §2 halaman 0 dan -0).
 PUBLIC_PAGES = {"/masuk": "login", "/daftar": "register"}
 # Delapan halaman rancangan pemilik proyek (INTERFACE §2, M56).
-DESTINATIONS = {"beranda", "aoi-3d", "citra", "diagram", "kejadian", "data", "laporan", "sistem"}
+DESTINATIONS = {"beranda", "aoi-3d", "citra", "forecast", "kejadian", "data", "laporan", "sistem"}
 # Hash susunan lama yang harus tetap hidup lewat ALIASES (M53 dan sebelumnya).
-LEGACY_HASHES = {"kondisi", "kondisi/citra", "kondisi/kecamatan", "kondisi/relief", "riwayat",
+LEGACY_HASHES = {"diagram", "kondisi", "kondisi/citra", "kondisi/kecamatan", "kondisi/relief", "riwayat",
                  "riwayat/grafik", "riwayat/laporan", "pengaturan", "pengaturan/akses", "akun",
                  "pantauan", "hari-ini", "statistik", "analitik", "katalog", "buat-dataset", "admin"}
 
@@ -142,7 +142,8 @@ def test_theme_css_is_scoped():
     scopes = {"umum.css": "html.tema-alt"} | {f"{k}.css": f'html[data-theme="{k}"]' for k in THEMES - {"o95"}}
     for name, scope in scopes.items():
         for sel in _selectors((tema / name).read_text(encoding="utf-8")):
-            for part in sel.split(","):
+            # Koma di dalam :is()/:not() bukan pemisah selektor.
+            for part in re.split(r",(?![^()]*\))", sel):
                 assert part.strip().startswith(scope), f"{name}: {part.strip()}"
 
 

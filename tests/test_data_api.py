@@ -143,17 +143,35 @@ class TestBackfill:
         assert (r.status_code, r.json()["code"]) == (409, "BACKFILL_RUNNING")
         gate["go"] = True
 
-    def test_s1_backfill_creates_dataset(self, make_client, synthetic_aoi, monkeypatch):
-        from etl.dataset_manager import DatasetManager
-        monkeypatch.setattr(DatasetManager, "_spawn_job_runner", lambda self, job_id: None)
+    def test_s1_backfill_runs_live_cycle_on_main_dataset(self, make_client, synthetic_aoi, monkeypatch):
+        # M58: backfill S1 = siklus Live dibatasi rentang, bukan dataset Katalog.
+        from etl import backfill_runs as br
+        from etl import live_cycle as lc
+        seen = {}
+
+        def fake(mon, area_ids=None, date_range=None, echo=print, max_cycles=20):
+            seen["range"] = date_range
+            echo("[1/1] fake")
+            return {"COMPLETED": 1, "FAILED": 0, "locked": False}
+        monkeypatch.setattr(lc, "backfill_s1", fake)
         de = make_client("DATA_ENGINEER")
-        a, b = (_today() - timedelta(days=40)).isoformat(), (_today() - timedelta(days=30)).isoformat()
-        r = de.post("/api/data/s1/backfill", json={"date_from": a, "date_to": b})
+        a, b = _today() - timedelta(days=40), _today() - timedelta(days=30)
+        r = de.post("/api/data/s1/backfill", json={"date_from": a.isoformat(), "date_to": b.isoformat()})
         assert r.status_code == 202, r.text
-        body = r.json()
-        assert body["kind"] == "DATASET" and body["dataset_id"]
-        listed = de.get("/api/data/s1/backfill").json()["datasets"]
-        assert body["dataset_id"] in {d["dataset_id"] for d in listed}
+        run = r.json()["run"]
+        assert r.json()["kind"] == "LIVE"
+        for _ in range(50):
+            if br.get(run["run_id"]).status != "RUNNING":
+                break
+            time.sleep(0.05)
+        assert br.get(run["run_id"]).status == "COMPLETED" and seen["range"] == (a, b)
+        assert "days" in de.get("/api/data/s1/backfill").json()
+
+    def test_s1_backfill_rejects_range_older_than_raster_window(self, make_client, synthetic_aoi):
+        de = make_client("DATA_ENGINEER")
+        a, b = _today() - timedelta(days=900), _today() - timedelta(days=800)
+        r = de.post("/api/data/s1/backfill", json={"date_from": a.isoformat(), "date_to": b.isoformat()})
+        assert (r.status_code, r.json()["code"]) == (400, "OUTSIDE_RASTER_WINDOW")
 
     def test_modis_missing_dates(self, db_client, synthetic_aoi):
         from etl import hydromet_job as hj
@@ -282,3 +300,13 @@ class TestExternalBackfill:
                          {"d": synthetic_aoi["dataset_id"], "x": day})
         body = make_client("DATA_ENGINEER").get("/api/data/gpm/backfill?days=366").json()
         assert day.isoformat() in body["stale_dates"]
+
+
+class TestActivity:
+    def test_main_dataset_activity_visible_to_data_engineer(self, make_client, synthetic_aoi):
+        body = make_client("DATA_ENGINEER").get("/api/data/activity").json()
+        assert set(body) >= {"hydromet", "live", "s1_runs", "running"}
+        assert "locked" in body["hydromet"] and isinstance(body["live"], list)
+
+    def test_activity_requires_data_role(self, make_client):
+        assert make_client("USER").get("/api/data/activity").status_code == 403

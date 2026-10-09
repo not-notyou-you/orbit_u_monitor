@@ -1,0 +1,1 @@
+-> Index range scan on observations using region_id over (region_id = 9 AND band_code = 'RAIN_24H' AND '2024-11-16' <= obs_date <= '2024-12-15'), with index condition: ((observations.band_code = 'RAIN_24H') and (observations.region_id = 9) and (observations.obs_date between '2024-11-16' and '2024-12-15'))  (cost=13.8 rows=30) (actual time=0.0851..0.0901 rows=30 loops=1)

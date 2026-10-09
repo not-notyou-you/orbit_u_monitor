@@ -38,6 +38,8 @@ Pages['data-home'] = (() => {
       UI.readoutHTML('SCENE + GRANULE', UI.int(total), UI.int(invalid) + ' NONAKTIF', invalid ? 'v-amber' : '') +
       UI.readoutHTML('DATASET', UI.int(r.datasets.n_datasets), UI.int(r.datasets.n_active) + ' SEDANG DIPROSES', r.datasets.n_active ? 'v-cyan' : '') +
       UI.readoutHTML('BACKFILL', running ? 'BERJALAN' : 'DIAM', running ? UI.int(running) + ' SATELIT' : 'TIDAK ADA YANG BERJALAN', running ? 'v-cyan' : '');
+    // Backfill dataset utama (skrip, penjadwal, halaman Data): progres + perkiraan selesai.
+    $('#dhMain').innerHTML = UI.mainActivityHTML(r.main);
     $('#dhCards').innerHTML = r.sources.map(s => '<section class="sat-card raised" aria-label="' + UI.esc(s.label) + '">' +
       '<header><b>' + UI.esc(s.label) + '</b>' + (s.backfill_running ? '<span class="v-cyan">● BACKFILL</span>' : '') + '</header>' +
       '<div class="screen"><div class="screen-inner"><dl class="kv">' +

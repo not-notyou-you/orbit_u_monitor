@@ -92,6 +92,106 @@ Pages['terrain3d'] = (() => {
             [Math.max.apply(null, lons), Math.max.apply(null, lats)]];
   }
 
+  // ------------------------------------------------- penyelarasan batas tile
+  // MapLibre menggambar SATU image source di dalam SATU tile. Tile itu dipilih
+  // ImageSource.getCoordinatesCenterTileID(): zoom = floor(-log2(sisi terpanjang
+  // citra)), lalu tile yang memuat TITIK TENGAH citra. Tile sebesar citra tidak
+  // berarti memuat citra: begitu citra melewati batas tile, bagian yang
+  // menyeberang DIPOTONG. Untuk AOI ini potongannya 46,6% lebar -- persis gejala
+  // "AOI hilang setengah saat di-zoom", dan selalu di sisi barat.
+  //
+  // Ini bukan bug yang bisa ditunggu: MapLibre `main` masih memakai cara yang
+  // sama dan loadTile() hanya menerima satu tile itu.
+  //
+  // Jalan keluarnya: JANGAN beri MapLibre extent citra. Citra digambar dulu ke
+  // kanvas yang extent-nya PERSIS satu tile Mercator yang memuatnya (sisanya
+  // transparan), lalu kanvas itulah yang dipasang. Karena extent-nya kini sama
+  // dengan tile, rumus di atas memilih tile itu sendiri -- tidak ada yang
+  // menyeberang, apa pun zoom kameranya.
+  const MAX_CANVAS_SIDE = 4096;
+
+  const mercX = lon => (lon + 180) / 360;
+  const mercY = lat => (180 - (180 / Math.PI) * Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360))) / 360;
+  const lonOf = x => x * 360 - 180;
+  const latOf = y => (Math.atan(Math.exp((180 - y * 360) * Math.PI / 180)) - Math.PI / 4) * 360 / Math.PI;
+
+  // Replikasi getCoordinatesCenterTileID() supaya pilihan tile bisa DIPERIKSA,
+  // bukan diandaikan. Kalau rumus di hulu berubah, pemeriksaan di bawah yang
+  // menangkapnya -- bukan pengguna yang melihat citranya terpotong lagi.
+  function maplibreTile(minX, minY, maxX, maxY) {
+    const dMax = Math.max(maxX - minX, maxY - minY);
+    const z = Math.max(0, Math.floor(-Math.log(dMax) / Math.LN2));
+    const n = Math.pow(2, z);
+    return { z: z, n: n,
+             x: Math.floor((minX + maxX) / 2 * n),
+             y: Math.floor((minY + maxY) / 2 * n) };
+  }
+
+  // Tile Mercator terkecil yang memuat seluruh kotak citra, lalu dinaikkan ke
+  // induknya sampai pilihan MapLibre sendiri benar-benar memuatnya.
+  function containingTile(minX, minY, maxX, maxY) {
+    let z = 24;
+    while (z > 0) {
+      const n = Math.pow(2, z);
+      if (Math.floor(minX * n) === Math.floor(maxX * n) &&
+          Math.floor(minY * n) === Math.floor(maxY * n)) break;
+      z--;
+    }
+    for (; z >= 0; z--) {
+      const n = Math.pow(2, z);
+      const t = { z: z, n: n, x: Math.floor(minX * n), y: Math.floor(minY * n) };
+      const pick = maplibreTile(t.x / n, t.y / n, (t.x + 1) / n, (t.y + 1) / n);
+      if (pick.z === z && pick.x === t.x && pick.y === t.y) return t;
+      // Pilihan MapLibre untuk extent tile ini bukan tile ini sendiri
+      // (pembulatan float di tepi pangkat dua); induknya tetap memuat citra.
+    }
+    return null;
+  }
+
+  // Gambar PNG ke kanvas se-tile, kembalikan {canvas, coordinates}.
+  // Pemetaan piksel -> Mercator dibuat AFIN dari tiga sudut (kiri-atas,
+  // kanan-atas, kiri-bawah), jadi grid yang sudutnya miring (raster sumber
+  // ber-CRS proyeksi) ikut benar, bukan hanya yang sejajar sumbu.
+  function tileAlignedCanvas(img, corners) {
+    const m = corners.map(c => ({ x: mercX(c[0]), y: mercY(c[1]) }));
+    const minX = Math.min.apply(null, m.map(q => q.x));
+    const maxX = Math.max.apply(null, m.map(q => q.x));
+    const minY = Math.min.apply(null, m.map(q => q.y));
+    const maxY = Math.max.apply(null, m.map(q => q.y));
+    const t = containingTile(minX, minY, maxX, maxY);
+    if (!t) return null;
+
+    const size = 1 / t.n;                       // sisi tile dalam satuan Mercator
+    const x0 = t.x / t.n, y0 = t.y / t.n;
+    // Kanvas dibuat cukup besar agar citra tidak kehilangan resolusi: piksel
+    // citra per satuan Mercator dipertahankan, lalu dibatasi MAX_CANVAS_SIDE.
+    const spanX = Math.max(maxX - minX, 1e-12), spanY = Math.max(maxY - minY, 1e-12);
+    let cw = Math.ceil(img.naturalWidth * size / spanX);
+    let ch = Math.ceil(img.naturalHeight * size / spanY);
+    const over = Math.max(cw, ch) / MAX_CANVAS_SIDE;
+    if (over > 1) { cw = Math.floor(cw / over); ch = Math.floor(ch / over); }
+    cw = Math.max(1, cw); ch = Math.max(1, ch);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = cw; canvas.height = ch;
+    const ctx = canvas.getContext('2d');
+    // Nearest, sama alasannya dengan raster-resampling di layernya.
+    ctx.imageSmoothingEnabled = false;
+    const sx = cw / size, sy = ch / size;
+    const [tl, tr, , bl] = m;
+    const W = img.naturalWidth, H = img.naturalHeight;
+    ctx.setTransform(
+      (tr.x - tl.x) / W * sx, (tr.y - tl.y) / W * sy,
+      (bl.x - tl.x) / H * sx, (bl.y - tl.y) / H * sy,
+      (tl.x - x0) * sx, (tl.y - y0) * sy);
+    ctx.drawImage(img, 0, 0);
+
+    const west = lonOf(x0), east = lonOf(x0 + size);
+    const north = latOf(y0), south = latOf(y0 + size);
+    return { canvas: canvas, tile: t,
+             coordinates: [[west, north], [east, north], [east, south], [west, south]] };
+  }
+
   // Kunci lapisan yang punya PNG, diurut seperti tile di Kondisi > Citra.
   function layerKeys(previews) {
     return LiveTiles.ROWS.reduce((acc, r) => acc.concat(r.keys.filter(k => previews[k])), []);
@@ -155,7 +255,8 @@ Pages['terrain3d'] = (() => {
     const pub = document.body.dataset.requiresAuth === 'false';
     st = { root, ctx, pub: pub, src: pub ? SOURCES.public : SOURCES.live,
            areas: [], areaId: null, date: null, card: null, key: null,
-           geo: null, map: null, maplibre: null, onAdm: null, ro: null };
+           geo: null, map: null, maplibre: null, onAdm: null, ro: null,
+           imgSeq: 0, imgUrl: null, logged: null };
     if (pick) {
       st.areaId = pick.area_id || null;
       st.date = pick.date || null;
@@ -199,6 +300,7 @@ Pages['terrain3d'] = (() => {
     if (!st) return;
     if (st.onAdm) document.removeEventListener('orbit-u:garis-wilayah', st.onAdm);
     if (st.ro) st.ro.disconnect();
+    if (st.imgUrl) URL.revokeObjectURL(st.imgUrl);
     if (st.map) { try { st.map.remove(); } catch (e) { /* kanvas sudah dilepas */ } }
     st = null;
   }
@@ -342,24 +444,59 @@ Pages['terrain3d'] = (() => {
   }
 
   // Tekstur = PNG lapisan terpilih, varian bergaris kalau checkbox taskbar aktif.
+  // Tekstur = PNG lapisan terpilih, di-pad ke batas tile (lihat
+  // tileAlignedCanvas) lalu dipasang sebagai image source. Asinkron karena PNG
+  // harus benar-benar termuat dulu: ukuran pikselnya yang menentukan ukuran
+  // kanvas. `seq` menjaga agar hasil pemuatan yang datang terlambat tidak
+  // menimpa lapisan yang sudah dipilih sesudahnya.
   function applyImage() {
     if (!st || !st.map || !st.card || !st.card.scene || !st.key || !st.geo) return;
     const p = (st.card.scene.previews || {})[st.key];
     if (!p) return;
     const url = UI.imgSrc(p);
-    const coords = st.geo.corners;
+    const mySeq = ++st.imgSeq;
+    const img = new Image();
+    img.decoding = 'sync';
+    img.onload = () => {
+      if (!st || st.imgSeq !== mySeq || !st.map) return;
+      const out = tileAlignedCanvas(img, st.geo.corners);
+      if (!out) { logOnce('Tidak menemukan tile yang memuat citra; citra tidak dipasang.'); return; }
+      out.canvas.toBlob(blob => {
+        if (!st || st.imgSeq !== mySeq || !st.map || !blob) return;
+        const objUrl = URL.createObjectURL(blob);
+        setImageSource(objUrl, out.coordinates);
+        // Object URL sebelumnya baru dilepas SETELAH yang baru dipasang:
+        // melepasnya lebih awal bisa membatalkan pemuatan yang sedang jalan.
+        if (st.imgUrl) URL.revokeObjectURL(st.imgUrl);
+        st.imgUrl = objUrl;
+        renderCaption();
+      }, 'image/png');
+    };
+    img.onerror = () => {
+      if (!st || st.imgSeq !== mySeq) return;
+      logOnce('PNG pratinjau gagal dimuat: ' + url);
+    };
+    img.src = url;
+  }
+
+  function setImageSource(url, coordinates) {
     const src = st.map.getSource(SRC_IMG);
     if (src) {
-      src.updateImage({ url: url, coordinates: coords });
-    } else {
-      st.map.addSource(SRC_IMG, { type: 'image', url: url, coordinates: coords });
-      st.map.addLayer({ id: LYR_IMG, type: 'raster', source: SRC_IMG,
-        paint: { 'raster-opacity': Number(UI.$('#t3Opacity', st.root).value) / 100,
-                 // Nearest: satu piksel preview mewakili puluhan meter sensor.
-                 // Interpolasi akan mengarang gradien halus yang tidak diukur.
-                 'raster-resampling': 'nearest', 'raster-fade-duration': 0 } });
+      src.updateImage({ url: url, coordinates: coordinates });
+      return;
     }
-    renderCaption();
+    st.map.addSource(SRC_IMG, { type: 'image', url: url, coordinates: coordinates });
+    st.map.addLayer({ id: LYR_IMG, type: 'raster', source: SRC_IMG,
+      paint: { 'raster-opacity': Number(UI.$('#t3Opacity', st.root).value) / 100,
+               // Nearest: satu piksel preview mewakili puluhan meter sensor.
+               // Interpolasi akan mengarang gradien halus yang tidak diukur.
+               'raster-resampling': 'nearest', 'raster-fade-duration': 0 } });
+  }
+
+  function logOnce(msg) {
+    if (!st || st.logged === msg) return;
+    st.logged = msg;
+    console.warn('[Relief 3D]', msg);
   }
 
   function renderCaption() {
@@ -387,5 +524,11 @@ Pages['terrain3d'] = (() => {
       { padding: 24, pitch: Number(UI.$('#t3Pitch', st.root).value), duration: 600 });
   }
 
-  return { init, destroy };
+  // Kait uji: geometri penyelarasan tile dihitung di sini dan pernah menjadi
+  // sebab citra tampil separuh, jadi harus bisa diuji langsung (tests/ui/
+  // tile_alignment.html lewat Chrome headless) alih-alih diuji lewat replika
+  // yang bisa menyimpang dari kode yang benar-benar jalan.
+  const _geo = { mercX, mercY, lonOf, latOf, maplibreTile, containingTile, tileAlignedCanvas };
+
+  return { init, destroy, _geo };
 })();

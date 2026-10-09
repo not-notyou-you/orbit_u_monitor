@@ -210,9 +210,21 @@ MYSQL_QUERIES = {
     "Q2": ("""SELECT obs_date, value FROM observations
         WHERE region_id = %(r)s AND band_code = %(b)s AND obs_date BETWEEN %(a)s AND %(z)s ORDER BY obs_date"""),
     # MySQL 8: ST_Area pada SRID geografis (4326) mengembalikan m² geodesik sejak 8.0.13.
-    "Q3": ("""SELECT region_id, region_name,
-               ST_Area(ST_Intersection(geom, ST_GeomFromText(%(p)s, 4326, 'axis-order=long-lat'))) / 1e6 AS km2
-        FROM regions WHERE ST_Intersects(geom, ST_GeomFromText(%(p)s, 4326, 'axis-order=long-lat')) ORDER BY km2 DESC"""),
+    # ST_Intersection geografis MySQL menyisakan POINT presisi di tepi irisan
+    # (GEOMETRYCOLLECTION), dan ST_Area menolak collection (galat 3516). Luas
+    # dijumlah dari anggota poligon saja — setara PostGIS, yang memberi luas 0
+    # untuk titik. Tanpa ST_CollectionExtract di MySQL 8.0, pakai deret 1..10.
+    "Q3": ("""WITH RECURSIVE t AS (
+            SELECT region_id, region_name,
+                   ST_Intersection(geom, ST_GeomFromText(%(p)s, 4326, 'axis-order=long-lat')) AS i
+            FROM regions WHERE ST_Intersects(geom, ST_GeomFromText(%(p)s, 4326, 'axis-order=long-lat'))),
+          seq (k) AS (SELECT 1 UNION ALL SELECT k + 1 FROM seq WHERE k < 10)
+        SELECT region_id, region_name,
+               CASE WHEN ST_GeometryType(i) IN ('POLYGON', 'MULTIPOLYGON') THEN ST_Area(i)
+                    ELSE (SELECT COALESCE(SUM(ST_Area(ST_GeometryN(i, k))), 0) FROM seq
+                          WHERE k <= ST_NumGeometries(i)
+                            AND ST_GeometryType(ST_GeometryN(i, k)) IN ('POLYGON', 'MULTIPOLYGON')) END / 1e6 AS km2
+        FROM t ORDER BY km2 DESC"""),
     "Q4": ("""WITH strong AS (SELECT * FROM alert_events WHERE severity IN ('WARNING','CRITICAL')),
              ev AS (SELECT * FROM disaster_events WHERE is_verified AND type_code IN ('BANJIR','BANJIR_BANDANG')),
              pairs AS (SELECT a.alert_id, e.event_id FROM strong a JOIN ev e ON e.region_id = a.region_id
@@ -268,17 +280,26 @@ def mysql_features(conn, schema: str) -> list[dict]:
     cur = conn.cursor()
     res = []
     # F1: SET ROLE ada (8.0) tetapi berlaku per sesi, bukan per transaksi; ROLLBACK tidak memulihkannya.
+    # Kriteria sama dengan PostgreSQL: setelah SET ROLE, apakah DELETE ditolak?
+    # Di MySQL hak role DITAMBAHKAN ke hak akun koneksi, tidak menggantikannya.
     try:
         cur.execute("CREATE ROLE IF NOT EXISTS bench_reader")
         cur.execute(f"GRANT SELECT ON {schema}.observations TO bench_reader")
+        cur.execute("GRANT bench_reader TO CURRENT_USER()")
         cur.execute("START TRANSACTION")
         cur.execute("SET ROLE bench_reader")
+        try:
+            cur.execute("DELETE FROM observations WHERE obs_id = -1")
+            denied = False
+        except Exception:  # noqa: BLE001
+            denied = True
         cur.execute("ROLLBACK")
         cur.execute("SELECT CURRENT_ROLE()")
         still = cur.fetchone()[0]
         cur.execute("SET ROLE NONE")
         res.append({"feature": "F1", "name": "SET ROLE per transaksi", "result": "SEBAGIAN",
-                    "evidence": f"SET ROLE per sesi; setelah ROLLBACK CURRENT_ROLE() masih {still} — aplikasi harus mereset manual"})
+                    "evidence": f"SET ROLE per sesi; DELETE ditolak={denied} (hak akun tetap berlaku); "
+                                f"setelah ROLLBACK CURRENT_ROLE() masih {still} — aplikasi harus mereset manual"})
     except Exception as e:  # noqa: BLE001
         res.append({"feature": "F1", "name": "SET ROLE per transaksi", "result": "GAGAL", "evidence": str(e)[:200]})
     # F2: tidak ada row-level security bawaan; hanya emulasi dengan VIEW + DEFINER.

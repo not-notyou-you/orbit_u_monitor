@@ -9,8 +9,6 @@ Keluaran:
                                         PK/FK/UNIQUE/CHECK, komentar; VIEW
     DOCS/generated/erd_physical.mmd     Mermaid erDiagram (entitas + FK)
 
-(DATABASE.md menulis `docs/generated/`; di repo ini foldernya `DOCS/`, yang di
-Windows adalah folder yang sama — IMPLEMENTATION_NOTES K10.)
 
 Pakai:
     python tools/data_dictionary.py                    # DB dari .env (DB_*)

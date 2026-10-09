@@ -6,15 +6,14 @@
 //   wajib, bisa dipulihkan) dan POST .../items/{id}/reprocess. Tidak ada
 //   "tambah manual" (M24).
 // * Backfill: POST /api/data/{src}/backfill.
-//   - GPM/MODIS: Job Hidromet di thread latar; progres + log dibaca dari
-//     GET /api/data/backfill/runs/{id}?since=n tiap 2 detik selama berjalan.
-//   - Sentinel-1: membuat dataset S1 atas AOI; progres dari
-//     GET /api/datasets/{id}/status, log dari GET /api/datasets/{id}/logs.
+//   GPM/MODIS = Job Hidromet, Sentinel-1 = siklus Live dibatasi rentang (M58);
+//   keduanya di thread latar, progres + log dibaca dari
+//   GET /api/data/backfill/runs/{id}?since=n tiap 2 detik selama berjalan.
 'use strict';
 Pages['data-source'] = (() => {
   const LABEL = { s1: 'Sentinel-1', gpm: 'GPM', modis: 'MODIS' };
   const HELP = {
-    s1: 'Membuat dataset Sentinel-1 atas AOI untuk rentang ini (maks. 366 hari). Scene yang sudah ada dipakai ulang; progres dan log dataset tampil di sebelah.',
+    s1: 'Mengisi dataset utama dengan setiap lintasan Sentinel-1 yang menutup AOI pada rentang ini (hanya 1 tahun terakhir; lebih lama lewat Katalog Dataset): unduh, olah, gambar, dan angka per kecamatan. Tanggal yang sudah ada dilewati.',
     gpm: 'Menjalankan Job Hidromet (GPM) per tanggal yang belum selesai: unduh granule, hitung hujan per kecamatan, cek alert. Tanggal yang sudah selesai dilewati.',
     modis: 'Mengisi tanggal yang belum punya angka MODIS (genangan, NDVI, NDWI). Job Hidromet ikut memastikan GPM tanggal itu. Tanggal yang sudah lengkap dilewati.',
   };
@@ -24,7 +23,7 @@ Pages['data-source'] = (() => {
 
   async function init(root, ctx) {
     const src = (ctx.tab && ctx.tab.source) || 'gpm';
-    st = { root, ctx, src, page: 1, run: null, lines: [], poll: null, dataset: null };
+    st = { root, ctx, src, page: 1, run: null, lines: [], poll: null };
     const $ = s => UI.$(s, root);
     $('#dsBfHelp').textContent = HELP[src];
     const today = UI.isoDate(new Date());
@@ -107,8 +106,7 @@ Pages['data-source'] = (() => {
     await UI.busy($('#dsBfGo'), async () => {
       try {
         const r = await API.post('/api/data/' + st.src + '/backfill', { date_from: from, date_to: to });
-        if (r.kind === 'DATASET') { st.dataset = r.dataset_id; st.run = null; }
-        else { st.run = r.run; st.lines = []; st.dataset = null; }
+        st.run = r.run; st.lines = [];
         await loadBackfill();
       } catch (e) { UI.showError('Backfill ' + LABEL[st.src], e); }
     });
@@ -120,20 +118,22 @@ Pages['data-source'] = (() => {
     try { r = await API.get('/api/data/' + st.src + '/backfill'); }
     catch (e) { UI.$('#dsHist', st.root).innerHTML = UI.emptyHTML('GAGAL MEMUAT'); return; }
     if (!st) return;
+    if (!st.run && r.runs.length) st.run = r.runs[0];
+    st.hydromet = r.hydromet || null;
     if (st.src === 's1') {
-      if (!st.dataset && r.datasets.length) st.dataset = r.datasets[0].dataset_id;
-      renderS1History(r.datasets);
-      await renderS1Run();
-    } else {
-      if (!st.run && r.runs.length) st.run = r.runs[0];
-      st.hydromet = r.hydromet || null;
-      renderHydrometHistory(r.days, r.stale_dates || []);
-      await pollRun();
-      // Backfill dari proses lain (skrip, scheduler, worker lain) tidak punya
-      // log di sini; perbarui progresnya dari DB tiap 10 detik.
-      if (st && st.hydromet && st.hydromet.external && !(st.run && st.run.status === 'RUNNING')) {
-        st.poll = setTimeout(() => { loadBackfill(); loadItems(); }, 10000);
-      }
+      // Siklus Live/backfill S1 dari proses lain (skrip, penjadwal): progresnya
+      // dibaca dari live_areas lewat /api/data/activity, sama seperti hidromet.
+      const a = await API.get('/api/data/activity').catch(() => null);
+      if (!st) return;
+      const live = a && (a.live || []).find(l => l.running);
+      st.hydromet = live ? { external: true, live } : null;
+    }
+    renderHydrometHistory(r.days || [], r.stale_dates || []);
+    await pollRun();
+    // Backfill dari proses lain (skrip, scheduler, worker lain) tidak punya
+    // log di sini; perbarui progresnya dari DB tiap 10 detik.
+    if (st && st.hydromet && st.hydromet.external && !(st.run && st.run.status === 'RUNNING')) {
+      st.poll = setTimeout(() => { loadBackfill(); loadItems(); }, 10000);
     }
   }
 
@@ -158,6 +158,23 @@ Pages['data-source'] = (() => {
 
   function renderExternal(h) {
     const $ = s => UI.$(s, st.root);
+    if (h.live) {
+      const l = h.live, j = l.job, p = l.progress, c = p && p.current;
+      $('#dsRunRec').textContent = '● BERJALAN';
+      $('#dsRunRec').className = 'scr-rec live';
+      $('#dsRun').innerHTML = '<p class="scr-text" style="margin:0">BACKFILL SENTINEL-1 DATASET UTAMA SEDANG BERJALAN ' +
+        '(scripts/backfill_s1.py atau penjadwal). Progres dibaca dari basis data; rincian di Data › Proses berjalan.</p>' +
+        (p && p.dates_total ? UI.progressHTML(p.percent, 'Progres backfill Sentinel-1') : '') +
+        '<dl class="kv" style="margin-top:6px"><dt>STATUS</dt><dd>' + UI.esc(l.status_message || UI.NA) + '</dd>' +
+        (p && p.dates_total ? '<dt>PROGRES</dt><dd>' + UI.int(p.dates_done) + '/' + UI.int(p.dates_total) + ' tanggal · ' +
+          UI.int(p.frames_done) + '/' + UI.int(p.frames_total) + ' frame (' + UI.num(p.percent, 1) + '%)</dd>' +
+          '<dt>SEDANG DIKERJAKAN</dt><dd>' + (c ? UI.esc((c.date ? UI.date(c.date) + ' · ' : '') + (c.stage || '') + ' · ' + (c.message || '')) : UI.NA) + '</dd>' +
+          '<dt>PERKIRAAN SELESAI</dt><dd>' + UI.esc(p.eta ? UI.dateTime(p.eta) + ' WIB' : 'menghitung…') + '</dd>' : '') +
+        '<dt>SCENE TERSIMPAN</dt><dd>' + UI.int(l.n_ready) + '</dd>' +
+        (j ? '<dt>JOB #' + j.job_id + '</dt><dd>' + UI.esc(UI.date(j.date_range_start)) + ' – ' + UI.esc(UI.date(j.date_range_end)) + ' · ' +
+          UI.int(j.downloaded_count) + ' diunduh, ' + UI.int(j.processed_count) + ' diproses dari ' + UI.int(j.total_scenes) + ' frame</dd>' : '') + '</dl>';
+      return;
+    }
     $('#dsRunRec').textContent = '● BERJALAN';
     $('#dsRunRec').className = 'scr-rec live';
     $('#dsRun').innerHTML = '<p class="scr-text" style="margin:0">BACKFILL HIDROMET SEDANG BERJALAN DI PROSES LAIN ' +
@@ -191,10 +208,11 @@ Pages['data-source'] = (() => {
   }
 
   const DAY_STATUS = { COMPLETED: ['SELESAI', ''], PROCESSING: ['DIKERJAKAN', 'v-cyan'], FAILED: ['GAGAL', 'v-alert'],
-    WAITING_UPSTREAM: ['MENUNGGU NASA', 'v-amber'] };
+    WAITING_UPSTREAM: ['MENUNGGU NASA', 'v-amber'], READY: ['SELESAI', ''], PARTIAL: ['SEBAGIAN', 'v-amber'],
+    INCOMPLETE: ['TIDAK MENUTUP AOI', 'v-dim'], DELETED: ['BERKAS DIHAPUS', 'v-dim'] };
 
   function renderHydrometHistory(days, stale) {
-    UI.$('#dsHistCh', st.root).textContent = 'CH-02 · RIWAYAT JOB HIDROMET PER TANGGAL';
+    UI.$('#dsHistCh', st.root).textContent = st.src === 's1' ? 'CH-02 · RIWAYAT LINTASAN SENTINEL-1 PER TANGGAL' : 'CH-02 · RIWAYAT JOB HIDROMET PER TANGGAL';
     const note = stale.length ? '<p class="scr-text v-amber" style="margin:0 0 6px">' + UI.int(stale.length) +
       ' TANGGAL TERPUTUS (proses berhenti sebelum selesai): ' + UI.esc(stale.slice(0, 5).map(d => UI.date(d)).join(', ')) +
       (stale.length > 5 ? ', …' : '') + '. Tanggal ini dikerjakan ulang otomatis oleh backfill berikutnya yang mencakupnya.</p>' : '';
@@ -205,44 +223,7 @@ Pages['data-source'] = (() => {
       { label: 'Angka ' + LABEL[st.src], cls: 'r', get: d => UI.int(d.n_observations) },
       { label: 'Gagal', cls: 'r', get: d => UI.int(d.failed_count) },
       { label: 'Selesai', get: d => d.completed_at ? UI.dateTime(d.completed_at) : '' },
-    ], days, { empty: 'BELUM ADA JOB HIDROMET', caption: 'Riwayat job per tanggal' }) + '</div>';
-  }
-
-  function renderS1History(datasets) {
-    UI.$('#dsHistCh', st.root).textContent = 'CH-02 · DATASET BACKFILL SENTINEL-1';
-    UI.$('#dsHist', st.root).innerHTML = UI.tableHTML([
-      { label: '#', key: 'dataset_id' }, { label: 'Rentang', get: d => UI.date(d.date_start, 'short') + ' – ' + UI.date(d.date_end, 'short') },
-      { label: 'Status', get: d => UI.datasetStatus(d.status) },
-      { label: 'Scene', cls: 'r', get: d => UI.int(d.completed_scenes) + '/' + UI.int(d.total_scenes) + (d.failed_scenes ? ' (' + d.failed_scenes + ' gagal)' : '') },
-      { label: 'Log', html: true, get: d => '<button type="button" class="small" data-ds="' + d.dataset_id + '">Lihat log</button>' },
-    ], datasets, { empty: 'BELUM ADA BACKFILL SENTINEL-1', caption: 'Dataset backfill Sentinel-1' }) +
-      '<p class="scr-text v-dim" style="margin:6px 0 0">Unduhan dan tahap per scene juga terlihat di <a href="#data/proses">Data › Proses berjalan</a>.</p>';
-    UI.$$('[data-ds]', st.root).forEach(b => b.addEventListener('click', () => { st.dataset = Number(b.dataset.ds); renderS1Run(); }));
-  }
-
-  async function renderS1Run() {
-    if (!st) return;
-    if (st.poll) { clearTimeout(st.poll); st.poll = null; }
-    const $ = s => UI.$(s, st.root);
-    $('#dsRunCh').textContent = 'CH-01 · PROSES BACKFILL (DATASET)';
-    if (!st.dataset) { $('#dsRunRec').textContent = ''; $('#dsRun').innerHTML = UI.emptyHTML('BELUM ADA BACKFILL SENTINEL-1'); return; }
-    let s, l;
-    try {
-      [s, l] = await Promise.all([API.get('/api/datasets/' + st.dataset + '/status'), API.get('/api/datasets/' + st.dataset + '/logs?limit=200&order=asc')]);
-    } catch (e) { $('#dsRun').innerHTML = UI.emptyHTML('LOG DATASET TIDAK DAPAT DIMUAT'); return; }
-    if (!st) return;
-    const active = UI.DATASET_ACTIVE.has(s.status);
-    $('#dsRunRec').textContent = '● ' + UI.datasetStatus(s.status).toUpperCase();
-    $('#dsRunRec').className = 'scr-rec ' + (active ? 'live' : 'off');
-    $('#dsRun').innerHTML = '<p class="scr-text" style="margin:0 0 4px">DATASET #' + st.dataset + ' · ' + UI.esc(UI.datasetStatus(s.status)) +
-      (s.progress_percent !== undefined ? ' · ' + UI.num(s.progress_percent, 0) + '%' : '') + '</p>' +
-      UI.progressHTML(s.progress_percent || 0, 'Progres dataset') +
-      '<div class="scr-log" id="dsLog" style="max-height:260px;margin-top:6px" role="log">' + ((l.logs || []).length ? l.logs.map(x =>
-        '<div><span class="v-dim">' + UI.esc(UI.dateTime(x.timestamp)) + '</span> ' + UI.esc(x.stage || x.module || '') + ' <span class="' +
-        (/FAIL|ERROR/.test(x.status) ? 'v-alert' : /RUN|START|WAIT/.test(x.status) ? 'v-amber' : '') + '">' + UI.esc(x.status || '') + '</span> ' +
-        UI.esc(x.message || '') + '</div>').join('') : UI.emptyHTML('BELUM ADA BARIS LOG')) + '</div>';
-    const log = $('#dsLog'); if (log) log.scrollTop = log.scrollHeight;
-    if (active) st.poll = setTimeout(renderS1Run, 4000);
+    ], days, { empty: st.src === 's1' ? 'BELUM ADA LINTASAN SENTINEL-1' : 'BELUM ADA JOB HIDROMET', caption: 'Riwayat per tanggal' }) + '</div>';
   }
 
   return { init, destroy };

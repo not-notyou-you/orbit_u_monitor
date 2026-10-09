@@ -3,6 +3,8 @@
 'use strict';
 Pages['about'] = {
   async init(root, ctx) {
+    // Tabel akses per peran hanya untuk Administrator.
+    UI.$('#abRoles', root).hidden = Auth.role() !== 'ADMIN';
     const box = UI.$('#abInfo', root);
     const rows = [['PERAN ANDA', UI.ROLE_LABEL[Auth.role()] || Auth.role()]];
     try {

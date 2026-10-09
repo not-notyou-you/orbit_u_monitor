@@ -7,13 +7,13 @@
 html[data-theme="pasir"] {
   /* palet konsep41 */
   --p-bg: #f6eedb; --p-card: #fdf8ec; --p-line: #d9c49a; --p-tx: #4a3222;
-  --p-mut: #8a6a4e; --p-acc: #c9a24a; --p-glow: #f1dfae;
+  --p-mut: #6e5039; --p-acc: #c9a24a; --p-glow: #f1dfae;
 
   --desk: var(--p-bg); --face: var(--p-card); --hilite: #ffffff; --light: #f3e7cc;
   --shadow: var(--p-line); --dark: var(--p-tx); --select: var(--p-tx);
   --text: var(--p-tx); --text-mut: var(--p-mut); --field: #fffdf7;
-  --crt: #fffbf2; --crt-grid: #eee0c2; --phos: #4a3222; --phos-dim: #8a6a4e;
-  --amber: #a5590b; --alert: #b3261e; --cyan: #2a6c8c;
+  --crt: #fffbf2; --crt-grid: #eee0c2; --phos: #4a3222; --phos-dim: #6e5039;
+  --amber: #874606; --alert: #b3261e; --cyan: #235b77;
   --font-ui: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --font-data: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --taskbar-h: 52px;
@@ -26,7 +26,7 @@ html[data-theme="pasir"] {
   --t-tx: var(--p-tx); --t-mut: var(--p-mut); --t-link: #7a5a1c;
   --t-acc: var(--p-acc); --t-acc-tx: #2b2016; --t-acc-soft: #f1e2bb;
   --t-sel: rgba(201, 162, 74, .22); --t-sel-tx: var(--p-tx); --t-hover: rgba(201, 162, 74, .12);
-  --t-focus: var(--p-tx); --t-ok: #3c8d4f; --t-invalid: #fdecea;
+  --t-focus: var(--p-tx); --t-ok: #2b6b3a; --t-invalid: #fdecea;
   --t-bw: 2px; --t-bw-ctl: 1px; --t-r: 10px; --t-r2: 6px; --t-r-check: 4px; --t-r-radio: 50%;
   --t-shadow: 0 8px 24px rgba(74, 50, 34, .08);
   --t-shadow-btn: 0 1px 2px rgba(74, 50, 34, .08); --t-shadow-hover: 0 6px 16px rgba(74, 50, 34, .12);

@@ -1084,7 +1084,7 @@ COMMENT ON COLUMN live_areas.name                IS 'Nama area, mis. "Lebak Sela
 COMMENT ON COLUMN live_areas.region_id           IS 'FK -> regions_of_interest.';
 COMMENT ON COLUMN live_areas.location_label      IS 'Label lokasi (salinan nama ROI).';
 COMMENT ON COLUMN live_areas.bbox_wkt            IS 'Bbox area dalam WKT.';
-COMMENT ON COLUMN live_areas.retention           IS 'Jumlah scene yang berkasnya disimpan (1-60, default 6, M11).';
+COMMENT ON COLUMN live_areas.retention           IS 'Jumlah scene terbaru yang ditampilkan kartu dan dipakai prakiraan (1-60, default 6). Berkas scene disimpan menurut umur: app_settings.storage.raster_retention_days (M58).';
 COMMENT ON COLUMN live_areas.enabled             IS 'false = siklus terjadwal dilewati.';
 COMMENT ON COLUMN live_areas.status              IS 'BACKFILLING | ACTIVE | RUNNING | WAITING | ERROR | DELETED.';
 COMMENT ON COLUMN live_areas.status_message      IS 'Pesan status untuk kartu Live.';
@@ -1201,10 +1201,10 @@ CREATE TABLE region_observations (
     CONSTRAINT uq_region_obs UNIQUE (region_id, band_id, obs_date)
 );
 CREATE INDEX idx_obs_date_band ON region_observations (obs_date DESC, band_id);
-COMMENT ON TABLE  region_observations IS 'Nilai harian per kecamatan per band dari GPM/MODIS (zonal statistics, M7). Dasar statistik, alert, laporan.';
+COMMENT ON TABLE  region_observations IS 'Deret waktu dataset utama: nilai per kecamatan per band dari GPM/MODIS (harian) dan Sentinel-1 (per lintasan: VV, VH, WATER_PCT) (M7, M58). Tidak pernah dihapus retensi raster. Dasar grafik, statistik, alert, laporan.';
 COMMENT ON COLUMN region_observations.obs_id            IS 'PK surrogate.';
 COMMENT ON COLUMN region_observations.region_id         IS 'FK -> administrative_regions (kecamatan level 3).';
-COMMENT ON COLUMN region_observations.band_id           IS 'FK -> spectral_bands, mis. RAIN_24H, NDVI, FLOOD.';
+COMMENT ON COLUMN region_observations.band_id           IS 'FK -> spectral_bands, mis. RAIN_24H, NDVI, FLOOD, VH, WATER_PCT.';
 COMMENT ON COLUMN region_observations.obs_date          IS 'Tanggal pengamatan = hari UTC (07.00-07.00 WIB, M28).';
 COMMENT ON COLUMN region_observations.value             IS 'Nilai agregat (satuan band: mm, indeks, %). NULL bila valid_fraction < 0,1.';
 COMMENT ON COLUMN region_observations.valid_fraction    IS 'Bagian poligon yang punya piksel valid (0-1).';

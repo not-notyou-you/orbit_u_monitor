@@ -1,5 +1,8 @@
 // js/analytics.js — Analitik (INTERFACE.md §2.4). Data: /hydromet/observations (dipaginasi),
 // /disasters, /alerts/evaluation, /alerts, /alert-rules.
+// Forecast 15 hari (M61) di grafik garis CH-01 (per kecamatan) dan CH-03 (rerata
+// kecamatan terpilih), dihitung dari data s.d. tanggal akhir filter; sakelar di
+// bawah tiap grafik, menyala bawaannya.
 'use strict';
 Pages['analytics'] = (() => {
   const UNIT = { RAIN_24H: 'mm', RAIN_72H: 'mm', RAIN_7D: 'mm', RAIN_30D: 'mm', NDVI: '', NDWI: '', FLOOD: '%' };
@@ -7,7 +10,8 @@ Pages['analytics'] = (() => {
   let st = null;
 
   async function init(root, ctx) {
-    st = { root, ctx, regions: [], alertPage: 1 };
+    st = { root, ctx, regions: [], alertPage: 1, fcOff: new Set() };
+    st.q = UI.forecastQueue(() => UI.$('#anFcProg', root));
     const $ = s => UI.$(s, root);
     Excel.mount($('#anExcel'), ['hujan_harian', 'observations', 'disaster_rain', 'alert_evaluation', 'alerts']);
     try {
@@ -69,7 +73,9 @@ Pages['analytics'] = (() => {
       st.obs = pick(obs); st.r24 = pick(rain24 || obs); st.r72 = pick(rain72);
       st.events = (events.items || []).filter(e => sel.has(e.region_id));
       st.rules = (rules.items || []).filter(r => r.is_active && r.threshold_value !== null);
+      st.q.reset();
       renderReadouts(ev); renderTrend(); renderHeat(); renderCorr(); renderEval(ev);
+      runForecasts();
       await loadAlerts();
       st.ctx.setStatus('Siap · ' + UI.date(f.from) + ' – ' + UI.date(f.to));
     } catch (e) {
@@ -86,6 +92,35 @@ Pages['analytics'] = (() => {
       UI.readoutHTML('MAKSIMUM', vals.length ? UI.num(Math.max(...vals), 1) : UI.NA, UI.esc(unit || 'INDEKS')) +
       UI.readoutHTML('KEJADIAN', UI.int(st.events.length), 'DALAM RENTANG', st.events.length ? 'v-amber' : '') +
       UI.readoutHTML('POD / FAR', (ev.pod === null ? UI.NA : UI.num(ev.pod, 2)) + ' / ' + (ev.far === null ? UI.NA : UI.num(ev.far, 2)), 'EVALUASI ALERT');
+  }
+
+  // ------------------------------------------------------------ forecast
+  const trendKey = rid => 't|' + st.f.band + '|' + rid + '|' + st.f.to;
+  const corrKey = band => 'c|' + band + '|' + st.f.ids.join(',') + '|' + st.f.to;
+  const fcPts = f => f && f.points && f.points.length ? f.points : null;
+
+  function runForecasts() {
+    const jobs = [];
+    if (!st.fcOff.has('trend')) {
+      const seen = new Set();
+      st.obs.forEach(o => { if (!seen.has(o.region_id)) { seen.add(o.region_id);
+        jobs.push({ kind: 'trend', key: trendKey(o.region_id), q: { band: st.f.band, region_id: o.region_id, end: st.f.to } }); } });
+    }
+    if (!st.fcOff.has('corr') && st.r24.length) {
+      ['RAIN_24H', 'RAIN_72H'].forEach(b => jobs.push({ kind: 'corr', key: corrKey(b),
+        q: { band: b, region_ids: st.f.ids.join(','), end: st.f.to } }));
+    }
+    if (jobs.length) st.q.run(jobs, j => { if (j.kind === 'trend') renderTrend(); else renderCorr(); });
+    else st.q.stop();
+  }
+
+  function bindFcToggle(box) {
+    UI.$$('[data-an-fc]', box).forEach(inp => inp.addEventListener('change', () => {
+      const k = inp.dataset.anFc;
+      if (inp.checked) st.fcOff.delete(k); else st.fcOff.add(k);
+      if (k === 'trend') renderTrend(); else renderCorr();
+      runForecasts();
+    }));
   }
 
   function groupBy(rows, key) { const m = {}; rows.forEach(r => { (m[r[key]] = m[r[key]] || []).push(r); }); return m; }
@@ -108,13 +143,20 @@ Pages['analytics'] = (() => {
     const all = thresholdsFor(st.f.band);
     const thr = Object.fromEntries(Object.entries(all).filter(([, v]) => v <= vmax * 1.5));
     const hidden = Object.entries(all).filter(([, v]) => v > vmax * 1.5);
+    const on = !st.fcOff.has('trend');
     // Small multiples: satu grafik satu warna per kecamatan (≤ 3 warna sinyal per screen).
     box.innerHTML = '<div class="cols-2">' + Object.keys(by).sort((a, b) => a.localeCompare(b, 'id')).map(name => {
-      const pts = by[name].sort((a, b) => a.obs_date < b.obs_date ? -1 : 1).map(o => ({ x: o.obs_date, y: o.value }));
+      const rows = by[name].sort((a, b) => a.obs_date < b.obs_date ? -1 : 1);
+      const pts = rows.map(o => ({ x: o.obs_date, y: o.value }));
+      const f = on ? st.q.cache[trendKey(rows[0].region_id)] : null;
       return '<div><p class="lbl" style="margin:0 0 2px">' + UI.esc(name.toUpperCase()) + '</p>' +
-        UI.chartSVG([{ label: name, points: pts }], { unit: UNIT[st.f.band], thresholds: thr, width: w, height: 150, zero: st.f.band.startsWith('RAIN'), label: 'Tren ' + st.f.band + ' ' + name }) + '</div>';
+        UI.chartSVG([{ label: name, points: pts, forecast: fcPts(f) }], { unit: UNIT[st.f.band], thresholds: thr, width: w, height: 150,
+          zero: st.f.band.startsWith('RAIN'), label: 'Tren ' + st.f.band + ' ' + name + (on ? ', dengan forecast 15 hari' : '') }) +
+        (on ? '<p class="scr-text v-dim fc-models">Forecast: ' + UI.esc(UI.forecastDesc(f)) + '</p>' : '') + '</div>';
     }).join('') + '</div>' + (hidden.length ? '<p class="v-dim" style="margin:6px 0 0;font-size:11px">AMBANG DI ATAS SKALA (TIDAK DIGAMBAR): ' +
-      hidden.map(([n, v]) => UI.esc(n.toUpperCase()) + ' ' + UI.num(v, 0)).join(' · ') + '</p>' : '');
+      hidden.map(([n, v]) => UI.esc(n.toUpperCase()) + ' ' + UI.num(v, 0)).join(' · ') + '</p>' : '') +
+      UI.forecastToggleHTML('data-an-fc="trend"', on);
+    bindFcToggle(box);
   }
 
   function renderHeat() {
@@ -169,13 +211,18 @@ Pages['analytics'] = (() => {
     const w = Math.max(300, Math.min(900, (box.clientWidth || 600) - 16));
     const markers = st.events.map((e, i) => ({ x: e.event_date, label: String(i + 1),
       tip: (i + 1) + '. ' + e.disaster_type_name + ' — ' + e.region_name + ' (' + UI.date(e.event_date) + ')' }));
+    const on = !st.fcOff.has('corr');
+    const f24 = on ? st.q.cache[corrKey('RAIN_24H')] : null, f72 = on ? st.q.cache[corrKey('RAIN_72H')] : null;
     box.innerHTML = UI.chartSVG([
-      { label: 'Hujan 24 jam (rerata)', points: meanSeries(st.r24) },
-      { label: 'Hujan 72 jam (rerata)', cls: 's2', points: meanSeries(st.r72) },
-    ], { unit: 'mm', width: w, height: 200, zero: true, markers, label: 'Hujan rerata dan kejadian',
+      { label: 'Hujan 24 jam (rerata)', color: 'var(--phos)', points: meanSeries(st.r24), forecast: fcPts(f24) },
+      { label: 'Hujan 72 jam (rerata)', cls: 's2', color: 'var(--cyan)', points: meanSeries(st.r72), forecast: fcPts(f72) },
+    ], { unit: 'mm', width: w, height: 200, zero: true, markers, label: 'Hujan rerata dan kejadian' + (on ? ', dengan forecast 15 hari' : ''),
       thresholds: Object.fromEntries(Object.entries(thresholdsFor('RAIN_24H')).filter(([, v]) => v <= 1.5 * Math.max(1, ...st.r72.concat(st.r24).map(o => o.value || 0)))) }) +
       '<div class="legend"><span><i style="background:var(--phos)"></i>HUJAN 24 JAM</span><span><i style="background:var(--cyan)"></i>HUJAN 72 JAM</span>' +
       '<span><i style="background:var(--amber)"></i>KEJADIAN (NOMOR)</span></div>' +
+      UI.forecastToggleHTML('data-an-fc="corr"', on) +
+      (on ? '<p class="scr-text v-dim fc-models"><span>Forecast 24 jam: ' + UI.esc(UI.forecastDesc(f24)) + '</span><span>Forecast 72 jam: ' +
+        UI.esc(UI.forecastDesc(f72)) + '</span></p>' : '') +
       (st.events.length ? UI.tableHTML([
         { label: '#', get: (e, i) => i + 1 }, { label: 'Tanggal', get: e => UI.date(e.event_date) },
         { label: 'Jenis', key: 'disaster_type_name' }, { label: 'Kecamatan', key: 'region_name' },
@@ -184,6 +231,7 @@ Pages['analytics'] = (() => {
         { label: '72j H-0', cls: 'r', get: e => rainOn(st.r72, e, 0) },
         { label: 'Verifikasi', get: e => e.is_verified ? 'TERVERIFIKASI' : 'BELUM' },
       ], st.events, { caption: 'Kejadian dan hujan H-0..H-2' }) : UI.emptyHTML('BELUM ADA KEJADIAN BENCANA TERCATAT DALAM RENTANG INI'));
+    bindFcToggle(box);
   }
   function rainOn(rows, e, off) {
     const d = UI.addDays(e.event_date, off);
@@ -229,5 +277,7 @@ Pages['analytics'] = (() => {
     catch (e) { UI.showError('Ekspor CSV', e); }
   }
 
-  return { init };
+  function destroy() { if (st) st.q.stop(); }
+
+  return { init, destroy };
 })();

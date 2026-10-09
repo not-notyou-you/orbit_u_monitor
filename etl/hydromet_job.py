@@ -386,10 +386,18 @@ def waiting_dates(db) -> list[date]:
 
 
 def run_daily(db, fetchers: Fetchers | None = None) -> list[DayResult]:
-    """Job harian 02:00 WIB: tanggal yang masih WAITING_UPSTREAM, lalu kemarin (UTC)."""
+    """Job harian 02:00 WIB: tanggal yang masih WAITING_UPSTREAM, lalu kemarin
+    (UTC), lalu buang raster yang keluar dari jendela raster (M58)."""
+    from etl.raster_retention import prune_main_rasters
+
     targets = sorted(set(waiting_dates(db)) | {target_date()})
     ctx = context(db)
-    return [run_day(db, d, fetchers=fetchers, ctx=ctx) for d in targets]
+    results = [run_day(db, d, fetchers=fetchers, ctx=ctx) for d in targets]
+    try:
+        prune_main_rasters(db)
+    except Exception:
+        logger.exception("[HYDROMET] pembersihan raster > jendela gagal (tidak fatal)")
+    return results
 
 
 def non_final_dates(db, days: int = FINAL_REFRESH_DAYS) -> list[date]:

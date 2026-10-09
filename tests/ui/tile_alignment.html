@@ -1,0 +1,152 @@
+<!doctype html>
+<!-- tests/ui/tile_alignment.html — uji geometri penyelarasan batas tile Relief 3D.
+
+     MapLibre menggambar satu image source di dalam SATU tile, dipilih dari
+     titik tengah citra; citra yang melewati batas tile dipotong (untuk AOI
+     Lebak 46,6% lebarnya, gejalanya "AOI hilang setengah"). terrain3d.js
+     menghindarinya dengan memberi MapLibre extent satu tile penuh, bukan
+     extent citra. Berkas ini menguji perhitungan itu di mesin JS yang
+     sebenarnya, memakai fungsi yang BENAR-BENAR dipakai halaman tersebut
+     (Pages.terrain3d._geo), bukan replikanya.
+
+     Dijalankan tanpa memasang apa pun:
+
+       chrome --headless --dump-dom --allow-file-access-from-files \
+         tests/ui/tile_alignment.html
+
+     Cetak "TILE-ALIGN OK" atau daftar kegagalan di #out. Tidak butuh server,
+     database, maupun jaringan. -->
+<html lang="id">
+<head><meta charset="utf-8"><title>Uji penyelarasan tile Relief 3D</title></head>
+<body>
+<pre id="out">belum jalan</pre>
+
+<!-- terrain3d.js memakai UI/API/LiveTiles/Maps saat init(); yang diuji di sini
+     hanya _geo, jadi cukup disediakan boneka agar berkasnya bisa dimuat. -->
+<script>
+  window.Pages = {};
+  window.UI = { $: () => null, $$: () => [], esc: s => s, date: s => s, icon: () => '',
+                screenHTML: () => '', emptyHTML: () => '', imgSrc: p => p && p.url,
+                boundaries: () => false };
+  window.API = { get: () => Promise.reject(new Error('tidak dipakai')), qs: () => '' };
+  window.LiveTiles = { ROWS: [], LONG: {}, legendHTML: () => '', sentenceHTML: () => '' };
+  window.Maps = { TILE_URL: '', TILE_ATTR: '' };
+</script>
+<script src="../../web/js/terrain3d.js"></script>
+<script>
+(() => {
+  const g = window.Pages.terrain3d._geo;
+  const fails = [];
+  const check = (cond, msg) => { if (!cond) fails.push(msg); };
+
+  // Kotak Mercator citra dari empat sudut lon/lat.
+  function box(corners) {
+    const m = corners.map(c => ({ x: g.mercX(c[0]), y: g.mercY(c[1]) }));
+    return { minX: Math.min(...m.map(q => q.x)), maxX: Math.max(...m.map(q => q.x)),
+             minY: Math.min(...m.map(q => q.y)), maxY: Math.max(...m.map(q => q.y)) };
+  }
+
+  // Berapa bagian citra yang jatuh di LUAR tile yang dipilih MapLibre untuk
+  // extent `coords` -- 0 berarti utuh.
+  function clippedFraction(imgCorners, coords) {
+    const b = box(imgCorners), c = box(coords);
+    const t = g.maplibreTile(c.minX, c.minY, c.maxX, c.maxY);
+    const x0 = t.x / t.n, x1 = (t.x + 1) / t.n, y0 = t.y / t.n, y1 = (t.y + 1) / t.n;
+    const outX = Math.max(0, x0 - b.minX) + Math.max(0, b.maxX - x1);
+    const outY = Math.max(0, y0 - b.minY) + Math.max(0, b.maxY - y1);
+    return Math.max(outX / (b.maxX - b.minX), outY / (b.maxY - b.minY));
+  }
+
+  const rect = (w, e, n, s) => [[w, n], [e, n], [e, s], [w, s]];
+
+  // 1. Kasus nyata yang dilaporkan: area 1, scene 2026-10-04. Extent citra
+  //    mentah terpotong ~47%; extent hasil penyelarasan harus utuh.
+  const AOI = rect(105.8628024, 106.526302, -6.4529504, -6.99941);
+  check(clippedFraction(AOI, AOI) > 0.4,
+        'kasus nyata seharusnya terpotong kalau extent citra dipakai langsung');
+
+  const b = box(AOI);
+  const t = g.containingTile(b.minX, b.minY, b.maxX, b.maxY);
+  check(t !== null, 'containingTile tidak menemukan tile untuk AOI nyata');
+  if (t) {
+    const size = 1 / t.n;
+    const aligned = rect(g.lonOf(t.x / t.n), g.lonOf(t.x / t.n + size),
+                         g.latOf(t.y / t.n), g.latOf(t.y / t.n + size));
+    check(clippedFraction(AOI, aligned) === 0,
+          'AOI nyata MASIH terpotong setelah penyelarasan: ' + clippedFraction(AOI, aligned));
+    check(t.z === 8 && t.x === 203 && t.y === 132,
+          'tile AOI nyata diharapkan z8/203/132, dapat z' + t.z + '/' + t.x + '/' + t.y);
+  }
+
+  // 2. Banyak extent acak: tidak satu pun boleh terpotong setelah diselaraskan.
+  //    Termasuk yang sengaja diletakkan tepat di batas tile.
+  let rnd = 20260408;
+  const rand = () => ((rnd = (rnd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  let worst = 0;
+  for (let i = 0; i < 400; i++) {
+    const w = -180 + rand() * 359;
+    const span = 0.002 + rand() * 3;           // AOI kecil s.d. beberapa derajat
+    const e = Math.min(179.9, w + span);
+    const n = -60 + rand() * 120;
+    const s = Math.max(-84, n - Math.min(span, 3));
+    if (e <= w || n <= s) continue;
+    const img = rect(w, e, n, s);
+    const bb = box(img);
+    const tt = g.containingTile(bb.minX, bb.minY, bb.maxX, bb.maxY);
+    if (!tt) { fails.push('containingTile null untuk ' + [w, e, n, s]); continue; }
+    const sz = 1 / tt.n;
+    const al = rect(g.lonOf(tt.x / tt.n), g.lonOf(tt.x / tt.n + sz),
+                    g.latOf(tt.y / tt.n), g.latOf(tt.y / tt.n + sz));
+    const f = clippedFraction(img, al);
+    worst = Math.max(worst, f);
+    if (f > 0) fails.push('terpotong ' + f.toFixed(4) + ' untuk ' + [w, e, n, s].map(x => x.toFixed(4)));
+  }
+
+  // 3. Kanvas hasil pad benar-benar memuat piksel citra, dan extent-nya tile.
+  //    Citra uji: kiri hitam pekat, kanan putih -- kalau separuh hilang (bug
+  //    yang diperbaiki), salah satu sisi akan ikut hilang.
+  const src = document.createElement('canvas');
+  src.width = 64; src.height = 32;
+  const sctx = src.getContext('2d');
+  sctx.fillStyle = '#000'; sctx.fillRect(0, 0, 32, 32);
+  sctx.fillStyle = '#fff'; sctx.fillRect(32, 0, 32, 32);
+  const img = new Image();
+  img.onload = () => {
+    const out = g.tileAlignedCanvas(img, AOI);
+    check(out !== null, 'tileAlignedCanvas mengembalikan null');
+    if (out) {
+      const bb = box(AOI), cc = box(out.coordinates);
+      check(cc.minX <= bb.minX && cc.maxX >= bb.maxX &&
+            cc.minY <= bb.minY && cc.maxY >= bb.maxY,
+            'extent kanvas tidak memuat extent citra');
+      check(clippedFraction(AOI, out.coordinates) === 0,
+            'extent kanvas masih membuat MapLibre memotong citra');
+      // Dua warna citra harus sama-sama ada di kanvas: bukti tidak ada sisi
+      // yang hilang saat digambar dengan transform afin.
+      const ctx = out.canvas.getContext('2d');
+      const d = ctx.getImageData(0, 0, out.canvas.width, out.canvas.height).data;
+      let black = 0, white = 0, clear = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] === 0) clear++;
+        else if (d[i] < 40) black++;
+        else if (d[i] > 215) white++;
+      }
+      check(black > 0, 'separuh hitam citra tidak sampai ke kanvas');
+      check(white > 0, 'separuh putih citra tidak sampai ke kanvas');
+      check(clear > 0, 'tidak ada area transparan: kanvas tidak di-pad');
+      const ratio = black / white;
+      check(ratio > 0.8 && ratio < 1.25,
+            'kedua separuh tidak seimbang (' + ratio.toFixed(2) + '): citra tergambar miring/terpotong');
+    }
+    document.getElementById('out').textContent =
+      fails.length ? 'TILE-ALIGN GAGAL\n' + fails.slice(0, 20).join('\n')
+                   : 'TILE-ALIGN OK (400 extent acak, terpotong maks ' + worst + ')';
+  };
+  img.onerror = () => {
+    document.getElementById('out').textContent = 'TILE-ALIGN GAGAL\ncitra uji tidak dapat dimuat';
+  };
+  img.src = src.toDataURL();
+})();
+</script>
+</body>
+</html>

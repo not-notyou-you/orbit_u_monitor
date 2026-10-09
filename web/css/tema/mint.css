@@ -6,14 +6,14 @@
 html[data-theme="mint"] {
   /* palet konsep38 */
   --m-bg: #eef7f0; --m-grid: #dbeee0; --m-card: #fafdfb; --m-line: #1f2a5a;
-  --m-mut: #59639a; --m-acc: #7fe0ea; --m-acc-soft: #d3f2f6;
+  --m-mut: #4a5388; --m-acc: #7fe0ea; --m-acc-soft: #d3f2f6;
 
   /* token Orbital 95 yang dibaca komponen lain */
   --desk: var(--m-bg); --face: var(--m-card); --hilite: #ffffff; --light: var(--m-acc-soft);
   --shadow: #9fb0c9; --dark: var(--m-line); --select: var(--m-line);
   --text: var(--m-line); --text-mut: var(--m-mut); --field: #ffffff;
-  --crt: #f6fcf8; --crt-grid: #d3e6da; --phos: #1f2a5a; --phos-dim: #59639a;
-  --amber: #b25e00; --alert: #c62839; --cyan: #0e7c8a;
+  --crt: #f6fcf8; --crt-grid: #d3e6da; --phos: #1f2a5a; --phos-dim: #4a5388;
+  --amber: #904a00; --alert: #c62839; --cyan: #0a6470;
   --font-ui: "Nunito", "Quicksand", "Segoe UI", system-ui, sans-serif;
   --font-data: "Nunito", "Segoe UI", system-ui, sans-serif;
   --taskbar-h: 46px;
@@ -27,7 +27,7 @@ html[data-theme="mint"] {
   --t-tx: var(--m-line); --t-mut: var(--m-mut); --t-link: #1f5fa8;
   --t-acc: var(--m-acc); --t-acc-tx: var(--m-line); --t-acc-soft: var(--m-acc-soft);
   --t-sel: var(--m-line); --t-sel-tx: #fafdfb; --t-hover: var(--m-acc-soft);
-  --t-focus: #1f5fa8; --t-ok: #2bb673; --t-invalid: #fff1f2;
+  --t-focus: #1f5fa8; --t-ok: #17784a; --t-invalid: #fff1f2;
   --t-bw: 2px; --t-bw-ctl: 2px; --t-r: 12px; --t-r2: 8px; --t-r-check: 4px; --t-r-radio: 50%;
   --t-shadow: 6px 6px 0 var(--m-acc), 6px 6px 0 2px var(--m-line);
   --t-shadow-btn: 3px 3px 0 var(--m-line); --t-shadow-hover: 5px 5px 0 var(--m-line);
