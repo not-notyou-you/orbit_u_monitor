@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Activity Diagram</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/uml.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 6 · Pemodelan sistem</div>
+  <h1>Activity diagram</h1>
+  <p class="lede">Activity diagram UML ber-swimlane. Kotak berlatar biru muda = aksi yang menulis atau membaca basis data.
+  Alurnya mengikuti kode: <code>api/routes/*.py</code>, <code>etl/hydromet_job.py</code>, <code>etl/live_cycle.py</code>,
+  <code>etl/report_periodic.py</code>.</p>
+</header>
+<div id="host"></div>
+<script>
+window.pageInit = function () {
+  const A = (lane, row, text, extra) => ({ type: "action", lane, row, text, ...extra });
+  const diagrams = [
+    { cap: "Activity diagram login", from: "api/routes/auth.py login; DATABASE.md §8.2, §8.6",
+      lanes: ["Pengguna", "Sistem (API)", "Basis data"],
+      nodes: [
+        { id: "s", type: "start", lane: 0, row: 0 },
+        { id: "a1", ...A(0, 1, "Membuka halaman Masuk") },
+        { id: "a2", ...A(0, 2, "Mengisi nama pengguna dan kata sandi") },
+        { id: "b1", ...A(1, 3, "Menerima permintaan login") },
+        { id: "c1", ...A(2, 4, "auth_get_user(username): hash dan status kunci", { db: true }) },
+        { id: "d1", type: "decision", lane: 1, row: 5, text: "Akun ada, aktif, tidak terkunci, sandi cocok?" },
+        { id: "c2", ...A(2, 6, "auth_record_login(gagal); catat LOGIN_FAILED", { db: true }) },
+        { id: "b2", ...A(1, 7, "Tampilkan galat INVALID_CREDENTIALS / ACCOUNT_LOCKED") },
+        { id: "c3", ...A(2, 8, "auth_record_login(sukses); catat LOGIN_SUCCESS", { db: true }) },
+        { id: "b3", ...A(1, 9, "Pasang cookie sesi JWT (8 jam)") },
+        { id: "a3", ...A(0, 10, "Melihat menu sesuai peran") },
+        { id: "e", type: "end", lane: 0, row: 11 },
+      ],
+      edges: [{ f: "s", t: "a1" }, { f: "a1", t: "a2" }, { f: "a2", t: "b1" }, { f: "b1", t: "c1" }, { f: "c1", t: "d1" },
+        { f: "d1", t: "c2", label: "tidak" }, { f: "c2", t: "b2" }, { f: "b2", t: "a2", loop: "l", loopX: 1.04 },
+        { f: "d1", t: "c3", label: "ya", down: true, tx: 2 }, { f: "c3", t: "b3" }, { f: "b3", t: "a3" }, { f: "a3", t: "e" }] },
+
+    { cap: "Activity diagram registrasi akun Relawan", from: "api/routes/auth.py register; fungsi auth_register_user",
+      lanes: ["Pengunjung", "Sistem (API)", "Basis data"],
+      nodes: [
+        { id: "s", type: "start", lane: 0, row: 0 },
+        { id: "a1", ...A(0, 1, "Mengisi email, nama pengguna, sandi, konfirmasi") },
+        { id: "d1", type: "decision", lane: 1, row: 2, text: "Sandi cocok, ≥ 10 karakter, belum 5 registrasi/jam dari IP ini?" },
+        { id: "b1", ...A(1, 3, "Tampilkan galat PASSWORD_MISMATCH / PASSWORD_POLICY / RATE_LIMITED"), dx: -0.0 },
+        { id: "c1", ...A(2, 4, "auth_register_user(): peran dikunci USER", { db: true }) },
+        { id: "d2", type: "decision", lane: 2, row: 5, text: "Username / email unik?" },
+        { id: "b2", ...A(1, 6, "Tampilkan galat USERNAME_TAKEN / EMAIL_TAKEN") },
+        { id: "c2", ...A(2, 7, "Catat REGISTER di user_activity_logs", { db: true }) },
+        { id: "b3", ...A(1, 8, "Buat sesi dan pasang cookie") },
+        { id: "a2", ...A(0, 9, "Masuk sebagai Relawan") },
+        { id: "e", type: "end", lane: 0, row: 10 },
+      ],
+      edges: [{ f: "s", t: "a1" }, { f: "a1", t: "d1" }, { f: "d1", t: "b1", label: "tidak", down: true }, { f: "b1", t: "a1", loop: "l", loopX: 1.04 },
+        { f: "d1", t: "c1", label: "ya" }, { f: "c1", t: "d2" }, { f: "d2", t: "b2", label: "tidak" }, { f: "b2", t: "a1", loop: "l", loopX: 1.02 },
+        { f: "d2", t: "c2", label: "ya", down: true }, { f: "c2", t: "b3" }, { f: "b3", t: "a2" }, { f: "a2", t: "e" }] },
+
+    { cap: "Activity diagram Job Hidromet harian sampai peringatan hujan", from: "etl/hydromet_job.py; PIPELINE.md §3",
+      lanes: ["Scheduler", "ETL Hidromet", "Penyedia data (NASA)", "Basis data"], laneW: 230,
+      nodes: [
+        { id: "s", type: "start", lane: 0, row: 0 },
+        { id: "a1", ...A(0, 1, "Pukul 02:00 WIB: picu Job Hidromet") },
+        { id: "d0", type: "decision", lane: 0, row: 2, text: "Advisory lock hydromet didapat?" },
+        { id: "z1", ...A(3, 2, "Catat SKIPPED_LOCKED", { db: true }) },
+        { id: "b1", ...A(1, 3, "Ambil tanggal yang belum COMPLETED") },
+        { id: "p1", ...A(2, 4, "Sediakan granule GPM IMERG Final / Late / Early") },
+        { id: "d1", type: "decision", lane: 1, row: 5, text: "Granule tersedia?" },
+        { id: "w1", ...A(3, 6, "Status WAITING_UPSTREAM (FAILED setelah 3 hari)", { db: true }) },
+        { id: "b2", ...A(1, 6, "Akumulasi 24h/72h/7d/30d → COG") },
+        { id: "c1", ...A(3, 7, "Agregasi zonal → region_observations", { db: true }) },
+        { id: "c2", ...A(3, 8, "Bandingkan alert_rules aktif → alert_events", { db: true }) },
+        { id: "p2", ...A(2, 9, "Sediakan MODIS (MCDWD, MOD09)") },
+        { id: "b3", ...A(1, 10, "Agregasi FLOOD / NDVI / NDWI") },
+        { id: "c3", ...A(3, 11, "Status COMPLETED (dengan/tanpa MODIS)", { db: true }) },
+        { id: "d2", type: "decision", lane: 1, row: 12, text: "Masih ada tanggal?" },
+        { id: "c4", ...A(3, 13, "Hitung forecast tersimpan; hapus raster > 365 hari", { db: true }) },
+        { id: "b4", ...A(0, 14, "Lepas lock") },
+        { id: "e", type: "end", lane: 0, row: 15 },
+      ],
+      edges: [{ f: "s", t: "a1" }, { f: "a1", t: "d0" }, { f: "d0", t: "z1", label: "tidak" }, { f: "z1", t: "e", loop: "r", loopX: 3.97 },
+        { f: "d0", t: "b1", label: "ya", down: true }, { f: "b1", t: "p1" }, { f: "p1", t: "d1" },
+        { f: "d1", t: "b2", label: "ya", down: true }, { f: "d1", t: "w1", label: "tidak" }, { f: "w1", t: "d2", loop: "r", loopX: 3.93 },
+        { f: "b2", t: "c1" }, { f: "c1", t: "c2" }, { f: "c2", t: "p2" }, { f: "p2", t: "b3" }, { f: "b3", t: "c3" }, { f: "c3", t: "d2" },
+        { f: "d2", t: "b1", label: "ya", loop: "l", loopX: 1.04 }, { f: "d2", t: "c4", label: "tidak", down: true, tx: 3 }, { f: "c4", t: "b4" }, { f: "b4", t: "e" }] },
+
+    { cap: "Activity diagram siklus Live Sentinel-1", from: "etl/live_cycle.py, etl/live_monitor.py; PIPELINE.md §4",
+      lanes: ["Scheduler", "ETL Live", "Penyedia data (ESA CDSE)", "Basis data"], laneW: 230,
+      nodes: [
+        { id: "s", type: "start", lane: 0, row: 0 },
+        { id: "a1", ...A(0, 1, "Pukul 01/07/13/19 WIB: picu siklus Live") },
+        { id: "b1", ...A(1, 2, "Cari scene S1 baru di jendela 365 hari") },
+        { id: "p1", ...A(2, 3, "Kembalikan daftar produk GRD IW") },
+        { id: "d1", type: "decision", lane: 1, row: 4, text: "Ada scene baru?" },
+        { id: "b2", ...A(1, 5, "Unduh + kalibrasi, Lee, COG; MODIS/GPM di-hardlink dari dataset utama") },
+        { id: "d2", type: "decision", lane: 1, row: 6, text: "Cakupan AOI ≥ 90%?" },
+        { id: "c0", ...A(3, 7, "Tandai INCOMPLETE, hapus berkas", { db: true }) },
+        { id: "b3", ...A(1, 7, "Metrik, 8 preview, peta perubahan air, kalimat kondisi") },
+        { id: "c1", ...A(3, 8, "live_scenes, live_scene_metrics, region_observations (VV, VH, WATER_PCT)", { db: true }) },
+        { id: "c2", ...A(3, 9, "Hitung forecast; catat live_events", { db: true }) },
+        { id: "e", type: "end", lane: 0, row: 10 },
+      ],
+      edges: [{ f: "s", t: "a1" }, { f: "a1", t: "b1" }, { f: "b1", t: "p1" }, { f: "p1", t: "d1" },
+        { f: "d1", t: "e", label: "tidak", loop: "l", loopX: 1.03 }, { f: "d1", t: "b2", label: "ya", down: true }, { f: "b2", t: "d2" },
+        { f: "d2", t: "c0", label: "tidak" }, { f: "c0", t: "e", loop: "r", loopX: 3.97 },
+        { f: "d2", t: "b3", label: "ya", down: true }, { f: "b3", t: "c1" }, { f: "c1", t: "c2" }, { f: "c2", t: "e" }] },
+
+    { cap: "Activity diagram backfill oleh Data Engineer", from: "api/routes/data.py; etl/backfill_runs.py",
+      lanes: ["Data Engineer", "Sistem (API)", "ETL (monitor_etl)", "Basis data"], laneW: 230,
+      nodes: [
+        { id: "s", type: "start", lane: 0, row: 0 },
+        { id: "a1", ...A(0, 1, "Membuka Data › satelit, mengisi rentang tanggal") },
+        { id: "d1", type: "decision", lane: 1, row: 2, text: "Rentang ≤ 366 hari dan tidak ada backfill lain?" },
+        { id: "b1", ...A(1, 3, "Tolak: INVALID_DATE_RANGE / BACKFILL_RUNNING / OUTSIDE_RASTER_WINDOW"), },
+        { id: "f", type: "fork", lane: 1, row: 4, span: 2 },
+        { id: "c1", ...A(2, 5, "Job Hidromet (GPM/MODIS) atau siklus Live (S1) per tanggal") },
+        { id: "c2", ...A(3, 6, "dataset_jobs, region_observations, live_scenes", { db: true }) },
+        { id: "a2", ...A(0, 5, "Melihat progres dan log (poll tiap 2 detik)") },
+        { id: "j", type: "join", lane: 0, row: 7, span: 3 },
+        { id: "a3", ...A(0, 8, "Melihat riwayat per tanggal") },
+        { id: "e", type: "end", lane: 0, row: 9 },
+      ],
+      edges: [{ f: "s", t: "a1" }, { f: "a1", t: "d1" }, { f: "d1", t: "b1", label: "tidak", down: true }, { f: "b1", t: "a1", loop: "l", loopX: 1.03 },
+        { f: "d1", t: "f", label: "ya", loop: "r", loopX: 1.97 }, { f: "f", t: "c1", tx: 2 }, { f: "f", t: "a2", tx: 0 }, { f: "c1", t: "c2" },
+        { f: "c2", t: "j" }, { f: "a2", t: "j" }, { f: "j", t: "a3", tx: 0 }, { f: "a3", t: "e" }] },
+
+    { cap: "Activity diagram acknowledge peringatan hujan", from: "api/routes/alerts.py acknowledge",
+      lanes: ["Analis", "Sistem (API)", "Basis data"],
+      nodes: [
+        { id: "s", type: "start", lane: 0, row: 0 },
+        { id: "a1", ...A(0, 1, "Membuka daftar peringatan aktif") },
+        { id: "c0", ...A(2, 2, "Baca v_alert_aktif", { db: true }) },
+        { id: "a2", ...A(0, 3, "Memilih peringatan, mengisi catatan") },
+        { id: "c1", ...A(2, 4, "SELECT … FOR UPDATE alert_events", { db: true }) },
+        { id: "d1", type: "decision", lane: 1, row: 5, text: "Sudah di-acknowledge?" },
+        { id: "b1", ...A(1, 6, "Tolak ALERT_ALREADY_ACKED") },
+        { id: "c2", ...A(2, 6, "UPDATE kolom ack (GRANT kolom); trigger audit_row", { db: true }) },
+        { id: "a3", ...A(0, 7, "Peringatan hilang dari daftar aktif") },
+        { id: "e", type: "end", lane: 0, row: 8 },
+      ],
+      edges: [{ f: "s", t: "a1" }, { f: "a1", t: "c0" }, { f: "c0", t: "a2" }, { f: "a2", t: "c1" }, { f: "c1", t: "d1" },
+        { f: "d1", t: "b1", label: "ya", down: true }, { f: "b1", t: "a3" }, { f: "d1", t: "c2", label: "tidak" }, { f: "c2", t: "a3" }, { f: "a3", t: "e" }] },
+
+    { cap: "Activity diagram mengelola kejadian bencana", from: "api/routes/disasters.py; etl/disasters.py",
+      lanes: ["Analis", "Sistem (API)", "Basis data"],
+      nodes: [
+        { id: "s", type: "start", lane: 0, row: 0 },
+        { id: "a1", ...A(0, 1, "Membuka Kejadian › Kelola") },
+        { id: "d0", type: "decision", lane: 0, row: 2, text: "Aksi?" },
+        { id: "a2", ...A(0, 3, "Mengisi jenis, kecamatan, tanggal, keterangan, sumber") },
+        { id: "d1", type: "decision", lane: 1, row: 4, text: "Data valid?" },
+        { id: "b1", ...A(1, 5, "Dialog galat INVALID_DISASTER / NOT_KECAMATAN"), dx: 0 },
+        { id: "c1", ...A(2, 5, "INSERT / UPDATE disaster_events", { db: true }) },
+        { id: "c3", ...A(2, 3, "UPDATE deleted_at (soft delete)", { db: true }) },
+        { id: "m", type: "merge", lane: 2, row: 6 },
+        { id: "c2", ...A(2, 7, "Trigger audit_row → audit_log", { db: true }) },
+        { id: "a3", ...A(0, 8, "Daftar kejadian diperbarui") },
+        { id: "e", type: "end", lane: 0, row: 9 },
+      ],
+      edges: [{ f: "s", t: "a1" }, { f: "a1", t: "d0" }, { f: "d0", t: "a2", label: "tambah / ubah", down: true }, { f: "d0", t: "c3", label: "hapus" },
+        { f: "a2", t: "d1" }, { f: "d1", t: "b1", label: "tidak", down: true }, { f: "b1", t: "a2", loop: "l", loopX: 1.03 },
+        { f: "d1", t: "c1", label: "ya" }, { f: "c1", t: "m" }, { f: "c3", t: "m", loop: "r", loopX: 2.97 }, { f: "m", t: "c2" }, { f: "c2", t: "a3" }, { f: "a3", t: "e" }] },
+
+    { cap: "Activity diagram melihat citra dan mengunduh laporan PDF", from: "api/routes/citra.py",
+      lanes: ["Pengguna", "Sistem (API)", "Basis data"],
+      nodes: [
+        { id: "s", type: "start", lane: 0, row: 0 },
+        { id: "a1", ...A(0, 1, "Membuka Citra Satelit dan memilih satelit") },
+        { id: "c1", ...A(2, 2, "SET LOCAL ROLE peran; baca v_citra_scenes (batas waktu per peran)", { db: true }) },
+        { id: "a2", ...A(0, 3, "Memilih tanggal (opsional: tanggal pembanding)") },
+        { id: "c2", ...A(2, 4, "Baca v_citra_metrics", { db: true }) },
+        { id: "b1", ...A(1, 5, "Tampilkan gambar, kalimat kondisi, tabel metrik") },
+        { id: "d1", type: "decision", lane: 0, row: 6, text: "Unduh PDF?" },
+        { id: "a3", ...A(0, 7, "Mencentang halaman: Ringkasan / S1 / MODIS / GPM") },
+        { id: "b2", ...A(1, 8, "Bangun PDF (reportlab)") },
+        { id: "c3", ...A(2, 9, "Catat DOWNLOAD_REPORT di user_activity_logs", { db: true }) },
+        { id: "e", type: "end", lane: 0, row: 10 },
+      ],
+      edges: [{ f: "s", t: "a1" }, { f: "a1", t: "c1" }, { f: "c1", t: "a2" }, { f: "a2", t: "c2" }, { f: "c2", t: "b1" }, { f: "b1", t: "d1" },
+        { f: "d1", t: "a3", label: "ya", down: true }, { f: "d1", t: "e", label: "tidak", loop: "l", loopX: 0.04 },
+        { f: "a3", t: "b2" }, { f: "b2", t: "c3" }, { f: "c3", t: "e" }] },
+
+    { cap: "Activity diagram membuat dataset historis", from: "etl/dataset_manager.py, etl/module5_orchestrator.py; PIPELINE.md §5",
+      lanes: ["Data Engineer", "Sistem (API)", "ETL", "Basis data"], laneW: 230,
+      nodes: [
+        { id: "s", type: "start", lane: 0, row: 0 },
+        { id: "a1", ...A(0, 1, "Wizard: pilih satelit, level, rentang ≤ 366 hari") },
+        { id: "d1", type: "decision", lane: 0, row: 2, text: "Lebih dari satu sumber?" },
+        { id: "a2", ...A(0, 3, "Pilih strategi fusion: CO_OCCURRENCE / FULL_COVERAGE / HYBRID") },
+        { id: "m", type: "merge", lane: 0, row: 4 },
+        { id: "c1", ...A(3, 5, "INSERT datasets, dataset_source_config, dataset_jobs", { db: true }) },
+        { id: "b1", ...A(2, 6, "Pakai ulang granule (hardlink) atau unduh dari arsip resmi") },
+        { id: "b2", ...A(2, 7, "Proses per tahap → COG; fusion → HDF5") },
+        { id: "c2", ...A(3, 8, "processing_jobs, data_products, data_lineage, fusion_products", { db: true }) },
+        { id: "a3", ...A(0, 9, "Mengunduh ZIP dari Dataset tersimpan") },
+        { id: "e", type: "end", lane: 0, row: 10 },
+      ],
+      edges: [{ f: "s", t: "a1" }, { f: "a1", t: "d1" }, { f: "d1", t: "a2", label: "ya", down: true }, { f: "d1", t: "m", label: "tidak", loop: "l", loopX: 0.04 },
+        { f: "a2", t: "m" }, { f: "m", t: "c1" }, { f: "c1", t: "b1" }, { f: "b1", t: "b2" }, { f: "b2", t: "c2" }, { f: "c2", t: "a3" }, { f: "a3", t: "e" }] },
+
+    { cap: "Activity diagram pembuatan laporan periodik", from: "etl/report_periodic.py; PIPELINE.md §6",
+      lanes: ["Scheduler", "ETL Laporan", "Basis data"],
+      nodes: [
+        { id: "s", type: "start", lane: 0, row: 0 },
+        { id: "a1", ...A(0, 1, "Senin 03:00 / tanggal 1 03:30 WIB: picu laporan") },
+        { id: "d1", type: "decision", lane: 1, row: 2, text: "Lock hydromet lepas dalam 60 menit?" },
+        { id: "b0", ...A(1, 3, "Tambahkan catatan: data hari terakhir belum lengkap"), },
+        { id: "m", type: "merge", lane: 1, row: 4 },
+        { id: "c1", ...A(2, 5, "Baca region_observations, alert_events, v_evaluasi_alert, v_ringkasan_kualitas", { db: true }) },
+        { id: "b1", ...A(1, 6, "Bangun PDF secara atomik (…_v2.pdf bila regenerasi)") },
+        { id: "d2", type: "decision", lane: 1, row: 7, text: "Berhasil?" },
+        { id: "c2", ...A(2, 8, "READY lama → SUPERSEDED; INSERT READY baru", { db: true }) },
+        { id: "c3", ...A(2, 7, "INSERT FAILED + pesan galat", { db: true }) },
+        { id: "e", type: "end", lane: 0, row: 9 },
+      ],
+      edges: [{ f: "s", t: "a1" }, { f: "a1", t: "d1" }, { f: "d1", t: "b0", label: "tidak", down: true }, { f: "d1", t: "m", label: "ya", loop: "r", loopX: 1.95 },
+        { f: "b0", t: "m" }, { f: "m", t: "c1" }, { f: "c1", t: "b1" }, { f: "b1", t: "d2" }, { f: "d2", t: "c3", label: "tidak" },
+        { f: "d2", t: "c2", label: "ya", down: true, tx: 2 }, { f: "c2", t: "e" }, { f: "c3", t: "e", loop: "r", loopX: 2.97 }] },
+  ];
+  const host = document.getElementById("host");
+  diagrams.forEach((d) => {
+    const fig = document.createElement("div");
+    fig.className = "fig"; fig.dataset.cap = d.cap; fig.dataset.from = d.from;
+    fig.innerHTML = '<div class="body white"></div>';
+    host.append(fig);
+    UML.activity(fig.querySelector(".body"), d);
+  });
+};
+</script>
+</main>
+</body>
+</html>

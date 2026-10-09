@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Testing</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/common.js"></script>
+<style>.chart{position:relative;height:900px;background:#fff}.sus input{width:42px;text-align:center}</style>
+</head>
+<body data-bab="5">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 11 · Testing</div>
+  <h1>Testing</h1>
+  <p class="lede" id="lede"></p>
+</header>
+
+<h2>Strategi pengujian</h2>
+<div class="fig" data-cap="Strategi pengujian terhadap lima kriteria evaluasi" data-from="SKRIPSI.txt bagian A (Testing)">
+<div class="body white"><pre class="mermaid">
+flowchart LR
+    subgraph T [Teknis — otomatis]
+        p[pytest 1.142 tes<br/>unit, API, RBAC, ETL]
+        g[grant_matrix.sql<br/>GRANT, VIEW, RLS]
+        b[benchmark<br/>Q1–Q6, E1–E3]
+        r[recovery<br/>backup/restore,<br/>kill & resume]
+    end
+    subgraph U [Pengguna — manual]
+        uat[UAT skenario per peran]
+        sus[Kuesioner SUS]
+    end
+    p --> ROB[Robustness]
+    g --> ROB
+    b --> PERF[Performance]
+    r --> REC[Recoverability]
+    p --> ADA[Adaptability]
+    uat --> LEA[Learnability]
+    sus --> LEA
+    uat --> ADA
+</pre></div>
+</div>
+
+<div class="fig" data-kind="Tabel" data-cap="Lima kriteria evaluasi, bukti pengujian, dan status">
+<div class="body"><table class="t">
+<tr><th>Kriteria</th><th>Yang diuji</th><th>Bukti di project</th><th>Status</th></tr>
+<tr><td><b>Learnability</b></td><td>Pengguna baru bisa menyelesaikan tugas per peran tanpa bantuan</td><td>Skenario UAT dan kuesioner SUS (templat di bawah); UI berbahasa Indonesia, satu baris instruksi per halaman, pesan galat diterjemahkan</td><td><span class="pill warn">diisi penulis</span></td></tr>
+<tr><td><b>Performance</b></td><td>Waktu kueri inti, skalabilitas, konkurensi, kecepatan tulis</td><td><code>benchmark/results/*.csv</code>: Q1–Q5 &lt; 2 ms di PostgreSQL; Q6 0,65 s pada 2,3 juta baris; 8.523 kueri/detik pada 8 klien</td><td><span class="pill ok">lulus</span></td></tr>
+<tr><td><b>Robustness</b></td><td>Toleransi terhadap input salah, peran salah, unduhan terputus, galat penyedia</td><td><code>test_rbac_api</code> (setiap endpoint × peran), <code>grant_matrix.sql</code>, <code>test_download_resilience</code>, <code>test_backfill_circuit_breaker</code>, CHECK/trigger di DB</td><td><span class="pill ok">lulus</span></td></tr>
+<tr><td><b>Recoverability</b></td><td>Pemulihan setelah proses mati dan dari backup</td><td><code>tests/recovery/backup_restore.sh</code>, <code>kill_and_resume.sh</code>, <code>recovery_backfill.py</code>; penulisan idempoten (upsert)</td><td><span class="pill warn">skrip ada, hasil belum dicatat</span></td></tr>
+<tr><td><b>Adaptability</b></td><td>Perubahan kebutuhan tanpa mengubah kode</td><td>Tambah jenis bencana, aturan peringatan, ambang mutu, kecamatan AOI, pengaturan lewat data (<code>disaster_types</code>, <code>alert_rules</code>, <code>quality_thresholds</code>, <code>app_settings</code>); band baru = baris baru</td><td><span class="pill ok">dapat ditunjukkan</span></td></tr>
+</table></div>
+</div>
+
+<h2>Hasil pengujian otomatis (pytest)</h2>
+<div class="fig" data-kind="Tabel" data-cap="Ringkasan hasil pytest" data-from="DOCS/hasil_uji/pytest.xml">
+<div class="body"><table class="t" id="sum"></table></div>
+</div>
+<div class="fig" data-cap="Jumlah kasus uji per berkas tes" data-from="DOCS/hasil_uji/pytest.xml">
+<div class="body"><div class="chart"><canvas id="cP"></canvas></div></div>
+</div>
+<div class="fig" data-kind="Tabel" data-cap="Hasil pytest per berkas dan kriteria yang didukung">
+<div class="body"><table class="t" id="files"></table></div>
+</div>
+
+<h2>Uji black-box fungsional</h2>
+<div class="fig" data-kind="Tabel" data-cap="Skenario uji black-box dan hasil" data-from="tests/test_rbac_api.py, test_auth.py, test_citra_api.py, test_data_api.py, test_alert_engine.py, grant_matrix.sql">
+<div class="body"><table class="t">
+<tr><th>No</th><th>Skenario</th><th>Masukan</th><th>Hasil yang diharapkan</th><th>Bukti uji</th><th class=c>Hasil</th></tr>
+<tr><td>1</td><td>Login dengan sandi benar</td><td>username + sandi valid</td><td>200, cookie sesi, menu sesuai peran</td><td><code>test_auth</code></td><td class="c y">Lulus</td></tr>
+<tr><td>2</td><td>Login dengan sandi salah 5 kali</td><td>sandi salah ×5</td><td>Akun terkunci 15 menit (423 ACCOUNT_LOCKED)</td><td><code>test_auth</code></td><td class="c y">Lulus</td></tr>
+<tr><td>3</td><td>Registrasi dengan nama pengguna terpakai</td><td>username yang sudah ada</td><td>409 USERNAME_TAKEN</td><td><code>test_auth</code></td><td class="c y">Lulus</td></tr>
+<tr><td>4</td><td>Registrasi tidak bisa memilih peran</td><td>payload berisi role ADMIN</td><td>Akun tetap USER</td><td><code>test_auth</code>, <code>grant_matrix.sql</code></td><td class="c y">Lulus</td></tr>
+<tr><td>5</td><td>Pengunjung membuka citra lebih dari 30 hari</td><td>tanggal &gt; 30 hari</td><td>Tanggal tidak terlihat (VIEW)</td><td><code>test_citra_api</code></td><td class="c y">Lulus</td></tr>
+<tr><td>6</td><td>Relawan membuka halaman Data</td><td>GET /api/data/summary</td><td>403 ROLE_FORBIDDEN</td><td><code>test_rbac_api</code></td><td class="c y">Lulus</td></tr>
+<tr><td>7</td><td>Pemeriksaan peran API dimatikan</td><td>kueri DELETE sebagai monitor_user</td><td>Ditolak basis data (DB_PERMISSION_DENIED)</td><td><code>test_rbac_api</code> lapis 3</td><td class="c y">Lulus</td></tr>
+<tr><td>8</td><td>Acknowledge alert dua kali</td><td>POST acknowledge ×2</td><td>409 ALERT_ALREADY_ACKED</td><td><code>test_monitor_api</code></td><td class="c y">Lulus</td></tr>
+<tr><td>9</td><td>Hujan melewati ambang 100 mm</td><td>RAIN_24H = 148 mm</td><td>alert WARNING tercatat sekali per aturan × kecamatan × hari</td><td><code>test_alert_engine</code></td><td class="c y">Lulus</td></tr>
+<tr><td>10</td><td>Nilai observasi di luar batas fisik</td><td>RAIN_24H negatif</td><td>Ditolak trigger <code>trg_obs_range</code></td><td>Uji manual (psql)</td><td class="c hl">[diisi penulis]</td></tr>
+<tr><td>11</td><td>Backfill rentang &gt; 366 hari</td><td>date_from–date_to 400 hari</td><td>400 INVALID_DATE_RANGE</td><td><code>test_data_api</code></td><td class="c y">Lulus</td></tr>
+<tr><td>12</td><td>Nonaktifkan scene tanpa alasan</td><td>is_valid=false, reason kosong</td><td>400 REASON_REQUIRED</td><td><code>test_data_api</code></td><td class="c y">Lulus</td></tr>
+<tr><td>13</td><td>Token API dicabut</td><td>Bearer token revoked</td><td>401 TOKEN_REVOKED</td><td><code>test_rbac_api</code></td><td class="c y">Lulus</td></tr>
+<tr><td>14</td><td>Perubahan data tercatat audit</td><td>UPDATE disaster_events</td><td>Baris audit_log dengan data lama/baru, hash disensor</td><td><code>test_audit</code></td><td class="c y">Lulus</td></tr>
+<tr><td>15</td><td>Setiap tabel dan kolom punya COMMENT</td><td>katalog skema</td><td>Tidak ada objek tanpa komentar</td><td><code>test_schema_comments</code></td><td class="c y">Lulus</td></tr>
+</table></div>
+</div>
+<p class="src">Hasil "Lulus" merujuk pada run pytest yang tercatat di <code>DOCS/hasil_uji/pytest.xml</code> (0 gagal). Cocokkan nama tes persisnya di berkas tersebut sebelum dikutip di naskah.</p>
+
+<h2>Uji recoverability</h2>
+<div class="fig" data-kind="Tabel" data-cap="Skenario uji recoverability" data-from="tests/recovery/; PIPELINE.md §8, §13">
+<div class="body"><table class="t">
+<tr><th>Skenario</th><th>Langkah</th><th>Hasil yang diharapkan</th><th>Skrip</th><th>Hasil</th></tr>
+<tr><td>Backup dan restore</td><td>pg_dump → buat DB baru → pg_restore → bandingkan db_manifest</td><td>Jumlah objek dan baris identik</td><td><code>backup_restore.sh</code></td><td class="hl">[diisi penulis]</td></tr>
+<tr><td>Proses mati saat backfill</td><td>Jalankan backfill → kill proses → jalankan ulang</td><td>Tanggal COMPLETED dilewati, tanggal terputus diulang, tanpa duplikat</td><td><code>kill_and_resume.sh</code>, <code>recovery_backfill.py</code></td><td class="hl">[diisi penulis]</td></tr>
+<tr><td>Dua worker berjalan bersamaan</td><td>Picu Job Hidromet dari dua proses</td><td>Satu berjalan, satu SKIPPED_LOCKED</td><td><code>test_monitor_api</code></td><td class="y">Lulus (pytest)</td></tr>
+<tr><td>Unduhan macet</td><td>Laju di bawah ambang selama 90 detik</td><td>Percobaan dibatalkan, retry dan resume Range</td><td><code>test_download_resilience</code></td><td class="y">Lulus (pytest)</td></tr>
+<tr><td>Penyedia gagal beruntun</td><td>5 hari FAILED berurutan</td><td>Backfill berhenti dengan kode keluar 4</td><td><code>test_backfill_circuit_breaker</code></td><td class="y">Lulus (pytest)</td></tr>
+</table></div>
+</div>
+
+<h2>Uji adaptability</h2>
+<div class="fig" data-kind="Tabel" data-cap="Skenario uji adaptability (perubahan tanpa mengubah kode)">
+<div class="body"><table class="t">
+<tr><th>Perubahan kebutuhan</th><th>Cara di sistem</th><th>Tabel</th><th>Hasil</th></tr>
+<tr><td>Jenis bencana baru (mis. Angin kencang)</td><td>Administrator menambah jenis di Pengaturan</td><td><code>disaster_types</code></td><td class="hl">[diisi penulis: screenshot]</td></tr>
+<tr><td>Ambang longsor dari literatur tersedia</td><td>Isi <code>threshold_value</code> lalu aktifkan aturan</td><td><code>alert_rules</code></td><td class="hl">[diisi penulis]</td></tr>
+<tr><td>Cakupan GMLS bertambah satu kecamatan</td><td>Tandai <code>in_aoi</code></td><td><code>administrative_regions</code></td><td class="hl">[diisi penulis]</td></tr>
+<tr><td>Ambang mutu diperketat</td><td>Ubah warn/fail di Pengaturan</td><td><code>quality_thresholds</code></td><td class="hl">[diisi penulis]</td></tr>
+<tr><td>Variabel satelit baru</td><td>Tambah baris band; tidak ada kolom baru</td><td><code>spectral_bands</code>, <code>region_observations</code></td><td>Dibuktikan oleh desain 1NF (halaman 6)</td></tr>
+</table></div>
+</div>
+
+<h2>User acceptance test (UAT)</h2>
+<div class="fig" data-kind="Tabel" data-cap="Templat skenario UAT per peran">
+<div class="body"><table class="t">
+<tr><th>No</th><th>Peran</th><th>Tugas</th><th>Kriteria berhasil</th><th class=c>Berhasil (Y/T)</th><th class=c>Waktu (detik)</th><th>Catatan</th></tr>
+<tr><td>1</td><td>Pengunjung</td><td>Mencari kondisi citra Sentinel-1 terbaru dan mengunduh PDF</td><td>PDF terunduh</td><td></td><td></td><td></td></tr>
+<tr><td>2</td><td>Pengunjung</td><td>Mendaftar akun Relawan</td><td>Masuk sebagai Relawan</td><td></td><td></td><td></td></tr>
+<tr><td>3</td><td>Relawan</td><td>Mengetahui hujan 24 jam di Bayah hari ini dan peringatan aktif</td><td>Menyebut angka dan kategori BMKG</td><td></td><td></td><td></td></tr>
+<tr><td>4</td><td>Relawan</td><td>Membuat token API</td><td>Token tampil sekali dan tersalin</td><td></td><td></td><td></td></tr>
+<tr><td>5</td><td>Analis</td><td>Acknowledge satu peringatan dengan catatan</td><td>Peringatan hilang dari daftar aktif</td><td></td><td></td><td></td></tr>
+<tr><td>6</td><td>Analis</td><td>Mencatat kejadian banjir baru</td><td>Kejadian muncul di daftar</td><td></td><td></td><td></td></tr>
+<tr><td>7</td><td>Analis</td><td>Mengunduh PDF analisa daerah dua kecamatan</td><td>PDF terunduh</td><td></td><td></td><td></td></tr>
+<tr><td>8</td><td>Data Engineer</td><td>Menjalankan backfill GPM 7 hari</td><td>Riwayat per tanggal COMPLETED</td><td></td><td></td><td></td></tr>
+<tr><td>9</td><td>Data Engineer</td><td>Menonaktifkan satu granule dengan alasan</td><td>Granule berstatus nonaktif</td><td></td><td></td><td></td></tr>
+<tr><td>10</td><td>Administrator</td><td>Membuat akun Analis baru</td><td>Akun bisa login</td><td></td><td></td><td></td></tr>
+</table></div>
+</div>
+
+<h2>System Usability Scale (SUS)</h2>
+<p>Isi jawaban responden (1 = sangat tidak setuju, 5 = sangat setuju). Skor dihitung otomatis:
+butir ganjil (skor − 1), butir genap (5 − skor), jumlah × 2,5. Angka hanya tersimpan di halaman ini selama tab terbuka.</p>
+<div class="fig" data-kind="Tabel" data-cap="Kuesioner dan perhitungan skor SUS">
+<div class="body sus"><table class="t" id="sus"></table>
+<p><button id="addR">Tambah responden</button></p></div>
+</div>
+<div class="fig" data-kind="Tabel" data-cap="Interpretasi skor SUS">
+<div class="body"><table class="t">
+<tr><th>Rentang skor</th><th>Grade</th><th>Adjective rating</th><th>Acceptability</th></tr>
+<tr><td>&gt; 80,3</td><td>A</td><td>Excellent</td><td>Acceptable</td></tr>
+<tr><td>68 – 80,3</td><td>B</td><td>Good</td><td>Acceptable</td></tr>
+<tr><td>68</td><td>C</td><td>OK</td><td>Marginal</td></tr>
+<tr><td>51 – 68</td><td>D</td><td>Poor</td><td>Marginal</td></tr>
+<tr><td>&lt; 51</td><td>F</td><td>Awful</td><td>Not acceptable</td></tr>
+</table></div>
+</div>
+
+<script>
+window.pageInit = function () {
+  const D = window.SKRIPSI_DATA, P = D.pytest, fmt = Skripsi.fmt;
+  document.getElementById("lede").innerHTML = `Hasil uji otomatis dibaca dari <code>DOCS/hasil_uji/pytest.xml</code> (${P.timestamp ? P.timestamp.slice(0, 10) : "—"}):
+    <b>${fmt(P.tests - P.failures - P.errors - P.skipped)} lulus</b>, ${P.failures + P.errors} gagal, ${P.skipped} dilewati dari ${fmt(P.tests)} kasus uji.`;
+  document.getElementById("sum").innerHTML = `<tr><th>Total kasus</th><th>Lulus</th><th>Gagal</th><th>Error</th><th>Dilewati</th><th>Waktu</th><th>Berkas tes</th></tr>
+    <tr><td class=r>${fmt(P.tests)}</td><td class=r>${fmt(P.tests - P.failures - P.errors - P.skipped)}</td><td class=r>${P.failures}</td><td class=r>${P.errors}</td><td class=r>${P.skipped}</td><td class=r>${fmt(P.time, 1)} s</td><td class=r>${P.files.length}</td></tr>`;
+  const crit = (f) => /rbac|auth|grant|security|audit|credential|database|schema/.test(f) ? "Robustness (keamanan & integritas)"
+    : /resilien|circuit|concurren|job_run|recover|regression|try8|multicore/.test(f) ? "Robustness / Recoverability"
+    : /config|source|strateg|dataset|excel/.test(f) ? "Adaptability" : /web_ui|openapi/.test(f) ? "Learnability (antarmuka)" : "Fungsional";
+  document.getElementById("files").innerHTML = "<tr><th class=c>No</th><th>Berkas</th><th class=c>Kasus</th><th class=c>Gagal</th><th class=c>Dilewati</th><th>Kriteria utama</th></tr>" +
+    P.files.map((f, i) => `<tr><td class=c>${i + 1}</td><td><code>${f.file}</code></td><td class=r>${f.n}</td><td class=r>${f.fail}</td><td class=r>${f.skip}</td><td>${crit(f.file)}</td></tr>`).join("");
+  Chart.register({ id: "bgPutih", beforeDraw(c) { const x = c.ctx; x.save(); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.restore(); } });
+  new Chart(document.getElementById("cP"), {
+    type: "bar",
+    data: { labels: P.files.map((f) => f.file), datasets: [{ label: "kasus uji lulus", data: P.files.map((f) => f.n - f.fail - f.skip), backgroundColor: "#1f6f8b" }, { label: "dilewati", data: P.files.map((f) => f.skip), backgroundColor: "#d9822b" }] },
+    options: { indexAxis: "y", maintainAspectRatio: false, animation: false, scales: { x: { stacked: true }, y: { stacked: true, ticks: { font: { size: 10 } } } } },
+  });
+
+  const Q = ["Saya rasa saya akan sering menggunakan sistem ini.", "Saya merasa sistem ini terlalu rumit.", "Saya merasa sistem ini mudah digunakan.",
+    "Saya rasa saya butuh bantuan teknisi untuk bisa menggunakan sistem ini.", "Saya merasa fungsi-fungsi sistem ini terintegrasi dengan baik.",
+    "Saya merasa ada terlalu banyak ketidakkonsistenan dalam sistem ini.", "Saya rasa kebanyakan orang akan cepat belajar menggunakan sistem ini.",
+    "Saya merasa sistem ini sangat merepotkan untuk digunakan.", "Saya merasa sangat percaya diri menggunakan sistem ini.",
+    "Saya perlu mempelajari banyak hal sebelum bisa menggunakan sistem ini."];
+  let n = 5;
+  const tbl = document.getElementById("sus");
+  function draw() {
+    const old = [...tbl.querySelectorAll("input")].reduce((m, i) => ((m[i.dataset.k] = i.value), m), {});
+    tbl.innerHTML = "<tr><th class=c>No</th><th>Pernyataan</th>" + Array.from({ length: n }, (_, r) => `<th class=c>R${r + 1}</th>`).join("") + "</tr>" +
+      Q.map((q, i) => `<tr><td class=c>${i + 1}</td><td>${q}</td>` + Array.from({ length: n }, (_, r) => `<td class=c><input data-k="${i}-${r}" type="number" min="1" max="5" value="${old[i + "-" + r] || ""}"></td>`).join("") + "</tr>").join("") +
+      `<tr class=sub><td></td><td>Skor SUS responden</td>` + Array.from({ length: n }, (_, r) => `<td class=c id="s${r}">—</td>`).join("") + "</tr>" +
+      `<tr class=sub><td></td><td>Rata-rata skor SUS</td><td colspan=${n} class=c id="avg">—</td></tr>`;
+    tbl.querySelectorAll("input").forEach((i) => (i.oninput = calc));
+    calc();
+  }
+  function calc() {
+    const scores = [];
+    for (let r = 0; r < n; r++) {
+      let s = 0, ok = true;
+      for (let i = 0; i < 10; i++) {
+        const v = +tbl.querySelector(`input[data-k="${i}-${r}"]`).value;
+        if (!(v >= 1 && v <= 5)) { ok = false; break; }
+        s += i % 2 === 0 ? v - 1 : 5 - v;
+      }
+      document.getElementById("s" + r).textContent = ok ? fmt(s * 2.5, 1) : "—";
+      if (ok) scores.push(s * 2.5);
+    }
+    const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+    const grade = avg === null ? "" : avg > 80.3 ? "A · Excellent" : avg >= 68 ? "B · Good" : avg >= 51 ? "D · Poor / Marginal" : "F · Not acceptable";
+    document.getElementById("avg").textContent = avg === null ? "—" : `${fmt(avg, 1)} (${grade}, ${scores.length} responden)`;
+  }
+  document.getElementById("addR").onclick = () => { n++; draw(); };
+  draw();
+};
+</script>
+</main>
+</body>
+</html>

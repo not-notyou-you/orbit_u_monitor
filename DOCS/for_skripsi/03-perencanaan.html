@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Perencanaan Basis Data</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 1–3 · Database planning, system definition, requirement collection</div>
+  <h1>Perencanaan dan definisi sistem</h1>
+  <p class="lede">Sumber: DATABASE.md §2.1–2.4 dan README §3. Mission objectives diturunkan dari rumusan masalah RM1–RM4.</p>
+</header>
+
+<h2>Mission statement</h2>
+<div class="fig" data-cap="Mission statement basis data Orbit-U: The Monitor" data-from="DATABASE.md §2.1">
+<div class="body white">
+<svg width="900" height="170" viewBox="0 0 900 170" font-family="Arial, sans-serif">
+  <rect x="2" y="2" width="896" height="166" rx="10" fill="#fff" stroke="#1d1f22" stroke-width="1.5"/>
+  <rect x="2" y="2" width="896" height="34" rx="10" fill="#eef2f5" stroke="#1d1f22" stroke-width="1.5"/>
+  <text x="450" y="24" text-anchor="middle" font-weight="bold" font-size="14">MISSION STATEMENT</text>
+  <text font-size="13.5" fill="#1d1f22">
+    <tspan x="24" y="62">Basis data Orbit-U: The Monitor menyimpan data pengamatan tiga satelit (Sentinel-1, MODIS, GPM) dalam bentuk</tspan>
+    <tspan x="24" y="84">yang terstruktur per kecamatan, lengkap dengan asal-usul dan mutunya. Basis data ini juga mencatat peringatan</tspan>
+    <tspan x="24" y="106">hujan dan kejadian bencana, supaya Gugus Mitigasi Lebak Selatan (GMLS) dapat memantau kondisi hidrometeorologi</tspan>
+    <tspan x="24" y="128">wilayahnya, menilai ketepatan peringatan, dan membagikan data dengan hak akses yang jelas.</tspan>
+  </text>
+</svg>
+</div>
+</div>
+
+<h2>Mission objectives</h2>
+<div class="fig" data-kind="Tabel" data-cap="Mission objectives dan keterkaitannya dengan rumusan masalah" data-from="DATABASE.md §2.2">
+<div class="body"><table class="t">
+<tr><th>Kode</th><th>Mission objective</th><th class=c>RM</th><th>Tabel utama</th></tr>
+<tr><td>MO1</td><td>Mencatat setiap scene dan granule yang ditemukan atau diunduh dari tiga penyedia resmi</td><td class=c>RM1</td><td><code>satellite_scenes</code>, <code>nasa_scenes</code></td></tr>
+<tr><td>MO2</td><td>Menyimpan nilai harian per kecamatan per variabel sebagai satu deret waktu</td><td class=c>RM1</td><td><code>region_observations</code></td></tr>
+<tr><td>MO3</td><td>Mencatat setiap berkas keluaran beserta checksum dan transformasi asalnya</td><td class=c>RM2</td><td><code>data_products</code>, <code>data_lineage</code>, <code>processing_jobs</code></td></tr>
+<tr><td>MO4</td><td>Mengukur mutu data dan menandai data di bawah ambang</td><td class=c>RM2</td><td><code>quality_metrics</code>, <code>quality_thresholds</code>, <code>quality_alerts</code></td></tr>
+<tr><td>MO5</td><td>Membangkitkan peringatan ketika hujan melewati ambang BMKG, serta mencatat siapa yang menindaklanjuti</td><td class=c>RM1, RM3</td><td><code>alert_rules</code>, <code>alert_events</code></td></tr>
+<tr><td>MO6</td><td>Mengarsipkan kejadian bencana dan membandingkannya dengan peringatan (hit, miss, false alarm)</td><td class=c>RM3</td><td><code>disaster_events</code>, <code>v_evaluasi_alert</code></td></tr>
+<tr><td>MO7</td><td>Menyajikan data kepada lima peran sesuai batas aksesnya</td><td class=c>RM3, RM4</td><td>19 VIEW, matriks GRANT</td></tr>
+<tr><td>MO8</td><td>Mencatat siapa mengubah apa dan siapa mengunduh apa</td><td class=c>RM4</td><td><code>audit_log</code>, <code>user_activity_logs</code></td></tr>
+</table></div>
+</div>
+
+<h2>System definition: batas sistem</h2>
+<div class="fig" data-cap="Batas sistem (system boundary) Orbit-U: The Monitor" data-from="DATABASE.md §2.3, README §2 dan §4">
+<div class="body white"><pre class="mermaid">
+flowchart LR
+    subgraph EXT1 [Penyedia data — di luar sistem, hanya dibaca]
+        direction TB
+        cdse[ESA Copernicus CDSE<br/>Sentinel-1 GRD]
+        lance[NASA LANCE / LAADS<br/>MODIS]
+        ges[NASA GES DISC<br/>GPM IMERG]
+        cod[BPS / OCHA COD-AB<br/>batas kecamatan]
+    end
+    subgraph SYS [Batas sistem: Orbit-U: The Monitor]
+        direction TB
+        etl[ETL & scheduler]
+        db[(Basis data PostgreSQL/PostGIS<br/>metadata scene, observasi per kecamatan,<br/>lineage, mutu, peringatan, kejadian,<br/>laporan, akun, log, audit)]
+        api[REST API FastAPI]
+        web[Aplikasi web]
+        etl --> db
+        db <--> api
+        api <--> web
+    end
+    fs[(Filesystem data/<br/>raster COG, HDF5, PNG, PDF<br/>— hanya path & checksum di DB)]
+    sig[SIGAP DESA<br/>data warga, KK, NIK, titik evakuasi,<br/>KRB — tidak diambil alih]
+    users([Pengunjung, Relawan, Analis,<br/>Data Engineer, Administrator])
+    dev([Skrip / sistem lain<br/>lewat token API])
+    EXT1 --> etl
+    etl --> fs
+    api --> fs
+    users <--> web
+    dev <--> api
+    sig -.-|tidak terhubung| SYS
+</pre></div>
+</div>
+
+<h2>User views</h2>
+<div class="fig" data-kind="Tabel" data-cap="User views per peran" data-from="DATABASE.md §2.3; INTERFACE.md §3.1">
+<div class="body"><table class="t">
+<tr><th>Peran</th><th>Label UI</th><th>Cara mendapat akun</th><th>Data yang dilihat</th><th>Data yang ditulis</th></tr>
+<tr><td><code>PUBLIC</code></td><td>Pengunjung</td><td>Tanpa akun</td><td>Scene 30 hari, kejadian 365 hari, master rujukan</td><td>Log login gagal, registrasi akun USER</td></tr>
+<tr><td><code>USER</code></td><td>Relawan</td><td>Registrasi mandiri</td><td>+ scene 365 hari, hujan per kecamatan, alert aktif, seluruh riwayat kejadian, 3D AOI</td><td>Token API milik sendiri, sandi sendiri</td></tr>
+<tr><td><code>ANALYST</code></td><td>Analis</td><td>Dibuat Administrator</td><td>+ semua scene, forecast, evaluasi alert, Laporan Keadaan AOI</td><td>Kejadian, acknowledge alert</td></tr>
+<tr><td><code>DATA_ENGINEER</code></td><td>Data Engineer</td><td>Dibuat Administrator</td><td>+ semua scene, dataset, lineage, mutu, EDA, Laporan Kesehatan Data</td><td>Dataset, backfill, nonaktifkan/pulihkan scene</td></tr>
+<tr><td><code>ADMIN</code></td><td>Administrator</td><td>Dibuat Administrator</td><td>Semua</td><td>Akun, aturan alert, ambang mutu, wilayah AOI, pengaturan, Live Area</td></tr>
+</table></div>
+</div>
+
+<div class="fig" data-kind="Tabel" data-cap="Matriks user view terhadap kelompok data (L = lihat, T = tulis)">
+<div class="body"><table class="t" id="uvm"></table></div>
+</div>
+
+<h2>Requirement collection and analysis</h2>
+<div class="fig" data-kind="Tabel" data-cap="Teknik pencarian fakta dan hasilnya pada rancangan" data-from="DATABASE.md §2.4">
+<div class="body"><table class="t">
+<tr><th>Teknik</th><th>Sumber</th><th>Hasil yang masuk ke rancangan</th></tr>
+<tr><td>Pemeriksaan dokumen</td><td>Ambang hujan BMKG; batas wilayah COD-AB (BPS/OCHA); spesifikasi produk ESA dan NASA</td><td><code>alert_rules</code> (50/100/150 mm), <code>administrative_regions</code>, <code>spectral_bands.valid_min/max</code></td></tr>
+<tr><td>Penelitian (studi pustaka & sistem sejenis)</td><td>Kode dan skema Orbit-U: The DataLab</td><td>Tabel warisan: scene, dataset, job, lineage, mutu, fusion, Live</td></tr>
+<tr><td>Observasi</td><td class="hl">[diisi penulis: tanggal, lokasi, yang diamati]</td><td class="hl">[diisi penulis]</td></tr>
+<tr><td>Wawancara</td><td class="hl">[diisi penulis: tanggal, narasumber GMLS, jabatan]</td><td class="hl">[diisi penulis: mis. daftar kecamatan AOI, peran pengguna, kebutuhan laporan]</td></tr>
+</table></div>
+</div>
+
+<div class="fig" data-kind="Tabel" data-cap="Kebutuhan data per peran hasil analisis">
+<div class="body"><table class="t">
+<tr><th>Kebutuhan</th><th>Peran</th><th>Dipenuhi oleh</th></tr>
+<tr><td>Melihat kondisi citra terkini tanpa akun</td><td>PUBLIC</td><td><code>v_citra_scenes</code> (30 hari), <code>v_public_live_latest</code></td></tr>
+<tr><td>Mengetahui hujan per kecamatan hari ini dan peringatan aktif</td><td>USER</td><td><code>v_statistik_hari_ini</code>, <code>v_alert_aktif</code></td></tr>
+<tr><td>Menindaklanjuti peringatan dan mencatat kejadian</td><td>ANALYST</td><td><code>alert_events</code> (kolom ack), <code>disaster_events</code></td></tr>
+<tr><td>Menilai ketepatan peringatan</td><td>ANALYST</td><td><code>v_evaluasi_alert</code>, <code>v_kejadian_dan_hujan</code></td></tr>
+<tr><td>Mengelola data satelit dan dataset historis</td><td>DATA_ENGINEER</td><td><code>datasets</code>, <code>satellite_scenes</code>, <code>nasa_scenes</code>, <code>data_lineage</code></td></tr>
+<tr><td>Memantau mutu dan kelengkapan data</td><td>DATA_ENGINEER</td><td><code>v_ringkasan_kualitas</code>, <code>v_kelengkapan_data</code></td></tr>
+<tr><td>Mengatur akun, aturan, dan wilayah</td><td>ADMIN</td><td><code>users</code>, <code>alert_rules</code>, <code>quality_thresholds</code>, <code>administrative_regions</code>, <code>app_settings</code></td></tr>
+<tr><td>Mengaudit perubahan dan unduhan</td><td>ADMIN</td><td><code>audit_log</code>, <code>v_log_login</code>, <code>v_log_unduhan</code></td></tr>
+</table></div>
+</div>
+
+<script>
+window.pageInit = function () {
+  const groups = [
+    ["Master rujukan (wilayah, band, sumber, jenis bencana)", "L", "L", "L", "L", "LT"],
+    ["Citra & scene Live", "L (30 hr)", "L (365 hr)", "L", "L", "LT"],
+    ["Observasi hujan per kecamatan", "", "L", "L", "L", "L"],
+    ["Peringatan hujan (alert)", "", "L", "LT (ack)", "L", "LT"],
+    ["Kejadian bencana", "L (365 hr)", "L", "LT", "L", "LT"],
+    ["Forecast & evaluasi alert", "", "", "L", "", "L"],
+    ["Dataset, scene, lineage, mutu", "", "", "", "LT", "LT"],
+    ["Laporan periodik", "", "", "L (Hidromet)", "L (Kesehatan Data)", "LT"],
+    ["Akun & token API", "T (registrasi)", "LT (milik sendiri)", "LT (milik sendiri)", "LT (milik sendiri)", "LT"],
+    ["Pengaturan, aturan, ambang", "", "", "", "", "LT"],
+    ["Log & audit", "", "", "L (Kejadian)", "L (Data)", "L"],
+  ];
+  document.getElementById("uvm").innerHTML = "<tr><th>Kelompok data</th><th class=c>PUBLIC</th><th class=c>USER</th><th class=c>ANALYST</th><th class=c>DATA_ENG</th><th class=c>ADMIN</th></tr>" +
+    groups.map((g) => "<tr><td>" + g[0] + "</td>" + g.slice(1).map((v) => `<td class=c>${v || "—"}</td>`).join("") + "</tr>").join("");
+};
+</script>
+</main>
+</body>
+</html>

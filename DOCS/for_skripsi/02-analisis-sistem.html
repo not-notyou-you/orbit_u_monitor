@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Analisis Sistem</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/uml.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">Bab 4 · Analisis sistem berjalan & identifikasi masalah</div>
+  <h1>Analisis sistem dan identifikasi masalah</h1>
+  <p class="lede">Bagian ini menggambarkan cara GMLS bekerja sebelum sistem dibangun (As-Is), masalah yang muncul
+  (5W1H), dan alur yang diusulkan (To-Be).</p>
+</header>
+
+<p class="note"><b>Diisi penulis:</b> alur As-Is di bawah adalah <b>draf</b> yang disusun dari README §2 (SIGAP DESA
+dipakai untuk data warga, sedangkan data hidrometeorologi belum punya tempat). Langkah persisnya, siapa pelakunya,
+dan alat yang dipakai (grup WhatsApp, situs BMKG, catatan kertas, spreadsheet) harus dikonfirmasi lewat wawancara
+atau observasi di GMLS, lalu diagram ini disesuaikan.</p>
+
+<h2>Sistem yang sedang berjalan (As-Is)</h2>
+<div class="fig" data-cap="Activity diagram sistem berjalan (As-Is) pemantauan hujan dan pencatatan kejadian di GMLS" data-from="Draf dari README §2, perlu konfirmasi GMLS">
+<div class="body white" id="asis"></div>
+</div>
+
+<h2>Identifikasi masalah</h2>
+<div class="fig" data-kind="Tabel" data-cap="Identifikasi masalah sistem berjalan dengan 5W1H">
+<div class="body"><table class="t">
+<tr><th style="width:110px">Unsur</th><th>Kondisi sistem berjalan</th><th>Kebutuhan sistem usulan</th></tr>
+<tr><td><b>What</b></td><td>Data hujan, citra satelit, dan catatan kejadian bencana tersebar dan tidak tersimpan terstruktur</td><td>Basis data monitoring hidrometeorologi dan arsip kejadian bencana</td></tr>
+<tr><td><b>Who</b></td><td>Relawan dan koordinator GMLS memantau secara manual</td><td>Relawan (USER), Analis, Data Engineer, Administrator, dan masyarakat umum (PUBLIC)</td></tr>
+<tr><td><b>When</b></td><td>Pemantauan dilakukan saat ada hujan lebat atau kabar kejadian, tidak terjadwal</td><td>Job Hidromet harian 02:00 WIB; siklus Live 01/07/13/19 WIB; laporan Senin 03:00 dan tanggal 1 03:30 WIB</td></tr>
+<tr><td><b>Where</b></td><td>Kecamatan cakupan GMLS di Lebak Selatan</td><td>10 kecamatan AOI GMLS, Kabupaten Lebak, Banten</td></tr>
+<tr><td><b>Why</b></td><td>Banjir bandang di Bayah surut dalam hitungan jam; tanpa arsip, peringatan tidak bisa dievaluasi terhadap kejadian nyata</td><td>Hujan harian sebagai indikator utama; data satu tempat, terlacak asal-usulnya, dan bisa dievaluasi (hit/miss/false alarm)</td></tr>
+<tr><td><b>How</b></td><td>Membuka sumber luar satu per satu dan meneruskan informasi lewat pesan</td><td>ETL otomatis dari API resmi ke PostgreSQL/PostGIS, agregasi per kecamatan, peringatan berbasis aturan, akses per peran</td></tr>
+</table></div>
+</div>
+
+<div class="fig" data-cap="Diagram sebab-akibat masalah pemantauan hidrometeorologi GMLS">
+<div class="body white"><pre class="mermaid">
+flowchart LR
+    subgraph D [Data]
+        d1[Data hujan tersebar<br/>di banyak sumber]
+        d2[Citra satelit tidak<br/>diolah per kecamatan]
+        d3[Asal-usul dan mutu<br/>data tidak tercatat]
+    end
+    subgraph P [Proses]
+        p1[Pemantauan manual,<br/>tidak terjadwal]
+        p2[Peringatan tidak<br/>berbasis ambang]
+        p3[Kejadian tidak diarsipkan<br/>secara terstruktur]
+    end
+    subgraph A [Akses]
+        a1[Tidak ada pembagian<br/>hak akses per peran]
+        a2[Tidak ada jejak siapa<br/>mengubah/mengunduh apa]
+    end
+    D --> M
+    P --> M
+    A --> M
+    M[["Kondisi hidrometeorologi Lebak Selatan<br/>tidak terpantau terstruktur dan<br/>peringatan tidak bisa dievaluasi"]]
+</pre></div>
+</div>
+
+<div class="fig" data-kind="Tabel" data-cap="Masalah, rumusan masalah, dan solusi yang dirancang">
+<div class="body"><table class="t">
+<tr><th>Masalah</th><th class=c>RM</th><th>Solusi di sistem</th><th>Objek basis data</th></tr>
+<tr><td>Data tiga satelit tidak terintegrasi</td><td class=c>RM1</td><td>Ingestion otomatis Sentinel-1, MODIS, GPM; nilai harian per kecamatan</td><td><code>satellite_scenes</code>, <code>nasa_scenes</code>, <code>region_observations</code></td></tr>
+<tr><td>Asal-usul dan mutu data tidak bisa ditelusuri</td><td class=c>RM2</td><td>Lineage SHA-256 dan metrik mutu per scene</td><td><code>data_products</code>, <code>data_lineage</code>, <code>quality_metrics</code></td></tr>
+<tr><td>Informasi sulit diakses relawan dan publik</td><td class=c>RM3</td><td>Dashboard web, peringatan hujan, laporan PDF, REST API</td><td>VIEW per peran, <code>alert_events</code>, <code>generated_reports</code></td></tr>
+<tr><td>Tidak ada kontrol akses dan jejak audit</td><td class=c>RM4</td><td>5 peran ↔ 5 role PostgreSQL, GRANT, RLS, trigger audit</td><td><code>roles</code>, <code>users</code>, <code>audit_log</code>, <code>user_activity_logs</code></td></tr>
+</table></div>
+</div>
+
+<h2>Sistem yang diusulkan (To-Be)</h2>
+<div class="fig" data-cap="Activity diagram sistem usulan (To-Be): dari data satelit sampai tindak lanjut peringatan" data-from="etl/hydromet_job.py, etl/alert_engine.py, api/routes/alerts.py">
+<div class="body white" id="tobe"></div>
+</div>
+
+<script>
+window.pageInit = function () {
+  UML.activity(document.getElementById("asis"), {
+    lanes: ["Relawan GMLS", "Koordinator GMLS", "Sumber luar (BMKG, media, warga)"],
+    laneW: 270,
+    nodes: [
+      { id: "s", type: "start", lane: 0, row: 0 },
+      { id: "a1", type: "action", lane: 0, row: 1, text: "Memantau cuaca dan kabar hujan" },
+      { id: "x1", type: "action", lane: 2, row: 1, text: "Informasi prakiraan cuaca dan laporan warga" },
+      { id: "d1", type: "decision", lane: 0, row: 2, text: "Hujan lebat / ada kejadian?" },
+      { id: "a2", type: "action", lane: 0, row: 3, text: "Meneruskan informasi lewat pesan grup" },
+      { id: "a3", type: "action", lane: 1, row: 4, text: "Menilai situasi berdasarkan pengalaman" },
+      { id: "d2", type: "decision", lane: 1, row: 5, text: "Terjadi bencana?" },
+      { id: "a4", type: "action", lane: 1, row: 6, text: "Mencatat kejadian secara manual (kertas / spreadsheet)" },
+      { id: "a5", type: "action", lane: 1, row: 7, text: "Menyusun laporan kegiatan secara manual" },
+      { id: "e", type: "end", lane: 1, row: 8 },
+    ],
+    edges: [
+      { f: "s", t: "a1" }, { f: "x1", t: "a1" }, { f: "a1", t: "d1" },
+      { f: "d1", t: "a2", label: "ya", down: true },
+      { f: "d1", t: "a1", label: "tidak", loop: "l", loopX: 0.04 },
+      { f: "a2", t: "a3" }, { f: "a3", t: "d2" },
+      { f: "d2", t: "a4", label: "ya", down: true },
+      { f: "d2", t: "e", label: "tidak", loop: "r", loopX: 1.9 },
+      { f: "a4", t: "a5" }, { f: "a5", t: "e" },
+    ],
+  });
+  UML.activity(document.getElementById("tobe"), {
+    lanes: ["Scheduler (monitor_etl)", "Basis data PostgreSQL", "Relawan / Analis"],
+    laneW: 270,
+    nodes: [
+      { id: "s", type: "start", lane: 0, row: 0 },
+      { id: "a1", type: "action", lane: 0, row: 1, text: "Unduh GPM, MODIS, Sentinel-1 dari API resmi" },
+      { id: "a2", type: "action", lane: 0, row: 2, text: "Olah raster dan agregasi per kecamatan" },
+      { id: "b1", type: "action", lane: 1, row: 3, db: true, text: "Simpan region_observations, data_products, data_lineage" },
+      { id: "a3", type: "action", lane: 0, row: 4, text: "Bandingkan hujan dengan alert_rules aktif" },
+      { id: "d1", type: "decision", lane: 0, row: 5, text: "Melewati ambang?" },
+      { id: "b2", type: "action", lane: 1, row: 6, db: true, text: "Simpan alert_events" },
+      { id: "u1", type: "action", lane: 2, row: 7, text: "Melihat alert aktif dan hujan per kecamatan di dashboard" },
+      { id: "u2", type: "action", lane: 2, row: 8, text: "Analis acknowledge alert dan mencatat kejadian" },
+      { id: "b3", type: "action", lane: 1, row: 9, db: true, text: "Simpan disaster_events, audit_log; hitung v_evaluasi_alert" },
+      { id: "e", type: "end", lane: 1, row: 10 },
+    ],
+    edges: [
+      { f: "s", t: "a1" }, { f: "a1", t: "a2" }, { f: "a2", t: "b1" }, { f: "b1", t: "a3" }, { f: "a3", t: "d1" },
+      { f: "d1", t: "b2", label: "ya" },
+      { f: "d1", t: "e", label: "tidak", loop: "l", loopX: 0.04 },
+      { f: "b2", t: "u1" }, { f: "u1", t: "u2" }, { f: "u2", t: "b3" }, { f: "b3", t: "e" },
+    ],
+  });
+};
+</script>
+</main>
+</body>
+</html>

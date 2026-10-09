@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pemilihan DBMS</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/common.js"></script>
+<style>.chart { position: relative; height: 380px; background: #fff; }</style>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 5 · DBMS selection</div>
+  <h1>Pemilihan DBMS: PostgreSQL vs MySQL 8.0</h1>
+  <p class="lede">Grafik dibaca dari <code>benchmark/results/*.csv</code>. Penjelasan lengkap di PERBANDINGAN_DBMS.md.
+  Grafik digambar di kanvas: tombol PNG mengunduh gambar resolusi layar.</p>
+</header>
+
+<h2>Langkah pemilihan DBMS</h2>
+<div class="fig" data-cap="Tahapan pemilihan DBMS" data-from="SKRIPSI.txt bagian A; PERBANDINGAN_DBMS.md">
+<div class="body white"><pre class="mermaid">
+flowchart LR
+    a["a. Kerangka acuan<br/>7 kriteria berbobot"] --> b["b. Daftar pendek<br/>PostgreSQL 18 + PostGIS<br/>MySQL 8.0<br/>(MongoDB 7: fitur saja)"]
+    b --> c["c. Evaluasi produk<br/>skema setara, data sintetis,<br/>Q1–Q6, E1–E3, F1–F3"]
+    c --> d["d. Rekomendasi<br/>PostgreSQL + PostGIS<br/>skor 4,90 vs 2,90"]
+</pre></div>
+</div>
+
+<h2>Kueri inti Q1–Q5</h2>
+<div class="fig" data-cap="Waktu median kueri inti Q1–Q5 (ms, skala logaritmik, lebih kecil lebih baik)" data-from="benchmark/results/timing.csv (30 run per kueri)">
+<div class="body"><div class="chart"><canvas id="cQ"></canvas></div></div>
+</div>
+<div class="fig" data-kind="Tabel" data-cap="Hasil kueri inti Q1–Q5">
+<div class="body"><table class="t" id="tQ"></table></div>
+</div>
+
+<h2>Skalabilitas</h2>
+<div class="fig" data-cap="Waktu kueri rekap Q6 terhadap jumlah baris observasi (ms)" data-from="benchmark/results/extended_scaling.csv">
+<div class="body"><div class="chart"><canvas id="cS"></canvas></div></div>
+</div>
+<div class="fig" data-kind="Tabel" data-cap="Hasil uji skalabilitas E1">
+<div class="body"><table class="t" id="tS"></table></div>
+</div>
+
+<h2>Konkurensi dan penulisan</h2>
+<div class="grid2">
+<div class="fig" data-cap="Throughput baca serentak (kueri/detik)" data-from="extended_concurrency_mysqlclient.csv">
+<div class="body"><div class="chart"><canvas id="cC"></canvas></div></div>
+</div>
+<div class="fig" data-cap="Kecepatan tulis ETL (baris/detik)" data-from="extended_write_mysqlclient.csv">
+<div class="body"><div class="chart"><canvas id="cW"></canvas></div></div>
+</div>
+</div>
+
+<h2>Uji fitur keamanan dan audit</h2>
+<div class="fig" data-kind="Tabel" data-cap="Hasil uji fitur F1–F3" data-from="benchmark/results/features.csv">
+<div class="body"><table class="t" id="tF"></table></div>
+</div>
+
+<h2>Skor terbobot</h2>
+<div class="fig" data-kind="Tabel" data-cap="Skor terbobot pemilihan DBMS (skala 1–5)" data-from="PERBANDINGAN_DBMS.md §3.8">
+<div class="body"><table class="t" id="tW"></table></div>
+</div>
+<div class="fig" data-cap="Perbandingan skor terbobot per kriteria" data-from="PERBANDINGAN_DBMS.md §3.8">
+<div class="body"><div class="chart"><canvas id="cR"></canvas></div></div>
+</div>
+
+<script>
+window.pageInit = function () {
+  const B = window.SKRIPSI_DATA.bench, fmt = Skripsi.fmt, esc = Skripsi.esc;
+  const PG = "#1f6f8b", MY = "#d9822b";
+  Chart.defaults.font.family = "Arial, sans-serif"; Chart.defaults.color = "#1d1f22"; Chart.defaults.animation = false;
+  Chart.register({ id: "bgPutih", beforeDraw(c) { const x = c.ctx; x.save(); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.restore(); } });
+  const by = (rows, e) => rows.filter((r) => r.engine.startsWith(e));
+
+  const pg = by(B.timing, "PostgreSQL"), my = by(B.timing, "MySQL");
+  new Chart(document.getElementById("cQ"), {
+    type: "bar",
+    data: { labels: pg.map((r) => r.query), datasets: [
+      { label: "PostgreSQL 18 + PostGIS", data: pg.map((r) => +r.median_ms), backgroundColor: PG },
+      { label: "MySQL 8.0", data: my.map((r) => +r.median_ms), backgroundColor: MY }] },
+    options: { maintainAspectRatio: false, scales: { y: { type: "logarithmic", title: { display: true, text: "median (ms)" } } } },
+  });
+  document.getElementById("tQ").innerHTML = "<tr><th>Kueri</th><th>Isi</th><th class=c>PostgreSQL median / p95 (ms)</th><th class=c>MySQL median / p95 (ms)</th><th class=c>MySQL ÷ PG</th></tr>" +
+    pg.map((r, i) => { const m = my[i]; const ratio = m.median_ms / r.median_ms; return `<tr><td>${r.query}</td><td>${esc(r.description)}</td><td class=r>${fmt(r.median_ms, 2)} / ${fmt(r.p95_ms, 2)}</td><td class=r>${fmt(m.median_ms, 2)} / ${fmt(m.p95_ms, 2)}</td><td class=r>${fmt(ratio, 1)}×</td></tr>`; }).join("");
+
+  const sc = (e) => by(B.scaling, e).filter((r) => r.query === "Q6");
+  new Chart(document.getElementById("cS"), {
+    type: "line",
+    data: { labels: sc("PostgreSQL").map((r) => fmt(r.rows) + " baris"), datasets: [
+      { label: "PostgreSQL", data: sc("PostgreSQL").map((r) => +r.median_ms), borderColor: PG, backgroundColor: PG },
+      { label: "MySQL 8.0", data: sc("MySQL").map((r) => +r.median_ms), borderColor: MY, backgroundColor: MY }] },
+    options: { maintainAspectRatio: false, scales: { y: { title: { display: true, text: "median Q6 (ms)" } } } },
+  });
+  document.getElementById("tS").innerHTML = "<tr><th>Skala</th><th class=c>Baris</th><th>Kueri</th><th class=c>PG median (ms)</th><th class=c>MySQL median (ms)</th><th class=c>PG data+indeks (MB)</th><th class=c>MySQL data+indeks (MB)</th></tr>" +
+    by(B.scaling, "PostgreSQL").map((r) => { const m = B.scaling.find((x) => x.engine.startsWith("MySQL") && x.scale === r.scale && x.query === r.query);
+      return `<tr><td class=c>×${r.scale}</td><td class=r>${fmt(r.rows)}</td><td>${r.query}</td><td class=r>${fmt(r.median_ms, 2)}</td><td class=r>${fmt(m.median_ms, 2)}</td><td class=r>${fmt(+r.data_mb + +r.index_mb, 1)}</td><td class=r>${fmt(+m.data_mb + +m.index_mb, 1)}</td></tr>`; }).join("");
+
+  const cc = (e) => by(B.concurrency, e);
+  new Chart(document.getElementById("cC"), {
+    type: "line",
+    data: { labels: cc("PostgreSQL").map((r) => r.clients + " klien"), datasets: [
+      { label: "PostgreSQL", data: cc("PostgreSQL").map((r) => +r.qps), borderColor: PG, backgroundColor: PG },
+      { label: "MySQL 8.0 (mysqlclient)", data: cc("MySQL").map((r) => +r.qps), borderColor: MY, backgroundColor: MY }] },
+    options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true, title: { display: true, text: "kueri/detik" } } } },
+  });
+  const wr = (e) => by(B.write, e);
+  new Chart(document.getElementById("cW"), {
+    type: "bar",
+    data: { labels: wr("PostgreSQL").map((r) => r.test), datasets: [
+      { label: "PostgreSQL", data: wr("PostgreSQL").map((r) => +r.rows_per_s), backgroundColor: PG },
+      { label: "MySQL 8.0 (mysqlclient)", data: wr("MySQL").map((r) => +r.rows_per_s), backgroundColor: MY }] },
+    options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true, title: { display: true, text: "baris/detik" } } } },
+  });
+
+  const engines = [...new Set(B.features.map((f) => f.engine))];
+  const feats = [...new Set(B.features.map((f) => f.feature + " · " + f.name))];
+  const cls = (r) => (r === "DIDUKUNG" ? "y" : r === "TIDAK DIDUKUNG" ? "n0" : "");
+  document.getElementById("tF").innerHTML = "<tr><th>Fitur</th>" + engines.map((e) => `<th>${e}</th>`).join("") + "</tr>" +
+    feats.map((f) => "<tr><td>" + f + "</td>" + engines.map((e) => { const r = B.features.find((x) => x.engine === e && x.feature + " · " + x.name === f);
+      return r ? `<td><span class="${cls(r.result)}">${r.result}</span><br><small>${esc(r.evidence)}</small></td>` : "<td>—</td>"; }).join("") + "</tr>").join("");
+
+  const W = [
+    ["Keamanan per peran dan audit", 25, 5, 2, "F1–F3"], ["Spasial", 20, 5, 2, "Q3 17×, galat 3516 di MySQL"],
+    ["Analitik dan skala", 15, 5, 2, "Q4 9×, Q6 ×30 8,5×"], ["Tulis/ETL", 10, 5, 3, "Insert 8×, upsert 2×"],
+    ["Konkurensi baca", 10, 5, 4, "Selisih 13–26%"], ["Integritas relasional dan rekursif", 10, 5, 5, "Keduanya FK; Q5 MySQL lebih cepat"],
+    ["Biaya, ekosistem, keakraban", 10, 4, 5, "MySQL dipakai SIGAP DESA"],
+  ];
+  const tot = (i) => W.reduce((s, w) => s + (w[1] / 100) * w[i], 0);
+  document.getElementById("tW").innerHTML = "<tr><th>Kriteria</th><th class=c>Bobot</th><th class=c>PostgreSQL</th><th class=c>MySQL 8.0</th><th class=c>PG × bobot</th><th class=c>MySQL × bobot</th><th>Dasar</th></tr>" +
+    W.map((w) => `<tr><td>${w[0]}</td><td class=c>${w[1]}%</td><td class=c>${w[2]}</td><td class=c>${w[3]}</td><td class=r>${fmt((w[1] / 100) * w[2], 2)}</td><td class=r>${fmt((w[1] / 100) * w[3], 2)}</td><td>${w[4]}</td></tr>`).join("") +
+    `<tr class=sub><td>Total</td><td class=c>100%</td><td></td><td></td><td class=r>${fmt(tot(2), 2)}</td><td class=r>${fmt(tot(3), 2)}</td><td>Rekomendasi: PostgreSQL + PostGIS</td></tr>`;
+  new Chart(document.getElementById("cR"), {
+    type: "bar",
+    data: { labels: W.map((w) => `${w[0]} (${w[1]}%)`), datasets: [
+      { label: "PostgreSQL", data: W.map((w) => w[2]), backgroundColor: PG },
+      { label: "MySQL 8.0", data: W.map((w) => w[3]), backgroundColor: MY }] },
+    options: { indexAxis: "y", maintainAspectRatio: false, scales: { x: { min: 0, max: 5, title: { display: true, text: "skor (1–5)" } } } },
+  });
+};
+</script>
+</main>
+</body>
+</html>

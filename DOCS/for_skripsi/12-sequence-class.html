@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sequence dan Class Diagram</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 6 · Pemodelan sistem</div>
+  <h1>Sequence diagram dan class diagram</h1>
+  <p class="lede">Sequence diagram menunjukkan urutan pesan antara peramban, API, dan basis data, termasuk
+  <code>SET LOCAL ROLE</code> per request. Class diagram menggambarkan kelas domain inti dan operasinya (opsional karena ERD sudah ada).</p>
+</header>
+
+<h2>Sequence diagram</h2>
+<div class="fig" data-cap="Sequence diagram login" data-from="api/routes/auth.py; api/security.py">
+<div class="body white"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor P as Pengguna
+    participant W as Web (app.js)
+    participant A as API FastAPI
+    participant DB as PostgreSQL (monitor_public)
+    P->>W: isi username & sandi, klik Masuk
+    W->>A: POST /api/auth/login
+    A->>DB: BEGIN#59; SET LOCAL ROLE monitor_public
+    A->>DB: SELECT * FROM auth_get_user(username)
+    DB-->>A: user_id, password_hash, is_active, locked_until
+    A->>A: bcrypt.verify(sandi, hash)
+    alt sandi benar dan akun aktif
+        A->>DB: auth_record_login(user_id, true)
+        A->>DB: INSERT user_activity_logs (LOGIN_SUCCESS)
+        A-->>W: 200 + cookie orbit_u_session (JWT 8 jam)
+        W->>A: GET /api/auth/session
+        A-->>W: role_code, permissions
+        W-->>P: menu sesuai peran
+    else sandi salah / akun terkunci
+        A->>DB: auth_record_login(user_id, false)
+        A->>DB: INSERT user_activity_logs (LOGIN_FAILED)
+        A-->>W: 401 INVALID_CREDENTIALS / 423 ACCOUNT_LOCKED
+        W-->>P: dialog galat
+    end
+</pre></div>
+</div>
+
+<div class="fig" data-cap="Sequence diagram request berperan: melihat citra satelit" data-from="api/deps.py; api/routes/citra.py">
+<div class="body white"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor P as Relawan
+    participant W as Web
+    participant A as API FastAPI
+    participant DB as PostgreSQL
+    P->>W: buka Citra › Sentinel-1
+    W->>A: GET /api/citra/areas/1/scenes?source=s1 (cookie)
+    A->>A: decode JWT → user_id
+    A->>DB: auth_session_user(user_id)
+    DB-->>A: role USER, aktif
+    A->>A: require_role("PUBLIC") ✓
+    A->>DB: BEGIN#59; SET LOCAL ROLE monitor_user#59; set_config('app.user_id', id)
+    A->>DB: SELECT … FROM v_citra_scenes
+    Note over DB: VIEW membatasi 365 hari untuk monitor_user<br/>(pg_has_role(current_user, …))
+    DB-->>A: daftar tanggal
+    A->>DB: COMMIT (role kembali otomatis)
+    A-->>W: 200 JSON
+    W-->>P: daftar tanggal dan gambar
+</pre></div>
+</div>
+
+<div class="fig" data-cap="Sequence diagram acknowledge peringatan hujan" data-from="api/routes/alerts.py">
+<div class="body white"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor A as Analis
+    participant W as Web
+    participant API as API FastAPI
+    participant DB as PostgreSQL (monitor_analyst)
+    A->>W: pilih alert, isi catatan, klik Tandai dibaca
+    W->>API: POST /api/alerts/{id}/acknowledge
+    API->>DB: SET LOCAL ROLE monitor_analyst
+    API->>DB: SELECT acknowledged_at FROM alert_events WHERE alert_id=:id FOR UPDATE
+    alt belum di-acknowledge
+        API->>DB: UPDATE alert_events SET acknowledged_by, acknowledged_at, ack_note
+        DB->>DB: trigger audit_row → INSERT audit_log
+        API-->>W: 200
+    else sudah
+        API-->>W: 409 ALERT_ALREADY_ACKED
+    end
+    W-->>A: daftar alert aktif diperbarui
+</pre></div>
+</div>
+
+<div class="fig" data-cap="Sequence diagram backfill oleh Data Engineer" data-from="api/routes/data.py; etl/backfill_runs.py">
+<div class="body white"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    actor D as Data Engineer
+    participant W as Web
+    participant API as API FastAPI
+    participant T as Thread ETL (monitor_etl)
+    participant N as NASA / ESA
+    participant DB as PostgreSQL
+    D->>W: isi rentang tanggal, klik Backfill
+    W->>API: POST /api/data/gpm/backfill {date_from, date_to}
+    API->>API: validasi ≤ 366 hari, cek BACKFILL_RUNNING
+    API->>T: mulai run backfill
+    API-->>W: 202 run_id
+    loop setiap tanggal
+        T->>N: unduh granule
+        N-->>T: berkas HDF5 / GRD
+        T->>DB: INSERT/UPSERT region_observations, dataset_jobs
+    end
+    loop setiap 2 detik
+        W->>API: GET /api/data/backfill/runs/{id}?since=n
+        API-->>W: progres + baris log baru
+    end
+    W-->>D: riwayat per tanggal
+</pre></div>
+</div>
+
+<div class="fig" data-cap="Sequence diagram Job Hidromet harian" data-from="etl/scheduler.py; etl/hydromet_job.py; etl/alert_engine.py">
+<div class="body white"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant S as Scheduler (APScheduler)
+    participant H as HydrometJob
+    participant G as NASA GES DISC / LANCE
+    participant DB as PostgreSQL (monitor_etl)
+    participant AE as AlertEngine
+    participant F as ForecastStore
+    S->>DB: pg_try_advisory_lock('orbit-u:hydromet')
+    DB-->>S: true
+    S->>H: run()
+    H->>DB: tanggal belum COMPLETED
+    loop setiap tanggal
+        H->>G: unduh GPM Final → Late → Early
+        G-->>H: granule harian
+        H->>H: akumulasi 24h/72h/7d/30d, agregasi zonal
+        H->>DB: UPSERT region_observations
+        H->>AE: evaluate(tanggal)
+        AE->>DB: INSERT alert_events (ON CONFLICT DO NOTHING)
+        H->>G: unduh MODIS (tidak fatal)
+        H->>DB: UPDATE dataset_jobs status COMPLETED
+    end
+    H->>F: refresh()
+    F->>DB: band_forecasts, points, scores
+    S->>DB: pg_advisory_unlock
+</pre></div>
+</div>
+
+<div class="fig" data-cap="Sequence diagram akses API dengan token pribadi" data-from="api/deps.py; DATABASE.md §8.6">
+<div class="body white"><pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant C as Skrip / sistem lain
+    participant API as API FastAPI
+    participant DB as PostgreSQL
+    C->>API: GET /api/hydromet/today<br/>Authorization: Bearer trn_xxxx…
+    API->>DB: auth_get_token(prefix 8 karakter)
+    DB-->>API: token_hash, user_id, scope, expires_at, revoked_at
+    API->>API: bandingkan SHA-256, cek kedaluwarsa & batas 120 req/menit
+    alt valid
+        API->>DB: SET LOCAL ROLE sesuai peran pemilik#59; SELECT …
+        API->>DB: INSERT user_activity_logs (API_REQUEST, bytes_sent)
+        API-->>C: 200 JSON
+    else tidak valid
+        API-->>C: 401 TOKEN_INVALID / TOKEN_EXPIRED / TOKEN_REVOKED
+    end
+</pre></div>
+</div>
+
+<h2>Class diagram</h2>
+<div class="fig" data-cap="Class diagram domain inti" data-from="monitor_schema.sql; api/routes/*.py">
+<div class="body white"><pre class="mermaid">
+classDiagram
+    direction LR
+    class Role {
+        +smallint role_id
+        +string role_code
+        +string db_role
+    }
+    class User {
+        +int user_id
+        +string username
+        +string email
+        +bool is_active
+        +login(username, password)
+        +changePassword(old, new)
+        +createToken(scope, days)
+    }
+    class ApiToken {
+        +int token_id
+        +string token_prefix
+        +string scope
+        +datetime expires_at
+        +revoke()
+    }
+    class AdministrativeRegion {
+        +int region_id
+        +string pcode
+        +string region_name
+        +bool in_aoi
+        +geometry geom
+    }
+    class SpectralBand {
+        +int band_id
+        +string band_code
+        +string unit
+        +decimal valid_min
+        +decimal valid_max
+    }
+    class SatelliteSource {
+        +smallint source_id
+        +string source_code
+    }
+    class RegionObservation {
+        +bigint obs_id
+        +date obs_date
+        +decimal value
+        +decimal valid_fraction
+        +string run_type
+    }
+    class AlertRule {
+        +int rule_id
+        +string rule_code
+        +string comparator
+        +decimal threshold_value
+        +Severity severity
+        +bool is_active
+        +evaluate(obs) bool
+    }
+    class AlertEvent {
+        +bigint alert_id
+        +date observation_date
+        +decimal observed_value
+        +decimal threshold_value
+        +acknowledge(user, note)
+    }
+    class DisasterType {
+        +smallint disaster_type_id
+        +string type_code
+    }
+    class DisasterEvent {
+        +int event_id
+        +date event_date
+        +string village_name
+        +bool is_verified
+        +softDelete()
+    }
+    class BandForecast {
+        +bigint forecast_id
+        +string model
+        +decimal skill
+    }
+    class ForecastPoint {
+        +smallint step
+        +date target_date
+        +decimal mean
+        +decimal lo
+        +decimal hi
+    }
+    Role "1" -- "0..*" User
+    User "1" -- "0..*" ApiToken
+    SatelliteSource "1" -- "1..*" SpectralBand
+    AdministrativeRegion "0..1" -- "0..*" AdministrativeRegion : induk
+    AdministrativeRegion "1" -- "0..*" RegionObservation
+    SpectralBand "1" -- "0..*" RegionObservation
+    SpectralBand "1" -- "0..*" AlertRule
+    DisasterType "1" -- "0..*" AlertRule
+    AlertRule "1" -- "0..*" AlertEvent
+    RegionObservation "1" -- "0..*" AlertEvent : memicu
+    User "0..1" -- "0..*" AlertEvent : acknowledge
+    DisasterType "1" -- "0..*" DisasterEvent
+    AdministrativeRegion "1" -- "0..*" DisasterEvent
+    User "1" -- "0..*" DisasterEvent : mencatat
+    SpectralBand "1" -- "0..*" BandForecast
+    BandForecast "1" *-- "0..15" ForecastPoint
+</pre></div>
+</div>
+
+<div class="fig" data-cap="Class diagram komponen ETL utama" data-from="etl/*.py">
+<div class="body white"><pre class="mermaid">
+classDiagram
+    direction TB
+    class Scheduler {
+        +start()
+        +hydromet_daily()
+        +live_cycle()
+        +reports()
+        +forecast_refresh()
+    }
+    class AdvisoryLock {
+        +acquire(key) bool
+        +release()
+    }
+    class HydrometJob {
+        +run(dates)
+        +modis_missing_dates()
+    }
+    class LiveCycle {
+        +run(area)
+        +enforce_retention()
+    }
+    class AlertEngine {
+        +evaluate(obs_date)
+    }
+    class ForecastStore {
+        +refresh()
+    }
+    class BandForecaster {
+        +fit(series)
+        +backtest()
+        +predict(horizon)
+    }
+    class ReportPeriodic {
+        +build(kind, period)
+    }
+    class DatasetManager {
+        +create(config)
+        +run_dataset_job()
+    }
+    class LineageTracker {
+        +record(parent, child, checksum)
+    }
+    Scheduler ..> AdvisoryLock
+    Scheduler --> HydrometJob
+    Scheduler --> LiveCycle
+    Scheduler --> ReportPeriodic
+    Scheduler --> ForecastStore
+    HydrometJob --> AlertEngine
+    HydrometJob --> ForecastStore
+    LiveCycle --> ForecastStore
+    ForecastStore --> BandForecaster
+    DatasetManager --> LineageTracker
+    LiveCycle --> DatasetManager
+</pre></div>
+</div>
+<p class="note">Nama metode pada class diagram komponen ETL diringkas dari fungsi Python yang ada; diagram ini menunjukkan
+tanggung jawab dan ketergantungan, bukan tanda tangan fungsi persis.</p>
+</main>
+</body>
+</html>

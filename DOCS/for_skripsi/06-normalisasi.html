@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Normalisasi</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 4b · Normalisasi</div>
+  <h1>Normalisasi UNF → 1NF → 2NF → 3NF</h1>
+  <p class="lede">Dua contoh memakai data nyata dari database <code>themonitor</code>: (1) observasi harian per kecamatan
+  tanggal 7 Oktober 2026, dan (2) peringatan hujan tanggal 6 Maret 2025. Garis bawah tebal = kunci primer, miring = kunci asing.</p>
+</header>
+
+<h2>Contoh 1 — Observasi harian per kecamatan</h2>
+
+<h3>Bentuk tidak normal (UNF)</h3>
+<p>Data seperti yang biasa dicatat di spreadsheet: satu baris per kecamatan per tanggal, berisi grup berulang (beberapa variabel di satu sel).</p>
+<div class="fig" data-kind="Tabel" data-cap="Data observasi dalam bentuk tidak normal (UNF)">
+<div class="body"><table class="t">
+<tr><th>tanggal</th><th>pcode</th><th>kecamatan</th><th>kabupaten</th><th>variabel (kode, nama, satuan, sumber, nilai, run)</th></tr>
+<tr><td>2026-10-07</td><td>ID3602030</td><td>Bayah</td><td>Lebak</td><td>RAIN_24H, Hujan 24 jam, mm, GPM, 0,7465, E<br>RAIN_72H, Hujan 72 jam, mm, GPM, 4,4018, E<br>NDVI, Indeks vegetasi (NDVI), index, MODIS, 0,6985, –</td></tr>
+<tr><td>2026-10-07</td><td>ID3602010</td><td>Malingping</td><td>Lebak</td><td>RAIN_24H, Hujan 24 jam, mm, GPM, 0,6221, E<br>RAIN_72H, Hujan 72 jam, mm, GPM, 1,1254, E<br>NDVI, Indeks vegetasi (NDVI), index, MODIS, 0,7409, –</td></tr>
+</table></div>
+</div>
+
+<h3>Bentuk normal pertama (1NF)</h3>
+<p>Grup berulang dipecah menjadi baris: satu nilai per sel. Variabel disimpan sebagai <b>baris</b>, bukan kolom
+<code>rain_24h</code>, <code>ndvi</code>, dan seterusnya, sehingga variabel baru tidak mengubah skema. Kunci: (pcode, kode_band, tanggal).</p>
+<div class="fig" data-kind="Tabel" data-cap="Data observasi dalam bentuk 1NF">
+<div class="body"><table class="t">
+<tr><th class="pk">tanggal</th><th class="pk">pcode</th><th>kecamatan</th><th>kabupaten</th><th class="pk">kode_band</th><th>nama_band</th><th>satuan</th><th>sumber</th><th class=c>nilai</th><th class=c>run</th></tr>
+<tr><td>2026-10-07</td><td>ID3602030</td><td>Bayah</td><td>Lebak</td><td>RAIN_24H</td><td>Hujan 24 jam</td><td>mm</td><td>GPM</td><td class=r>0,7465</td><td class=c>E</td></tr>
+<tr><td>2026-10-07</td><td>ID3602030</td><td>Bayah</td><td>Lebak</td><td>RAIN_72H</td><td>Hujan 72 jam</td><td>mm</td><td>GPM</td><td class=r>4,4018</td><td class=c>E</td></tr>
+<tr><td>2026-10-07</td><td>ID3602030</td><td>Bayah</td><td>Lebak</td><td>NDVI</td><td>Indeks vegetasi (NDVI)</td><td>index</td><td>MODIS</td><td class=r>0,6985</td><td class=c>–</td></tr>
+<tr><td>2026-10-07</td><td>ID3602010</td><td>Malingping</td><td>Lebak</td><td>RAIN_24H</td><td>Hujan 24 jam</td><td>mm</td><td>GPM</td><td class=r>0,6221</td><td class=c>E</td></tr>
+<tr><td>2026-10-07</td><td>ID3602010</td><td>Malingping</td><td>Lebak</td><td>RAIN_72H</td><td>Hujan 72 jam</td><td>mm</td><td>GPM</td><td class=r>1,1254</td><td class=c>E</td></tr>
+<tr><td>2026-10-07</td><td>ID3602010</td><td>Malingping</td><td>Lebak</td><td>NDVI</td><td>Indeks vegetasi (NDVI)</td><td>index</td><td>MODIS</td><td class=r>0,7409</td><td class=c>–</td></tr>
+</table></div>
+</div>
+
+<div class="fig" data-cap="Diagram ketergantungan fungsional relasi observasi 1NF">
+<div class="body white"><pre class="mermaid">
+flowchart LR
+    K["<b>(tanggal, pcode, kode_band)</b>"]
+    P["pcode"]
+    B["kode_band"]
+    nilai[nilai]
+    run[run]
+    kec[kecamatan]
+    kab[kabupaten]
+    nb[nama_band]
+    sat[satuan]
+    src[sumber]
+    K -- penuh --> nilai
+    K -- penuh --> run
+    P -- parsial --> kec
+    P -- parsial --> kab
+    B -- parsial --> nb
+    B -- parsial --> sat
+    B -- parsial --> src
+    kec -. transitif .-> kab
+    src -. "sumber → nama_sumber, penyedia" .-> src2[nama_sumber, penyedia]
+    style K fill:#e3f0f4,stroke:#0f5e78,stroke-width:2px
+</pre></div>
+</div>
+
+<h3>Bentuk normal kedua (2NF)</h3>
+<p>Ketergantungan parsial dihapus: atribut yang hanya bergantung pada <code>pcode</code> pindah ke relasi Wilayah,
+dan atribut yang hanya bergantung pada <code>kode_band</code> pindah ke relasi Band.</p>
+<div class="grid2">
+<div class="fig" data-kind="Tabel" data-cap="2NF — relasi Observasi">
+<div class="body"><table class="t">
+<tr><th class="pk">tanggal</th><th class="pk fk">pcode</th><th class="pk fk">kode_band</th><th class=c>nilai</th><th class=c>run</th></tr>
+<tr><td>2026-10-07</td><td>ID3602030</td><td>RAIN_24H</td><td class=r>0,7465</td><td class=c>E</td></tr>
+<tr><td>2026-10-07</td><td>ID3602030</td><td>RAIN_72H</td><td class=r>4,4018</td><td class=c>E</td></tr>
+<tr><td>2026-10-07</td><td>ID3602030</td><td>NDVI</td><td class=r>0,6985</td><td class=c>–</td></tr>
+<tr><td>2026-10-07</td><td>ID3602010</td><td>RAIN_24H</td><td class=r>0,6221</td><td class=c>E</td></tr>
+<tr><td>2026-10-07</td><td>ID3602010</td><td>RAIN_72H</td><td class=r>1,1254</td><td class=c>E</td></tr>
+<tr><td>2026-10-07</td><td>ID3602010</td><td>NDVI</td><td class=r>0,7409</td><td class=c>–</td></tr>
+</table></div></div>
+<div>
+<div class="fig" data-kind="Tabel" data-cap="2NF — relasi Wilayah">
+<div class="body"><table class="t">
+<tr><th class="pk">pcode</th><th>kecamatan</th><th>kabupaten</th></tr>
+<tr><td>ID3602030</td><td>Bayah</td><td>Lebak</td></tr>
+<tr><td>ID3602010</td><td>Malingping</td><td>Lebak</td></tr>
+</table></div></div>
+<div class="fig" data-kind="Tabel" data-cap="2NF — relasi Band">
+<div class="body"><table class="t">
+<tr><th class="pk">kode_band</th><th>nama_band</th><th>satuan</th><th>sumber</th></tr>
+<tr><td>RAIN_24H</td><td>Hujan 24 jam</td><td>mm</td><td>GPM</td></tr>
+<tr><td>RAIN_72H</td><td>Hujan 72 jam</td><td>mm</td><td>GPM</td></tr>
+<tr><td>NDVI</td><td>Indeks vegetasi (NDVI)</td><td>index</td><td>MODIS</td></tr>
+</table></div></div>
+</div>
+</div>
+
+<h3>Bentuk normal ketiga (3NF)</h3>
+<p>Ketergantungan transitif dihapus. Kabupaten adalah wilayah juga, jadi menjadi rujukan rekursif ke Wilayah
+(<code>parent_region_id</code>). Atribut sumber satelit dipindah ke relasi Sumber, dan Band hanya menyimpan FK-nya.
+Pada tahap fisik, setiap relasi diberi PK surrogate, sedangkan kunci alami tetap dijaga sebagai UNIQUE.</p>
+<div class="grid2">
+<div class="fig" data-kind="Tabel" data-cap="3NF — administrative_regions">
+<div class="body"><table class="t">
+<tr><th class="pk">region_id</th><th>pcode (UK)</th><th>region_name</th><th>admin_level</th><th class="fk">parent_region_id</th></tr>
+<tr><td>…</td><td>ID3602</td><td>Lebak</td><td class=c>2</td><td>–</td></tr>
+<tr><td>…</td><td>ID3602030</td><td>Bayah</td><td class=c>3</td><td>→ Lebak</td></tr>
+<tr><td>…</td><td>ID3602010</td><td>Malingping</td><td class=c>3</td><td>→ Lebak</td></tr>
+</table></div></div>
+<div class="fig" data-kind="Tabel" data-cap="3NF — satellite_sources">
+<div class="body"><table class="t">
+<tr><th class="pk">source_id</th><th>source_code (UK)</th></tr>
+<tr><td>…</td><td>GPM</td></tr>
+<tr><td>…</td><td>MODIS</td></tr>
+</table></div></div>
+<div class="fig" data-kind="Tabel" data-cap="3NF — spectral_bands">
+<div class="body"><table class="t">
+<tr><th class="pk">band_id</th><th>band_code (UK)</th><th>band_name</th><th>unit</th><th class="fk">source_id</th></tr>
+<tr><td>…</td><td>RAIN_24H</td><td>Hujan 24 jam</td><td>mm</td><td>→ GPM</td></tr>
+<tr><td>…</td><td>RAIN_72H</td><td>Hujan 72 jam</td><td>mm</td><td>→ GPM</td></tr>
+<tr><td>…</td><td>NDVI</td><td>Indeks vegetasi (NDVI)</td><td>index</td><td>→ MODIS</td></tr>
+</table></div></div>
+<div class="fig" data-kind="Tabel" data-cap="3NF — region_observations">
+<div class="body"><table class="t">
+<tr><th class="pk">obs_id</th><th class="fk">region_id</th><th class="fk">band_id</th><th>obs_date</th><th>value</th><th>run_type</th></tr>
+<tr><td>…</td><td>→ Bayah</td><td>→ RAIN_24H</td><td>2026-10-07</td><td class=r>0,7465</td><td class=c>E</td></tr>
+<tr><td colspan=6>UNIQUE (region_id, band_id, obs_date)</td></tr>
+</table></div></div>
+</div>
+
+<div class="fig" data-cap="Hasil dekomposisi contoh 1 sampai 3NF">
+<div class="body white"><pre class="mermaid">
+erDiagram
+    satellite_sources ||--|{ spectral_bands : "source_id"
+    administrative_regions |o--o{ administrative_regions : "parent_region_id"
+    administrative_regions ||--o{ region_observations : "region_id"
+    spectral_bands ||--o{ region_observations : "band_id"
+    satellite_sources {
+        int source_id PK
+        string source_code UK
+    }
+    spectral_bands {
+        int band_id PK
+        string band_code UK
+        string band_name
+        string unit
+        int source_id FK
+    }
+    administrative_regions {
+        int region_id PK
+        string pcode UK
+        string region_name
+        int admin_level
+        int parent_region_id FK
+    }
+    region_observations {
+        bigint obs_id PK
+        int region_id FK
+        int band_id FK
+        date obs_date
+        decimal value
+        string run_type
+    }
+</pre></div>
+</div>
+
+<h2>Contoh 2 — Peringatan hujan</h2>
+<h3>UNF dan 1NF</h3>
+<p>Satu catatan peringatan memuat aturan, jenis bencana, kecamatan, nilai, dan petugas yang menindaklanjuti.
+Data ini sudah atomik (1NF), dengan kunci (kode_aturan, pcode, tanggal).</p>
+<div class="fig" data-kind="Tabel" data-cap="Data peringatan hujan dalam 1NF (tanggal 6 Maret 2025)">
+<div class="body"><table class="t">
+<tr><th class="pk">tanggal</th><th class="pk">kode_aturan</th><th>pembanding</th><th>ambang</th><th>severity</th><th>kode_jenis</th><th>nama_jenis</th><th class="pk">pcode</th><th>kecamatan</th><th>nilai</th><th>ack_oleh</th></tr>
+<tr><td>2025-03-06</td><td>FLOOD_RAIN24_VHEAVY</td><td>&gt;=</td><td class=r>100</td><td>WARNING</td><td>BANJIR</td><td>Banjir</td><td>ID3602031</td><td>Cilograng</td><td class=r>148,20</td><td>–</td></tr>
+<tr><td>2025-03-06</td><td>FLOOD_RAIN24_HEAVY</td><td>&gt;=</td><td class=r>50</td><td>INFO</td><td>BANJIR</td><td>Banjir</td><td>ID3602031</td><td>Cilograng</td><td class=r>148,20</td><td>–</td></tr>
+<tr><td>2025-03-06</td><td>FLOOD_RAIN24_VHEAVY</td><td>&gt;=</td><td class=r>100</td><td>WARNING</td><td>BANJIR</td><td>Banjir</td><td>ID3602030</td><td>Bayah</td><td class=r>138,64</td><td>–</td></tr>
+<tr><td>2025-03-06</td><td>FLOOD_RAIN24_HEAVY</td><td>&gt;=</td><td class=r>50</td><td>INFO</td><td>BANJIR</td><td>Banjir</td><td>ID3602030</td><td>Bayah</td><td class=r>138,64</td><td>–</td></tr>
+</table></div>
+</div>
+
+<h3>2NF dan 3NF</h3>
+<p>Atribut aturan (pembanding, ambang, severity, jenis) bergantung hanya pada kode_aturan, sehingga dipindah ke
+<code>alert_rules</code>. Nama jenis bergantung transitif lewat kode_jenis, sehingga dipindah ke <code>disaster_types</code>.
+Nama kecamatan pindah ke <code>administrative_regions</code>, dan nilai hujan dirujuk lewat <code>obs_id</code>.</p>
+<div class="fig" data-cap="Hasil dekomposisi contoh 2 sampai 3NF">
+<div class="body white"><pre class="mermaid">
+erDiagram
+    disaster_types ||--o{ alert_rules : "disaster_type_id"
+    spectral_bands ||--o{ alert_rules : "band_id"
+    alert_rules ||--o{ alert_events : "rule_id"
+    administrative_regions ||--o{ alert_events : "region_id"
+    region_observations ||--o{ alert_events : "obs_id"
+    users |o--o{ alert_events : "acknowledged_by"
+    disaster_types {
+        smallint disaster_type_id PK
+        string type_code UK
+        string type_name
+    }
+    alert_rules {
+        int rule_id PK
+        string rule_code UK
+        smallint disaster_type_id FK
+        int band_id FK
+        string comparator
+        decimal threshold_value
+        enum severity
+        boolean is_active
+    }
+    alert_events {
+        bigint alert_id PK
+        int rule_id FK
+        int region_id FK
+        bigint obs_id FK
+        date observation_date
+        decimal observed_value "salinan historis"
+        decimal threshold_value "salinan historis"
+        enum severity "salinan historis"
+        int acknowledged_by FK
+        datetime acknowledged_at
+    }
+</pre></div>
+</div>
+<p class="note"><b>Redundansi yang disengaja.</b> <code>observed_value</code>, <code>threshold_value</code>, dan <code>severity</code>
+di <code>alert_events</code> adalah <b>salinan historis</b>, bukan pelanggaran 3NF. Ambang aturan bisa diubah ADMIN kapan saja,
+dan nilai observasi bisa ditimpa run GPM Final. Peringatan harus tetap menunjukkan angka yang memicunya pada saat itu
+(DATABASE.md §5.2 dan §9).</p>
+
+<h2>Pemeriksaan BCNF dan 4NF</h2>
+<div class="fig" data-kind="Tabel" data-cap="Pemeriksaan tabel inti terhadap 3NF, BCNF, dan 4NF">
+<div class="body"><table class="t">
+<tr><th>Tabel</th><th>Determinan</th><th class=c>3NF</th><th class=c>BCNF</th><th class=c>4NF</th><th>Catatan</th></tr>
+<tr><td><code>region_observations</code></td><td>obs_id; (region_id, band_id, obs_date)</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td>Semua determinan adalah candidate key; satu fakta per baris</td></tr>
+<tr><td><code>spectral_bands</code></td><td>band_id; band_code</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td>—</td></tr>
+<tr><td><code>administrative_regions</code></td><td>region_id; pcode</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td><code>area_km2</code> GENERATED dari <code>geom</code> (redundansi terkendali)</td></tr>
+<tr><td><code>alert_rules</code></td><td>rule_id; rule_code</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td>—</td></tr>
+<tr><td><code>alert_events</code></td><td>alert_id; (rule_id, region_id, observation_date); obs_id → region_id, observation_date</td><td class=c>✓*</td><td class=c>✓*</td><td class="c y">✓</td><td>*Salinan historis dan <code>obs_id</code> → (region_id, tanggal) disengaja untuk menegakkan keunikan per aturan × kecamatan × hari</td></tr>
+<tr><td><code>disaster_events</code></td><td>event_id</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td>Desa disimpan sebagai teks karena tidak ada master desa di COD-AB</td></tr>
+<tr><td><code>band_forecasts</code></td><td>forecast_id; (band_id, region_id, data_stamp)</td><td class=c>✓*</td><td class=c>✓*</td><td class="c y">✓</td><td>*<code>mae</code>, <code>skill</code> ringkasan dari <code>band_forecast_scores</code> (disengaja)</td></tr>
+<tr><td><code>band_forecast_points</code>, <code>band_forecast_scores</code></td><td>(forecast_id, step); (forecast_id, model)</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td>Titik dan skor dipisah ke dua tabel, bukan satu tabel, sehingga tidak ada multivalued dependency</td></tr>
+<tr><td><code>data_lineage</code></td><td>lineage_id; (parent_product_id, child_product_id)</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td>Satu baris per sisi graf; parameter JSONB dibaca utuh</td></tr>
+<tr><td><code>users</code></td><td>user_id; username; lower(email)</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td>—</td></tr>
+</table></div>
+</div>
+<p>4NF hanya menuntut tidak ada <i>multivalued dependency</i> (dua himpunan banyak-nilai yang saling bebas dalam satu tabel).
+Contoh yang menunjukkan desain ini sudah menghindarinya: titik forecast (<code>step</code>) dan skor per model (<code>model</code>)
+sama-sama banyak-nilai terhadap satu forecast, tetapi saling bebas. Keduanya disimpan di dua tabel terpisah. Kalau digabung
+dalam satu tabel (forecast_id, step, model), setiap titik harus diulang untuk setiap model, dan itu pelanggaran 4NF.</p>
+<p class="note">Pengecualian 1NF yang disengaja (M32): <code>datasets.required_tiers</code>, <code>datasets.preview_options</code>, dan
+<code>dataset_source_config.processing_levels</code> berupa <code>TEXT[]</code> dengan paling banyak 7 elemen, divalidasi CHECK,
+dan tidak pernah di-join. Di model logikal, ketiganya bisa digambar sebagai entitas terpisah.</p>
+</main>
+</body>
+</html>

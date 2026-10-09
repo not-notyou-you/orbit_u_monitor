@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ERD Fisik dan Kamus Data</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/erd.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 4c · Physical database design</div>
+  <h1>ERD fisik dan kamus data</h1>
+  <p class="lede" id="lede"></p>
+</header>
+
+<h2>Ringkasan objek basis data</h2>
+<div class="fig" data-kind="Tabel" data-cap="Jumlah objek basis data PostgreSQL">
+<div class="body"><table class="t" id="objs"></table></div>
+</div>
+
+<h2>Tabel master dan transaksi</h2>
+<p>Prasyarat prodi: master ≥ 10 dan tabel transaksi ≥ 100 record.</p>
+<div class="fig" data-kind="Tabel" data-cap="Jumlah record tabel master dan transaksi" id="countfig">
+<div class="body"><table class="t" id="counts"></table></div>
+</div>
+
+<h2>ERD fisik per modul</h2>
+<p class="src">Tipe data PostgreSQL apa adanya (<code>varchar</code>, <code>timestamptz</code>, <code>geometry_multipolygon</code>, <code>jsonb</code>, enum). Tabel modul lain hanya ditampilkan PK-nya.</p>
+<div id="modules"></div>
+
+<h2>Kamus data</h2>
+<p><input class="search" id="q" placeholder="Cari tabel atau kolom…"> <button id="openAll">Buka semua</button></p>
+<div id="dict"></div>
+
+<h2>VIEW</h2>
+<div class="fig" data-kind="Tabel" data-cap="Daftar VIEW (pandangan pengguna)">
+<div class="body"><table class="t" id="views"></table></div>
+</div>
+
+<script>
+window.pageInit = function () {
+  const D = window.SKRIPSI_DATA, esc = Skripsi.esc, fmt = Skripsi.fmt, db = D.db;
+  const nT = Object.keys(D.tables).length;
+  document.getElementById("lede").innerHTML = `Dibangkitkan dari katalog PostgreSQL database <code>themonitor</code>: ${nT} tabel, ${D.views.length} VIEW,
+    ${D.rels.length} foreign key. Kamus data dibangkitkan <code>tools/data_dictionary.py</code> dari <code>COMMENT ON</code> di skema
+    (data diperbarui ${D.generated}${db ? `, jumlah record ${db.at}` : ""}).`;
+
+  const cons = {};
+  Object.values(D.tables).forEach((T) => T.cons.forEach((c) => (cons[c.type] = (cons[c.type] || 0) + 1)));
+  const objs = [
+    ["Tabel", nT], ["VIEW", D.views.length], ["Kolom", Object.values(D.tables).reduce((s, T) => s + T.cols.length, 0)],
+    ["Primary key", cons.PK || 0], ["Foreign key", cons.FK || 0], ["Unique", cons.UNIQUE || 0], ["Check", cons.CHECK || 0],
+  ];
+  if (db) objs.push(["Indeks (termasuk PK/UNIQUE)", db.indexes.length], ["Trigger", db.triggers.length], ["Policy RLS", db.policies.length], ["GRANT tabel/VIEW ke role monitor_*", db.grants.length]);
+  document.getElementById("objs").innerHTML = "<tr><th>Objek</th><th class=c>Jumlah</th></tr>" + objs.map(([a, b]) => `<tr><td>${a}</td><td class=r>${fmt(b)}</td></tr>`).join("");
+
+  const master = ["roles", "users", "satellite_sources", "spectral_bands", "administrative_regions", "regions_of_interest", "processing_stages", "quality_thresholds", "disaster_types", "alert_rules", "fusion_strategies", "report_types"];
+  if (db) {
+    const trans = Object.keys(db.counts).filter((t) => !master.includes(t) && t !== "app_settings").sort((a, b) => db.counts[b] - db.counts[a]);
+    const row = (t, kind, i) => `<tr><td class=c>${i}</td><td><code>${t}</code></td><td>${kind}</td><td class=r>${fmt(db.counts[t])}</td><td class=c>${kind === "Master" ? "" : db.counts[t] >= 100 ? '<span class="y">✓ ≥ 100</span>' : ""}</td></tr>`;
+    const nTrans100 = trans.filter((t) => db.counts[t] >= 100).length;
+    document.getElementById("counts").innerHTML = "<tr><th class=c>No</th><th>Tabel</th><th>Jenis</th><th class=c>Record</th><th class=c>Syarat</th></tr>" +
+      master.map((t, i) => row(t, "Master", i + 1)).join("") +
+      `<tr class=sub><td colspan=5>Transaksi (${nTrans100} tabel ≥ 100 record)</td></tr>` +
+      trans.map((t, i) => row(t, "Transaksi", master.length + i + 1)).join("") +
+      `<tr class=sub><td colspan=3>Total record</td><td class=r>${fmt(Object.values(db.counts).reduce((a, b) => a + b, 0))}</td><td></td></tr>`;
+    document.getElementById("countfig").dataset.from = `database themonitor, ${db.at}; region_observations ${db.obs_range[0]} s.d. ${db.obs_range[1]}`;
+  } else document.getElementById("countfig").remove();
+
+  const host = document.getElementById("modules");
+  ERD.MODULES.forEach((m) => {
+    const { text } = ERD.moduleErd(m, "physical");
+    const fig = document.createElement("div");
+    fig.className = "fig"; fig.dataset.cap = `ERD fisik modul ${m.name}`; fig.dataset.from = "Katalog PostgreSQL (DOCS/generated/erd_physical.mmd)";
+    fig.innerHTML = `<div class="body white"><pre class="mermaid">${esc(text)}</pre></div>`;
+    host.append(fig);
+  });
+
+  const dict = document.getElementById("dict");
+  const idx = {};
+  (db ? db.indexes : []).forEach((i) => (idx[i.t] = idx[i.t] || []).push(i));
+  Object.keys(D.tables).sort().forEach((t) => {
+    const T = D.tables[t];
+    const d = document.createElement("details");
+    d.className = "tbl"; d.dataset.key = (t + " " + T.cols.map((c) => c.n).join(" ")).toLowerCase();
+    d.innerHTML = `<summary><code>${t}</code> <small>${T.cols.length} kolom${db && db.counts[t] !== undefined ? " · " + fmt(db.counts[t]) + " record" : ""} — ${esc(T.desc)}</small></summary>
+      <div><div class="fig" data-kind="Tabel" data-cap="Kamus data tabel ${t}"><div class="body"><table class="t">
+      <tr><th class=c>No</th><th>Kolom</th><th>Tipe</th><th class=c>Null</th><th>Default</th><th>Kunci</th><th>Keterangan</th></tr>
+      ${T.cols.map((c, i) => `<tr><td class=c>${i + 1}</td><td class="${c.k.includes("PK") ? "pk" : c.k.includes("FK") ? "fk" : ""}">${c.n}</td><td><code>${esc(c.t)}</code></td><td class=c>${c.nn ? "NOT NULL" : "NULL"}</td><td><code>${esc(c.d.replace(/::regclass|nextval\('([^']+)'\)/g, (m, s) => (s ? "serial" : "")))}</code></td><td>${esc(c.k)}</td><td>${esc(c.ds)}</td></tr>`).join("")}
+      </table>
+      ${T.cons.length ? `<table class="t" style="margin-top:8px"><tr><th>Constraint</th><th>Jenis</th><th>Definisi</th></tr>${T.cons.map((c) => `<tr><td><code>${c.n}</code></td><td>${c.type}</td><td><code>${esc(c.def)}</code></td></tr>`).join("")}</table>` : ""}
+      ${idx[t] ? `<table class="t" style="margin-top:8px"><tr><th>Indeks</th><th>Definisi</th></tr>${idx[t].map((i) => `<tr><td><code>${i.n}</code></td><td><code>${esc(i.def.replace(/ ON public\.\w+ USING/, " USING"))}</code></td></tr>`).join("")}</table>` : ""}
+      </div></div></div>`;
+    dict.append(d);
+  });
+  document.getElementById("q").oninput = (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    dict.querySelectorAll("details").forEach((d) => { d.style.display = !q || d.dataset.key.includes(q) ? "" : "none"; if (q) d.open = d.dataset.key.includes(q); });
+  };
+  document.getElementById("openAll").onclick = () => dict.querySelectorAll("details").forEach((d) => (d.open = true));
+
+  document.getElementById("views").innerHTML = "<tr><th class=c>No</th><th>VIEW</th><th>Kolom</th><th>Keterangan</th></tr>" +
+    D.views.map((v, i) => `<tr><td class=c>${i + 1}</td><td><code>${v.name}</code></td><td>${v.cols.map((c) => `<code>${c}</code>`).join(", ")}</td><td>${esc(v.desc)}</td></tr>`).join("");
+};
+</script>
+</main>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Use Case Diagram</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/uml.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 6 · Pemodelan sistem</div>
+  <h1>Use case diagram</h1>
+  <p class="lede">Notasi UML 2.x: aktor stickman, system boundary, asosiasi garis lurus, «include» dan «extend» garis putus-putus,
+  generalisasi aktor panah segitiga kosong. Use case diambil dari route API dan kunci izin di <code>api/routes/auth.py</code>.
+  Diagram dipecah per aktor; aktor turunan mewarisi semua use case aktor induknya.</p>
+</header>
+
+<h2>Generalisasi aktor</h2>
+<div class="fig" data-cap="Generalisasi aktor sistem" data-from="INTERFACE.md §1; monitor_security.sql">
+<div class="body white" id="tree"></div>
+</div>
+
+<h2>Use case per aktor</h2>
+<div id="uc"></div>
+
+<h2>Daftar use case</h2>
+<div class="fig" data-kind="Tabel" data-cap="Daftar use case, aktor, dan endpoint API">
+<div class="body"><table class="t" id="list"></table></div>
+</div>
+
+<h2>Deskripsi use case</h2>
+<div id="desc"></div>
+
+<script>
+window.pageInit = function () {
+  UML.actorTree(document.getElementById("tree"), {
+    w: 820, h: 600,
+    actors: [
+      { id: "P", name: "Pengunjung", x: 410, y: 30 },
+      { id: "U", name: "Relawan", x: 410, y: 175 },
+      { id: "A", name: "Analis", x: 250, y: 320 },
+      { id: "D", name: "Data Engineer", x: 570, y: 320 },
+      { id: "M", name: "Administrator", x: 410, y: 480 },
+      { id: "S", name: "Scheduler (sistem)", x: 730, y: 30 },
+    ],
+    gen: [{ child: "U", parent: "P" }, { child: "A", parent: "U" }, { child: "D", parent: "U" }, { child: "M", parent: "A" }, { child: "M", parent: "D" }],
+    notes: [{ x: 730, y: 140, text: "Aktor sistem: proses terjadwal yang terhubung sebagai monitor_etl", wrap: 26 }],
+  });
+
+  const diagrams = [
+    { cap: "Use case diagram aktor Pengunjung", actor: ["P", "Pengunjung"], cases: [
+        ["p1", "Melihat Beranda dan peta AOI"], ["p2", "Melihat citra satelit 30 hari terakhir"], ["p3", "Mengunduh laporan PDF citra", 1],
+        ["p4", "Membandingkan dua tanggal scene", 1], ["p5", "Melihat kejadian bencana 365 hari"], ["p6", "Melihat halaman Tentang"],
+        ["p7", "Registrasi akun Relawan"], ["p8", "Login"], ["p9", "Validasi kata sandi dan batas registrasi", 1] ],
+      rel: [["p3", "p2", "extend"], ["p4", "p2", "extend"], ["p7", "p9", "include"]] },
+    { cap: "Use case diagram aktor Relawan", actor: ["U", "Relawan"], cases: [
+        ["u1", "Melihat 3D AOI"], ["u2", "Melihat citra satelit 365 hari"], ["u3", "Melihat hujan per kecamatan hari ini"],
+        ["u4", "Melihat peringatan hujan aktif"], ["u5", "Mengganti kata sandi"], ["u6", "Membuat token API"], ["u7", "Mencabut token API"],
+        ["u8", "Logout"], ["u9", "Login", 1] ],
+      rel: [["u1", "u9", "include"], ["u3", "u9", "include"], ["u5", "u9", "include"], ["u6", "u9", "include"]] },
+    { cap: "Use case diagram aktor Analis", actor: ["A", "Analis"], cases: [
+        ["a1", "Melihat keadaan terbaru semua band dan forecast 15 hari"], ["a2", "Menganalisis daerah per kecamatan"], ["a3", "Mengunduh PDF analisa daerah", 1],
+        ["a4", "Acknowledge peringatan hujan"], ["a5", "Mengelola kejadian bencana"], ["a6", "Ekspor / impor kejadian Excel", 1],
+        ["a7", "Melihat evaluasi peringatan (hit, miss, false alarm)"], ["a8", "Mengunduh Laporan Keadaan AOI"], ["a9", "Melihat log halaman Kejadian"],
+        ["a10", "Login", 1] ],
+      rel: [["a3", "a2", "extend"], ["a6", "a5", "extend"], ["a4", "a10", "include"], ["a5", "a10", "include"], ["a7", "a10", "include"]] },
+    { cap: "Use case diagram aktor Data Engineer", actor: ["D", "Data Engineer"], cases: [
+        ["d1", "Melihat ringkasan data per satelit"], ["d2", "Menonaktifkan / memulihkan scene"], ["d3", "Memproses ulang scene"],
+        ["d4", "Menjalankan backfill"], ["d5", "Memantau progres dan log backfill", 1], ["d6", "Membuat dataset historis"],
+        ["d7", "Memilih strategi fusion", 1], ["d8", "Mengunduh dataset ZIP"], ["d9", "Melakukan EDA"], ["d10", "Mengunduh Laporan Kesehatan Data"],
+        ["d11", "Melihat log halaman Data"], ["d12", "Mengisi alasan nonaktif", 1] ],
+      rel: [["d4", "d5", "include"], ["d7", "d6", "extend"], ["d2", "d12", "include"]] },
+    { cap: "Use case diagram aktor Administrator", actor: ["M", "Administrator"], cases: [
+        ["m1", "Mengelola akun pengguna"], ["m2", "Reset sandi / buka kunci akun", 1], ["m3", "Mengatur aturan peringatan"],
+        ["m4", "Mengatur ambang mutu data"], ["m5", "Mengatur jenis bencana"], ["m6", "Menandai kecamatan AOI"], ["m7", "Mengelola Live Area"],
+        ["m8", "Menjalankan siklus Live sekarang", 1], ["m9", "Mengubah pengaturan aplikasi"], ["m10", "Melihat log masuk, unduhan, dan audit"] ],
+      rel: [["m2", "m1", "extend"], ["m8", "m7", "extend"]] },
+    { cap: "Use case diagram aktor Scheduler", actor: ["S", "Scheduler"], cases: [
+        ["s1", "Menjalankan Job Hidromet harian"], ["s2", "Agregasi zonal per kecamatan", 1], ["s3", "Mengevaluasi aturan peringatan", 1],
+        ["s4", "Menjalankan siklus Live Sentinel-1"], ["s5", "Menghitung forecast tersimpan", 1], ["s6", "Memperbarui GPM Late → Final"],
+        ["s7", "Membuat laporan mingguan / bulanan"], ["s8", "Menghapus raster lebih dari 365 hari", 1] ],
+      rel: [["s1", "s2", "include"], ["s1", "s3", "include"], ["s1", "s5", "include"], ["s4", "s5", "include"], ["s1", "s8", "include"], ["s4", "s2", "include"]] },
+  ];
+  const host = document.getElementById("uc");
+  diagrams.forEach((d) => {
+    const fig = document.createElement("div");
+    fig.className = "fig"; fig.dataset.cap = d.cap;
+    fig.innerHTML = '<div class="body white"></div>';
+    host.append(fig);
+    const cases = d.cases.map(([id, name, col]) => ({ id, name, col: col || 0 }));
+    UML.useCase(fig.querySelector(".body"), {
+      title: "Orbit-U: The Monitor",
+      actors: [{ id: d.actor[0], name: d.actor[1] }],
+      cases,
+      links: cases.filter((c) => !c.col).map((c) => ({ a: d.actor[0], u: c.id })),
+      rel: d.rel.map(([from, to, type]) => ({ from, to, type })),
+    });
+  });
+
+  const list = [
+    ["UC-01", "Melihat Beranda dan peta AOI", "Pengunjung+", "GET /api/regions, /api/public/*"],
+    ["UC-02", "Melihat citra satelit (batas waktu per peran)", "Pengunjung+", "GET /api/citra/…"],
+    ["UC-03", "Mengunduh laporan PDF citra", "Pengunjung+", "GET /api/citra/report.pdf"],
+    ["UC-04", "Melihat kejadian bencana", "Pengunjung+", "GET /api/disasters"],
+    ["UC-05", "Registrasi akun Relawan", "Pengunjung", "POST /api/auth/register"],
+    ["UC-06", "Login / logout", "Pengunjung, semua peran", "POST /api/auth/login, /logout"],
+    ["UC-07", "Melihat 3D AOI", "Relawan+", "GET /api/live/…/card"],
+    ["UC-08", "Melihat hujan per kecamatan dan peringatan aktif", "Relawan+", "GET /api/hydromet/*, /api/alerts"],
+    ["UC-09", "Mengelola sandi dan token API sendiri", "Relawan+", "POST /api/auth/change-password, /tokens"],
+    ["UC-10", "Melihat forecast dan analisa daerah", "Analis", "GET /api/diagram/*"],
+    ["UC-11", "Acknowledge peringatan hujan", "Analis", "POST /api/alerts/{id}/acknowledge"],
+    ["UC-12", "Mengelola kejadian bencana", "Analis", "POST/PUT/DELETE /api/disasters"],
+    ["UC-13", "Melihat evaluasi peringatan", "Analis", "GET /api/alerts/evaluation"],
+    ["UC-14", "Mengunduh laporan (Keadaan AOI / Kesehatan Data)", "Analis, Data Engineer", "GET /api/reports/…"],
+    ["UC-15", "Mengelola scene per satelit", "Data Engineer", "PATCH /api/data/{src}/items/{id}, …/reprocess"],
+    ["UC-16", "Menjalankan backfill", "Data Engineer", "POST /api/data/{src}/backfill"],
+    ["UC-17", "Membuat dan mengunduh dataset historis", "Data Engineer", "/api/datasets/*"],
+    ["UC-18", "Melakukan EDA", "Data Engineer", "GET /api/data/eda"],
+    ["UC-19", "Mengelola akun pengguna", "Administrator", "/api/admin/users*"],
+    ["UC-20", "Mengatur aturan, ambang, wilayah, pengaturan, Live Area", "Administrator", "/api/admin/*, /api/live/areas"],
+    ["UC-21", "Melihat log dan audit", "Analis, Data Engineer, Administrator", "/api/logs/*, /api/admin/logs/*, /api/admin/audit"],
+    ["UC-22", "Menjalankan Job Hidromet harian", "Scheduler", "etl/hydromet_job.py"],
+    ["UC-23", "Menjalankan siklus Live Sentinel-1", "Scheduler", "etl/live_cycle.py"],
+    ["UC-24", "Membuat laporan periodik", "Scheduler", "etl/report_periodic.py"],
+  ];
+  document.getElementById("list").innerHTML = "<tr><th>Kode</th><th>Use case</th><th>Aktor</th><th>Endpoint / modul</th></tr>" +
+    list.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td><code>${r[3]}</code></td></tr>`).join("");
+
+  const desc = [
+    { id: "UC-06", name: "Login", actor: "Relawan, Analis, Data Engineer, Administrator", pre: "Pengguna memiliki akun aktif.",
+      main: ["Pengguna membuka halaman Masuk.", "Pengguna mengisi nama pengguna dan kata sandi.", "Sistem mengambil hash dan status kunci lewat fungsi auth_get_user.", "Sistem memverifikasi kata sandi (bcrypt).", "Sistem mencatat hasil lewat auth_record_login dan log LOGIN_SUCCESS.", "Sistem memasang cookie sesi JWT (8 jam) dan menampilkan menu sesuai peran."],
+      alt: ["4a. Kata sandi salah: sistem mencatat LOGIN_FAILED dan menambah hitungan gagal; setelah 5 kali akun dikunci 15 menit (ACCOUNT_LOCKED).", "3a. Akun nonaktif: sistem menolak dengan ACCOUNT_INACTIVE."],
+      post: "Sesi aktif; setiap request berikutnya berjalan dengan SET LOCAL ROLE sesuai peran." },
+    { id: "UC-05", name: "Registrasi akun Relawan", actor: "Pengunjung", pre: "Belum memiliki akun.",
+      main: ["Pengunjung membuka halaman Registrasi.", "Pengunjung mengisi email, nama pengguna, kata sandi, dan konfirmasi.", "Sistem memvalidasi kebijakan sandi (≥ 10 karakter) dan batas 5 registrasi per IP per jam.", "Sistem memanggil auth_register_user; peran dikunci USER di dalam fungsi.", "Sistem mencatat REGISTER dan langsung membuat sesi."],
+      alt: ["3a. Sandi tidak sesuai: PASSWORD_POLICY / PASSWORD_MISMATCH.", "4a. Nama pengguna atau email sudah dipakai: USERNAME_TAKEN / EMAIL_TAKEN.", "3b. Terlalu banyak registrasi: RATE_LIMITED."],
+      post: "Akun Relawan aktif dan pengguna masuk." },
+    { id: "UC-02", name: "Melihat citra satelit", actor: "Pengunjung dan semua peran", pre: "Ada scene Live yang sudah diproses.",
+      main: ["Pengguna membuka Citra Satelit dan memilih satelit.", "Sistem membaca v_citra_scenes, yang membatasi tanggal menurut peran (30 hari, 365 hari, atau semua).", "Pengguna memilih tanggal.", "Sistem menampilkan gambar, kalimat kondisi, dan tabel metrik per band dari v_citra_metrics."],
+      alt: ["3a. Pengguna memilih tanggal pembanding: sistem menampilkan dua gambar berdampingan dan kolom selisih (extend).", "4a. Pengguna memilih Unduh PDF: sistem membuat PDF dan mencatat DOWNLOAD_REPORT (extend)."],
+      post: "Pengguna melihat kondisi citra sesuai batas aksesnya." },
+    { id: "UC-11", name: "Acknowledge peringatan hujan", actor: "Analis", pre: "Ada alert_events yang belum ditindaklanjuti.",
+      main: ["Analis membuka daftar peringatan aktif.", "Analis memilih peringatan dan mengisi catatan.", "Sistem mengunci baris (SELECT … FOR UPDATE) dan memeriksa status.", "Sistem mengisi acknowledged_by, acknowledged_at, ack_note (GRANT kolom).", "Trigger audit_row mencatat perubahan ke audit_log."],
+      alt: ["3a. Peringatan sudah di-acknowledge: sistem menolak dengan ALERT_ALREADY_ACKED."],
+      post: "Peringatan hilang dari v_alert_aktif dan tercatat siapa yang menindaklanjuti." },
+    { id: "UC-12", name: "Mengelola kejadian bencana", actor: "Analis", pre: "Analis sudah login.",
+      main: ["Analis membuka Kejadian › Kelola.", "Analis memilih Tambah, Ubah, atau Hapus.", "Analis mengisi jenis, kecamatan, tanggal, keterangan (10–4000 karakter), dan sumber informasi.", "Sistem memvalidasi data dan menyimpan ke disaster_events.", "Trigger audit_row mencatat perubahan."],
+      alt: ["4a. Data tidak valid: sistem menampilkan dialog galat (INVALID_DISASTER / NOT_KECAMATAN).", "2a. Hapus: sistem mengisi deleted_at (soft delete), baris tidak dihapus fisik.", "2b. Analis mengimpor atau mengekspor Excel (extend)."],
+      post: "Kejadian tersimpan; bila terverifikasi, ikut dihitung v_evaluasi_alert." },
+    { id: "UC-16", name: "Menjalankan backfill", actor: "Data Engineer", pre: "Data Engineer sudah login.",
+      main: ["Data Engineer membuka Data › satelit dan mengisi rentang tanggal.", "Sistem memeriksa rentang ≤ 366 hari.", "Sistem menjalankan Job Hidromet (GPM/MODIS) atau siklus Live terbatas rentang (Sentinel-1) di thread monitor_etl.", "UI memoll progres dan log setiap 2 detik.", "Sistem menampilkan riwayat per tanggal dari dataset_jobs / live_scenes."],
+      alt: ["2a. Rentang terlalu panjang: INVALID_DATE_RANGE.", "3a. Backfill hidromet lain sedang berjalan: BACKFILL_RUNNING (409).", "3b. Seluruh rentang S1 di luar jendela raster 1 tahun: OUTSIDE_RASTER_WINDOW."],
+      post: "region_observations terisi untuk rentang tersebut." },
+    { id: "UC-19", name: "Mengelola akun pengguna", actor: "Administrator", pre: "Administrator sudah login.",
+      main: ["Administrator membuka Sistem › Pengguna.", "Administrator membuat akun baru atau mengubah peran, nama, organisasi, status aktif.", "Sistem menyimpan ke users; trigger mencatat audit (hash sandi disensor)."],
+      alt: ["2a. Reset sandi atau buka kunci akun (extend).", "2b. Mengubah akun sendiri: CANNOT_MODIFY_SELF."],
+      post: "Akun diperbarui; akun tidak pernah dihapus, hanya dinonaktifkan." },
+    { id: "UC-22", name: "Menjalankan Job Hidromet harian", actor: "Scheduler", pre: "Pukul 02:00 WIB.",
+      main: ["Scheduler mencoba advisory lock hydromet.", "Sistem mengambil tanggal yang belum COMPLETED.", "Sistem mengunduh GPM (Final → Late → Early) dan menghitung akumulasi 24h/72h/7d/30d.", "Sistem melakukan agregasi zonal per kecamatan ke region_observations (include).", "Sistem mengevaluasi alert_rules aktif dan menulis alert_events (include).", "Sistem mengunduh dan mengagregasi MODIS.", "Sistem menghitung forecast tersimpan dan menghapus raster lebih dari 365 hari (include)."],
+      alt: ["1a. Lock dipegang proses lain: SKIPPED_LOCKED.", "3a. Granule belum terbit: WAITING_UPSTREAM, lalu FAILED setelah 3 hari.", "6a. MODIS gagal: hari tetap COMPLETED tanpa MODIS."],
+      post: "Data harian dan peringatan hari itu tersedia." },
+  ];
+  document.getElementById("desc").innerHTML = desc.map((d) => `<div class="fig" data-kind="Tabel" data-cap="Deskripsi use case ${d.id} ${d.name}"><div class="body"><table class="t">
+    <tr><th style="width:170px">Kode</th><td>${d.id}</td></tr><tr><th>Nama use case</th><td>${d.name}</td></tr><tr><th>Aktor</th><td>${d.actor}</td></tr>
+    <tr><th>Prakondisi</th><td>${d.pre}</td></tr>
+    <tr><th>Alur utama</th><td><ol style="margin:0;padding-left:18px">${d.main.map((s) => `<li>${s}</li>`).join("")}</ol></td></tr>
+    <tr><th>Alur alternatif</th><td>${d.alt.map((s) => `<div>${s}</div>`).join("")}</td></tr>
+    <tr><th>Pascakondisi</th><td>${d.post}</td></tr></table></div></div>`).join("");
+};
+</script>
+</main>
+</body>
+</html>

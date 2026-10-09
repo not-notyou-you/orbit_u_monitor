@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Keamanan dan VIEW</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 4c · Pandangan pengguna, keamanan, indeks, redundansi</div>
+  <h1>Keamanan, VIEW, indeks, dan redundansi terkendali</h1>
+  <p class="lede">Matriks GRANT, policy, trigger, dan indeks di halaman ini dibaca langsung dari katalog PostgreSQL
+  (<code>information_schema</code>, <code>pg_policies</code>, <code>pg_indexes</code>), jadi sama persis dengan database yang berjalan.</p>
+</header>
+
+<h2>Hierarki role</h2>
+<div class="fig" data-cap="Hierarki role aplikasi dan role PostgreSQL" data-from="monitor_security.sql; pg_auth_members">
+<div class="body white"><pre class="mermaid">
+flowchart BT
+    pub["monitor_public<br/><small>PUBLIC · Pengunjung</small>"]
+    usr["monitor_user<br/><small>USER · Relawan</small>"]
+    ana["monitor_analyst<br/><small>ANALYST · Analis</small>"]
+    de["monitor_data_engineer<br/><small>DATA_ENGINEER</small>"]
+    adm["monitor_admin<br/><small>ADMIN · Administrator</small>"]
+    app(["monitor_app<br/>LOGIN, NOINHERIT<br/><small>koneksi API</small>"])
+    etl(["monitor_etl<br/>LOGIN<br/><small>scheduler & pipeline</small>"])
+    usr -->|mewarisi| pub
+    ana -->|mewarisi| usr
+    de -->|mewarisi| usr
+    adm -->|mewarisi| ana
+    adm -->|mewarisi| de
+    app -.->|SET LOCAL ROLE per request| pub & usr & ana & de & adm
+</pre></div>
+</div>
+
+<h2>Tiga lapis penegakan akses</h2>
+<div class="fig" data-cap="Tiga lapis penegakan hak akses per request" data-from="INTERFACE.md §3.2; api/deps.py">
+<div class="body white"><pre class="mermaid">
+flowchart LR
+    B([Peramban / skrip]) --> L1
+    subgraph L1 [Lapis 1 · UI]
+        m[Menu disusun dari<br/>kunci izin /api/auth/session]
+    end
+    L1 --> L2
+    subgraph L2 [Lapis 2 · API]
+        r["require_role(...) per route<br/>→ 401 / 403 ROLE_FORBIDDEN"]
+    end
+    L2 --> L3
+    subgraph L3 [Lapis 3 · Basis data]
+        s["BEGIN;<br/>SET LOCAL ROLE monitor_&lt;peran&gt;;<br/>set_config('app.user_id', id)"]
+        g[GRANT tabel & kolom]
+        v[VIEW dengan batas waktu per peran]
+        p[RLS policy]
+        a[Trigger audit_row → audit_log]
+        s --> g & v & p
+        g --> a
+    end
+    L3 --> R([Hasil / galat DB_PERMISSION_DENIED])
+</pre></div>
+</div>
+
+<h2>Matriks GRANT</h2>
+<p>S = SELECT, I = INSERT, U = UPDATE, D = DELETE. Hak yang tercantum adalah hak <b>langsung</b>; peran di atas mewarisi hak peran di bawahnya.</p>
+<div class="fig" data-kind="Tabel" data-cap="Matriks GRANT tabel per role PostgreSQL" data-from="information_schema.role_table_grants">
+<div class="body"><table class="t" id="gtab"></table></div>
+</div>
+<div class="fig" data-kind="Tabel" data-cap="Matriks GRANT VIEW per role PostgreSQL" data-from="information_schema.role_table_grants">
+<div class="body"><table class="t" id="gview"></table></div>
+</div>
+<div class="fig" data-kind="Tabel" data-cap="GRANT tingkat kolom">
+<div class="body"><table class="t" id="gcol"></table></div>
+</div>
+
+<h2>Row-level security dan fungsi autentikasi</h2>
+<div class="fig" data-kind="Tabel" data-cap="Policy row-level security" data-from="pg_policies">
+<div class="body"><table class="t" id="pol"></table></div>
+</div>
+<div class="fig" data-kind="Tabel" data-cap="Fungsi SECURITY DEFINER untuk autentikasi" data-from="DATABASE.md §8.2">
+<div class="body"><table class="t">
+<tr><th>Fungsi</th><th>Dipakai untuk</th></tr>
+<tr><td><code>auth_get_user(username)</code></td><td>Ambil hash dan status kunci saat login</td></tr>
+<tr><td><code>auth_record_login(user_id, success)</code></td><td>Catat hasil verifikasi; 5 gagal beruntun → kunci 15 menit</td></tr>
+<tr><td><code>auth_session_user(user_id)</code></td><td>Peran dan status terkini setiap request</td></tr>
+<tr><td><code>auth_get_token(prefix)</code></td><td>Cari token Bearer sebelum pemiliknya diketahui</td></tr>
+<tr><td><code>auth_change_own_password(hash)</code></td><td>Ganti sandi sendiri; baris ditentukan <code>app.user_id</code></td></tr>
+<tr><td><code>auth_register_user(username, email, hash)</code></td><td>Registrasi mandiri; peran dikunci USER di dalam fungsi</td></tr>
+</table></div>
+</div>
+
+<h2>Trigger</h2>
+<div class="fig" data-kind="Tabel" data-cap="Daftar trigger: audit, integritas, dan pembukuan" data-from="information_schema.triggers">
+<div class="body"><table class="t" id="trg"></table></div>
+</div>
+
+<h2>VIEW per peran</h2>
+<div class="fig" data-kind="Tabel" data-cap="VIEW dan peran yang dapat membacanya" data-from="information_schema.role_table_grants; DATABASE.md §7">
+<div class="body"><table class="t" id="vr"></table></div>
+</div>
+<div class="fig" data-kind="Tabel" data-cap="Definisi evaluasi alert pada v_evaluasi_alert" data-from="DATABASE.md §7">
+<div class="body"><table class="t">
+<tr><th>Hasil</th><th>Syarat (alert WARNING/CRITICAL, kejadian terverifikasi, jenis dan kecamatan sama)</th></tr>
+<tr><td>HIT</td><td>Ada alert pada H-3 sampai H-0 sebelum kejadian</td></tr>
+<tr><td>MISS</td><td>Kejadian tanpa alert dalam jendela itu</td></tr>
+<tr><td>FALSE_ALARM</td><td>Alert tanpa kejadian dalam 0–3 hari sesudahnya</td></tr>
+</table></div>
+</div>
+
+<h2>Indeks</h2>
+<div class="fig" data-kind="Tabel" data-cap="Rancangan indeks berdasarkan pola akses" data-from="DATABASE.md §6.4">
+<div class="body"><table class="t">
+<tr><th>Pola akses</th><th>Jenis indeks</th><th>Contoh</th></tr>
+<tr><td>Kueri spasial (scene di AOI, kecamatan berisi titik)</td><td>GiST</td><td>pada <code>geom</code>, <code>bbox</code>, <code>location</code></td></tr>
+<tr><td>Deret waktu terbaru</td><td>B-tree (… DESC)</td><td><code>idx_obs_date_band</code>, <code>idx_scenes_acq_dt</code>, <code>idx_nasa_scenes_source_date</code></td></tr>
+<tr><td>Baris "aktif" saja</td><td>Indeks parsial</td><td><code>idx_alerts_active</code>, <code>idx_datasets_status</code>, <code>idx_disasters_date_region</code></td></tr>
+<tr><td>Pencarian tanpa membedakan huruf</td><td>Indeks ekspresi</td><td><code>lower(name)</code>, <code>lower(email)</code></td></tr>
+<tr><td>Lineage dua arah</td><td>B-tree</td><td><code>idx_lineage_parent_id</code>, <code>idx_lineage_child_id</code></td></tr>
+<tr><td>Forecast terbaru per deret</td><td>B-tree komposit</td><td><code>idx_band_forecasts_latest</code></td></tr>
+</table></div>
+</div>
+<div class="fig" data-kind="Tabel" data-cap="Jumlah indeks per jenis" data-from="pg_indexes">
+<div class="body"><table class="t" id="ix"></table></div>
+</div>
+
+<h2>Redundansi terkendali</h2>
+<div class="fig" data-kind="Tabel" data-cap="Redundansi terkendali dan penjaga konsistensinya" data-from="DATABASE.md §9">
+<div class="body"><table class="t">
+<tr><th>Redundansi</th><th>Alasan</th><th>Penjaga konsistensi</th></tr>
+<tr><td><code>administrative_regions.area_km2</code></td><td>Luas dipakai berulang di laporan</td><td>Kolom <code>GENERATED ALWAYS … STORED</code> dari <code>geom</code></td></tr>
+<tr><td><code>regions_of_interest.centroid</code></td><td>Titik peta tanpa menghitung ulang</td><td>Trigger <code>trg_roi_centroid</code></td></tr>
+<tr><td><code>datasets.bbox_wkt</code></td><td>Dibaca pipeline tanpa PostGIS</td><td>Ditulis bersama <code>bbox</code> oleh kode yang sama</td></tr>
+<tr><td><code>alert_events.observed_value / threshold_value / severity</code></td><td>Salinan historis</td><td>Sengaja tidak ikut berubah</td></tr>
+<tr><td><code>datasets.total_scenes / completed_scenes / failed_scenes / total_size_bytes</code></td><td>Progres tanpa COUNT setiap halaman dibuka</td><td>Diperbarui job</td></tr>
+<tr><td><code>band_forecasts.mae / mae_naive / skill</code></td><td>Ringkasan yang dibaca API setiap request</td><td>Ditulis bersama skor oleh <code>forecast_store</code></td></tr>
+</table></div>
+</div>
+
+<script>
+window.pageInit = function () {
+  const D = window.SKRIPSI_DATA, db = D.db, esc = Skripsi.esc;
+  if (!db) return;
+  const roles = ["monitor_public", "monitor_user", "monitor_analyst", "monitor_data_engineer", "monitor_admin", "monitor_etl", "monitor_app"];
+  const short = { SELECT: "S", INSERT: "I", UPDATE: "U", DELETE: "D", TRUNCATE: "T", REFERENCES: "R", TRIGGER: "Tg" };
+  const head = "<tr><th>Objek</th>" + roles.map((r) => `<th class=c>${r.replace("monitor_", "").toUpperCase()}</th>`).join("") + "</tr>";
+  const viewNames = new Set(D.views.map((v) => v.name));
+  const byObj = {};
+  db.grants.forEach((g) => ((byObj[g.obj] = byObj[g.obj] || {})[g.role] = g.priv.split(",").map((p) => short[p] || p).filter((p) => "SIUD".includes(p)).join("")));
+  const rowsFor = (names) => names.map((o) => `<tr><td><code>${o}</code></td>` + roles.map((r) => `<td class=c>${(byObj[o] || {})[r] || ""}</td>`).join("") + "</tr>").join("");
+  const tables = Object.keys(D.tables).sort();
+  document.getElementById("gtab").innerHTML = head + rowsFor(tables);
+  document.getElementById("gview").innerHTML = head + rowsFor([...viewNames].sort());
+  document.getElementById("gcol").innerHTML = "<tr><th>Tabel</th><th>Role</th><th>Hak</th><th>Kolom</th></tr>" +
+    Object.values(db.colgrants.reduce((m, g) => { const k = g.obj + g.role; (m[k] = m[k] || { ...g, cols: [] }).cols.push(g.col); return m; }, {}))
+      .map((g) => `<tr><td><code>${g.obj}</code></td><td>${g.role}</td><td>${g.priv}</td><td>${g.cols.map((c) => `<code>${c}</code>`).join(", ")}</td></tr>`).join("");
+  document.getElementById("pol").innerHTML = "<tr><th>Tabel</th><th>Policy</th><th>Perintah</th><th>Role</th><th>USING</th></tr>" +
+    db.policies.map((p) => `<tr><td><code>${p.t}</code></td><td><code>${p.n}</code></td><td>${p.cmd}</td><td>${p.roles}</td><td><code>${esc(p.using)}</code></td></tr>`).join("");
+  const kind = (n) => (n.startsWith("trg_audit") ? "Audit" : n.endsWith("updated_at") ? "Pembukuan (updated_at)" : "Integritas / turunan");
+  document.getElementById("trg").innerHTML = "<tr><th>Tabel</th><th>Trigger</th><th>Waktu</th><th>Event</th><th>Fungsi</th><th>Kelompok</th></tr>" +
+    db.triggers.map((t) => `<tr><td><code>${t.t}</code></td><td><code>${t.n}</code></td><td>${t.timing}</td><td>${t.ev}</td><td><code>${esc(t.stmt.replace("EXECUTE FUNCTION ", ""))}</code></td><td>${kind(t.n)}</td></tr>`).join("");
+
+  const label = { monitor_public: "PUBLIC", monitor_user: "USER", monitor_analyst: "ANALYST", monitor_data_engineer: "DATA_ENGINEER", monitor_admin: "ADMIN", monitor_etl: "ETL" };
+  document.getElementById("vr").innerHTML = "<tr><th>VIEW</th><th>Dibaca (GRANT langsung)</th><th>Isi</th></tr>" +
+    D.views.map((v) => `<tr><td><code>${v.name}</code></td><td>${Object.keys(byObj[v.name] || {}).map((r) => label[r] || r).join(", ") || "—"}</td><td>${esc(v.desc)}</td></tr>`).join("");
+
+  const kinds = {};
+  db.indexes.forEach((i) => {
+    const d = i.def;
+    const k = /_pkey$/.test(i.n) ? "Primary key" : / USING gist/.test(d) ? "GiST (spasial)" : / WHERE /.test(d) ? (/UNIQUE/.test(d) ? "Unik parsial" : "Parsial") : /UNIQUE/.test(d) ? "Unik" : /\(\(|lower\(|COALESCE/.test(d) ? "Ekspresi" : "B-tree";
+    kinds[k] = (kinds[k] || 0) + 1;
+  });
+  document.getElementById("ix").innerHTML = "<tr><th>Jenis</th><th class=c>Jumlah</th></tr>" + Object.entries(kinds).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${k}</td><td class=r>${v}</td></tr>`).join("") +
+    `<tr class=sub><td>Total</td><td class=r>${db.indexes.length}</td></tr>`;
+};
+</script>
+</main>
+</body>
+</html>

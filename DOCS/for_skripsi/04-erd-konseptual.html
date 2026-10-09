@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ERD Konseptual</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 4a · Conceptual database design</div>
+  <h1>ERD konseptual</h1>
+  <p class="lede">Model konseptual bebas dari pertimbangan fisik: tanpa tipe data dan tanpa kunci surrogate. Entitas
+  diberi nama bisnis, kunci yang digambar adalah kunci alami (candidate key). Notasi Chen dipecah per area subjek supaya
+  terbaca di halaman A4; gambar ringkas semua entitas inti memakai notasi Crow's Foot.</p>
+</header>
+
+<h2>Identifikasi entitas</h2>
+<div class="fig" data-kind="Tabel" data-cap="Daftar tipe entitas konseptual dan tabel fisiknya" data-from="DATABASE.md §2.5">
+<div class="body"><table class="t">
+<tr><th>Area subjek</th><th>Entitas (konseptual)</th><th>Tabel fisik</th><th>Jenis</th></tr>
+<tr><td rowspan=4>Rujukan</td><td>Sumber Satelit, Variabel (Band)</td><td><code>satellite_sources</code>, <code>spectral_bands</code></td><td>Master</td></tr>
+<tr><td>Wilayah Administrasi, Area Pantauan</td><td><code>administrative_regions</code>, <code>regions_of_interest</code></td><td>Master</td></tr>
+<tr><td>Jenis Bencana, Aturan Peringatan, Ambang Mutu</td><td><code>disaster_types</code>, <code>alert_rules</code>, <code>quality_thresholds</code></td><td>Master</td></tr>
+<tr><td>Tahap Proses, Strategi Fusion, Jenis Laporan</td><td><code>processing_stages</code>, <code>fusion_strategies</code>, <code>report_types</code></td><td>Master</td></tr>
+<tr><td>Akses</td><td>Peran, Pengguna, Token API</td><td><code>roles</code>, <code>users</code>, <code>api_tokens</code></td><td>Master / transaksi</td></tr>
+<tr><td>Akuisisi</td><td>Scene Sentinel-1, Granule NASA</td><td><code>satellite_scenes</code>, <code>nasa_scenes</code></td><td>Transaksi</td></tr>
+<tr><td>Pemrosesan</td><td>Dataset, Job, Produk Data, Lineage, Metrik Mutu</td><td><code>datasets</code>, <code>processing_jobs</code>, <code>data_products</code>, <code>data_lineage</code>, <code>quality_metrics</code></td><td>Transaksi</td></tr>
+<tr><td>Pemantauan</td><td>Observasi Wilayah, Peringatan, Kejadian Bencana, Forecast</td><td><code>region_observations</code>, <code>alert_events</code>, <code>disaster_events</code>, <code>band_forecasts</code></td><td>Transaksi</td></tr>
+<tr><td>Jejak</td><td>Laporan, Log Aktivitas, Log Audit</td><td><code>generated_reports</code>, <code>user_activity_logs</code>, <code>audit_log</code></td><td>Transaksi</td></tr>
+</table></div>
+</div>
+
+<h2>ERD konseptual ringkas (Crow's Foot)</h2>
+<div class="fig" data-cap="ERD konseptual entitas inti (notasi Crow's Foot)" data-from="DATABASE.md §2.6">
+<div class="body white"><pre class="mermaid">
+erDiagram
+    PERAN ||--o{ PENGGUNA : "dimiliki"
+    SUMBER_SATELIT ||--|{ VARIABEL : "mengukur"
+    WILAYAH ||--o{ WILAYAH : "induk dari"
+    WILAYAH ||--o{ OBSERVASI : "diamati di"
+    VARIABEL ||--o{ OBSERVASI : "nilai dari"
+    PRODUK_DATA |o--o{ OBSERVASI : "sumber"
+    JENIS_BENCANA ||--o{ ATURAN_PERINGATAN : "dipicu oleh"
+    VARIABEL ||--o{ ATURAN_PERINGATAN : "diuji pada"
+    ATURAN_PERINGATAN ||--o{ PERINGATAN : "menghasilkan"
+    OBSERVASI ||--o{ PERINGATAN : "memicu"
+    PENGGUNA |o--o{ PERINGATAN : "menindaklanjuti"
+    JENIS_BENCANA ||--o{ KEJADIAN : "jenis"
+    WILAYAH ||--o{ KEJADIAN : "lokasi"
+    PENGGUNA ||--o{ KEJADIAN : "mencatat"
+    SUMBER_SATELIT ||--o{ GRANULE_NASA : "menerbitkan"
+    SCENE_S1 |o--o{ PRODUK_DATA : "menghasilkan"
+    GRANULE_NASA |o--o{ PRODUK_DATA : "menghasilkan"
+    TAHAP_PROSES ||--o{ JOB_PROSES : "tahap"
+    JOB_PROSES ||--o{ PRODUK_DATA : "menulis"
+    PRODUK_DATA ||--o{ LINEAGE : "induk / anak"
+    SCENE_S1 ||--o{ METRIK_MUTU : "dinilai"
+    PENGGUNA ||--o{ TOKEN_API : "memiliki"
+    PENGGUNA |o--o{ LOG_AKTIVITAS : "melakukan"
+</pre></div>
+</div>
+
+<h2>ERD konseptual notasi Chen per area subjek</h2>
+<p>Persegi = entitas, belah ketupat = relasi, oval = atribut, atribut bergaris bawah = kunci. Angka di garis = kardinalitas.</p>
+<div id="chen"></div>
+
+<h2>Kunci kandidat, primer, dan alternatif</h2>
+<div class="fig" data-kind="Tabel" data-cap="Candidate key, primary key, dan alternate key" data-from="DATABASE.md §2.7; monitor_schema.sql">
+<div class="body"><table class="t" id="keys"></table></div>
+</div>
+
+<h2>Domain atribut entitas inti</h2>
+<p>Domain dibangkitkan dari skema: tipe data, wajib/tidak, dan constraint CHECK yang menyebut kolom tersebut.</p>
+<div id="domains"></div>
+
+<script>
+window.pageInit = function () {
+  const D = window.SKRIPSI_DATA;
+  const esc = Skripsi.esc;
+  const areas = [
+    {
+      cap: "ERD Chen area Pemantauan: wilayah, observasi, peringatan, dan kejadian",
+      ents: {
+        WIL: ["Wilayah", ["<u>pcode</u>", "nama", "level", "in_aoi", "geometri"]],
+        VAR: ["Variabel", ["<u>kode_band</u>", "nama", "satuan", "batas_min", "batas_maks"]],
+        OBS: ["Observasi", ["tanggal", "nilai", "fraksi_valid", "run_GPM"]],
+        ATR: ["Aturan Peringatan", ["<u>kode_aturan</u>", "pembanding", "ambang", "severity", "aktif"]],
+        PRG: ["Peringatan", ["tanggal", "nilai_teramati", "ambang_saat_itu", "waktu_ack"]],
+        JB: ["Jenis Bencana", ["<u>kode_jenis</u>", "nama"]],
+        KJD: ["Kejadian", ["tanggal", "desa", "keterangan", "sumber_info", "terverifikasi"]],
+        USR: ["Pengguna", ["<u>username</u>", "nama", "email"]],
+      },
+      rels: [
+        ["r1", "induk dari", "WIL", "WIL", "1", "N"],
+        ["r2", "diamati di", "WIL", "OBS", "1", "N"],
+        ["r3", "nilai dari", "VAR", "OBS", "1", "N"],
+        ["r4", "diuji pada", "VAR", "ATR", "1", "N"],
+        ["r5", "dipicu oleh", "JB", "ATR", "1", "N"],
+        ["r6", "menghasilkan", "ATR", "PRG", "1", "N"],
+        ["r7", "memicu", "OBS", "PRG", "1", "N"],
+        ["r8", "menindaklanjuti", "USR", "PRG", "1", "N"],
+        ["r9", "jenis", "JB", "KJD", "1", "N"],
+        ["r10", "lokasi", "WIL", "KJD", "1", "N"],
+        ["r11", "mencatat", "USR", "KJD", "1", "N"],
+      ],
+    },
+    {
+      cap: "ERD Chen area Akuisisi dan Lineage: scene, granule, job, produk, mutu",
+      ents: {
+        SRC: ["Sumber Satelit", ["<u>kode_sumber</u>", "nama", "penyedia"]],
+        S1: ["Scene Sentinel-1", ["<u>id_produk_ESA</u>", "waktu_akuisisi", "orbit", "status", "valid"]],
+        GR: ["Granule NASA", ["<u>sumber+tile+produk+tanggal</u>", "run_type", "valid"]],
+        DS: ["Dataset", ["<u>nama</u>", "rentang_tanggal", "jenis", "status"]],
+        TP: ["Tahap Proses", ["<u>kode_tahap</u>", "urutan"]],
+        JOB: ["Job Proses", ["percobaan", "status", "parameter", "durasi"]],
+        PD: ["Produk Data", ["<u>path_berkas</u>", "tier", "checksum_SHA256", "ukuran"]],
+        QM: ["Metrik Mutu", ["band", "skor_mutu", "status_QA"]],
+      },
+      rels: [
+        ["a1", "menerbitkan", "SRC", "GR", "1", "N"],
+        ["a2", "diproses", "S1", "JOB", "1", "N"],
+        ["a3", "diproses", "GR", "JOB", "1", "N"],
+        ["a4", "tahap", "TP", "JOB", "1", "N"],
+        ["a5", "menulis", "JOB", "PD", "1", "N"],
+        ["a6", "lineage<br/>induk→anak", "PD", "PD", "M", "N"],
+        ["a7", "memiliki", "DS", "PD", "1", "N"],
+        ["a8", "dinilai", "S1", "QM", "1", "N"],
+      ],
+    },
+    {
+      cap: "ERD Chen area Akses dan Jejak: peran, pengguna, token, laporan, log",
+      ents: {
+        RL: ["Peran", ["<u>kode_peran</u>", "<u>role_DB</u>", "label"]],
+        USR: ["Pengguna", ["<u>username</u>", "<u>email</u>", "nama", "organisasi", "aktif"]],
+        TOK: ["Token API", ["<u>prefix</u>", "hash", "scope", "kedaluwarsa"]],
+        RT: ["Jenis Laporan", ["<u>kode_laporan</u>", "periode"]],
+        GR: ["Laporan", ["periode_mulai", "status", "checksum"]],
+        LA: ["Log Aktivitas", ["waktu", "aksi", "byte_terkirim", "IP"]],
+        AU: ["Log Audit", ["waktu", "tabel", "operasi", "data_lama", "data_baru"]],
+      },
+      rels: [
+        ["b1", "dimiliki", "RL", "USR", "1", "N"],
+        ["b2", "memiliki", "USR", "TOK", "1", "N"],
+        ["b3", "audiens", "RL", "RT", "1", "N"],
+        ["b4", "jenis", "RT", "GR", "1", "N"],
+        ["b5", "melakukan", "USR", "LA", "1", "N"],
+        ["b6", "mengubah", "USR", "AU", "1", "N"],
+      ],
+    },
+  ];
+  const host = document.getElementById("chen");
+  areas.forEach((ar) => {
+    const L = ["flowchart TB"];
+    for (const [id, [name, attrs]] of Object.entries(ar.ents)) {
+      L.push(`    ${id}["<b>${name}</b>"]`);
+      attrs.forEach((a, i) => { L.push(`    ${id}_a${i}(["${a}"])`); L.push(`    ${id}_a${i} --- ${id}`); });
+    }
+    ar.rels.forEach(([id, label, a, b, ca, cb]) => {
+      L.push(`    ${id}{"${label}"}`);
+      L.push(`    ${a} ---|${ca}| ${id}`);
+      L.push(`    ${id} ---|${cb}| ${b}`);
+    });
+    L.push("    classDef ent fill:#ffffff,stroke:#1d1f22,stroke-width:2px");
+    L.push("    classDef att fill:#ffffff,stroke:#6b7280");
+    L.push(`    class ${Object.keys(ar.ents).join(",")} ent`);
+    const fig = document.createElement("div");
+    fig.className = "fig"; fig.dataset.cap = ar.cap;
+    fig.innerHTML = `<div class="body white"><pre class="mermaid">${L.join("\n")}</pre></div>`;
+    host.append(fig);
+  });
+
+  const keys = [
+    ["roles", "role_id; role_code; db_role", "role_id", "role_code, db_role"],
+    ["users", "user_id; username; lower(email)", "user_id", "username, lower(email) (unik parsial)"],
+    ["satellite_sources", "source_id; source_code", "source_id", "source_code"],
+    ["spectral_bands", "band_id; band_code", "band_id", "band_code"],
+    ["administrative_regions", "region_id; pcode", "region_id", "pcode (P-code COD-AB)"],
+    ["satellite_scenes", "scene_id; product_identifier; scene_uuid", "scene_id", "product_identifier, scene_uuid"],
+    ["nasa_scenes", "nasa_scene_id; (source, tile_id, product_short_name, acquisition_date)", "nasa_scene_id", "(source, tile_id, product_short_name, acquisition_date)"],
+    ["region_observations", "obs_id; (region_id, band_id, obs_date)", "obs_id", "(region_id, band_id, obs_date)"],
+    ["alert_events", "alert_id; (rule_id, region_id, observation_date)", "alert_id", "(rule_id, region_id, observation_date)"],
+    ["band_forecasts", "forecast_id; (band_id, COALESCE(region_id,0), data_stamp)", "forecast_id", "(band_id, COALESCE(region_id,0), data_stamp)"],
+    ["data_lineage", "lineage_id; (parent_product_id, child_product_id)", "lineage_id", "(parent_product_id, child_product_id)"],
+    ["api_tokens", "token_id; token_prefix", "token_id", "token_prefix"],
+  ];
+  document.getElementById("keys").innerHTML = "<tr><th>Entitas / tabel</th><th>Candidate key</th><th>Primary key (surrogate)</th><th>Alternate key</th></tr>" +
+    keys.map((k) => `<tr><td><code>${k[0]}</code></td><td>${esc(k[1])}</td><td class="pk">${k[2]}</td><td>${esc(k[3])}</td></tr>`).join("");
+
+  const core = ["administrative_regions", "spectral_bands", "region_observations", "alert_rules", "alert_events", "disaster_types", "disaster_events", "users"];
+  const dhost = document.getElementById("domains");
+  core.forEach((t) => {
+    const T = D.tables[t];
+    if (!T) return;
+    const checks = T.cons.filter((c) => c.type === "CHECK");
+    const rows = T.cols.filter((c) => !/geom/.test(c.t) || true).map((c) => {
+      const dom = checks.filter((k) => new RegExp("\\b" + c.n + "\\b").test(k.def)).map((k) => k.def.replace(/^CHECK \(\(?|\)\)?$/g, "").replace(/::[a-z ]+(\[\])?/g, "")).join("; ");
+      return `<tr><td class="${c.k.includes("PK") ? "pk" : c.k.includes("FK") ? "fk" : ""}">${c.n}</td><td><code>${esc(c.t)}</code></td><td class=c>${c.nn ? "ya" : "tidak"}</td><td>${esc(dom) || "—"}</td><td>${esc(c.ds)}</td></tr>`;
+    }).join("");
+    const fig = document.createElement("div");
+    fig.className = "fig"; fig.dataset.kind = "Tabel"; fig.dataset.cap = `Domain atribut ${t}`;
+    fig.innerHTML = `<div class="body"><table class="t"><tr><th>Atribut</th><th>Tipe</th><th class=c>Wajib</th><th>Domain / constraint</th><th>Keterangan</th></tr>${rows}</table></div>`;
+    dhost.append(fig);
+  });
+};
+</script>
+</main>
+</body>
+</html>

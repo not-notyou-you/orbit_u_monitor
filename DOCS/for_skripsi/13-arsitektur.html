@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Arsitektur dan Alur Data</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 9–10 · Implementation, data conversion & loading</div>
+  <h1>Arsitektur sistem dan alur data</h1>
+  <p class="lede">Sumber: README §4, PIPELINE.md §1–§10, dan <code>etl/scheduler.py</code>.</p>
+</header>
+
+<h2>Arsitektur sistem</h2>
+<div class="fig" data-cap="Arsitektur sistem Orbit-U: The Monitor" data-from="README §4">
+<div class="body white"><pre class="mermaid">
+flowchart TB
+    subgraph SRC [Penyedia data resmi]
+        direction LR
+        cdse[ESA CDSE<br/>Sentinel-1 GRD]
+        nasa1[NASA LANCE / LAADS<br/>MODIS]
+        nasa2[NASA GES DISC<br/>GPM IMERG]
+    end
+    subgraph ETL [Lapisan ETL — Python]
+        direction LR
+        sch[APScheduler<br/>+ advisory lock]
+        hj[Job Hidromet harian]
+        lc[Siklus Live S1]
+        dj[Job Dataset<br/>on-demand]
+        rp[Laporan periodik]
+        fc[Forecast tersimpan]
+        sch --> hj & lc & rp & fc
+    end
+    subgraph STORE [Penyimpanan]
+        direction LR
+        fs[(Filesystem data/<br/>COG, HDF5, PNG, PDF)]
+        db[(PostgreSQL 18 + PostGIS<br/>41 tabel, 19 VIEW<br/>GRANT, RLS, audit)]
+    end
+    subgraph APP [Lapisan aplikasi]
+        direction LR
+        api[REST API FastAPI<br/>OpenAPI /docs<br/>SET LOCAL ROLE per request]
+        web[Web HTML/CSS/JS<br/>Leaflet, MapLibre 3D]
+    end
+    U([Pengguna 5 peran])
+    X([Skrip lain via token API])
+    SRC --> ETL
+    ETL -->|monitor_etl| db
+    ETL --> fs
+    db <-->|monitor_app| api
+    fs --> api
+    api <--> web
+    web <--> U
+    api <--> X
+</pre></div>
+</div>
+
+<h2>Deployment</h2>
+<div class="fig" data-cap="Deployment diagram" data-from="README §9; run.ps1">
+<div class="body white"><pre class="mermaid">
+flowchart LR
+    subgraph C [Perangkat pengguna]
+        br[Peramban web]
+    end
+    subgraph S [Server Windows]
+        subgraph P [Proses uvicorn]
+            api[FastAPI + berkas statis web/]
+            sch[APScheduler di dalam proses API]
+        end
+        pg[(PostgreSQL 18<br/>+ PostGIS)]
+        disk[(Disk data/)]
+        api --- pg
+        sch --- pg
+        api --- disk
+        sch --- disk
+    end
+    subgraph I [Internet]
+        prov[CDSE, NASA Earthdata]
+        cdn[CDN tile peta & DEM]
+    end
+    br -- HTTP --> api
+    br --> cdn
+    sch -- HTTPS --> prov
+</pre></div>
+</div>
+
+<h2>Pipeline per satelit</h2>
+<div class="fig" data-cap="Pipeline pemrosesan per satelit dan tier artefak" data-from="PIPELINE.md §2; etl/processing_plan.py">
+<div class="body white"><pre class="mermaid">
+flowchart LR
+    subgraph S1 [Sentinel-1]
+        direction LR
+        s1a[RAW<br/>GRD IW VV+VH] --> s1b[ALIGNED<br/>kalibrasi σ⁰, EPSG:4326, crop AOI]
+        s1b --> s1c[DESPECKLED<br/>filter Lee 7×7]
+        s1c --> s1d[COG]
+        s1c --> s1e[QA → quality_metrics]
+    end
+    subgraph MO [MODIS]
+        direction LR
+        m1[RAW<br/>MCDWD, MOD09A1/GA] --> m2[ALIGNED<br/>peta banjir] --> m3[INDICES<br/>NDVI, NDWI] --> m4[COG]
+    end
+    subgraph GP [GPM IMERG]
+        direction LR
+        g1[RAW<br/>Final → Late → Early] --> g2[ALIGNED<br/>hujan 1 hari] --> g3[ACCUMULATED<br/>24h, 72h, 7d, 30d] --> g4[COG]
+    end
+    s1d & m4 & g4 --> F[FUSED<br/>HDF5 multi-sensor]
+    s1d & m4 & g4 --> Z[Agregasi zonal per kecamatan<br/>→ region_observations]
+    Z --> AL[alert_events]
+    Z --> FC[band_forecasts]
+</pre></div>
+</div>
+
+<div class="fig" data-kind="Tabel" data-cap="Tier artefak (D14)" data-from="PIPELINE.md §2">
+<div class="body"><table class="t">
+<tr><th>Tier</th><th>Isi</th><th>Folder</th></tr>
+<tr><td>RAW</td><td>Format vendor</td><td><code>bronze/</code></td></tr>
+<tr><td>ALIGNED</td><td>EPSG:4326 + crop AOI (S1: terkalibrasi, sigma-nought)</td><td><code>bronze/</code></td></tr>
+<tr><td>DESPECKLED</td><td>S1 setelah filter Lee 7×7</td><td><code>silver/</code></td></tr>
+<tr><td>INDICES</td><td>MODIS NDVI/NDWI</td><td><code>silver/</code></td></tr>
+<tr><td>ACCUMULATED</td><td>GPM 24h/72h/7d/30d</td><td><code>silver/</code></td></tr>
+<tr><td>COG</td><td>Cloud-Optimized GeoTIFF per band</td><td><code>gold/</code></td></tr>
+<tr><td>FUSED</td><td>HDF5 multi-sensor</td><td><code>fusion/</code></td></tr>
+</table></div>
+</div>
+
+<h2>Lineage data</h2>
+<div class="fig" data-cap="Contoh graf lineage satu scene Sentinel-1 (DAG produk dengan checksum SHA-256)" data-from="data_products, data_lineage; etl/lineage_tracker.py">
+<div class="body white"><pre class="mermaid">
+flowchart LR
+    sc[(satellite_scenes)] --> r[data_products<br/>RAW .zip<br/>sha256]
+    r -->|data_lineage<br/>CALIBRATE| a[data_products<br/>ALIGNED VV/VH]
+    a -->|data_lineage<br/>SPECKLE_FILTER| d[data_products<br/>DESPECKLED]
+    d -->|data_lineage<br/>COG| c[data_products<br/>COG VV/VH]
+    d -.->|QUALITY_ANALYTICS| q[(quality_metrics)]
+    c -->|agregasi zonal| o[(region_observations<br/>source_product_id)]
+    pj[(processing_jobs)] -.-> r & a & d & c
+</pre></div>
+</div>
+
+<h2>Jadwal scheduler</h2>
+<div class="fig" data-kind="Tabel" data-cap="Jadwal job terjadwal dan kunci advisory" data-from="PIPELINE.md §7; etl/scheduler.py">
+<div class="body"><table class="t">
+<tr><th>Job</th><th>Jadwal (Asia/Jakarta)</th><th>Kunci</th><th>Menulis ke</th></tr>
+<tr><td>Hidromet harian</td><td>02:00 setiap hari</td><td><code>hydromet</code></td><td><code>region_observations</code>, <code>alert_events</code>, <code>dataset_jobs</code></td></tr>
+<tr><td>Pembaruan GPM Late → Final</td><td>Minggu 04:00</td><td><code>hydromet</code></td><td><code>region_observations.run_type</code></td></tr>
+<tr><td>Siklus Live</td><td>01:00, 07:00, 13:00, 19:00</td><td><code>live</code></td><td><code>live_scenes</code>, <code>live_scene_metrics</code>, <code>region_observations</code></td></tr>
+<tr><td>Laporan mingguan</td><td>Senin 03:00 / 03:15</td><td><code>report</code></td><td><code>generated_reports</code></td></tr>
+<tr><td>Laporan bulanan</td><td>Tanggal 1, 03:30 / 03:45</td><td><code>report</code></td><td><code>generated_reports</code></td></tr>
+<tr><td>Forecast tersimpan</td><td>00:30, 06:30, 12:30, 18:30</td><td><code>forecast</code></td><td><code>band_forecasts</code>, <code>band_forecast_points</code>, <code>band_forecast_scores</code></td></tr>
+</table></div>
+</div>
+<div class="fig" data-cap="Linimasa job terjadwal dalam satu hari (WIB)" data-from="PIPELINE.md §7">
+<div class="body white"><pre class="mermaid">
+gantt
+    dateFormat HH:mm
+    axisFormat %H:%M
+    title Jadwal harian scheduler (WIB)
+    section Hidromet
+    Job Hidromet harian        :h1, 02:00, 60m
+    section Live Sentinel-1
+    Siklus Live 01             :l1, 01:00, 45m
+    Siklus Live 07             :l2, 07:00, 45m
+    Siklus Live 13             :l3, 13:00, 45m
+    Siklus Live 19             :l4, 19:00, 45m
+    section Forecast
+    Forecast 00.30             :f1, 00:30, 10m
+    Forecast 06.30             :f2, 06:30, 10m
+    Forecast 12.30             :f3, 12:30, 10m
+    Forecast 18.30             :f4, 18:30, 10m
+    section Laporan (Senin / tgl 1)
+    Laporan mingguan           :r1, 03:00, 30m
+    Laporan bulanan            :r2, 03:30, 30m
+</pre></div>
+</div>
+<p class="src">Durasi batang hanya ilustrasi urutan; lama sebenarnya bergantung jumlah data.</p>
+
+<h2>Tiga tempat data dan retensi</h2>
+<div class="fig" data-cap="Tiga tempat data dan umur penyimpanannya" data-from="README §4 (M58); PIPELINE.md §9">
+<div class="body white"><pre class="mermaid">
+flowchart LR
+    subgraph U [Dataset utama]
+        direction TB
+        u1[Job Hidromet + siklus Live]
+        u2[(Raster COG/PNG<br/>365 hari bergulir)]
+        u3[(region_observations,<br/>live_scene_metrics<br/>disimpan selamanya)]
+        u1 --> u2 & u3
+    end
+    subgraph L [Tampilan Live]
+        l1[N scene terbaru<br/>live_areas.retention 1–60]
+    end
+    subgraph H [Dataset historis — Katalog]
+        h1[Dataset buatan Data Engineer<br/>sampai dihapus pemiliknya]
+    end
+    U --> L
+    U -. granule dipakai ulang<br/>hardlink .-> H
+    u2 -- lebih dari 365 hari --> del[Berkas dihapus<br/>data_products.is_valid = false]
+</pre></div>
+</div>
+
+<h2>Data conversion and loading</h2>
+<div class="fig" data-cap="Urutan pemuatan awal basis data" data-from="DATABASE.md §10; PIPELINE.md §10">
+<div class="body white"><pre class="mermaid">
+flowchart TD
+    a["apply_schema.py<br/>monitor_schema.sql → monitor_security.sql → monitor_seed.sql"] --> b["load_regions.py<br/>COD-AB → administrative_regions, AOI, dataset sistem, Live Area"]
+    b --> c["create_admin.py<br/>akun Administrator pertama"]
+    c --> d["backfill_hydromet.py<br/>GPM + MODIS → region_observations → alert_events"]
+    d --> e["backfill_s1.py<br/>Sentinel-1 per lintasan"]
+    e --> f["import_disasters.py &lt;csv&gt;<br/>opsional: kejadian dari CSV"]
+    f --> g["db_manifest.sql<br/>jumlah objek & baris untuk bukti"]
+</pre></div>
+</div>
+</main>
+</body>
+</html>

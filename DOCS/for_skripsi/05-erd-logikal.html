@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ERD Logikal</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/erd.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 4b · Logical database design</div>
+  <h1>ERD logikal, entitas kuat/lemah, dan multiplicity</h1>
+  <p class="lede">Model logikal relasional, belum terikat DBMS: atribut ditulis dengan domain umum (integer, string,
+  decimal, date, datetime, geometry, document), lengkap dengan PK, FK, dan UK. Diagram dibangkitkan dari skema yang
+  berjalan dan dipecah menjadi empat modul. Tabel dari modul lain digambar hanya dengan PK-nya.</p>
+</header>
+
+<h2>ERD logikal per modul</h2>
+<p class="src">Notasi Crow's Foot: <code>||</code> tepat satu, <code>|o</code> nol atau satu (FK boleh kosong), <code>o{</code> nol atau banyak. Label garis = nama kolom FK.</p>
+<div id="modules"></div>
+
+<h2>Entitas kuat dan lemah</h2>
+<div class="fig" data-kind="Tabel" data-cap="Identifikasi entitas kuat (strong) dan lemah (weak)" data-from="monitor_schema.sql; DATABASE.md §5.1">
+<div class="body"><table class="t" id="sw"></table></div>
+</div>
+
+<h2>Multiplicity setiap relasi</h2>
+<p>Dibangkitkan dari 76 foreign key di skema. Sisi induk <b>1</b> bila kolom FK <code>NOT NULL</code>, <b>0..1</b> bila boleh kosong.</p>
+<div class="fig" data-kind="Tabel" data-cap="Multiplicity dan aksi referensial setiap relasi" data-from="Katalog PostgreSQL (erd_physical.mmd, data_dictionary.md)">
+<div class="body"><table class="t" id="mult"></table></div>
+</div>
+
+<h2>Constraint integritas</h2>
+<div class="fig" data-kind="Tabel" data-cap="Jenis constraint integritas dan contohnya" data-from="DATABASE.md §5.3">
+<div class="body"><table class="t">
+<tr><th>Jenis</th><th>Penegakan</th><th>Contoh</th></tr>
+<tr><td>Entity integrity</td><td>PRIMARY KEY</td><td>PK di semua tabel</td></tr>
+<tr><td>Referential integrity</td><td>FOREIGN KEY + aksi eksplisit</td><td><code>RESTRICT</code> untuk master dan ROI, <code>CASCADE</code> untuk entitas dependen, <code>SET NULL</code> untuk rujukan opsional</td></tr>
+<tr><td>Domain</td><td>CHECK, ENUM, regex</td><td><code>valid_fraction</code> 0–1, <code>quality_score</code> 0–100, <code>retention</code> 1–60, regex <code>username</code>/<code>email</code></td></tr>
+<tr><td>Antar kolom</td><td>CHECK multi-kolom</td><td><code>chk_dataset_date_range</code>, <code>chk_alert_ack_pair</code>, <code>chk_scene_invalidation</code>, <code>chk_rule_active_needs_threshold</code>, <code>chk_token_max_lifetime</code></td></tr>
+<tr><td>Antar tabel</td><td>Trigger</td><td><code>trg_users_role_not_public</code>, <code>trg_obs_range</code></td></tr>
+<tr><td>Keunikan bersyarat</td><td>Indeks unik parsial</td><td><code>uq_roi_monitor_aoi</code>, <code>uq_report_ready</code>, <code>uq_users_email</code></td></tr>
+</table></div>
+</div>
+<div class="fig" data-kind="Tabel" data-cap="Jumlah constraint per jenis di skema">
+<div class="body"><table class="t" id="ccount"></table></div>
+</div>
+
+<script>
+window.pageInit = function () {
+  const D = window.SKRIPSI_DATA, esc = Skripsi.esc;
+  const host = document.getElementById("modules");
+  ERD.MODULES.forEach((m) => {
+    const { text, ext } = ERD.moduleErd(m, "logical");
+    const fig = document.createElement("div");
+    fig.className = "fig"; fig.dataset.cap = `ERD logikal modul ${m.name}`;
+    fig.dataset.from = ext.length ? "Tabel rujukan dari modul lain: " + ext.join(", ") : "Skema";
+    fig.innerHTML = `<div class="body white"><pre class="mermaid">${esc(text)}</pre></div>`;
+    host.append(fig);
+  });
+
+  const weak = {
+    band_forecast_points: ["band_forecasts", "PK komposit (forecast_id, step); tidak punya identitas sendiri"],
+    band_forecast_scores: ["band_forecasts", "PK komposit (forecast_id, model); tidak punya identitas sendiri"],
+  };
+  const dependent = {
+    dataset_source_config: "datasets", dataset_jobs: "datasets", scene_job_state: "dataset_jobs", data_lineage: "data_products",
+    quality_metrics: "satellite_scenes, data_products", live_scene_metrics: "live_scenes", alert_events: "alert_rules, region_observations",
+  };
+  const rows = Object.keys(D.tables).sort().map((t) => {
+    if (weak[t]) return `<tr><td><code>${t}</code></td><td><b>Lemah</b></td><td>${weak[t][0]}</td><td>${weak[t][1]}</td></tr>`;
+    if (dependent[t]) return `<tr><td><code>${t}</code></td><td>Kuat (eksistensi bergantung)</td><td>${dependent[t]}</td><td>PK surrogate sendiri; ikut terhapus induknya (ON DELETE CASCADE)</td></tr>`;
+    return `<tr><td><code>${t}</code></td><td>Kuat</td><td>—</td><td>PK sendiri</td></tr>`;
+  });
+  document.getElementById("sw").innerHTML = "<tr><th>Entitas</th><th>Jenis</th><th>Induk pengidentifikasi</th><th>Alasan</th></tr>" + rows.join("");
+
+  document.getElementById("mult").innerHTML = "<tr><th>No</th><th>Induk</th><th class=c>Mult. induk</th><th>Anak</th><th class=c>Mult. anak</th><th>Kolom FK</th><th>ON DELETE</th></tr>" +
+    D.rels.slice().sort((a, b) => a.parent.localeCompare(b.parent) || a.child.localeCompare(b.child)).map((r, i) => {
+      const m = ERD.multiplicity(r);
+      return `<tr><td class=c>${i + 1}</td><td><code>${r.parent}</code></td><td class=c>${m.parent}</td><td><code>${r.child}</code></td><td class=c>${m.child}</td><td><code>${r.fk}</code></td><td>${ERD.fkAction(r) || "NO ACTION"}</td></tr>`;
+    }).join("");
+
+  const cnt = {};
+  Object.values(D.tables).forEach((T) => T.cons.forEach((c) => (cnt[c.type] = (cnt[c.type] || 0) + 1)));
+  const label = { PK: "PRIMARY KEY", FK: "FOREIGN KEY", UNIQUE: "UNIQUE", CHECK: "CHECK", EXCLUDE: "EXCLUDE" };
+  document.getElementById("ccount").innerHTML = "<tr><th>Jenis</th><th class=c>Jumlah</th></tr>" +
+    Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${label[k] || k}</td><td class=r>${v}</td></tr>`).join("") +
+    `<tr class=sub><td>Total</td><td class=r>${Object.values(cnt).reduce((a, b) => a + b, 0)}</td></tr>`;
+};
+</script>
+</main>
+</body>
+</html>

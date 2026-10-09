@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Alur Penelitian</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body data-bab="3">
+<main>
+<header class="page">
+  <div class="stage">Bab 3 · Metodologi penelitian</div>
+  <h1>Alur penelitian dan metode</h1>
+  <p class="lede">Alur penelitian mengikuti Database System Development Life Cycle (DBSDLC) sesuai SKRIPSI.txt bagian A,
+  dengan metode pengumpulan data, identifikasi masalah, dan perancangan dari bagian B.</p>
+</header>
+
+<h2>Diagram alur penelitian</h2>
+<div class="fig" data-cap="Alur penelitian berdasarkan DBSDLC" data-from="SKRIPSI.txt bagian A; DATABASE.md">
+<div class="body white"><pre class="mermaid">
+flowchart TD
+    S([Mulai]) --> A1[Analisis sistem yang sedang berjalan<br/><i>As-Is System Analysis</i>]
+    A1 --> A2[Identifikasi masalah<br/><i>5W1H</i>]
+    A2 --> P[1. Database Planning<br/>mission statement & mission objectives]
+    P --> SD[2. System Definition<br/>batas sistem & user views]
+    SD --> RC[3. Requirement Collection & Analysis<br/>pemeriksaan dokumen, observasi, studi pustaka]
+    RC --> DD
+    subgraph DD [4. Database Design]
+        direction TB
+        C1[Conceptual design<br/>entitas, relasi, atribut, kunci, domain → ERD konseptual]
+        C2[Logical design<br/>strong/weak, multiplicity, normalisasi 3NF, constraint]
+        C3[Physical design<br/>DDL PostgreSQL, indeks, VIEW, keamanan, redundansi terkendali]
+        C1 --> C2 --> C3
+    end
+    C1 -. anomali / redundansi .-> RC
+    C2 -. tinjau ulang .-> C1
+    DD --> DS[5. DBMS Selection<br/>kerangka acuan → daftar pendek → evaluasi → rekomendasi]
+    DS --> PM[6. Pemodelan Sistem<br/>use case, activity, sequence, class diagram]
+    PM --> UI[7. Desain Antarmuka]
+    UI --> PR[8. Prototyping]
+    PR -. umpan balik pengguna .-> UI
+    PR --> IM[9. Implementation<br/>FastAPI, ETL Python, Web]
+    IM --> DL[10. Data Conversion & Loading<br/>COD-AB, backfill GPM/MODIS/Sentinel-1]
+    DL --> TS[11. Testing<br/>learnability, performance, robustness,<br/>recoverability, adaptability]
+    TS --> OK{Lolos?}
+    OK -- tidak --> IM
+    OK -- ya --> E([Selesai: rancangan basis data,<br/>rekomendasi DBMS, aplikasi & API])
+</pre></div>
+</div>
+
+<h2>Kerangka metode penelitian</h2>
+<div class="fig" data-cap="Kerangka metode penelitian" data-from="SKRIPSI.txt bagian B">
+<div class="body white"><pre class="mermaid">
+flowchart LR
+    subgraph M1 [Metode pengumpulan data]
+        direction TB
+        o[Observasi<br/>alur kerja GMLS]
+        sp[Studi pustaka<br/>DBSDLC, UML, ambang BMKG,<br/>produk ESA & NASA]
+        pd[Pemeriksaan dokumen<br/>ambang hujan BMKG, COD-AB BPS,<br/>spesifikasi produk satelit]
+    end
+    subgraph M2 [Metode identifikasi masalah]
+        direction TB
+        w[5W1H]
+        er[Entity-Relationship Diagram]
+    end
+    subgraph M3 [Metode perancangan]
+        direction TB
+        db[DBSDLC<br/>11 tahap]
+        uml[UML<br/>use case, activity, class]
+    end
+    subgraph H [Hasil akhir]
+        direction TB
+        h1[Rancangan database]
+        h2[Rekomendasi DBMS]
+        h3[Rancangan aplikasi]
+        h4[Middleware / REST API]
+    end
+    M1 --> M2 --> M3 --> H
+</pre></div>
+</div>
+
+<h2>Peta tahap ke artefak</h2>
+<div class="fig" data-kind="Tabel" data-cap="Tahap DBSDLC, artefak penelitian, dan bukti di project">
+<div class="body"><table class="t">
+<tr><th>No</th><th>Tahap</th><th>Artefak</th><th>Bukti di project</th></tr>
+<tr><td class=c>1</td><td>Database Planning</td><td>Mission statement, 8 mission objectives</td><td>DATABASE.md §2.1–2.2</td></tr>
+<tr><td class=c>2</td><td>System Definition</td><td>Batas sistem, user views 5 peran</td><td>DATABASE.md §2.3</td></tr>
+<tr><td class=c>3</td><td>Requirement Collection &amp; Analysis</td><td>Tabel fact-finding, 5W1H</td><td>DATABASE.md §2.4</td></tr>
+<tr><td class=c>4a</td><td>Conceptual Design</td><td>ERD konseptual, kunci, domain</td><td>DATABASE.md §2.5–2.7</td></tr>
+<tr><td class=c>4b</td><td>Logical Design</td><td>ERD logikal, multiplicity, normalisasi, constraint</td><td>DATABASE.md §5</td></tr>
+<tr><td class=c>4c</td><td>Physical Design</td><td>DDL, indeks, VIEW, GRANT/RLS, audit</td><td><code>database/monitor_schema.sql</code>, <code>monitor_security.sql</code></td></tr>
+<tr><td class=c>5</td><td>DBMS Selection</td><td>Benchmark Q1–Q6, uji fitur F1–F3, skor terbobot</td><td><code>benchmark/</code>, PERBANDINGAN_DBMS.md</td></tr>
+<tr><td class=c>6</td><td>Pemodelan Sistem</td><td>Use case, activity, sequence, class</td><td>INTERFACE.md §9; halaman 10–12</td></tr>
+<tr><td class=c>7</td><td>Desain Antarmuka</td><td>Peta situs, wireframe, design system</td><td>DESIGN.md, <code>web/</code></td></tr>
+<tr><td class=c>8</td><td>Prototyping</td><td>Aplikasi web berjalan</td><td><code>web/</code>, <code>api/</code></td></tr>
+<tr><td class=c>9</td><td>Implementation</td><td>ETL, API, scheduler</td><td><code>etl/</code>, <code>api/</code></td></tr>
+<tr><td class=c>10</td><td>Data Conversion &amp; Loading</td><td>Pemuatan COD-AB, backfill 3 satelit</td><td><code>scripts/</code>, PIPELINE.md §10</td></tr>
+<tr><td class=c>11</td><td>Testing</td><td>pytest, matriks GRANT, recovery, UAT/SUS</td><td><code>tests/</code>, <code>DOCS/hasil_uji/</code></td></tr>
+</table></div>
+</div>
+</main>
+</body>
+</html>

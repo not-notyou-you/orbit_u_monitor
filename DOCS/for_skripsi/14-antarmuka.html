@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Desain Antarmuka</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 7–8 · Desain antarmuka & prototyping</div>
+  <h1>Desain antarmuka</h1>
+  <p class="lede">Peta situs, matriks akses halaman, dan wireframe halaman utama. Wireframe mengikuti struktur aplikasi
+  (<code>web/app.html</code>, INTERFACE.md §2) dan design system Orbital 95 (DESIGN.md): jendela dengan title bar,
+  menu bar, satu baris instruksi, isi, dan taskbar dengan tombol Mulai.</p>
+</header>
+
+<p class="note">Untuk naskah, sandingkan setiap wireframe dengan <b>screenshot aplikasi jadi</b> (bukti prototyping).
+Screenshot bisa diambil dari aplikasi yang berjalan, atau dengan <code>tests/ui/screenshots.py</code> (perlu paket
+<code>websocket-client</code> dan database <code>themonitor_dev</code>).</p>
+
+<h2>Peta situs</h2>
+<div class="fig" data-cap="Peta situs (site map) aplikasi" data-from="INTERFACE.md §2; web/js/app.js">
+<div class="body white"><pre class="mermaid">
+flowchart LR
+    root((Orbit-U:<br/>The Monitor))
+    root --> m0[Masuk /masuk]
+    root --> m00[Registrasi /daftar]
+    root --> b[1 Beranda]
+    root --> aoi[2 3D AOI]
+    root --> c[3 Citra Satelit]
+    root --> f[4 Forecast]
+    root --> k[5 Kejadian]
+    root --> d[6 Data]
+    root --> l[7 Laporan]
+    root --> s[8 Sistem]
+    c --> c1[Ringkasan] & c2[Sentinel-1] & c3[MODIS] & c4[GPM] & c5[Laporan PDF]
+    f --> f1[Keadaan terbaru] & f2[Analisa daerah] & f3[Tren & evaluasi alert]
+    k --> k1[Lihat] & k2[Kelola]
+    d --> d1[Ringkasan] & d2[Sentinel-1] & d3[GPM] & d4[MODIS] & d5[Unduh data] & d6[Dataset tersimpan] & d7[Proses berjalan] & d8[EDA]
+    l --> l1[Kesehatan data] & l2[Keadaan AOI]
+    s --> s1[Tentang] & s2[Log] & s3[Akun saya] & s4[Pengguna] & s5[Pengaturan]
+</pre></div>
+</div>
+
+<h2>Akses halaman per peran</h2>
+<div class="fig" data-kind="Tabel" data-cap="Matriks akses halaman per peran (● penuh, ◐ terbatas, — tidak tampil)" data-from="INTERFACE.md §3.1">
+<div class="body"><table class="t">
+<tr><th>Halaman / fitur</th><th class=c>PUBLIC</th><th class=c>USER</th><th class=c>ANALYST</th><th class=c>DATA_ENG</th><th class=c>ADMIN</th></tr>
+<tr><td>0 Masuk, Registrasi</td><td class=c>●</td><td class=c>—</td><td class=c>—</td><td class=c>—</td><td class=c>—</td></tr>
+<tr><td>1 Beranda</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td></tr>
+<tr><td>2 3D AOI</td><td class=c>—</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td></tr>
+<tr><td>3 Citra Satelit (termasuk PDF)</td><td class=c>◐ 30 hari</td><td class=c>◐ 365 hari</td><td class=c>●</td><td class=c>●</td><td class=c>●</td></tr>
+<tr><td>4 Forecast</td><td class=c>—</td><td class=c>—</td><td class=c>●</td><td class=c>—</td><td class=c>●</td></tr>
+<tr><td>5.1 Lihat kejadian</td><td class=c>◐ 365 hari</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td></tr>
+<tr><td>5.2 Kelola kejadian</td><td class=c>—</td><td class=c>—</td><td class=c>●</td><td class=c>—</td><td class=c>●</td></tr>
+<tr><td>6 Data</td><td class=c>—</td><td class=c>—</td><td class=c>—</td><td class=c>●</td><td class=c>●</td></tr>
+<tr><td>7.1 Laporan Kesehatan data</td><td class=c>—</td><td class=c>—</td><td class=c>—</td><td class=c>●</td><td class=c>●</td></tr>
+<tr><td>7.2 Laporan Keadaan AOI</td><td class=c>—</td><td class=c>—</td><td class=c>●</td><td class=c>—</td><td class=c>●</td></tr>
+<tr><td>8.1 Tentang</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td></tr>
+<tr><td>8.2 Log</td><td class=c>—</td><td class=c>—</td><td class=c>◐ Kejadian</td><td class=c>◐ Data</td><td class=c>●</td></tr>
+<tr><td>8.3 Akun saya / Manajemen akun</td><td class=c>—</td><td class=c>◐ sendiri</td><td class=c>◐ sendiri</td><td class=c>◐ sendiri</td><td class=c>● semua</td></tr>
+<tr><td>8.4 Pengaturan aplikasi</td><td class=c>—</td><td class=c>—</td><td class=c>—</td><td class=c>—</td><td class=c>●</td></tr>
+</table></div>
+</div>
+
+<h2>Alur navigasi</h2>
+<div class="fig" data-cap="Alur navigasi pengunjung sampai halaman berperan" data-from="INTERFACE.md §2">
+<div class="body white"><pre class="mermaid">
+flowchart LR
+    v([Pengunjung membuka /]) --> b[Beranda]
+    b --> c[Citra 30 hari] & k[Kejadian 365 hari]
+    b --> q{Buka halaman<br/>ber-akun?}
+    q -- ya --> m[/masuk?next=…/]
+    m --> r{Punya akun?}
+    r -- tidak --> reg[/daftar/] --> b2
+    r -- ya --> b2[Beranda + menu sesuai peran]
+    b2 --> x[Halaman tujuan]
+</pre></div>
+</div>
+
+<h2>Wireframe</h2>
+<div id="wf"></div>
+
+<h2>Komponen design system</h2>
+<div class="fig" data-kind="Tabel" data-cap="Komponen antarmuka Orbital 95" data-from="DESIGN.md §4">
+<div class="body"><table class="t">
+<tr><th>Komponen</th><th>Aturan</th></tr>
+<tr><td>Jendela</td><td>Bevel menonjol, lebar maksimal 1200px; title bar biru dengan teks putih tebal</td></tr>
+<tr><td>Menu bar</td><td>Tepat di bawah title bar; halaman aktif ditandai latar seleksi</td></tr>
+<tr><td>Lede</td><td>Satu baris instruksi di setiap halaman</td></tr>
+<tr><td>Layar data</td><td>Data (angka, tabel, grafik, log) di dalam "layar CRT" gelap dengan teks fosfor hijau</td></tr>
+<tr><td>Lampu status</td><td>Hijau OK, amber sibuk, merah gagal; selalu didampingi teks</td></tr>
+<tr><td>Dialog</td><td>Semua pesan memakai dialog modal; tidak ada toast</td></tr>
+<tr><td>Taskbar</td><td>Tetap di bawah: tombol Mulai (menu per peran), tombol tugas, tray akun</td></tr>
+<tr><td>Tema</td><td>Orbital 95 (bawaan), Kertas Mint, Mika Pasir, Piksel Marun (M57)</td></tr>
+</table></div>
+</div>
+
+<script>
+window.pageInit = function () {
+  const NS = "http://www.w3.org/2000/svg";
+  const W = 960, H = 600, CX = 16, CY = 108, CW = W - 32, CH = H - CY - 44;
+  const MENU = ["Beranda", "3D AOI", "Citra Satelit", "Forecast", "Kejadian", "Data", "Laporan", "Sistem"];
+  function el(tag, a, p) { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (p) p.append(e); return e; }
+  function txt(p, x, y, s, o = {}) { const t = el("text", { x, y, "font-family": "Arial, sans-serif", "font-size": o.size || 12, fill: o.fill || "#222", "text-anchor": o.anchor || "start", "font-weight": o.bold ? "bold" : "normal" }, p); t.textContent = s; return t; }
+  function wire(spec) {
+    const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+    el("rect", { width: W, height: H, fill: "#ffffff" }, svg);
+    el("rect", { x: 4, y: 4, width: W - 8, height: H - 40, fill: "#f2f2f2", stroke: "#333", "stroke-width": 2 }, svg);
+    el("rect", { x: 6, y: 6, width: W - 12, height: 26, fill: "#5b6b7c" }, svg);
+    txt(svg, 16, 24, "Orbit-U: The Monitor — " + spec.title, { fill: "#fff", bold: true, size: 13 });
+    ["_", "□", "×"].forEach((s, i) => { el("rect", { x: W - 74 + i * 22, y: 10, width: 18, height: 16, fill: "#ddd", stroke: "#333" }, svg); txt(svg, W - 65 + i * 22, 23, s, { anchor: "middle", size: 11 }); });
+    let mx = 12;
+    MENU.forEach((m) => {
+      const w = m.length * 7 + 18;
+      if (m === spec.menu) el("rect", { x: mx - 4, y: 37, width: w, height: 22, fill: "#c9d3dd", stroke: "#333" }, svg);
+      txt(svg, mx + 4, 52, m, { size: 12, bold: m === spec.menu });
+      mx += w + 4;
+    });
+    el("line", { x1: 6, y1: 62, x2: W - 6, y2: 62, stroke: "#999" }, svg);
+    if (spec.tabs) {
+      let tx = 16;
+      spec.tabs.forEach((t, i) => { const w = t.length * 7 + 20; el("rect", { x: tx, y: 68, width: w, height: 22, fill: i === (spec.tab || 0) ? "#f2f2f2" : "#ddd", stroke: "#333" }, svg); txt(svg, tx + 10, 83, t, { size: 11.5 }); tx += w + 2; });
+    }
+    txt(svg, 16, 104, spec.lede || "", { size: 11.5, fill: "#555" });
+    spec.blocks.forEach((b) => {
+      const [gx, gy, gw, gh, label, kind] = b;
+      const x = CX + (gx / 12) * CW, y = CY + 8 + (gy / 12) * (CH - 8), w = (gw / 12) * CW - 8, h = (gh / 12) * (CH - 8) - 8;
+      const g = el("g", {}, svg);
+      if (kind === "btn") { el("rect", { x, y, width: w, height: Math.min(h, 26), fill: "#ddd", stroke: "#333", "stroke-width": 1.5 }, g); txt(g, x + w / 2, y + Math.min(h, 26) / 2 + 4, label, { anchor: "middle", size: 12 }); return; }
+      if (kind === "input") { txt(g, x, y + 12, label, { size: 11.5 }); el("rect", { x, y: y + 17, width: w, height: 22, fill: "#fff", stroke: "#333" }, g); return; }
+      el("rect", { x, y, width: w, height: h, fill: kind === "screen" ? "#3a3f45" : "#fff", stroke: "#333", "stroke-width": 1.5, "stroke-dasharray": kind === "img" || kind === "map" ? "6 4" : "0" }, g);
+      const fg = kind === "screen" ? "#cfe8cf" : "#333";
+      if (kind === "img" || kind === "map") { el("line", { x1: x, y1: y, x2: x + w, y2: y + h, stroke: "#bbb" }, g); el("line", { x1: x + w, y1: y, x2: x, y2: y + h, stroke: "#bbb" }, g); }
+      if (kind === "chart") { const pts = []; for (let i = 0; i <= 12; i++) pts.push(`${x + 10 + (i / 12) * (w - 20)},${y + h - 20 - (Math.sin(i * 0.9) * 0.3 + 0.4 + i * 0.02) * (h - 50)}`); el("polyline", { points: pts.join(" "), fill: "none", stroke: fg, "stroke-width": 2 }, g); el("polyline", { points: `${x + 10},${y + 30} ${x + 10},${y + h - 16} ${x + w - 10},${y + h - 16}`, fill: "none", stroke: fg }, g); }
+      if (kind === "table" || kind === "screen") { const rows = Math.max(1, Math.floor((h - 34) / 18)); for (let i = 0; i < rows; i++) el("line", { x1: x + 8, y1: y + 34 + i * 18, x2: x + w - 8, y2: y + 34 + i * 18, stroke: kind === "screen" ? "#6c8a6c" : "#ccc" }, g); }
+      if (kind === "cards") { const n = b[6] || 4; for (let i = 0; i < n; i++) { const cw = (w - 16 - (n - 1) * 8) / n; el("rect", { x: x + 8 + i * (cw + 8), y: y + 28, width: cw, height: h - 36, fill: "#f6f6f6", stroke: "#666" }, g); } }
+      txt(g, x + 8, y + 18, label, { size: 12, bold: true, fill: fg });
+    });
+    el("rect", { x: 0, y: H - 32, width: W, height: 32, fill: "#d4d4d4", stroke: "#333" }, svg);
+    el("rect", { x: 4, y: H - 28, width: 64, height: 24, fill: "#e6e6e6", stroke: "#333" }, svg);
+    txt(svg, 36, H - 11, "Mulai", { anchor: "middle", bold: true });
+    el("rect", { x: W - 190, y: H - 28, width: 186, height: 24, fill: "#e6e6e6", stroke: "#888" }, svg);
+    txt(svg, W - 182, H - 11, spec.tray || "relawan.bayah · Relawan", { size: 11.5 });
+    return svg;
+  }
+  const specs = [
+    { cap: "Wireframe halaman Masuk", title: "Masuk", menu: null, lede: "Masuk untuk membuka halaman sesuai peran akun Anda.", tray: "Pengunjung",
+      blocks: [[2, 0.5, 4.5, 10, "Masuk", "box"], [2.3, 2, 3.9, 1.6, "Nama pengguna", "input"], [2.3, 3.8, 3.9, 1.6, "Kata sandi", "input"], [4.2, 6, 2, 1.4, "Masuk", "btn"], [2.3, 8, 3.9, 1.4, "Daftar akun Relawan", "btn"], [7, 0.5, 4, 10, "Manfaat akun Relawan", "table"]] },
+    { cap: "Wireframe halaman Beranda", title: "Beranda", menu: "Beranda", lede: "Ringkasan sistem dan pintu masuk ke setiap halaman.",
+      blocks: [[0, 0, 12, 2, "1.1 Sambutan dan 1.2 penjelasan sistem", "box"], [0, 2, 12, 2, "Peringatan hujan aktif (USER+)", "screen"], [0, 4, 7, 4, "1.3 Kartu halaman sesuai peran", "cards", 4], [7, 4, 5, 8, "1.4 Peta AOI kecamatan", "map"], [0, 8, 7, 4, "Daftar kecamatan AOI dan tema tampilan", "table"]] },
+    { cap: "Wireframe halaman Citra Satelit per satelit", title: "Citra Satelit", menu: "Citra Satelit", tabs: ["Ringkasan", "Sentinel-1", "MODIS", "GPM", "Laporan PDF"], tab: 1, lede: "Pilih tanggal scene; bandingkan dua tanggal bila perlu.",
+      blocks: [[0, 0, 3, 12, "Daftar tanggal (batas peran)", "table"], [3, 0, 4.5, 6, "Gambar scene (lightbox)", "img"], [7.5, 0, 4.5, 6, "Gambar pembanding", "img"], [3, 6, 9, 2, "Kalimat kondisi", "screen"], [3, 8, 9, 4, "Tabel metrik per band × metrik + selisih", "screen"]] },
+    { cap: "Wireframe halaman Forecast", title: "Forecast", menu: "Forecast", tabs: ["Keadaan terbaru", "Analisa daerah", "Tren & evaluasi alert"], lede: "Semua band 30 hari terakhir dengan forecast 15 hari.", tray: "analis · Analis",
+      blocks: [[0, 0, 12, 8, "Grafik semua band + forecast 15 hari (pita 80%)", "chart"], [0, 8, 4, 1.3, "Sakelar forecast", "btn"], [0, 9.5, 12, 2.5, "Model terpilih, keyakinan, skill vs naive", "screen"]] },
+    { cap: "Wireframe halaman Kelola Kejadian", title: "Kejadian", menu: "Kejadian", tabs: ["Lihat", "Kelola"], tab: 1, lede: "Catat, ubah, atau hapus kejadian bencana.", tray: "analis · Analis",
+      blocks: [[0, 0, 7, 10.5, "Daftar kejadian (jenis, kecamatan, tanggal, terverifikasi)", "screen"], [0, 10.6, 2, 1.3, "Tambah", "btn"], [2.1, 10.6, 2.3, 1.3, "Ekspor Excel", "btn"], [7, 0, 5, 12, "Formulir kejadian", "box"], [7.3, 1.2, 4.4, 1.6, "Jenis bencana", "input"], [7.3, 3, 4.4, 1.6, "Kecamatan / desa", "input"], [7.3, 4.8, 4.4, 1.6, "Tanggal", "input"], [7.3, 6.6, 4.4, 1.6, "Keterangan (10–4000 karakter)", "input"], [7.3, 8.4, 4.4, 1.6, "Sumber informasi", "input"], [9.7, 10.5, 2, 1.3, "Simpan", "btn"]] },
+    { cap: "Wireframe halaman Data per satelit dan backfill", title: "Data", menu: "Data", tabs: ["Ringkasan", "Sentinel-1", "GPM", "MODIS", "Unduh data", "Tersimpan", "Proses", "EDA"], tab: 2, lede: "Kelola granule dan jalankan backfill rentang tanggal.", tray: "engineer · Data Engineer",
+      blocks: [[0, 0, 7, 12, "Daftar granule (aktif / nonaktif) + aksi", "screen"], [7, 0, 5, 4, "Backfill", "box"], [7.3, 1.2, 2.1, 1.6, "Dari", "input"], [9.6, 1.2, 2.1, 1.6, "Sampai", "input"], [9.7, 2.9, 2, 1.2, "Jalankan", "btn"], [7, 4, 5, 5, "Progres dan log langsung", "screen"], [7, 9, 5, 3, "Riwayat per tanggal", "table"]] },
+    { cap: "Wireframe halaman Laporan", title: "Laporan", menu: "Laporan", tabs: ["Kesehatan data", "Keadaan AOI"], tab: 1, lede: "Laporan otomatis mingguan/bulanan atau buat untuk rentang bebas.", tray: "analis · Analis",
+      blocks: [[0, 0, 8, 12, "Daftar laporan (periode, status, checksum, unduh)", "screen"], [8, 0, 4, 6, "Buat laporan rentang bebas", "box"], [8.3, 1.2, 3.4, 1.6, "Dari tanggal", "input"], [8.3, 3, 3.4, 1.6, "Sampai tanggal", "input"], [9.7, 4.7, 2, 1.2, "Unduh PDF", "btn"]] },
+    { cap: "Wireframe halaman Sistem › Pengguna", title: "Sistem", menu: "Sistem", tabs: ["Tentang", "Log", "Akun saya", "Pengguna", "Pengaturan"], tab: 3, lede: "Kelola akun, peran, dan status aktif.", tray: "admin · Administrator",
+      blocks: [[0, 0, 8, 12, "Daftar akun (username, peran, status, login terakhir)", "screen"], [8, 0, 4, 9, "Formulir akun", "box"], [8.3, 1.2, 3.4, 1.6, "Nama pengguna", "input"], [8.3, 3, 3.4, 1.6, "Nama lengkap", "input"], [8.3, 4.8, 3.4, 1.6, "Peran", "input"], [8.3, 7, 1.6, 1.3, "Simpan", "btn"], [10, 7, 1.7, 1.3, "Reset sandi", "btn"]] },
+  ];
+  const host = document.getElementById("wf");
+  specs.forEach((s) => {
+    const fig = document.createElement("div");
+    fig.className = "fig"; fig.dataset.cap = s.cap; fig.dataset.from = "web/pages/*.html; DESIGN.md";
+    const body = document.createElement("div"); body.className = "body white";
+    body.append(wire(s));
+    fig.append(body);
+    host.append(fig);
+  });
+};
+</script>
+</main>
+</body>
+</html>
