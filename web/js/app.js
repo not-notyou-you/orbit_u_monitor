@@ -1,12 +1,12 @@
 // web/js/app.js — kerangka "desktop" Orbital 95: router hash, jendela utama, taskbar.
 //
-// Susunan halaman mengikuti INTERFACE.md §2 (M56, rancangan pemilik proyek):
-// Beranda → 3D AOI → Citra Satelit → Forecast → Kejadian → Data → Laporan →
-// Sistem, ditambah Masuk (/masuk) dan Registrasi (/daftar) di luar aplikasi.
-// Aplikasi terbuka untuk pengunjung: menu disusun dari izin di
-// GET /api/auth/session, jadi pengunjung hanya melihat Beranda, Citra
-// (30 hari), Kejadian (1 tahun), dan Sistem › Tentang. Hash susunan lama
-// (M53) tetap hidup lewat ALIASES.
+// Susunan halaman mengikuti INTERFACE.md §2 (M56, rancangan pemilik proyek;
+// M63): Beranda (Pantau Lokasi) → Tentang → 3D AOI → Citra Satelit →
+// Forecast → Kejadian → Data → Laporan → Sistem, ditambah Masuk (/masuk) dan
+// Registrasi (/daftar) di luar aplikasi. Aplikasi terbuka untuk pengunjung:
+// menu disusun dari izin di GET /api/auth/session, jadi pengunjung hanya
+// melihat Beranda, Tentang, Citra (30 hari), dan Kejadian (1 tahun). Hash
+// susunan lama (M53) tetap hidup lewat ALIASES.
 //
 // /app#<tujuan>[/<tab>[/<bagian>]] memuat fragmen pages/<berkas>.html ke panel
 // jendela dan skrip js/<berkas>.js (sekali), lalu memanggil
@@ -15,15 +15,22 @@
 'use strict';
 
 window.Pages = window.Pages || {};
-const ASSET_V = '6.16';
+const ASSET_V = '6.18';
 
 // `lede` = keterangan halaman; tidak lagi ditampilkan di jendela (dihapus atas
 // permintaan pemilik proyek), disimpan sebagai dokumentasi rute.
 const ROUTES = [
   {
     hash: 'beranda', file: 'home', title: 'Beranda', icon: 'globe', perm: ['home.view'],
-    lede: 'Sambutan, penjelasan singkat, halaman yang tersedia untuk peran Anda, pilihan tema tampilan, dan peta kecamatan AOI.',
-    desc: 'Titik mendarat: apa aplikasi ini, keadaan terakhir, dan pintasan ke halaman Anda.',
+    lede: 'Pantau lokasi: kondisi kecamatan tempat Anda berada (pengguna yang masuk, dengan izin lokasi) atau yang Anda pilih — kalimat kondisi, citra satelit kecamatan itu, dan angkanya.',
+    desc: 'Pantau lokasi: kondisi satu kecamatan, citra satelitnya, dan angka 30 hari terakhir.',
+  },
+  {
+    // M63: isi Beranda lama (sambutan, penjelasan, kartu halaman, tema, peta
+    // AOI) digabung dengan Sistem › Tentang menjadi menu sendiri.
+    hash: 'tentang', file: 'about', title: 'Tentang', icon: 'help', perm: ['about.view'],
+    lede: 'Apa aplikasi ini, batasannya, halaman untuk peran Anda, tema tampilan, peta AOI, sumber data, dan versi.',
+    desc: 'Apa aplikasi ini, batasannya, halaman per peran, tema tampilan, peta AOI, dan sumber data.',
   },
   {
     hash: 'aoi-3d', file: 'terrain3d', title: '3D AOI', icon: 'satellite', perm: ['aoi3d.view'], css: true,
@@ -141,13 +148,9 @@ const ROUTES = [
     ],
   },
   {
-    hash: 'sistem', title: 'Sistem', icon: 'gear', perm: ['about.view'],
-    desc: 'Tentang aplikasi, log, akun, dan pengaturan.',
+    hash: 'sistem', title: 'Sistem', icon: 'gear', perm: ['logs.data', 'logs.disasters', 'logs.all', 'account.manage'],
+    desc: 'Log, akun, dan pengaturan.',
     tabs: [
-      {
-        key: 'tentang', file: 'about', title: 'Tentang', perm: ['about.view'],
-        lede: 'Apa aplikasi ini, sumber datanya, batasannya, dan siapa yang membuatnya.',
-      },
       {
         key: 'log', file: 'logs', title: 'Log', perm: ['logs.data', 'logs.disasters', 'logs.all'],
         lede: 'Catatan yang hanya bisa dibaca, sesuai peran: Data Engineer → halaman Data, Analis → halaman Kejadian, Administrator → semuanya.',
@@ -173,6 +176,8 @@ const ROUTES = [
 // Dicocokkan dari awalan terpanjang, jadi "pengaturan/operasi/live" ikut
 // pindah dengan sisa segmennya.
 const ALIASES = {
+  // M63: Tentang keluar dari Sistem menjadi menu sendiri
+  'sistem/tentang': 'tentang',
   // M61: halaman Diagram berganti nama menjadi Forecast
   'diagram': 'forecast',
   // susunan M53

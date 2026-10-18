@@ -22,6 +22,12 @@ load_dotenv()
 
 # Test tidak boleh melanjutkan job produksi saat lifespan API berjalan.
 os.environ["AUTO_RESUME_JOBS"] = "false"
+# M64: test TIDAK PERNAH mengirim email sungguhan walau .env berisi kredensial
+# SMTP -- pesan ditulis sebagai .eml ke LOGS_DIR/mail (direktori sementara).
+# Alamat uji @example.org memakai null MX, jadi cek DNS dimatikan di sini dan
+# diuji tersendiri di tests/test_notify.py.
+os.environ["MAIL_BACKEND"] = "file"
+os.environ["MAIL_CHECK_DNS"] = "false"
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -24,7 +24,7 @@ from api.deps import get_db, require_role, set_clients
 from api.security import jwt_secret
 from api.routes import (
     admin, admin_monitor, alerts, auth, citra, data, datasets, diagram, excel, disasters, health, hydromet, lineage,
-    live, logs, pipeline,
+    live, lokasi, logs, pipeline,
     products, public, quality, regions, report, reports, scenes, storage,
 )
 
@@ -139,6 +139,8 @@ def _role(min_role: str) -> list:
 app.include_router(health.router, prefix="/api", tags=["Health"], dependencies=_role("PUBLIC"))
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(public.router, prefix="/api/public", tags=["Public"], dependencies=_role("PUBLIC"))
+# Pantau Lokasi di Beranda (M63): kondisi per kecamatan, batas waktu di VIEW.
+app.include_router(lokasi.router, prefix="/api/public/lokasi", tags=["Public"], dependencies=_role("PUBLIC"))
 # Susunan halaman v2 (M56): Citra per satelit, batas waktu per role di VIEW.
 app.include_router(citra.router, prefix="/api/citra", tags=["Imagery"], dependencies=_role("PUBLIC"))
 app.include_router(diagram.router, prefix="/api/diagram", tags=["Diagram"], dependencies=_role("ANALYST"))

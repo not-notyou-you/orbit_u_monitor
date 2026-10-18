@@ -1,4 +1,5 @@
-// js/account.js — Akun Saya: profil (/auth/me), ubah sandi, token API milik sendiri.
+// js/account.js — Akun Saya: profil (/auth/me), email & peringatan (M64), ubah sandi,
+// token API milik sendiri.
 'use strict';
 Pages['account'] = {
   async init(root, ctx) {
@@ -20,6 +21,9 @@ Pages['account'] = {
       i.setAttribute('aria-invalid', msg ? 'true' : 'false');
       UI.$('#' + id + 'Err', root).textContent = msg || '';
     };
+
+    // ---- email & peringatan (M64)
+    await initNotify(root, setErr);
 
     // ---- ubah sandi
     UI.$('#pwForm', root).addEventListener('submit', async ev => {
@@ -94,3 +98,85 @@ Pages['account'] = {
     loadTokens();
   },
 };
+
+// Email dan kecamatan langganan peringatan (M64). Email disimpan server hanya
+// setelah lolos pengecekan (format, belum dipakai, domain punya server mail,
+// email konfirmasi terkirim); penolakan dijelaskan di bawah kolomnya.
+async function initNotify(root, setErr) {
+  const addr = UI.$('#mailAddr', root), state = UI.$('#mailState', root), del = UI.$('#mailDel', root);
+  const list = UI.$('#regList', root), all = UI.$('#regAll', root), regState = UI.$('#regState', root);
+  let prefs, regions = [];
+  try {
+    [prefs, regions] = await Promise.all([API.get('/api/auth/notify'),
+      Maps.regions().then(g => g.features.map(f => f.properties)).catch(() => [])]);
+  } catch (e) {
+    UI.$('#mailBox', root).innerHTML = '<legend>Email &amp; peringatan</legend>' + UI.emptyHTML('PENGATURAN EMAIL TIDAK DAPAT DIMUAT');
+    UI.$('#regBox', root).hidden = true;
+    return;
+  }
+  regions.sort((a, b) => a.name.localeCompare(b.name, 'id'));
+
+  function showMail(p) {
+    prefs = p;
+    addr.value = p.email || '';
+    del.hidden = !p.email;
+    state.textContent = p.email
+      ? (p.email_verified_at ? 'Tersimpan dan terkonfirmasi sejak ' + UI.dateTime(p.email_verified_at) + '.'
+        : 'Email lama belum dicek ulang — simpan sekali lagi agar peringatan dikirim ke alamat ini.')
+      : 'Belum ada email. Anda tidak menerima peringatan, dan itu tidak masalah.';
+    const off = UI.$('#mailOff', root);
+    off.hidden = p.mail_configured;
+    off.textContent = 'Pengiriman email belum diatur di server ini; email belum bisa disimpan. Hubungi Administrator.';
+    summary();
+  }
+  function summary() {
+    const n = prefs.all_regions ? regions.length : prefs.region_ids.length;
+    const ok = prefs.email && prefs.email_verified_at;
+    regState.textContent = !n ? 'Belum ada kecamatan dipilih — tidak ada peringatan.'
+      : (prefs.all_regions ? 'Semua kecamatan' : n + ' kecamatan') + ' dipilih' +
+        (ok ? '; peringatan dikirim ke ' + prefs.email + '.' : '; isi email di atas agar peringatan terkirim.');
+  }
+  function renderRegions() {
+    all.checked = prefs.all_regions;
+    list.innerHTML = regions.map(r => '<label class="check"><input type="checkbox" value="' + r.region_id + '"' +
+      (prefs.all_regions || prefs.region_ids.includes(r.region_id) ? ' checked' : '') + (prefs.all_regions ? ' disabled' : '') +
+      '> ' + UI.esc(r.name) + '</label>').join('') || UI.emptyHTML('AOI BELUM DIATUR');
+  }
+  showMail(prefs);
+  renderRegions();
+  all.addEventListener('change', () => UI.$$('input', list).forEach(i => { i.disabled = all.checked; if (all.checked) i.checked = true; }));
+
+  UI.$('#mailForm', root).addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const v = addr.value.trim();
+    if (!v) { setErr('mailAddr', 'Isi alamat email, atau pakai "Hapus email".'); return; }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { setErr('mailAddr', 'Format email tidak valid.'); return; }
+    setErr('mailAddr', '');
+    state.textContent = 'Memeriksa alamat dan mengirim email konfirmasi…';
+    await UI.busy(UI.$('#mailBtn', root), async () => {
+      try {
+        showMail(await API.put('/api/auth/email', { email: v }));
+        UI.info('Email tersimpan', 'Email konfirmasi sudah dikirim ke ' + v + '. Bila tidak ada di kotak masuk, periksa folder spam.');
+      } catch (e) {
+        setErr('mailAddr', (UI.ERROR_TEXT[e.code] || UI.errorText(e)) + ' Email tidak disimpan.');
+        showMail(prefs);
+      }
+    });
+  });
+  del.addEventListener('click', async () => {
+    if (!await UI.confirm('Hapus email', 'Hapus ' + prefs.email + '? Anda tidak akan menerima peringatan lagi.', 'Hapus')) return;
+    await UI.busy(del, async () => {
+      try { showMail(await API.put('/api/auth/email', { email: null })); setErr('mailAddr', ''); }
+      catch (e) { UI.showError('Hapus email', e); }
+    });
+  });
+  UI.$('#regBtn', root).addEventListener('click', async () => {
+    const ids = UI.$$('input:checked', list).map(i => +i.value);
+    await UI.busy(UI.$('#regBtn', root), async () => {
+      try {
+        prefs = await API.put('/api/auth/notify', { all_regions: all.checked, region_ids: all.checked ? [] : ids });
+        renderRegions(); summary();
+      } catch (e) { UI.showError('Simpan pilihan kecamatan', e); }
+    });
+  });
+}

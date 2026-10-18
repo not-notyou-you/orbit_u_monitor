@@ -81,6 +81,8 @@ CREATE TABLE users (
     full_name          VARCHAR(100) NOT NULL,
     organization       VARCHAR(100),
     email              VARCHAR(254) CHECK (email IS NULL OR email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+    email_verified_at  TIMESTAMPTZ,
+    notify_all_regions BOOLEAN      NOT NULL DEFAULT false,
     is_active          BOOLEAN      NOT NULL DEFAULT true,
     failed_login_count SMALLINT     NOT NULL DEFAULT 0 CHECK (failed_login_count >= 0),
     locked_until       TIMESTAMPTZ,
@@ -98,7 +100,9 @@ COMMENT ON COLUMN users.username           IS 'Alternate key, huruf kecil/angka/
 COMMENT ON COLUMN users.password_hash      IS 'Hash bcrypt (cost 12). Tidak pernah dikirim ke klien; disensor di audit_log.';
 COMMENT ON COLUMN users.full_name          IS 'Nama lengkap untuk tampilan.';
 COMMENT ON COLUMN users.organization       IS 'Asal organisasi, mis. GMLS, BPBD Lebak, kampus.';
-COMMENT ON COLUMN users.email              IS 'Alamat email (unik, tanpa membedakan huruf besar). Wajib untuk akun hasil registrasi mandiri (M56); NULL untuk akun lama buatan ADMIN.';
+COMMENT ON COLUMN users.email              IS 'Alamat email (unik, tanpa membedakan huruf besar). Opsional (M64; wajib saat registrasi pada M56). Hanya disimpan bila lolos pengecekan: format, MX domain, dan email konfirmasi terkirim.';
+COMMENT ON COLUMN users.email_verified_at  IS 'Waktu email lolos pengecekan dan email konfirmasi terkirim (M64). NULL = email lama yang belum dicek; tidak dikirimi peringatan.';
+COMMENT ON COLUMN users.notify_all_regions IS 'true = berlangganan peringatan email untuk SEMUA kecamatan AOI, termasuk yang ditambahkan kemudian (M64).';
 COMMENT ON COLUMN users.is_active          IS 'false = akun dinonaktifkan ADMIN; login ditolak.';
 COMMENT ON COLUMN users.failed_login_count IS 'Jumlah gagal login beruntun; 5 kali -> locked_until diisi.';
 COMMENT ON COLUMN users.locked_until       IS 'Akun terkunci sementara sampai waktu ini (15 menit setelah 5 kali gagal).';
@@ -1492,6 +1496,45 @@ COMMENT ON COLUMN api_tokens.last_used_at IS 'Waktu terakhir dipakai.';
 COMMENT ON COLUMN api_tokens.revoked_at   IS 'Waktu dicabut; NULL = aktif.';
 COMMENT ON COLUMN api_tokens.created_at   IS 'Waktu token dibuat.';
 
+-- Peringatan email (M64) --------------------------------------------------------
+-- Kecamatan yang dipilih pengguna untuk peringatan email. Kosong (dan
+-- users.notify_all_regions false) = tidak menerima peringatan; itu sah.
+CREATE TABLE user_notify_regions (
+    user_id    INT          NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    region_id  INT          NOT NULL REFERENCES administrative_regions (region_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, region_id)
+);
+CREATE INDEX idx_user_notify_regions_region ON user_notify_regions (region_id);
+COMMENT ON TABLE  user_notify_regions IS 'Langganan peringatan email per kecamatan (M64): tempat tinggal, beberapa, atau tidak sama sekali. Diubah pemiliknya lewat auth_set_own_notify().';
+COMMENT ON COLUMN user_notify_regions.user_id    IS 'FK -> users pelanggan.';
+COMMENT ON COLUMN user_notify_regions.region_id  IS 'FK -> administrative_regions (kecamatan AOI).';
+COMMENT ON COLUMN user_notify_regions.created_at IS 'Waktu kecamatan dipilih.';
+
+-- Satu baris = satu butir "tidak normal" (kalimat kondisi atau alert hujan)
+-- untuk satu kecamatan dan satu tanggal data yang SUDAH dikirim ke pengguna.
+-- Kunci unik ini yang mencegah data yang sama dikirim dua kali; data baru
+-- (tanggal lain) dengan kondisi yang sama tetap dikirim.
+CREATE TABLE notify_sent (
+    notify_id  BIGSERIAL    PRIMARY KEY,
+    user_id    INT          NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    region_id  INT          NOT NULL REFERENCES administrative_regions (region_id),
+    item_key   VARCHAR(20)  NOT NULL,
+    data_date  DATE         NOT NULL,
+    level      SMALLINT     NOT NULL CHECK (level BETWEEN 1 AND 2),
+    sent_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    CONSTRAINT uq_notify_sent UNIQUE (user_id, region_id, item_key, data_date)
+);
+CREATE INDEX idx_notify_sent_time ON notify_sent (sent_at DESC);
+COMMENT ON TABLE  notify_sent IS 'Butir tidak normal yang sudah dikirim lewat email (M64). Kunci unik (pengguna, kecamatan, butir, tanggal data) mencegah pengiriman ulang data yang sama.';
+COMMENT ON COLUMN notify_sent.notify_id IS 'PK surrogate.';
+COMMENT ON COLUMN notify_sent.user_id   IS 'FK -> users penerima.';
+COMMENT ON COLUMN notify_sent.region_id IS 'FK -> administrative_regions (kecamatan).';
+COMMENT ON COLUMN notify_sent.item_key  IS 'Butir kalimat kondisi (mis. gpm_rain_7d, s1_vh, modis_flood) atau "alert" untuk alert hujan BMKG.';
+COMMENT ON COLUMN notify_sent.data_date IS 'Tanggal data yang menunjukkan kondisi tidak normal (tanggal observasi satelit atau alert).';
+COMMENT ON COLUMN notify_sent.level     IS 'Tingkat saat dikirim: 1 Waspada, 2 Tinggi.';
+COMMENT ON COLUMN notify_sent.sent_at   IS 'Waktu email terkirim.';
+
 -- =============================================================================
 -- TRIGGER updated_at
 -- =============================================================================
@@ -1935,6 +1978,76 @@ WHERE pg_has_role(current_user, 'monitor_analyst', 'MEMBER')
    OR o.obs_date = l.obs_date
 GROUP BY o.obs_date, src.source_code, b.band_code, b.band_name, b.unit;
 COMMENT ON VIEW v_citra_obs_aoi IS 'Angka harian GPM/MODIS (Job Hidromet, termasuk backfill) dirata-rata ke kecamatan AOI, batas waktu per role pemanggil seperti v_citra_scenes; observasi terakhir selalu terlihat (M56). PUBLIC+.';
+
+-- Pantau Lokasi (M63, INTERFACE.md §2 halaman 1): angka per kecamatan untuk
+-- Beranda. Batas waktu sama dengan v_citra_obs_aoi (PUBLIC 30 hari, USER 365
+-- hari, ANALYST/DATA_ENGINEER semua). DUA observasi terakhir per kecamatan ×
+-- band selalu terlihat: kalimat kondisi membandingkan nilai terbaru dengan
+-- sebelumnya (mis. lintasan Sentinel-1 ±12 hari), dan pipeline yang sempat
+-- berhenti tidak boleh membuat pembandingnya hilang.
+CREATE VIEW v_public_lokasi_obs AS
+WITH ranked AS (
+    SELECT o.region_id, o.band_id, o.obs_date, o.value, o.valid_fraction, o.run_type,
+           row_number() OVER (PARTITION BY o.region_id, o.band_id ORDER BY o.obs_date DESC) AS rn
+    FROM region_observations o
+)
+SELECT o.region_id,
+       r.pcode,
+       r.region_name,
+       o.obs_date,
+       src.source_code,
+       b.band_code,
+       b.unit,
+       o.value,
+       o.valid_fraction,
+       o.run_type
+FROM ranked                 o
+JOIN administrative_regions r   ON r.region_id = o.region_id AND r.in_aoi
+JOIN spectral_bands         b   ON b.band_id = o.band_id
+JOIN satellite_sources      src ON src.source_id = b.source_id
+WHERE pg_has_role(current_user, 'monitor_analyst', 'MEMBER')
+   OR pg_has_role(current_user, 'monitor_data_engineer', 'MEMBER')
+   OR o.obs_date >= CURRENT_DATE - CASE WHEN pg_has_role(current_user, 'monitor_user', 'MEMBER') THEN 365 ELSE 30 END
+   OR o.rn <= 2;
+COMMENT ON VIEW v_public_lokasi_obs IS 'Angka harian/per lintasan per kecamatan AOI untuk Pantau Lokasi di Beranda, batas waktu per role pemanggil seperti v_citra_obs_aoi; dua observasi terakhir per kecamatan × band selalu terlihat (M63). PUBLIC+.';
+
+-- Rentang biasa per kecamatan × band: persentil 2–98 setahun sampai observasi
+-- terakhir band itu. Hanya dua angka per band, jadi aman dibuka walau
+-- riwayatnya sendiri tidak (pola band_ranges() di api/routes/diagram.py).
+CREATE VIEW v_public_lokasi_range AS
+WITH last AS (
+    SELECT band_id, max(obs_date) AS obs_date FROM region_observations GROUP BY band_id
+)
+SELECT o.region_id,
+       b.band_code,
+       percentile_cont(0.02) WITHIN GROUP (ORDER BY o.value) AS p02,
+       percentile_cont(0.98) WITHIN GROUP (ORDER BY o.value) AS p98,
+       count(*)                                              AS n_obs
+FROM region_observations    o
+JOIN administrative_regions r ON r.region_id = o.region_id AND r.in_aoi
+JOIN spectral_bands         b ON b.band_id = o.band_id
+JOIN last                   l ON l.band_id = o.band_id
+WHERE o.value IS NOT NULL
+  AND o.obs_date > l.obs_date - 365
+GROUP BY o.region_id, b.band_code;
+COMMENT ON VIEW v_public_lokasi_range IS 'Rentang biasa (persentil 2–98, 365 hari s.d. observasi terakhir band) per kecamatan AOI × band untuk grafik dan kalimat Pantau Lokasi (M63). PUBLIC+.';
+
+-- Alert hujan 7 hari terakhir per kecamatan, tanpa kolom penanganan
+-- (acknowledged_by/at): yang publik hanya "kecamatan ini pernah melewati
+-- ambang BMKG", angka yang sama yang sudah tampak di grafik hujannya.
+CREATE VIEW v_public_lokasi_alert AS
+SELECT a.region_id,
+       a.observation_date,
+       a.severity,
+       b.band_code,
+       a.observed_value,
+       a.threshold_value
+FROM alert_events           a
+JOIN administrative_regions r  ON r.region_id = a.region_id AND r.in_aoi
+JOIN alert_rules            ru ON ru.rule_id = a.rule_id
+JOIN spectral_bands         b  ON b.band_id = ru.band_id
+WHERE a.observation_date >= CURRENT_DATE - 7;
+COMMENT ON VIEW v_public_lokasi_alert IS 'Alert hujan 7 hari terakhir per kecamatan AOI untuk Pantau Lokasi, tanpa kolom penanganan alert (M63). PUBLIC+.';
 
 -- Log halaman Data (DATA_ENGINEER, ADMIN): aktivitas unduhan/backfill +
 -- jejak audit tabel katalog dan scene.

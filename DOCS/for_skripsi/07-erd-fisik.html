@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script src="assets/data.js"></script>
 <script src="assets/erd.js"></script>
+<script src="assets/erdsvg.js"></script>
 <script src="assets/common.js"></script>
 </head>
 <body data-bab="4">
@@ -73,12 +74,19 @@ window.pageInit = function () {
   } else document.getElementById("countfig").remove();
 
   const host = document.getElementById("modules");
-  ERD.MODULES.forEach((m) => {
-    const { text } = ERD.moduleErd(m, "physical");
+  const MODS = ERDSVG.MODULES;
+  host.innerHTML = `<p class="src">Enam modul yang sama dengan halaman ERD utuh: ${MODS.map((m) => `<span style="display:inline-block;width:11px;height:11px;background:${m.color};vertical-align:-1px"></span> ${m.id} ${m.name}`).join(" · ")}.
+    Geser tabel untuk merapikan garis; FK pencatat (created_by, updated_by, invalidated_by, generated_by, verified_by) disembunyikan.</p>`;
+  MODS.forEach((m) => {
     const fig = document.createElement("div");
-    fig.className = "fig"; fig.dataset.cap = `ERD fisik modul ${m.name}`; fig.dataset.from = "Katalog PostgreSQL (DOCS/generated/erd_physical.mmd)";
-    fig.innerHTML = `<div class="body white"><pre class="mermaid">${esc(text)}</pre></div>`;
-    host.append(fig);
+    fig.className = "fig"; fig.dataset.cap = `ERD fisik modul ${m.id} ${m.name}`;
+    fig.dataset.from = "Katalog PostgreSQL; tabel putus-putus = modul lain";
+    const body = document.createElement("div"); body.className = "body white";
+    fig.append(body); host.append(fig);
+    const ext = ERDSVG.externals(m, true);
+    ERDSVG.render(body, { tables: m.tables, ext, mode: "all", hideBook: true, key: "v6.07." + m.id, layout: ERDSVG.layoutOne(m),
+      
+      legendModules: [m, ...MODS.filter((x) => x !== m && Object.keys(ext).some((t) => x.tables.includes(t)))] });
   });
 
   const dict = document.getElementById("dict");

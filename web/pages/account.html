@@ -1,10 +1,39 @@
-<!-- pages/account.html — Akun Saya (INTERFACE.md §2.9): profil, ubah sandi, token API, panduan. -->
+<!-- pages/account.html — Akun Saya (INTERFACE.md §2.9): profil, email & peringatan (M64),
+     ubah sandi, token API, panduan. -->
 <div class="layout">
   <div class="control-panel">
     <fieldset>
       <legend>Profil</legend>
       <div class="screen"><div class="screen-inner"><span class="scr-ch">PROFIL</span><dl class="kv" id="profile"></dl></div></div>
       <p class="mut" style="margin:4px 0 0;font-size:11px">Nama, organisasi, dan peran diatur Administrator.</p>
+    </fieldset>
+    <!-- Email & peringatan (M64): keduanya opsional. Tanpa email atau tanpa
+         kecamatan, pengguna tidak menerima peringatan -- dan itu tidak masalah. -->
+    <form id="mailForm" novalidate>
+      <fieldset id="mailBox">
+        <legend>Email &amp; peringatan</legend>
+        <p class="mut" style="margin:0 0 6px;font-size:11px">Opsional. Peringatan email dikirim bila data satelit baru
+          menunjukkan kondisi tidak normal di kecamatan yang Anda pilih, lengkap dengan bukti dan penjelasannya.</p>
+        <p class="pl-warn" id="mailOff" hidden></p>
+        <div class="field"><label for="mailAddr">Alamat email</label>
+          <input type="email" id="mailAddr" autocomplete="email" maxlength="254" aria-describedby="mailHint mailAddrErr">
+          <span class="hint" id="mailHint">Disimpan hanya bila valid dan bisa menerima email: sistem mengirim email konfirmasi ke alamat ini.</span>
+          <span class="err" id="mailAddrErr"></span></div>
+        <p class="mut" id="mailState" role="status" style="margin:0 0 6px;font-size:11px"></p>
+        <div class="btn-row end">
+          <button type="button" id="mailDel" hidden>Hapus email</button>
+          <button type="submit" class="default" id="mailBtn">Simpan email</button>
+        </div>
+      </fieldset>
+    </form>
+    <fieldset id="regBox">
+      <legend>Kecamatan yang dipantau</legend>
+      <p class="mut" style="margin:0 0 6px;font-size:11px">Pilih satu (mis. tempat tinggal Anda), beberapa, atau semua.
+        Tanpa pilihan, Anda tidak menerima peringatan.</p>
+      <label class="check"><input type="checkbox" id="regAll"> Semua kecamatan (termasuk yang ditambahkan nanti)</label>
+      <div class="listbox pl-checks" id="regList" role="group" aria-label="Kecamatan untuk peringatan email"></div>
+      <p class="mut" id="regState" role="status" style="margin:6px 0 0;font-size:11px"></p>
+      <div class="btn-row end"><button type="button" class="default" id="regBtn">Simpan pilihan</button></div>
     </fieldset>
     <form id="pwForm" novalidate>
       <fieldset>

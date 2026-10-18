@@ -1,5 +1,5 @@
 # api/routes/reports.py
-"""Laporan periodik (INTERFACE.md §4.8).
+"""Laporan periodik (INTERFACE.md §4.6).
 
 Daftar dan unduhan disaring RLS ``generated_reports`` per audiens: ANALYST
 melihat Hidromet, DATA_ENGINEER Kesehatan Data, ADMIN keduanya. Laporan di

@@ -631,8 +631,9 @@ EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
 
 
 class RegisterRequest(BaseModel):
-    """Registrasi mandiri (M56): selalu menjadi USER."""
-    email: str = Field(min_length=6, max_length=254, pattern=EMAIL_PATTERN)
+    """Registrasi mandiri (M56): selalu menjadi USER. Email opsional (M64);
+    bila diisi, harus lolos pengecekan etl.mailer.verify_and_confirm."""
+    email: str | None = Field(default=None, max_length=254)
     username: str = Field(pattern=USERNAME_PATTERN)
     password: str = Field(min_length=1, max_length=200)
     password_confirm: str = Field(min_length=1, max_length=200)
@@ -644,6 +645,25 @@ class SessionInfoResponse(BaseModel):
     role_code: str
     permissions: list[str]
     user: MeResponse | None = None
+
+
+class EmailUpdateRequest(BaseModel):
+    """Email sendiri (M64). null/kosong = hapus email (berhenti menerima peringatan)."""
+    email: str | None = Field(default=None, max_length=254)
+
+
+class NotifyPrefsRequest(BaseModel):
+    """Kecamatan langganan peringatan email (M64). Kosong dan all_regions false = tidak menerima."""
+    all_regions: bool = False
+    region_ids: list[int] = Field(default_factory=list, max_length=500)
+
+
+class NotifyPrefsResponse(BaseModel):
+    email: str | None = None
+    email_verified_at: datetime | None = None
+    all_regions: bool = False
+    region_ids: list[int] = []
+    mail_configured: bool = False
 
 
 class ChangePasswordRequest(BaseModel):
@@ -694,6 +714,8 @@ class AdminUserItem(BaseModel):
     full_name: str
     organization: str | None = None
     email: str | None = None
+    email_verified_at: datetime | None = None
+    notify_regions: int = 0
     role_code: str
     is_active: bool
     is_locked: bool
@@ -717,6 +739,7 @@ class AdminUserCreateRequest(BaseModel):
     organization: str | None = Field(default=None, max_length=100)
     role_code: str = Field(pattern=r"^(USER|ANALYST|DATA_ENGINEER|ADMIN)$")
     password: str = Field(min_length=1, max_length=200)
+    email: str | None = Field(default=None, max_length=254)   # opsional, dicek dulu (M64)
 
 
 class AdminUserUpdateRequest(BaseModel):
@@ -724,6 +747,7 @@ class AdminUserUpdateRequest(BaseModel):
     organization: str | None = Field(default=None, max_length=100)
     role_code: str | None = Field(default=None, pattern=r"^(USER|ANALYST|DATA_ENGINEER|ADMIN)$")
     is_active: bool | None = None
+    email: str | None = Field(default=None, max_length=254)   # null/"" = hapus; dicek dulu (M64)
 
 
 class AdminResetPasswordRequest(BaseModel):

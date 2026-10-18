@@ -16,8 +16,11 @@ from api.deps import Principal, get_session, require_role
 from api.errors import ApiError, error_response
 from api.schemas import (
     ChangePasswordRequest,
+    EmailUpdateRequest,
     LoginRequest,
     MeResponse,
+    NotifyPrefsRequest,
+    NotifyPrefsResponse,
     OkResponse,
     RegisterRequest,
     SessionInfoResponse,
@@ -74,6 +77,41 @@ PERMISSIONS: dict[str, str] = {
 # token_rate_limiter). Cukup untuk menahan skrip pendaftaran massal tanpa
 # CAPTCHA; organisasi pengguna < 100 akun.
 register_rate_limiter = RateLimiter(limit=5, window_s=3600)
+# Pengecekan email mengirim email konfirmasi ke alamat yang diketik; batasnya
+# mencegah fitur ini dipakai mengirimi alamat orang lain berulang-ulang (M64).
+email_rate_limiter = RateLimiter(limit=5, window_s=3600)
+
+# Kode galat etl.mailer -> (HTTP, pesan).
+_MAIL_HTTP = {
+    "EMAIL_INVALID": (422, "Email address is not valid or its domain does not exist"),
+    "EMAIL_UNREACHABLE": (422, "Email address cannot receive mail; it was not saved"),
+    "MAIL_NOT_CONFIGURED": (503, "Email sending is not configured on this server"),
+    "MAIL_SEND_FAILED": (503, "The confirmation email could not be sent; try again later"),
+}
+
+
+def _mail_error(exc) -> ApiError:
+    status, detail = _MAIL_HTTP.get(exc.code, (503, "Email error"))
+    return ApiError(status, detail, exc.code)
+
+
+def verify_email(sess: Session, email: str | None, display_name: str) -> str | None:
+    """Email ternormalisasi yang lolos pengecekan (format, belum dipakai akun
+    lain, MX domain, email konfirmasi terkirim), atau None bila dikosongkan.
+    Urutan ini sengaja: konfirmasi baru dikirim setelah semua yang bisa ditolak
+    tanpa mengirim apa pun sudah lolos (M64)."""
+    from etl.mailer import EMAIL_RE, MailError, normalize, verify_and_confirm
+    e = normalize(email)
+    if e is None:
+        return None
+    if not EMAIL_RE.match(e):
+        raise ApiError(422, "Email address is not valid", "EMAIL_INVALID")
+    if not sess.scalar(text("SELECT auth_email_available(:e)"), {"e": e}):
+        raise ApiError(409, "Email is already registered", "EMAIL_TAKEN")
+    try:
+        return verify_and_confirm(e, display_name)
+    except MailError as exc:
+        raise _mail_error(exc)
 
 
 def _permissions(principal: Principal) -> list[str]:
@@ -163,7 +201,12 @@ def register(req: RegisterRequest, request: Request, sess: Session = Depends(get
     if not register_rate_limiter.allow(meta.get("ip") or "unknown"):
         raise ApiError(429, "Too many registrations from this address; try again later", "RATE_LIMITED",
                        headers={"Retry-After": "3600"})
-    username, email = req.username.strip().lower(), req.email.strip().lower()
+    username = req.username.strip().lower()
+    # Username diperiksa SEBELUM email dicek, karena pengecekan email
+    # mengirim email konfirmasi -- jangan kirim untuk akun yang lalu ditolak.
+    if sess.execute(text("SELECT 1 FROM auth_get_user(:u)"), {"u": username}).first():
+        raise ApiError(409, f"Username {username} already exists", "USERNAME_TAKEN")
+    email = verify_email(sess, req.email, username)
     try:
         with sess.begin_nested():
             user_id = sess.scalar(text("SELECT auth_register_user(:u, :e, :h)"),
@@ -173,7 +216,8 @@ def register(req: RegisterRequest, request: Request, sess: Session = Depends(get
         if "email" in constraint:
             raise ApiError(409, "Email is already registered", "EMAIL_TAKEN")
         raise ApiError(409, f"Username {username} already exists", "USERNAME_TAKEN")
-    log_activity(sess, "REGISTER", user_id=user_id, target_type="users", target_id=user_id, **meta)
+    log_activity(sess, "REGISTER", user_id=user_id, target_type="users", target_id=user_id,
+                 detail={"email": email is not None}, **meta)
     token, _exp = create_session_jwt(user_id, "USER")
     principal = Principal(role_code="USER", user_id=user_id, username=username, full_name=username,
                           auth="session")
@@ -220,6 +264,68 @@ def change_password(req: ChangePasswordRequest, sess: Session = Depends(get_sess
         raise ApiError(400, "New password must differ from the current password", "PASSWORD_POLICY")
     sess.execute(text("SELECT auth_change_own_password(:h)"), {"h": hash_password(req.new_password)})
     return OkResponse(message="Password changed")
+
+
+# --- email dan peringatan (M64) -----------------------------------------------
+
+def _notify_prefs(sess: Session) -> NotifyPrefsResponse:
+    from etl.mailer import MailConfig
+    row = sess.execute(text("SELECT * FROM auth_get_own_notify()")).mappings().first() or {}
+    return NotifyPrefsResponse(email=row.get("email"), email_verified_at=row.get("email_verified_at"),
+                               all_regions=bool(row.get("all_regions")), region_ids=list(row.get("region_ids") or []),
+                               mail_configured=MailConfig.from_env().configured)
+
+
+@router.get("/notify", response_model=NotifyPrefsResponse, summary="Own email and alert subscriptions")
+def get_notify(sess: Session = Depends(get_session),
+               principal: Principal = Depends(require_role("USER"))) -> NotifyPrefsResponse:
+    return _notify_prefs(sess)
+
+
+@router.put("/email", response_model=NotifyPrefsResponse, summary="Set or remove own email (checked first)",
+            responses={422: {"description": "Email invalid or cannot receive mail; not saved"},
+                       409: {"description": "Email used by another account"},
+                       503: {"description": "Email sending not configured or failed"}})
+def put_email(req: EmailUpdateRequest, request: Request, sess: Session = Depends(get_session),
+              principal: Principal = Depends(require_role("USER"))) -> NotifyPrefsResponse:
+    """The address is saved only after it passes the check: valid format, not
+    used by another account, the domain has a mail server, and a confirmation
+    email was sent successfully. `null` removes the email (no more alerts)."""
+    meta = request_meta(request)
+    if req.email is None or not req.email.strip():
+        sess.execute(text("SELECT auth_set_own_email(NULL)"))
+        log_activity(sess, "EMAIL_REMOVED", user_id=principal.user_id, target_type="users",
+                     target_id=principal.user_id, **meta)
+        return _notify_prefs(sess)
+    if not email_rate_limiter.allow(principal.user_id):
+        raise ApiError(429, "Too many email changes; try again in an hour", "RATE_LIMITED",
+                       headers={"Retry-After": "3600"})
+    try:
+        email = verify_email(sess, req.email, principal.full_name or principal.username)
+    except ApiError as exc:
+        # Dikembalikan, bukan dilempar, supaya baris log penolakan ikut
+        # ter-commit (pola yang sama dengan login gagal).
+        log_activity(sess, "EMAIL_REJECTED", user_id=principal.user_id, target_type="users",
+                     target_id=principal.user_id, detail={"code": exc.code}, **meta)
+        return error_response(exc.status_code, exc.detail, exc.code, headers=exc.headers)
+    try:
+        with sess.begin_nested():
+            sess.execute(text("SELECT auth_set_own_email(:e)"), {"e": email})
+    except IntegrityError:
+        raise ApiError(409, "Email is already registered", "EMAIL_TAKEN")
+    log_activity(sess, "EMAIL_SET", user_id=principal.user_id, target_type="users",
+                 target_id=principal.user_id, **meta)
+    return _notify_prefs(sess)
+
+
+@router.put("/notify", response_model=NotifyPrefsResponse, summary="Choose kecamatan for email alerts")
+def put_notify(req: NotifyPrefsRequest, sess: Session = Depends(get_session),
+               principal: Principal = Depends(require_role("USER"))) -> NotifyPrefsResponse:
+    """`all_regions` covers every monitored kecamatan, including ones added
+    later. Region ids that are not monitored kecamatan are ignored."""
+    sess.execute(text("SELECT auth_set_own_notify(:a, CAST(:r AS int[]))"),
+                 {"a": req.all_regions, "r": sorted(set(req.region_ids))})
+    return _notify_prefs(sess)
 
 
 # --- token API ----------------------------------------------------------------

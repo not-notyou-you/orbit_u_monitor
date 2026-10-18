@@ -15,7 +15,7 @@ Status:
 
 | Bagian SKRIPSI.txt | Status |
 |---|---|
-| D. Rancangan Database | Terjawab (8 Okt 2026): skema + DATABASE.md + `DOCS/generated/data_dictionary.md` dan `erd_physical.mmd` (38 tabel, 19 VIEW) |
+| D. Rancangan Database | Terjawab (8 Okt 2026): skema + DATABASE.md + `DOCS/generated/data_dictionary.md` dan `erd_physical.mmd` (38 tabel, 19 VIEW; dibangkitkan ulang 19 Okt 2026 setelah M63/M64: 43 tabel, 22 VIEW) |
 | D. Rekomendasi DBMS | Terjawab (8 Okt 2026): PostgreSQL dan MySQL 8.0 diuji, rekomendasi di [PERBANDINGAN_DBMS.md](PERBANDINGAN_DBMS.md). Acuan penelitian terdahulu belum ada |
 | D. Rancangan Sistem/Aplikasi | Terjawab |
 | D. Middleware / API Database | Sebagian: API ada, `docs/api_examples.md` tidak ada |
@@ -23,7 +23,7 @@ Status:
 | C.1 Legalitas objek studi ≥ 2 tahun | Belum ada bukti di project |
 | A. Tahap DBSDLC: implementasi, loading, keamanan | Terjawab |
 | A. Tahap DBSDLC: perencanaan, analisis, desain konseptual dan logikal, UML | Sebagian (8 Okt 2026): DATABASE.md, PIPELINE.md, DESIGN.md ditulis ulang dari kode (M60). UML di INTERFACE.md §9. Belum: bukti fact-finding GMLS |
-| A. Testing 5 kriteria | Sebagian: uji teknis lulus 1.140/1.140 (8 Okt 2026, INTERFACE.md §7.1, `DOCS/hasil_uji/`); uji pengguna (UAT/SUS) belum ada |
+| A. Testing 5 kriteria | Sebagian: uji teknis lulus 1.140/1.140 (8 Okt 2026); diulang 19 Okt 2026 setelah M63/M64: 1.187/1.187 (INTERFACE.md §7.1, `DOCS/hasil_uji/`); uji pengguna (UAT/SUS) belum ada |
 
 ---
 

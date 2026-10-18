@@ -62,6 +62,31 @@ DOCS: dict[tuple[str, str], dict] = {
                                 "previews": {"s1_vh": {"label": "Sentinel-1 VH", "url": "/api/public/live/1/preview/s1_vh.png"}}}],
                      "total": 1},
     },
+    ("GET", "/api/public/lokasi"): {
+        "description": "Monitored kecamatan (AOI) with a short condition status for the Beranda location picker. "
+                       "No sign-in. Device coordinates are never sent: the browser matches them against "
+                       "`GET /api/regions` itself.",
+        "response": {"items": [{"region_id": 6, "pcode": "ID3602140", "name": "Cibeber", "area_km2": 401.2,
+                                "status": {"label": "Waspada", "level": 1, "text": "Waspada — curah hujan 7 hari melewati ambang"},
+                                "abnormal": 1, "alert": None,
+                                "dates": {"s1": "2026-10-12", "modis": "2026-10-07", "gpm": "2026-10-07"}}],
+                     "total": 10},
+    },
+    ("GET", "/api/public/lokasi/{region_id}"): {
+        "description": "Condition of one kecamatan: status, what is abnormal (sentences + rain alerts of the last "
+                       "7 days), latest value per band with the previous one and the usual range (2nd–98th "
+                       "percentile, 365 days), and the latest Live scene previews cropped to the kecamatan. "
+                       "Numbers come from `v_public_lokasi_obs`: visitors see 30 days, but the two latest "
+                       "observations per band are always visible.",
+        "response": {"region": {"region_id": 6, "name": "Cibeber", "area_km2": 401.2},
+                     "status": {"label": "Waspada", "level": 1, "text": "Waspada — curah hujan 7 hari melewati ambang"},
+                     "abnormal": [{"key": "gpm_rain_7d", "what": "curah hujan 7 hari", "category": "alert", "level": 1,
+                                   "because": "rata-rata akumulasi 81,5 mm, di atas ambang waspada 75 mm"}],
+                     "stats": [{"band_code": "RAIN_7D", "unit": "mm", "value": 81.5, "obs_date": "2026-10-07",
+                                "prev_value": 76.2, "range": {"p02": 0.0, "p98": 226.2}}],
+                     "imagery": {"area_id": 1, "scene_date": "2026-10-12", "cropped": True,
+                                 "previews": {"s1_vh": {"url": "/api/public/lokasi/6/preview/s1_vh.png"}}}},
+    },
     ("GET", "/api/live/areas/{area_id}/card"): {
         "description": "Everything the Live card shows for one area: selected scene (default latest) with metrics, "
                        "sentences, 9 preview URLs and `water_change` (new/receded/persistent km² vs the previous "

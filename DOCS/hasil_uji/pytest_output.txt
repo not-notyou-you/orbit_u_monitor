@@ -2,22 +2,81 @@ D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\pytest_asyncio\plugin.py:208
 The event loop scope for asynchronous fixtures will default to the fixture caching scope. Future versions of pytest-asyncio will default the loop scope for asynchronous fixtures to function scope. Set the default fixture loop scope explicitly in order to avoid unexpected behavior in the future. Valid fixture loop scopes are: "function", "class", "module", "package", "session"
 
   warnings.warn(PytestDeprecationWarning(_DEFAULT_FIXTURE_LOOP_SCOPE_UNSET))
-........................................................................ [  6%]
-........................................................................ [ 12%]
-........................................................................ [ 18%]
-........................................................................ [ 25%]
-........................................................................ [ 31%]
-........................................................................ [ 37%]
-...........ss........................................................... [ 44%]
-........................................................................ [ 50%]
-........................................................................ [ 56%]
-........................................................................ [ 63%]
-........................................................................ [ 69%]
-........................................................................ [ 75%]
-........................................................................ [ 81%]
-........................................................................ [ 88%]
-........................................................................ [ 94%]
-..............................................................           [100%]
+============================= test session starts =============================
+platform win32 -- Python 3.10.11, pytest-8.3.4, pluggy-1.6.0
+rootdir: D:\NOT-NOTYOU-YOU\themonitor
+plugins: anyio-4.15.1, asyncio-0.24.0, cov-6.0.0
+asyncio: mode=strict, default_loop_scope=None
+collected 1189 items
+
+tests\security\test_grant_matrix.py .                                    [  0%]
+tests\test_admin_api.py ......                                           [  0%]
+tests\test_alert_engine.py .............                                 [  1%]
+tests\test_aoi_coverage_gate.py ..........                               [  2%]
+tests\test_api_endpoints.py ............................................ [  6%]
+.........                                                                [  6%]
+tests\test_audit.py ............                                         [  7%]
+tests\test_auth.py ......................................                [ 11%]
+tests\test_backfill_circuit_breaker.py .....                             [ 11%]
+tests\test_citra_api.py .........                                        [ 12%]
+tests\test_data_api.py ...................                               [ 13%]
+tests\test_database.py .........................                         [ 16%]
+tests\test_dataset_sources_api.py ................                       [ 17%]
+tests\test_deletion_manager.py ...                                       [ 17%]
+tests\test_diagram_api.py .............                                  [ 18%]
+tests\test_download_concurrency.py ..........................            [ 20%]
+tests\test_download_resilience.py ..................                     [ 22%]
+tests\test_etl_pipeline.py ...................                           [ 24%]
+tests\test_excel_io.py ...........................                       [ 26%]
+tests\test_folder_manager.py ........................................... [ 29%]
+....                                                                     [ 30%]
+tests\test_fusion_grid.py ..............                                 [ 31%]
+tests\test_fusion_grid_pinned.py .............                           [ 32%]
+tests\test_fusion_product_identity.py ...                                [ 32%]
+tests\test_fusion_strategies.py ................                         [ 34%]
+tests\test_geo_utils.py .......................                          [ 36%]
+tests\test_gpm_native_resolution.py ......                               [ 36%]
+tests\test_hydromet_aggregate.py ................ss                      [ 38%]
+tests\test_jan_mar_2025_hybrid_regressions.py ....                       [ 38%]
+tests\test_job_run_state.py ..............                               [ 39%]
+tests\test_live_interpret_forecast.py ...............                    [ 40%]
+tests\test_live_monitor.py .....................                         [ 42%]
+tests\test_live_preview_geo.py .......                                   [ 43%]
+tests\test_live_scene_metrics.py .....                                   [ 43%]
+tests\test_lokasi_api.py .............                                   [ 44%]
+tests\test_modis_dependency.py ..                                        [ 44%]
+tests\test_modis_quality_bands.py .........                              [ 45%]
+tests\test_module10_preview.py ........................                  [ 47%]
+tests\test_monitor_api.py .......................                        [ 49%]
+tests\test_multicore_regressions.py .....                                [ 50%]
+tests\test_notify.py ..............                                      [ 51%]
+tests\test_openapi_docs.py ....                                          [ 51%]
+tests\test_orchestrator_preview_stage.py .............                   [ 52%]
+tests\test_per_satellite_config.py ..................................... [ 55%]
+.........................................                                [ 59%]
+tests\test_pipeline_branching.py .................                       [ 60%]
+tests\test_pipeline_logger.py ..................                         [ 62%]
+tests\test_preview_gallery.py .....                                      [ 62%]
+tests\test_processing_plan.py .......................................... [ 66%]
+.                                                                        [ 66%]
+tests\test_quality_metrics.py ...........................                [ 68%]
+tests\test_rbac_api.py ................................................. [ 72%]
+........................................................................ [ 78%]
+............................................                             [ 82%]
+tests\test_report_generation.py ...................                      [ 83%]
+tests\test_reports.py ............                                       [ 84%]
+tests\test_s1_mosaic.py .........                                        [ 85%]
+tests\test_s1_observations_retention.py ....                             [ 86%]
+tests\test_scene_reconcile.py ..........                                 [ 86%]
+tests\test_scenes_source.py ....                                         [ 87%]
+tests\test_schema_comments.py .....                                      [ 87%]
+tests\test_source_config.py ............................................ [ 91%]
+............                                                             [ 92%]
+tests\test_tier_names.py ...................                             [ 93%]
+tests\test_try8_regressions.py ..................                        [ 95%]
+tests\test_water_change.py ......................                        [ 97%]
+tests\test_web_ui.py ................................                    [100%]
+
 ============================== warnings summary ===============================
 venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:64
   D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\matplotlib\_fontconfig_pattern.py:64: PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'
@@ -148,6 +207,21 @@ tests/test_preview_gallery.py: 6 warnings
   D:\NOT-NOTYOU-YOU\themonitor\etl\module10_generate_preview.py:546: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
     transform = src.transform * Affine.scale(src.width / out_w, src.height / out_h)
 
+tests/test_lokasi_api.py::test_region_crop_projected_grid
+tests/test_lokasi_api.py::test_region_crop_projected_grid
+tests/test_lokasi_api.py::test_region_crop_projected_grid
+tests/test_lokasi_api.py::test_region_crop_projected_grid
+  D:\NOT-NOTYOU-YOU\themonitor\tests\test_lokasi_api.py:224: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    xy = [t * (c, r) for c, r in ((0, 0), (w, 0), (w, h), (0, h))]
+
+tests/test_lokasi_api.py::test_region_crop_projected_grid
+tests/test_lokasi_api.py::test_region_crop_projected_grid
+tests/test_lokasi_api.py::test_region_crop_projected_grid
+tests/test_lokasi_api.py::test_region_crop_projected_grid
+tests/test_lokasi_api.py::test_region_crop_projected_grid
+  D:\NOT-NOTYOU-YOU\themonitor\tests\test_lokasi_api.py:228: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
+    box = [t * (c, r) for c, r in ((50, 40), (150, 40), (150, 120), (50, 120), (50, 40))]
+
 tests/test_modis_quality_bands.py::TestFloodGapFill::test_two_day_wins_and_one_day_cs_fills_gaps
 tests/test_modis_quality_bands.py::TestFloodGapFill::test_nrt_granule_without_the_fill_field
   D:\NOT-NOTYOU-YOU\themonitor\venv\lib\site-packages\rasterio\transform.py:189: PendingDeprecationWarning: Use `@` matmul instead of `*` mul operator for matrix multiplication
@@ -198,5 +272,4 @@ tests/test_water_change.py::TestPngAndMetrics::test_png_colors_and_orbit_label
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 - generated xml file: D:\NOT-NOTYOU-YOU\themonitor\DOCS\hasil_uji\pytest.xml --
-1140 passed, 2 skipped, 1581 warnings in 137.61s (0:02:17)
-exit=0
+========= 1187 passed, 2 skipped, 1590 warnings in 132.97s (0:02:12) ==========

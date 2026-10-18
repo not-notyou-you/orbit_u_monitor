@@ -141,6 +141,9 @@ INSERT INTO app_settings (setting_key, setting_value, description) VALUES
     ('live.min_aoi_coverage',           '0.90',            'Porsi AOI yang wajib tertutup Sentinel-1 agar sebuah tanggal dipakai Live; di bawah ini scene ditolak sebagai INCOMPLETE.'),
     -- M58: jendela berkas raster bergulir. Angka per kecamatan (region_observations)
     -- dan metrik scene tidak pernah dihapus; hanya berkas raster yang dibuang.
-    ('storage.raster_retention_days',   '365',             'Umur maksimum berkas raster dataset utama (GPM/MODIS/S1) dalam hari; yang lebih tua dihapus, angkanya tetap (M58).');
+    ('storage.raster_retention_days',   '365',             'Umur maksimum berkas raster dataset utama (GPM/MODIS/S1) dalam hari; yang lebih tua dihapus, angkanya tetap (M58).'),
+    -- M64: peringatan email kondisi tidak normal per kecamatan.
+    ('notify.enabled',                  'true',            'Kirim peringatan email kondisi tidak normal ke pengguna yang berlangganan kecamatan (M64).'),
+    ('notify.max_age_days',             '7',               'Hanya data yang tanggalnya paling lama sekian hari yang memicu email; data backfill yang lebih tua tidak dikirim (M64).');
 
 COMMIT;

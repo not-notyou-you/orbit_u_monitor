@@ -27,11 +27,11 @@
 <tr><td>Wilayah Administrasi, Area Pantauan</td><td><code>administrative_regions</code>, <code>regions_of_interest</code></td><td>Master</td></tr>
 <tr><td>Jenis Bencana, Aturan Peringatan, Ambang Mutu</td><td><code>disaster_types</code>, <code>alert_rules</code>, <code>quality_thresholds</code></td><td>Master</td></tr>
 <tr><td>Tahap Proses, Strategi Fusion, Jenis Laporan</td><td><code>processing_stages</code>, <code>fusion_strategies</code>, <code>report_types</code></td><td>Master</td></tr>
-<tr><td>Akses</td><td>Peran, Pengguna, Token API</td><td><code>roles</code>, <code>users</code>, <code>api_tokens</code></td><td>Master / transaksi</td></tr>
+<tr><td>Akses</td><td>Peran, Pengguna, Token API, Langganan Peringatan</td><td><code>roles</code>, <code>users</code>, <code>api_tokens</code>, <code>user_notify_regions</code></td><td>Master / transaksi</td></tr>
 <tr><td>Akuisisi</td><td>Scene Sentinel-1, Granule NASA</td><td><code>satellite_scenes</code>, <code>nasa_scenes</code></td><td>Transaksi</td></tr>
 <tr><td>Pemrosesan</td><td>Dataset, Job, Produk Data, Lineage, Metrik Mutu</td><td><code>datasets</code>, <code>processing_jobs</code>, <code>data_products</code>, <code>data_lineage</code>, <code>quality_metrics</code></td><td>Transaksi</td></tr>
 <tr><td>Pemantauan</td><td>Observasi Wilayah, Peringatan, Kejadian Bencana, Forecast</td><td><code>region_observations</code>, <code>alert_events</code>, <code>disaster_events</code>, <code>band_forecasts</code></td><td>Transaksi</td></tr>
-<tr><td>Jejak</td><td>Laporan, Log Aktivitas, Log Audit</td><td><code>generated_reports</code>, <code>user_activity_logs</code>, <code>audit_log</code></td><td>Transaksi</td></tr>
+<tr><td>Jejak</td><td>Laporan, Log Aktivitas, Log Audit, Peringatan Terkirim</td><td><code>generated_reports</code>, <code>user_activity_logs</code>, <code>audit_log</code>, <code>notify_sent</code></td><td>Transaksi</td></tr>
 </table></div>
 </div>
 
@@ -133,10 +133,12 @@ window.pageInit = function () {
       ],
     },
     {
-      cap: "ERD Chen area Akses dan Jejak: peran, pengguna, token, laporan, log",
+      cap: "ERD Chen area Akses dan Jejak: peran, pengguna, token, langganan peringatan, laporan, log",
       ents: {
         RL: ["Peran", ["<u>kode_peran</u>", "<u>role_DB</u>", "label"]],
-        USR: ["Pengguna", ["<u>username</u>", "<u>email</u>", "nama", "organisasi", "aktif"]],
+        USR: ["Pengguna", ["<u>username</u>", "<u>email</u> (opsional)", "email_terverifikasi", "semua_kecamatan", "nama", "organisasi", "aktif"]],
+        WIL: ["Kecamatan", ["<u>pcode</u>", "nama"]],
+        NS: ["Peringatan Terkirim", ["butir", "tanggal_data", "tingkat", "waktu_kirim"]],
         TOK: ["Token API", ["<u>prefix</u>", "hash", "scope", "kedaluwarsa"]],
         RT: ["Jenis Laporan", ["<u>kode_laporan</u>", "periode"]],
         GR: ["Laporan", ["periode_mulai", "status", "checksum"]],
@@ -150,6 +152,9 @@ window.pageInit = function () {
         ["b4", "jenis", "RT", "GR", "1", "N"],
         ["b5", "melakukan", "USR", "LA", "1", "N"],
         ["b6", "mengubah", "USR", "AU", "1", "N"],
+        ["b7", "berlangganan", "USR", "WIL", "M", "N"],
+        ["b8", "menerima", "USR", "NS", "1", "N"],
+        ["b9", "tentang", "WIL", "NS", "1", "N"],
       ],
     },
   ];
@@ -187,6 +192,8 @@ window.pageInit = function () {
     ["band_forecasts", "forecast_id; (band_id, COALESCE(region_id,0), data_stamp)", "forecast_id", "(band_id, COALESCE(region_id,0), data_stamp)"],
     ["data_lineage", "lineage_id; (parent_product_id, child_product_id)", "lineage_id", "(parent_product_id, child_product_id)"],
     ["api_tokens", "token_id; token_prefix", "token_id", "token_prefix"],
+    ["user_notify_regions", "(user_id, region_id)", "(user_id, region_id) (komposit)", "—"],
+    ["notify_sent", "notify_id; (user_id, region_id, item_key, data_date)", "notify_id", "(user_id, region_id, item_key, data_date)"],
   ];
   document.getElementById("keys").innerHTML = "<tr><th>Entitas / tabel</th><th>Candidate key</th><th>Primary key (surrogate)</th><th>Alternate key</th></tr>" +
     keys.map((k) => `<tr><td><code>${k[0]}</code></td><td>${esc(k[1])}</td><td class="pk">${k[2]}</td><td>${esc(k[3])}</td></tr>`).join("");

@@ -46,6 +46,10 @@ EXPECTED: dict[tuple[str, str], tuple] = {
     ("GET", "/api/auth/session"): (P,),
     ("POST", "/api/auth/register"): (P,),
     ("POST", "/api/auth/change-password"): (U,),
+    # email & peringatan (M64)
+    ("GET", "/api/auth/notify"): (U,),
+    ("PUT", "/api/auth/email"): (U,),
+    ("PUT", "/api/auth/notify"): (U,),
     ("GET", "/api/auth/tokens"): (U,),
     ("POST", "/api/auth/tokens"): (U,),
     ("DELETE", "/api/auth/tokens/{token_id}"): (U,),
@@ -116,6 +120,11 @@ EXPECTED: dict[tuple[str, str], tuple] = {
     # publik (§4.2, Tahap 3)
     ("GET", "/api/public/live"): (P,),
     ("GET", "/api/public/live/{area_id}/preview/{key}.png"): (P,),
+    # Pantau Lokasi di Beranda (M63): batas waktu per role di VIEW v_public_lokasi_obs
+    ("GET", "/api/public/lokasi"): (P,),
+    ("GET", "/api/public/lokasi/{region_id}"): (P,),
+    ("GET", "/api/public/lokasi/{region_id}/trend"): (P,),
+    ("GET", "/api/public/lokasi/{region_id}/preview/{key}.png"): (P,),
     # citra satelit (M56): batas waktu per role di VIEW v_citra_scenes
     ("GET", "/api/citra/summary"): (P,),
     ("GET", "/api/citra/sources/{key}"): (P,),
@@ -180,6 +189,9 @@ EXPECTED: dict[tuple[str, str], tuple] = {
     ("GET", "/api/admin/quality-thresholds"): (A,),
     ("PUT", "/api/admin/quality-thresholds"): (A,),
     ("GET", "/api/admin/settings"): (A,),
+    ("GET", "/api/admin/notify/status"): (A,),
+    ("POST", "/api/admin/notify/test"): (A,),
+    ("POST", "/api/admin/notify/run"): (A,),
     ("PUT", "/api/admin/settings"): (A,),
     ("GET", "/api/admin/pipeline/status"): (A,),
     ("GET", "/api/admin/archive/stats"): (A,),
@@ -264,6 +276,9 @@ def test_endpoint_x_role(method, path, make_client, monkeypatch):
     monkeypatch.setattr(DatasetManager, "_spawn_deletion_runner", lambda self, *a, **k: None)
     monkeypatch.setattr(LiveMonitor, "start_cycle", lambda self, area_id: False)
     monkeypatch.setattr(LiveMonitor, "retry_scene", lambda self, area_id, d: False)
+    # Putaran peringatan email (M64) tidak dijalankan di latar oleh tes peran.
+    from etl import notify
+    monkeypatch.setattr(notify, "run_quietly", lambda db, source: None)
 
     min_role = EXPECTED[(method, path)][0]
     results = {}

@@ -1,5 +1,6 @@
-<!-- pages/register.html — fragmen /daftar (INTERFACE.md §2 halaman -0). Email, nama
-     pengguna, kata sandi, konfirmasi. Peran lain dibuat Administrator. -->
+<!-- pages/register.html — fragmen /daftar (INTERFACE.md §2 halaman -0). Nama pengguna,
+     kata sandi, konfirmasi, dan email OPSIONAL (M64; hanya untuk peringatan
+     email). Peran lain dibuat Administrator. -->
 <div class="desk-icons" aria-label="Pintasan">
   <a class="desk-icon" href="/app#beranda"><span aria-hidden="true" data-icon="globe"></span><span>Beranda</span></a>
   <a class="desk-icon" href="/masuk"><span aria-hidden="true" data-icon="key"></span><span>Masuk</span></a>
@@ -12,11 +13,6 @@
     <form id="regForm" novalidate>
       <fieldset>
         <legend>Akun baru</legend>
-        <div class="field">
-          <label for="rEmail">Email</label>
-          <input type="email" id="rEmail" autocomplete="email" maxlength="254" required aria-describedby="rEmailErr">
-          <span class="err" id="rEmailErr" aria-live="polite"></span>
-        </div>
         <div class="field">
           <label for="rUser">Nama pengguna</label>
           <input type="text" id="rUser" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="50" required aria-describedby="rUserErr rUserHint">
@@ -35,6 +31,13 @@
           <span class="err" id="rPw2Err" aria-live="polite"></span>
         </div>
         <label class="check"><input type="checkbox" id="rShow"> Tampilkan kata sandi</label>
+        <div class="field">
+          <label for="rEmail">Email <span class="mut">(opsional)</span></label>
+          <input type="email" id="rEmail" autocomplete="email" maxlength="254" aria-describedby="rEmailHint rEmailErr">
+          <span class="hint" id="rEmailHint">Hanya untuk peringatan email kondisi tidak normal di kecamatan pilihan Anda.
+            Boleh dikosongkan. Bila diisi, sistem mengirim email konfirmasi; alamat yang tidak bisa menerima email ditolak.</span>
+          <span class="err" id="rEmailErr" aria-live="polite"></span>
+        </div>
       </fieldset>
       <div class="btn-row end">
         <button type="submit" class="default" id="regBtn">Daftar</button>

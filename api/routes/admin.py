@@ -32,7 +32,10 @@ from api.security import hash_password, password_policy_error
 router = APIRouter()
 
 _USER_SELECT = """
-    SELECT u.user_id, u.username, u.full_name, u.organization, u.email, r.role_code, u.is_active,
+    SELECT u.user_id, u.username, u.full_name, u.organization, u.email, u.email_verified_at,
+           CASE WHEN u.notify_all_regions THEN -1
+                ELSE (SELECT count(*) FROM user_notify_regions n WHERE n.user_id = u.user_id) END AS notify_regions,
+           r.role_code, u.is_active,
            (u.locked_until IS NOT NULL AND u.locked_until > now()) AS is_locked,
            u.locked_until, u.last_login_at, u.created_by, u.created_at, u.updated_at
     FROM users u JOIN roles r ON r.role_id = u.role_id
@@ -53,6 +56,25 @@ def _get_user(sess: Session, user_id: int) -> AdminUserItem:
     if row is None:
         raise ApiError(404, f"User {user_id} not found", "NOT_FOUND")
     return AdminUserItem(**row)
+
+
+def _verify_email(sess: Session, email: str | None, name: str, user_id: int | None) -> str | None:
+    """Pengecekan yang sama dengan Akun saya (M64): format, belum dipakai akun
+    lain, MX domain, email konfirmasi terkirim ke alamat itu. None = kosong."""
+    from etl.mailer import EMAIL_RE, MailError, normalize, verify_and_confirm
+    from api.routes.auth import _mail_error
+    e = normalize(email)
+    if e is None:
+        return None
+    if not EMAIL_RE.match(e):
+        raise ApiError(422, "Email address is not valid", "EMAIL_INVALID")
+    if sess.scalar(text("SELECT 1 FROM users WHERE lower(email) = :e AND user_id IS DISTINCT FROM :u"),
+                   {"e": e, "u": user_id}):
+        raise ApiError(409, "Email is already registered", "EMAIL_TAKEN")
+    try:
+        return verify_and_confirm(e, name)
+    except MailError as exc:
+        raise _mail_error(exc)
 
 
 def _check_password(password: str) -> None:
@@ -92,12 +114,17 @@ def create_user(req: AdminUserCreateRequest, sess: Session = Depends(get_session
     _check_password(req.password)
     if sess.scalar(text("SELECT 1 FROM users WHERE username = :u"), {"u": req.username}):
         raise ApiError(409, f"Username {req.username} already exists", "USERNAME_TAKEN")
+    email = _verify_email(sess, req.email, req.full_name.strip(), None)
     user_id = sess.scalar(text("""
-        INSERT INTO users (role_id, username, password_hash, full_name, organization, created_by)
-        SELECT role_id, :username, :hash, :full_name, :org, :by FROM roles WHERE role_code = :role
+        INSERT INTO users (role_id, username, password_hash, full_name, organization, created_by,
+                           email, email_verified_at)
+        SELECT role_id, :username, :hash, :full_name, :org, :by, :email,
+               CASE WHEN CAST(:email AS text) IS NULL THEN NULL ELSE now() END
+        FROM roles WHERE role_code = :role
         RETURNING user_id"""),
         {"username": req.username, "hash": hash_password(req.password), "full_name": req.full_name.strip(),
-         "org": (req.organization or "").strip() or None, "by": principal.user_id, "role": req.role_code})
+         "org": (req.organization or "").strip() or None, "by": principal.user_id, "role": req.role_code,
+         "email": email})
     return _get_user(sess, user_id)
 
 
@@ -123,6 +150,13 @@ def update_user(user_id: int, req: AdminUserUpdateRequest, sess: Session = Depen
     if req.is_active is not None:
         sets.append("is_active = :active")
         params["active"] = req.is_active
+    if "email" in req.model_fields_set:
+        from etl.mailer import normalize
+        wanted = normalize(req.email)
+        if wanted != (current.email or None):
+            email = _verify_email(sess, wanted, req.full_name or current.full_name, user_id)
+            sets.append("email = :email, email_verified_at = CASE WHEN CAST(:email AS text) IS NULL THEN NULL ELSE now() END")
+            params["email"] = email
     if sets:
         sess.execute(text(f"UPDATE users SET {', '.join(sets)} WHERE user_id = :u"), params)
     return _get_user(sess, user_id)

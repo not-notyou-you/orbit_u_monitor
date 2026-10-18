@@ -88,7 +88,12 @@ flowchart LR
 <tr><td><code>auth_session_user(user_id)</code></td><td>Peran dan status terkini setiap request</td></tr>
 <tr><td><code>auth_get_token(prefix)</code></td><td>Cari token Bearer sebelum pemiliknya diketahui</td></tr>
 <tr><td><code>auth_change_own_password(hash)</code></td><td>Ganti sandi sendiri; baris ditentukan <code>app.user_id</code></td></tr>
-<tr><td><code>auth_register_user(username, email, hash)</code></td><td>Registrasi mandiri; peran dikunci USER di dalam fungsi</td></tr>
+<tr><td><code>auth_register_user(username, email, hash)</code></td><td>Registrasi mandiri; peran dikunci USER di dalam fungsi; email boleh NULL (M64)</td></tr>
+<tr><td><code>auth_email_available(email)</code></td><td>Email belum dipakai akun lain; dicek sebelum email konfirmasi dikirim (M64)</td></tr>
+<tr><td><code>auth_get_own_notify()</code></td><td>Email, status pengecekan, dan kecamatan langganan milik <code>app.user_id</code> (M64)</td></tr>
+<tr><td><code>auth_set_own_email(email)</code></td><td>Simpan/hapus email sendiri setelah lolos pengecekan aplikasi (M64)</td></tr>
+<tr><td><code>auth_set_own_notify(all, region_ids)</code></td><td>Ganti kecamatan langganan sendiri; yang bukan kecamatan AOI diabaikan (M64)</td></tr>
+<tr><td><code>notify_recipients()</code></td><td>Hanya <code>monitor_etl</code>: penerima peringatan (email terverifikasi + kecamatan); satu-satunya jalan ETL membaca email (M64)</td></tr>
 </table></div>
 </div>
 

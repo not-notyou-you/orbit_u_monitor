@@ -1,6 +1,7 @@
 // js/register.js — /daftar (INTERFACE.md §2 halaman -0, M56). POST /api/auth/register
 // membuat akun Relawan (USER; peran dikunci di fungsi DB auth_register_user)
-// dan langsung menyetel cookie sesi, lalu diantar ke Beranda.
+// dan langsung menyetel cookie sesi, lalu diantar ke Beranda. Email opsional
+// (M64): bila diisi, server mengeceknya dan mengirim email konfirmasi.
 'use strict';
 Pages['register'] = {
   init(root) {
@@ -13,13 +14,13 @@ Pages['register'] = {
       $('#' + input.id + 'Err').textContent = msg || '';
     };
     const rules = {
-      rEmail: v => !v ? 'Wajib diisi.' : /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? '' : 'Format email tidak valid.',
+      rEmail: v => !v || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? '' : 'Format email tidak valid (atau kosongkan).',
       rUser: v => !v ? 'Wajib diisi.' : /^[a-z0-9_.]{3,50}$/.test(v) ? '' : '3–50 karakter: huruf kecil, angka, titik, atau garis bawah.',
       rPw: v => !v ? 'Wajib diisi.' : v.length < 10 ? 'Minimal 10 karakter.' : new TextEncoder().encode(v).length > 72 ? 'Maksimal 72 byte.' : '',
       rPw2: v => !v ? 'Wajib diisi.' : v !== pw.value ? 'Tidak sama dengan kata sandi.' : '',
     };
     const check = i => { const m = rules[i.id](i.id === 'rUser' ? i.value.trim().toLowerCase() : i.id === 'rEmail' ? i.value.trim() : i.value); setErr(i, m); return !m; };
-    [email, user, pw, pw2].forEach(i => {
+    [user, pw, pw2, email].forEach(i => {
       i.addEventListener('blur', () => check(i));
       i.addEventListener('input', () => { if (i.getAttribute('aria-invalid') === 'true') check(i); });
     });
@@ -27,12 +28,12 @@ Pages['register'] = {
     $('#rShow').addEventListener('change', e => { pw.type = pw2.type = e.target.checked ? 'text' : 'password'; });
     $('#regForm').addEventListener('submit', async ev => {
       ev.preventDefault();
-      const bad = [email, user, pw, pw2].filter(i => !check(i));
+      const bad = [user, pw, pw2, email].filter(i => !check(i));
       if (bad.length) { bad[0].focus(); return; }
       await UI.busy($('#regBtn'), async () => {
-        status('Mendaftarkan…');
+        status(email.value.trim() ? 'Memeriksa email dan mendaftarkan…' : 'Mendaftarkan…');
         try {
-          await API.post('/api/auth/register', { email: email.value.trim(), username: user.value.trim().toLowerCase(),
+          await API.post('/api/auth/register', { email: email.value.trim() || null, username: user.value.trim().toLowerCase(),
             password: pw.value, password_confirm: pw2.value }, { noRedirect: true });
           status('Berhasil');
           await UI.info('Akun dibuat', 'Selamat datang, ' + user.value.trim().toLowerCase() + '. Anda sudah masuk sebagai Relawan.');
@@ -40,11 +41,13 @@ Pages['register'] = {
         } catch (e) {
           status('Gagal (' + (e.status || 'jaringan') + ')');
           if (e.code === 'USERNAME_TAKEN') setErr(user, UI.ERROR_TEXT.USERNAME_TAKEN);
-          if (e.code === 'EMAIL_TAKEN') setErr(email, UI.ERROR_TEXT.EMAIL_TAKEN);
+          if (['EMAIL_TAKEN', 'EMAIL_INVALID', 'EMAIL_UNREACHABLE', 'MAIL_NOT_CONFIGURED', 'MAIL_SEND_FAILED'].includes(e.code)) {
+            setErr(email, UI.ERROR_TEXT[e.code] + ' Perbaiki atau kosongkan email.');
+          }
           await UI.showError('Gagal mendaftar', e);
         }
       });
     });
-    email.focus();
+    user.focus();
   },
 };

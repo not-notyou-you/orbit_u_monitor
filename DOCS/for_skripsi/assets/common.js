@@ -7,6 +7,7 @@
     ["03-perencanaan.html", "3", "Perencanaan & definisi sistem"],
     ["04-erd-konseptual.html", "4", "ERD konseptual"],
     ["05-erd-logikal.html", "5", "ERD logikal & multiplicity"],
+    ["erd-utuh.html", "5+", "ERD utuh & per modul (berwarna)"],
     ["06-normalisasi.html", "6", "Normalisasi"],
     ["07-erd-fisik.html", "7", "ERD fisik & kamus data"],
     ["08-keamanan.html", "8", "Keamanan, VIEW, indeks"],

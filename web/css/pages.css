@@ -89,3 +89,49 @@
 .dg-chart .hit:focus { outline: none; stroke: currentColor; stroke-width: 1; }
 .chart-tip.dg-tip { border: 1px solid rgba(0, 0, 0, .55); line-height: 1.35;
   box-shadow: 2px 2px 0 rgba(0, 0, 0, .45); text-shadow: none; font-family: var(--font-data); }
+
+/* ---------------------------------------------------------------- Beranda: Pantau Lokasi (M63) */
+.pl-note { margin-top: 8px; }
+.pl-sec { margin-top: 8px; }
+.pl-sec > legend { font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+.pl-ic svg { width: 16px; height: 16px; display: block; }
+.pl-where { margin: 0; line-height: 1.6; }
+.pl-priv { display: block; font-size: 11px; color: var(--text-mut); margin-top: 2px; }
+.pl-geo { margin: 0 0 8px; }
+.pl-geo-line { margin: 0; line-height: 1.6; }
+.pl-help { margin-top: 6px; font-size: 12px; }
+.pl-help summary { cursor: pointer; }
+.pl-help p { margin: 4px 0 0; line-height: 1.5; max-width: 80ch; }
+.pl-list { max-height: 340px; }
+.pl-list button { display: flex; align-items: center; gap: 6px; }
+.pl-list .pl-name { flex: 1; min-width: 0; text-align: left; }
+.pl-badge { font-size: 10px; font-weight: 700; letter-spacing: .06em; padding: 0 4px; border: 1px solid currentColor; white-space: nowrap; }
+.pl-list button[aria-selected="true"] .pl-badge, .pl-list button:hover .pl-badge { color: #fff; }
+.pl-legend { color: var(--text); }
+.pl-h { font-size: 13px; margin: 12px 0 2px; }
+.pl-sub { font-size: 11px; margin: 0 0 6px; line-height: 1.5; }
+.pl-status { margin: 0; font-size: 14px; line-height: 1.5; }
+.pl-abn { margin: 0; padding-left: 18px; line-height: 1.5; }
+.pl-abn li { margin-bottom: 3px; }
+.pl-all { margin-top: 8px; }
+.pl-all summary { cursor: pointer; }
+.pl-stats .readout .r-val { font-size: 22px; }
+.pl-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.pl-chart { min-width: 0; }
+.pl-chart .lbl { margin: 0 0 2px; display: flex; align-items: center; gap: 4px; }
+.chart .rng { fill: var(--phos); fill-opacity: .1; }
+/* Layar sentuh: baris daftar dan tombol lokasi cukup besar untuk jari. */
+@media (pointer: coarse) {
+  .pl-list button { min-height: 40px; }
+  #hoGeo button, #hoMine button, #hoHeroBtns .btn, #hoHeroBtns button { min-height: 40px; }
+}
+/* Potongan per kecamatan kecil dan tegak: di ponsel dua kolom cukup terbaca
+   (main.css menurunkan .tiles ke satu kolom di bawah 420px). */
+@media (max-width: 420px) { #hoCitra .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---------------------------------------------------------------- Akun saya: email & peringatan (M64) */
+.pl-checks { max-height: 220px; padding: 4px; }
+.pl-checks .check { margin: 0; padding: 2px 4px; }
+.pl-warn { margin: 0 0 6px; padding: 4px 6px; border: 1px solid var(--amber); font-size: 11px; }
+.pl-sub-note { margin: 6px 0 0; font-size: 11px; }
+@media (pointer: coarse) { .pl-checks .check { min-height: 36px; } }

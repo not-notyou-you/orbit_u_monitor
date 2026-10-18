@@ -1,7 +1,7 @@
 # run.ps1 — jalankan API + web UI Orbit-U: The Monitor di mesin ini.
 #
 # Lingkungan sudah disiapkan: venv/ (Python 3.10.11) dan PostgreSQL 14 lokal
-# (database orbit_u_monitor, PostGIS 3.4, schema + migrasi 001-026 terpasang).
+# (database themonitor, PostGIS 3.4, schema + migrasi 001-026 terpasang).
 # TimescaleDB tidak terpasang — schema.sql sudah menanganinya sebagai opsional.
 #
 # Pakai:  .\run.ps1          -> http://localhost:8001

@@ -172,7 +172,7 @@ Orbital 95 adalah tema **bawaan**. Tiga tema lain diambil dari konsep di `DOCS/d
 | `pasir` | Mika Pasir | konsep41 |
 | `piksel` | Piksel Marun | konsep44 |
 
-- Tema dipilih di Beranda, lalu diterapkan `web/js/theme.js` sebagai `data-theme` di `<html>` **sebelum**
+- Tema dipilih di Tentang (sebelum M63 di Beranda), lalu diterapkan `web/js/theme.js` sebagai `data-theme` di `<html>` **sebelum**
   `<body>` diurai, sehingga tidak ada kedipan tema bawaan.
 - Pilihan disimpan di `localStorage` (`orbit-u.tema`) per peramban, bukan per akun.
 - CSS tema ada di `web/css/tema/`: `umum.css` (struktur bersama, tercakup `html.tema-alt`) ditambah satu

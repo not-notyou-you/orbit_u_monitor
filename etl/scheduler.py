@@ -100,9 +100,13 @@ def run_locked(db, spec_id: str, lock: str, fn: Callable[[], object]) -> dict:
 def job_hydromet_daily(db) -> dict:
     from etl import forecast_store as fs
     from etl import hydromet_job as hj
+    from etl import notify
     out = run_locked(db, "hydromet_daily", "hydromet",
                      lambda: [(str(r.obs_date), r.status) for r in hj.run_daily(db)])
     fs.refresh_quietly(db)
+    # M64: peringatan email setelah angka dan alert hari ini tersimpan.
+    # Backfill/proses ulang tidak lewat sini, jadi tanggal lampau tidak memicu email.
+    notify.run_quietly(db, "hydromet_daily")
     return out
 
 
@@ -147,7 +151,11 @@ def job_live(db) -> dict:
             except Exception:
                 logger.exception("[SCHED] siklus Live area=%s gagal", area["area_id"])
         return done
-    return run_locked(db, "live_cycle", "live", _run)
+    from etl import notify
+    out = run_locked(db, "live_cycle", "live", _run)
+    # M64: lintasan Sentinel-1 baru (VV/VH/% air per kecamatan) bisa memicu email.
+    notify.run_quietly(db, "live_cycle")
+    return out
 
 
 def job_report(db, code: str, wait_minutes: float | None = None) -> dict:

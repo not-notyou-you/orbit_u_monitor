@@ -192,6 +192,11 @@ Pages['admin'] = (() => {
     UI.$('#auList', p).innerHTML = UI.screenHTML({ channel: 'CH-01 · AKUN PENGGUNA', rec: UI.int(r.total) + ' AKUN', recCls: 'off', body: UI.tableHTML([
       { label: 'Pengguna', key: 'username' }, { label: 'Nama', key: 'full_name' }, { label: 'Organisasi', key: 'organization' },
       { label: 'Peran', get: u => (ROLES.find(x => x[0] === u.role_code) || [0, u.role_code])[1] },
+      // M64: email opsional; "terkonfirmasi" = lolos pengecekan dan menerima peringatan.
+      { label: 'Email', html: true, get: u => !u.email ? '<span class="v-dim">—</span>'
+        : UI.esc(u.email) + (u.email_verified_at ? '' : ' <span class="v-amber">BELUM DICEK</span>') +
+          '<br><span class="v-dim" style="font-size:11px">' + (u.notify_regions === -1 ? 'semua kecamatan'
+            : u.notify_regions ? u.notify_regions + ' kecamatan' : 'tanpa peringatan') + '</span>' },
       { label: 'Status', html: true, get: u => (u.is_active ? 'AKTIF' : '<span class="v-dim">NONAKTIF</span>') + (u.is_locked ? ' <span class="v-amber">TERKUNCI</span>' : '') },
       { label: 'Masuk terakhir', get: u => u.last_login_at ? UI.dateTime(u.last_login_at) : 'belum pernah' },
       { label: 'Aksi', html: true, get: u => btn('data-edit="' + u.user_id + '"', 'Ubah…') + ' ' + btn('data-pw="' + u.user_id + '"', 'Reset sandi…') + (u.is_locked ? ' ' + btn('data-unlock="' + u.user_id + '"', 'Buka kunci') : '') },
@@ -209,15 +214,19 @@ Pages['admin'] = (() => {
       { id: 'username', label: 'Nama pengguna', required: true, pattern: '^[a-z0-9_.]{3,50}$', patternMsg: '3–50 karakter: huruf kecil, angka, titik, garis bawah.', autocomplete: 'off' },
       { id: 'full_name', label: 'Nama lengkap', required: true, maxlength: 100 }, { id: 'organization', label: 'Organisasi', maxlength: 100, value: 'GMLS' },
       { id: 'role_code', label: 'Peran', type: 'select', options: ROLES, value: 'USER' },
+      { id: 'email', label: 'Email (opsional)', type: 'email', maxlength: 254, autocomplete: 'off',
+        hint: 'Untuk peringatan email. Dicek dulu: sistem mengirim email konfirmasi; alamat yang tidak bisa menerima email ditolak.' },
       { id: 'password', label: 'Kata sandi awal', type: 'password', required: true, minlength: 10, hint: 'Minimal 10 karakter. Sampaikan ke pengguna lewat jalur aman.', autocomplete: 'new-password' },
-    ], v => API.post('/api/admin/users', v));
+    ], v => API.post('/api/admin/users', Object.assign({}, v, { email: (v.email || '').trim() || null })));
     if (r) { st.users = null; UI.info('Buat akun', 'Akun "' + r.username + '" dibuat.'); tabUsers(); }
   }
   async function editUser(u) {
     const r = await formDialog('Ubah akun ' + u.username, [
       { id: 'full_name', label: 'Nama lengkap', required: true, value: u.full_name, maxlength: 100 }, { id: 'organization', label: 'Organisasi', value: u.organization, maxlength: 100 },
       { id: 'role_code', label: 'Peran', type: 'select', options: ROLES, value: u.role_code }, { id: 'is_active', label: 'Akun aktif', type: 'checkbox', value: u.is_active },
-    ], v => API.patch('/api/admin/users/' + u.user_id, v));
+      { id: 'email', label: 'Email (opsional)', type: 'email', maxlength: 254, value: u.email || '', autocomplete: 'off',
+        hint: 'Kosongkan untuk menghapus. Alamat baru dicek dulu dan dikirimi email konfirmasi.' },
+    ], v => API.patch('/api/admin/users/' + u.user_id, Object.assign({}, v, { email: (v.email || '').trim() || null })));
     if (r) { st.users = null; tabUsers(); }
   }
   async function resetPw(u) {
@@ -619,12 +628,33 @@ Pages['admin'] = (() => {
 
   // ================================================================ 11. Pengaturan
   async function tabSettings() {
-    const s = await API.get('/api/admin/settings');
-    panel().innerHTML = UI.screenHTML({ channel: 'CH-01 · APP_SETTINGS', body: UI.tableHTML([
+    const [s, ns] = await Promise.all([API.get('/api/admin/settings'), API.get('/api/admin/notify/status').catch(() => null)]);
+    // M64: keadaan pengiriman email peringatan + uji kirim.
+    const sent = ns && ns.last_7_days.EMAIL_ALERT_SENT, fail = ns && ns.last_7_days.EMAIL_ALERT_FAILED;
+    const mail = !ns ? '' : UI.screenHTML({ channel: 'CH-00 · EMAIL PERINGATAN', rec: ns.configured ? '● SIAP' : '● BELUM DIATUR',
+      recCls: ns.configured ? 'live' : 'off', body:
+        '<dl class="kv">' + [['PENGIRIM', ns.sender || '—'], ['SERVER', ns.backend === 'file' ? 'berkas .eml (MAIL_BACKEND=file)' : (ns.server || '—')],
+          ['TAUTAN', ns.base_url || '— (APP_BASE_URL kosong: email tanpa tautan)'], ['PELANGGAN', UI.int(ns.subscribers) + ' akun (' + UI.int(ns.with_email) + ' ber-email)'],
+          ['7 HARI', UI.int(sent ? sent.count : 0) + ' terkirim, ' + UI.int(fail ? fail.count : 0) + ' gagal'], ['BATAS/PUTARAN', UI.int(ns.max_per_run) + ' email']]
+          .map(([k, v]) => '<dt>' + k + '</dt><dd>' + UI.esc(v) + '</dd>').join('') + '</dl>' +
+        '<div class="btn-row" style="margin-top:6px"><button type="button" class="small" id="ntTest"' + (ns.configured ? '' : ' disabled') + '>Kirim email uji ke saya</button>' +
+        '<button type="button" class="small" id="ntRun"' + (ns.configured ? '' : ' disabled') + '>Kirim peringatan sekarang</button></div>' +
+        '<p class="scr-text v-dim" style="margin:6px 0 0;font-size:11px">Kredensial SMTP di .env (MAIL_*). Peringatan otomatis dikirim setelah Job Hidromet harian dan siklus Live; ' +
+        'data yang sama tidak dikirim dua kali. Matikan lewat notify.enabled di bawah.</p>' });
+    panel().innerHTML = mail + UI.screenHTML({ channel: 'CH-01 · APP_SETTINGS', body: UI.tableHTML([
       { label: 'Kunci', key: 'setting_key' }, { label: 'Nilai', get: x => JSON.stringify(x.setting_value) }, { label: 'Keterangan', key: 'description' },
       { label: 'Diubah', get: x => UI.dateTime(x.updated_at) }, { label: 'Aksi', html: true, get: x => btn('data-set="' + UI.esc(x.setting_key) + '"', 'Ubah…') },
     ], s.items) }) + '<div id="asExcel" style="margin-top:8px;max-width:420px"></div>';
     Excel.mount(UI.$('#asExcel', panel()), ['app_settings'], { onImported: tabSettings });
+    const tb = UI.$('#ntTest', panel()), rb = UI.$('#ntRun', panel());
+    if (tb) tb.addEventListener('click', () => UI.busy(tb, async () => {
+      try { const r = await API.post('/api/admin/notify/test', {}); UI.info('Email uji', 'Email uji dikirim ke ' + r.to + (r.via === 'file' ? ' (ditulis sebagai berkas .eml).' : '.')); }
+      catch (e) { UI.showError('Email uji', e); }
+    }));
+    if (rb) rb.addEventListener('click', () => UI.busy(rb, async () => {
+      try { await API.post('/api/admin/notify/run', {}); UI.info('Peringatan email', 'Putaran peringatan berjalan di latar. Hanya data baru yang belum pernah dikirim yang diemailkan.'); }
+      catch (e) { UI.showError('Peringatan email', e); }
+    }));
     UI.$$('[data-set]', panel()).forEach(b => b.addEventListener('click', async () => {
       const x = s.items.find(i => i.setting_key === b.dataset.set);
       const isNum = typeof x.setting_value === 'number', isBool = typeof x.setting_value === 'boolean';

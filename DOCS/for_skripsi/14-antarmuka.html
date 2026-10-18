@@ -29,7 +29,8 @@ flowchart LR
     root((Orbit-U:<br/>The Monitor))
     root --> m0[Masuk /masuk]
     root --> m00[Registrasi /daftar]
-    root --> b[1 Beranda]
+    root --> b[1 Beranda · Pantau Lokasi]
+    root --> t[1b Tentang]
     root --> aoi[2 3D AOI]
     root --> c[3 Citra Satelit]
     root --> f[4 Forecast]
@@ -37,12 +38,13 @@ flowchart LR
     root --> d[6 Data]
     root --> l[7 Laporan]
     root --> s[8 Sistem]
+    b --> b1[Landing] & b2[Lokasi saya] & b3[Informasi lokasi] & b4[Panel pantau kecamatan]
     c --> c1[Ringkasan] & c2[Sentinel-1] & c3[MODIS] & c4[GPM] & c5[Laporan PDF]
     f --> f1[Keadaan terbaru] & f2[Analisa daerah] & f3[Tren & evaluasi alert]
     k --> k1[Lihat] & k2[Kelola]
     d --> d1[Ringkasan] & d2[Sentinel-1] & d3[GPM] & d4[MODIS] & d5[Unduh data] & d6[Dataset tersimpan] & d7[Proses berjalan] & d8[EDA]
     l --> l1[Kesehatan data] & l2[Keadaan AOI]
-    s --> s1[Tentang] & s2[Log] & s3[Akun saya] & s4[Pengguna] & s5[Pengaturan]
+    s --> s2[Log] & s3[Akun saya · email & peringatan] & s4[Pengguna] & s5[Pengaturan · email peringatan]
 </pre></div>
 </div>
 
@@ -51,7 +53,9 @@ flowchart LR
 <div class="body"><table class="t">
 <tr><th>Halaman / fitur</th><th class=c>PUBLIC</th><th class=c>USER</th><th class=c>ANALYST</th><th class=c>DATA_ENG</th><th class=c>ADMIN</th></tr>
 <tr><td>0 Masuk, Registrasi</td><td class=c>●</td><td class=c>—</td><td class=c>—</td><td class=c>—</td><td class=c>—</td></tr>
-<tr><td>1 Beranda</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td></tr>
+<tr><td>1 Beranda: Informasi lokasi + panel pantau (angka per kecamatan)</td><td class=c>◐ 30 hari</td><td class=c>◐ 365 hari</td><td class=c>●</td><td class=c>●</td><td class=c>●</td></tr>
+<tr><td>1 Beranda: Lokasi saya (geolokasi)</td><td class=c>—</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td></tr>
+<tr><td>1b Tentang</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td></tr>
 <tr><td>2 3D AOI</td><td class=c>—</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td></tr>
 <tr><td>3 Citra Satelit (termasuk PDF)</td><td class=c>◐ 30 hari</td><td class=c>◐ 365 hari</td><td class=c>●</td><td class=c>●</td><td class=c>●</td></tr>
 <tr><td>4 Forecast</td><td class=c>—</td><td class=c>—</td><td class=c>●</td><td class=c>—</td><td class=c>●</td></tr>
@@ -60,9 +64,9 @@ flowchart LR
 <tr><td>6 Data</td><td class=c>—</td><td class=c>—</td><td class=c>—</td><td class=c>●</td><td class=c>●</td></tr>
 <tr><td>7.1 Laporan Kesehatan data</td><td class=c>—</td><td class=c>—</td><td class=c>—</td><td class=c>●</td><td class=c>●</td></tr>
 <tr><td>7.2 Laporan Keadaan AOI</td><td class=c>—</td><td class=c>—</td><td class=c>●</td><td class=c>—</td><td class=c>●</td></tr>
-<tr><td>8.1 Tentang</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td><td class=c>●</td></tr>
 <tr><td>8.2 Log</td><td class=c>—</td><td class=c>—</td><td class=c>◐ Kejadian</td><td class=c>◐ Data</td><td class=c>●</td></tr>
 <tr><td>8.3 Akun saya / Manajemen akun</td><td class=c>—</td><td class=c>◐ sendiri</td><td class=c>◐ sendiri</td><td class=c>◐ sendiri</td><td class=c>● semua</td></tr>
+<tr><td>Peringatan email: email + kecamatan langganan</td><td class=c>—</td><td class=c>◐ sendiri</td><td class=c>◐ sendiri</td><td class=c>◐ sendiri</td><td class=c>● + status & uji</td></tr>
 <tr><td>8.4 Pengaturan aplikasi</td><td class=c>—</td><td class=c>—</td><td class=c>—</td><td class=c>—</td><td class=c>●</td></tr>
 </table></div>
 </div>
@@ -71,14 +75,33 @@ flowchart LR
 <div class="fig" data-cap="Alur navigasi pengunjung sampai halaman berperan" data-from="INTERFACE.md §2">
 <div class="body white"><pre class="mermaid">
 flowchart LR
-    v([Pengunjung membuka /]) --> b[Beranda]
-    b --> c[Citra 30 hari] & k[Kejadian 365 hari]
+    v([Pengunjung membuka /]) --> b[Beranda: Informasi lokasi]
+    b --> p[Pilih kecamatan → panel pantau]
+    b --> c[Citra 30 hari] & k[Kejadian 365 hari] & t[Tentang]
     b --> q{Buka halaman<br/>ber-akun?}
     q -- ya --> m[/masuk?next=…/]
     m --> r{Punya akun?}
     r -- tidak --> reg[/daftar/] --> b2
     r -- ya --> b2[Beranda + menu sesuai peran]
     b2 --> x[Halaman tujuan]
+</pre></div>
+</div>
+
+<div class="fig" data-cap="Urutan bagian Beranda menurut keadaan perangkat (M63)" data-from="INTERFACE.md §2 halaman 1; web/js/home.js, web/js/geo.js">
+<div class="body white"><pre class="mermaid">
+flowchart TD
+    a([Beranda dibuka]) --> m{Sudah masuk?}
+    m -- tidak --> info[Informasi lokasi lebih dulu<br/>daftar + peta kecamatan berwarna status]
+    m -- ya --> s{Izin lokasi?}
+    s -- belum ditanya --> btn[Tombol Gunakan lokasi saya] --> s2{Diizinkan?}
+    s -- ditolak / tidak didukung / bukan HTTPS --> info
+    s -- sudah diizinkan --> loc[Baca lokasi di peramban]
+    s2 -- ya --> loc
+    s2 -- tidak --> info
+    loc --> w{Titik di kecamatan AOI?}
+    w -- ya --> mine[Lokasi saya + panel pantau<br/>lalu Informasi lokasi]
+    w -- tidak --> info
+    info --> pick[Pilih kecamatan → panel pantau]
 </pre></div>
 </div>
 
@@ -104,7 +127,7 @@ flowchart LR
 window.pageInit = function () {
   const NS = "http://www.w3.org/2000/svg";
   const W = 960, H = 600, CX = 16, CY = 108, CW = W - 32, CH = H - CY - 44;
-  const MENU = ["Beranda", "3D AOI", "Citra Satelit", "Forecast", "Kejadian", "Data", "Laporan", "Sistem"];
+  const MENU = ["Beranda", "Tentang", "3D AOI", "Citra Satelit", "Forecast", "Kejadian", "Data", "Laporan", "Sistem"];
   function el(tag, a, p) { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); if (p) p.append(e); return e; }
   function txt(p, x, y, s, o = {}) { const t = el("text", { x, y, "font-family": "Arial, sans-serif", "font-size": o.size || 12, fill: o.fill || "#222", "text-anchor": o.anchor || "start", "font-weight": o.bold ? "bold" : "normal" }, p); t.textContent = s; return t; }
   function wire(spec) {
@@ -151,8 +174,12 @@ window.pageInit = function () {
   const specs = [
     { cap: "Wireframe halaman Masuk", title: "Masuk", menu: null, lede: "Masuk untuk membuka halaman sesuai peran akun Anda.", tray: "Pengunjung",
       blocks: [[2, 0.5, 4.5, 10, "Masuk", "box"], [2.3, 2, 3.9, 1.6, "Nama pengguna", "input"], [2.3, 3.8, 3.9, 1.6, "Kata sandi", "input"], [4.2, 6, 2, 1.4, "Masuk", "btn"], [2.3, 8, 3.9, 1.4, "Daftar akun Relawan", "btn"], [7, 0.5, 4, 10, "Manfaat akun Relawan", "table"]] },
-    { cap: "Wireframe halaman Beranda", title: "Beranda", menu: "Beranda", lede: "Ringkasan sistem dan pintu masuk ke setiap halaman.",
-      blocks: [[0, 0, 12, 2, "1.1 Sambutan dan 1.2 penjelasan sistem", "box"], [0, 2, 12, 2, "Peringatan hujan aktif (USER+)", "screen"], [0, 4, 7, 4, "1.3 Kartu halaman sesuai peran", "cards", 4], [7, 4, 5, 8, "1.4 Peta AOI kecamatan", "map"], [0, 8, 7, 4, "Daftar kecamatan AOI dan tema tampilan", "table"]] },
+    { cap: "Wireframe halaman Beranda (Pantau Lokasi, M63)", title: "Beranda", menu: "Beranda", lede: "Kondisi kecamatan Anda: kalimat kondisi, citra kecamatan itu, dan angkanya.",
+      blocks: [[0, 0, 12, 1.6, "Landing: sambutan singkat + Pantau lokasi ↓ + bukan peringatan dini resmi", "box"], [0, 1.7, 12, 1.4, "Lokasi saya: Anda berada di Kec. X · akurasi (pengguna masuk, izin lokasi)", "box"],
+        [0, 3.2, 3.5, 3.6, "Informasi lokasi: daftar kecamatan + status", "table"], [3.5, 3.2, 8.5, 3.6, "Peta kecamatan berwarna status", "map"],
+        [0, 6.9, 12, 1.6, "Panel pantau: STATUS + yang tidak normal + tanggal data", "screen"], [0, 8.6, 6, 3.4, "Citra dipotong ke kecamatan (9 tile)", "img"], [6, 8.6, 6, 3.4, "Angka terbaru + tren 30 hari (pita rentang biasa)", "chart"]] },
+    { cap: "Wireframe halaman Tentang (isi Beranda sebelum M63)", title: "Tentang", menu: "Tentang", lede: "Apa aplikasi ini, batasannya, halaman per peran, tema, peta AOI, dan sumber data.",
+      blocks: [[0, 0, 12, 2, "Sambutan, penjelasan, dan batasan", "box"], [0, 2, 7, 4, "Kartu halaman sesuai peran", "cards", 4], [7, 2, 5, 6, "Peta AOI kecamatan", "map"], [0, 6, 7, 2, "Tema tampilan", "cards", 4], [0, 8, 6, 4, "Info aplikasi (peran, server, versi)", "table"], [6, 8, 6, 4, "Sumber data + tabel akses (ADMIN)", "table"]] },
     { cap: "Wireframe halaman Citra Satelit per satelit", title: "Citra Satelit", menu: "Citra Satelit", tabs: ["Ringkasan", "Sentinel-1", "MODIS", "GPM", "Laporan PDF"], tab: 1, lede: "Pilih tanggal scene; bandingkan dua tanggal bila perlu.",
       blocks: [[0, 0, 3, 12, "Daftar tanggal (batas peran)", "table"], [3, 0, 4.5, 6, "Gambar scene (lightbox)", "img"], [7.5, 0, 4.5, 6, "Gambar pembanding", "img"], [3, 6, 9, 2, "Kalimat kondisi", "screen"], [3, 8, 9, 4, "Tabel metrik per band × metrik + selisih", "screen"]] },
     { cap: "Wireframe halaman Forecast", title: "Forecast", menu: "Forecast", tabs: ["Keadaan terbaru", "Analisa daerah", "Tren & evaluasi alert"], lede: "Semua band 30 hari terakhir dengan forecast 15 hari.", tray: "analis · Analis",
@@ -163,8 +190,11 @@ window.pageInit = function () {
       blocks: [[0, 0, 7, 12, "Daftar granule (aktif / nonaktif) + aksi", "screen"], [7, 0, 5, 4, "Backfill", "box"], [7.3, 1.2, 2.1, 1.6, "Dari", "input"], [9.6, 1.2, 2.1, 1.6, "Sampai", "input"], [9.7, 2.9, 2, 1.2, "Jalankan", "btn"], [7, 4, 5, 5, "Progres dan log langsung", "screen"], [7, 9, 5, 3, "Riwayat per tanggal", "table"]] },
     { cap: "Wireframe halaman Laporan", title: "Laporan", menu: "Laporan", tabs: ["Kesehatan data", "Keadaan AOI"], tab: 1, lede: "Laporan otomatis mingguan/bulanan atau buat untuk rentang bebas.", tray: "analis · Analis",
       blocks: [[0, 0, 8, 12, "Daftar laporan (periode, status, checksum, unduh)", "screen"], [8, 0, 4, 6, "Buat laporan rentang bebas", "box"], [8.3, 1.2, 3.4, 1.6, "Dari tanggal", "input"], [8.3, 3, 3.4, 1.6, "Sampai tanggal", "input"], [9.7, 4.7, 2, 1.2, "Unduh PDF", "btn"]] },
-    { cap: "Wireframe halaman Sistem › Pengguna", title: "Sistem", menu: "Sistem", tabs: ["Tentang", "Log", "Akun saya", "Pengguna", "Pengaturan"], tab: 3, lede: "Kelola akun, peran, dan status aktif.", tray: "admin · Administrator",
-      blocks: [[0, 0, 8, 12, "Daftar akun (username, peran, status, login terakhir)", "screen"], [8, 0, 4, 9, "Formulir akun", "box"], [8.3, 1.2, 3.4, 1.6, "Nama pengguna", "input"], [8.3, 3, 3.4, 1.6, "Nama lengkap", "input"], [8.3, 4.8, 3.4, 1.6, "Peran", "input"], [8.3, 7, 1.6, 1.3, "Simpan", "btn"], [10, 7, 1.7, 1.3, "Reset sandi", "btn"]] },
+    { cap: "Wireframe halaman Sistem › Akun saya (email & peringatan, M64)", title: "Sistem", menu: "Sistem", tabs: ["Log", "Akun saya", "Pengguna", "Pengaturan"], tab: 1, lede: "Ubah kata sandi, token API, dan email peringatan milik Anda.",
+      blocks: [[0, 0, 4, 3, "Profil", "screen"], [0, 3.1, 4, 4.4, "Email & peringatan (opsional)", "box"], [0.3, 4.3, 3.4, 1.6, "Alamat email (dicek + email konfirmasi)", "input"], [2.1, 6.1, 1.6, 1.2, "Simpan", "btn"],
+        [0, 7.6, 4, 4.4, "Kecamatan yang dipantau: semua / beberapa / tidak ada", "table"], [4, 0, 8, 4, "Buat token API", "box"], [4, 4, 8, 8, "Token API milik saya", "screen"]] },
+    { cap: "Wireframe halaman Sistem › Pengguna", title: "Sistem", menu: "Sistem", tabs: ["Log", "Akun saya", "Pengguna", "Pengaturan"], tab: 2, lede: "Kelola akun, peran, status aktif, dan email.", tray: "admin · Administrator",
+      blocks: [[0, 0, 8, 12, "Daftar akun (username, peran, email + status cek, kecamatan, login terakhir)", "screen"], [8, 0, 4, 10.5, "Formulir akun", "box"], [8.3, 1.2, 3.4, 1.6, "Nama pengguna", "input"], [8.3, 3, 3.4, 1.6, "Nama lengkap", "input"], [8.3, 4.8, 3.4, 1.6, "Peran", "input"], [8.3, 6.6, 3.4, 1.6, "Email (opsional, dicek)", "input"], [8.3, 8.8, 1.6, 1.3, "Simpan", "btn"], [10, 8.8, 1.7, 1.3, "Reset sandi", "btn"]] },
   ];
   const host = document.getElementById("wf");
   specs.forEach((s) => {

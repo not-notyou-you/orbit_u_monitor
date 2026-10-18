@@ -43,6 +43,8 @@ pypdf==6.19.0
 # aplikasi tetap PostgreSQL + PostGIS.
 PyMySQL==1.1.1
 python-dotenv==1.0.1
+# M64: cek MX domain email sebelum menyimpannya (etl/mailer.py)
+dnspython==2.7.0
 psutil==6.1.0
 pytest==8.3.4
 pytest-asyncio==0.24.0

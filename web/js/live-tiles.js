@@ -1,5 +1,5 @@
 // web/js/live-tiles.js — tile preview Live (9 kunci), legenda, dan kalimat kondisi.
-// Dipakai Beranda Publik (/api/public/live) dan Pantauan Live (/api/live/areas/{id}/card).
+// Dipakai Beranda (Pantau Lokasi, /api/public/lokasi), Citra Satelit, dan Pantauan Live.
 'use strict';
 
 const LiveTiles = (() => {
@@ -24,6 +24,7 @@ const LiveTiles = (() => {
     normal: ['NORMAL', ''], alert: ['WASPADA', 'v-amber'], waspada: ['WASPADA', 'v-amber'],
     high: ['TINGGI', 'v-alert'], tinggi: ['TINGGI', 'v-alert'],
     'flood-indicated': ['INDIKASI GENANGAN', 'v-alert'], 'n/a': ['TIDAK TERSEDIA', 'v-dim'], na: ['TIDAK TERSEDIA', 'v-dim'],
+    unavailable: ['TIDAK TERSEDIA', 'v-dim'],
   };
   const LEGEND_LABEL = {
     'No water': 'Tanpa air', 'Permanent water (reference)': 'Air permanen (rujukan)',

@@ -39,18 +39,88 @@ ber-akun diantar ke `/masuk?next=…`.
 | # | Halaman | Hash | Tab (berkas `pages/*.html` + `js/*.js`) |
 |---|---|---|---|
 | 0 | Masuk | `/masuk` | `login` — nama pengguna + kata sandi, panel manfaat akun Relawan |
-| -0 | Registrasi | `/daftar` | `register` — email, nama pengguna, kata sandi, konfirmasi |
-| 1 | Beranda | `#beranda` | `home` — 1.1 sambutan, 1.2 penjelasan, 1.3 kartu halaman per peran, 1.4 peta AOI + daftar kecamatan; alert hujan aktif untuk USER+; pilihan tema tampilan (Orbital 95 bawaan, Kertas Mint, Mika Pasir, Piksel Marun — M57) |
+| -0 | Registrasi | `/daftar` | `register` — nama pengguna, kata sandi, konfirmasi, email **opsional** (M64; dicek dan dikirimi email konfirmasi bila diisi) |
+| 1 | Beranda (Pantau Lokasi, M63) | `#beranda` | `home` — landing singkat → Lokasi saya (USER+, izin lokasi, di dalam AOI) → Informasi lokasi (daftar + peta kecamatan berwarna status) → panel pantau satu kecamatan: kalimat kondisi + yang tidak normal, citra dipotong ke kecamatan, angka terbaru + tren 30 hari |
+| 1b | Tentang (M63; dulu Sistem › Tentang dan isi Beranda lama) | `#tentang` | `about` — sambutan, penjelasan + batasan, kartu halaman per peran, pilihan tema tampilan (Orbital 95 bawaan, Kertas Mint, Mika Pasir, Piksel Marun — M57), peta AOI + daftar kecamatan, info aplikasi, sumber data, tabel akses per peran (ADMIN) |
 | 2 | 3D AOI | `#aoi-3d` | `terrain3d` — citra di atas relief DEM |
 | 3 | Citra Satelit | `#citra/…` | `ringkasan` (`citra`), `sentinel-1` / `modis` / `gpm` (`citra-sat`, satelit dari `tab.source`), `laporan` (`citra-report`) |
 | 4 | Forecast (dulu Diagram, M61) | `#forecast/…` | `terbaru` + `analisa-daerah` (`diagram`, mode dari `tab.mode`; setiap grafik garis + forecast 15 hari dengan sakelar di bawahnya), `evaluasi` (`analytics`; CH-01 tren per kecamatan dan CH-03 rerata hujan juga diberi forecast) |
 | 5 | Kejadian | `#kejadian/…` | `lihat` (`disasters-view`), `kelola` (`disasters`) |
 | 6 | Data | `#data/…` | `ringkasan` (`data-home`), `sentinel-1` / `gpm` / `modis` (`data-source`), `unduh` (`create-dataset`), `tersimpan` (`catalog`), `proses` (`process`), `eda` (`eda`) |
 | 7 | Laporan | `#laporan/…` | `kesehatan-data` + `keadaan-aoi` (`reports`, jenis dari `tab.kind`) |
-| 8 | Sistem | `#sistem/…` | `tentang` (`about`), `log` (`logs`), `akun` (`account`), `pengguna` (`admin`, kelompok `akses`), `pengaturan` (`admin`, kelompok `pengaturan`) |
+| 8 | Sistem | `#sistem/…` | `log` (`logs`), `akun` (`account`), `pengguna` (`admin`, kelompok `akses`), `pengaturan` (`admin`, kelompok `pengaturan`) |
 
 Isi per halaman:
 
+* **Peringatan email (M64)**. Email dan kecamatan sama-sama opsional. Tanpa salah satunya, pengguna
+  tidak menerima peringatan, dan tidak ada yang rusak.
+  * **Akun saya › Email & peringatan:** email disimpan hanya bila lolos pengecekan
+    (`etl/mailer.py` `verify_and_confirm`):
+    1. format valid;
+    2. belum dipakai akun lain;
+    3. domain punya server mail (MX, atau rekaman A);
+    4. email konfirmasi berhasil dikirim.
+
+    Gagal di salah satu langkah → email **tidak** disimpan dan alasannya tampil. Pengecekan yang sama
+    berlaku di registrasi dan di form akun Admin.
+    * Batas: kotak surat yang tidak ada di domain yang valid tidak bisa diketahui seketika; pantulannya
+      masuk ke inbox pengirim.
+    * Kecamatan: tidak ada, satu (mis. tempat tinggal), beberapa, atau "semua kecamatan" (termasuk yang
+      nanti ditambahkan ke AOI). Di Beranda, pengguna yang masuk juga punya tombol "Terima peringatan
+      email untuk kecamatan ini".
+  * **Kapan dikirim** (`etl/notify.py`): setelah Job Hidromet harian dan siklus Live (scheduler), atau
+    tombol Admin "Kirim peringatan sekarang".
+    * Butir "tidak normal" dihitung dengan aturan yang sama dengan Beranda.
+    * Butir dikirim bila tanggal datanya ≤ `notify.max_age_days` (7) hari dan belum pernah dikirim ke
+      pengguna itu (`notify_sent`). Data yang sama tidak dikirim dua kali; data baru dengan kondisi yang
+      sama tetap dikirim. Backfill tanggal lampau tidak memicu email.
+    * Satu email per pengguna per putaran, semua kecamatannya digabung. Maks. `MAIL_MAX_PER_RUN` per putaran.
+  * **Isi email** (satu email untuk awam dan analis, `etl/notify_email.py`): per kecamatan berlapis tiga.
+    1. **Ringkasnya:** bahasa sehari-hari + saran + "bukan peringatan dini resmi".
+    2. **Bukti:** citra scene Live terbaru dipotong ke kecamatan (inline, maks. 3) + tabel nilai · ambang ·
+       sebelumnya · rentang biasa · tanggal data.
+    3. **Detail teknis:** kalimat aturan, produk sumber dan run IMERG, bagian kecamatan yang teramati,
+       metode, keterbatasan.
+
+    Selalu HTML + teks polos. Kaki email menyebut alasan pengguna menerimanya dan tautan ke Akun saya
+    (`APP_BASE_URL`).
+* **1 Beranda (Pantau Lokasi, M63)**. "Wilayah terdaftar" = kecamatan
+  `administrative_regions.in_aoi`.
+  * Urutan bagian menurut keadaan:
+    * **Lokasi saya** tampil hanya bila pengguna sudah masuk, izin lokasi
+      diberikan, dan titik perangkat jatuh di dalam poligon kecamatan AOI. Panel
+      pantau tampil di dalamnya, Informasi lokasi di bawahnya.
+    * Pengunjung, perangkat di luar wilayah, izin ditolak, peramban tanpa lokasi,
+      atau koneksi tidak aman: **Informasi lokasi** lebih dulu. Panel pantau
+      muncul di bawahnya untuk kecamatan yang dipilih (pilihan terakhir diingat
+      di `localStorage` `orbit-u.lokasi`).
+  * Panel pantau berisi tiga bagian:
+    * **kalimat kondisi**: status Normal/Waspada/Tinggi/Tidak tersedia + daftar
+      "yang tidak normal" + alert hujan 7 hari + tanggal data per satelit
+      (`etl/lokasi_interpret.py`, ambang dari `etl/live_interpret.py`);
+    * **citra**: scene Live terbaru dipotong ke kecamatan (`etl/region_crop.py`);
+    * **statistik**: angka terbaru tiap band + pengamatan sebelumnya + rentang
+      biasa, lalu grafik 30 hari dengan pita rentang biasa.
+  * Izin dan kompatibilitas perangkat (`web/js/geo.js`):
+    * Koordinat tidak dikirim ke server; titik dicocokkan di browser dengan
+      `GET /api/regions`.
+    * Izin tidak pernah diminta saat halaman dibuka. Lokasi dibaca otomatis hanya
+      bila izin sudah `granted` (Permissions API). Selain itu lewat tombol
+      "Gunakan lokasi saya". Bila Permissions API tidak ada (Safari < 16,
+      WebView), keadaannya dianggap `prompt`.
+    * Geolocation hanya ada di konteks aman (HTTPS; `localhost` saat
+      pengembangan). Lewat `http://IP-LAN` halaman langsung ke Informasi lokasi.
+    * `enableHighAccuracy: false`, batas waktu 12 detik, cache 5 menit.
+      Akurasi > 2 km (desktop Windows/macOS tanpa GPS, dari Wi-Fi/IP) disebut
+      "perkiraan".
+    * Galat 1/2/3 (ditolak / lokasi perangkat mati / waktu habis) masing-masing
+      punya pesan.
+    * Setelah izin ditolak, tampil petunjuk mengaktifkan izin sesuai platform:
+      iOS/iPadOS, Android, Windows, macOS, dan browser dalam aplikasi
+      (WhatsApp/Instagram/Facebook).
+    * Izin yang dicabut selagi halaman terbuka ikut terbaca (event `change`).
+    * Bila batas kecamatan (`GET /api/regions`) gagal dimuat, halaman tidak menyebut "di luar wilayah".
+      Ia mengatakan lokasi belum bisa dicocokkan, lalu menawarkan "Coba lagi" dan pilihan manual.
 * **3.2–3.4 per satelit**: penjelasan satelit (lintasan, resolusi, informasi
   yang bisa diambil, keterbatasan), daftar tanggal dalam batas peran, gambar
   PNG (perbesar dengan lightbox), kalimat kondisi, tabel angka per band ×
@@ -88,7 +158,7 @@ Isi per halaman:
 
 Alamat lama tetap hidup lewat `ALIASES` (awalan terpanjang): `#kondisi/citra`
 → `#citra/sentinel-1`, `#kondisi/kecamatan` → `#citra/gpm`, `#kondisi/relief`
-→ `#aoi-3d`, `#diagram/…` → `#forecast/…` (M61), `#riwayat/grafik` → `#forecast/evaluasi`, `#riwayat/laporan` →
+→ `#aoi-3d`, `#diagram/…` → `#forecast/…` (M61), `#sistem/tentang` → `#tentang` (M63), `#riwayat/grafik` → `#forecast/evaluasi`, `#riwayat/laporan` →
 `#laporan`, `#pengaturan/…` → `#sistem/pengaturan`, `#pengaturan/akses` →
 `#sistem/pengguna`, `#akun` → `#sistem/akun`, dst. Halaman publik lama
 dialihkan 301: `/kondisi` → `/app#citra`, `/relief` → `/app#aoi-3d`.
@@ -104,7 +174,9 @@ dialihkan 301: `/kondisi` → `/app#citra`, `/relief` → `/app#aoi-3d`.
 | Halaman / fitur | PUBLIC | USER | ANALYST | DATA_ENG | ADMIN |
 |---|:-:|:-:|:-:|:-:|:-:|
 | 0 Masuk, -0 Registrasi | ● | — | — | — | — |
-| 1 Beranda | ● | ● | ● | ● | ● |
+| 1 Beranda: Informasi lokasi + panel pantau (angka per kecamatan) | ◐ 30 hari | ◐ 365 hari | ● | ● | ● |
+| 1 Beranda: Lokasi saya (geolokasi) | — | ● | ● | ● | ● |
+| 1b Tentang | ● | ● | ● | ● | ● |
 | 2 3D AOI | — | ● | ● | ● | ● |
 | 3 Citra Satelit (termasuk PDF) | ◐ 30 hari | ◐ 365 hari | ● | ● | ● |
 | 4 Forecast | — | — | ● | — | ● |
@@ -113,9 +185,9 @@ dialihkan 301: `/kondisi` → `/app#citra`, `/relief` → `/app#aoi-3d`.
 | 6 Data | — | — | — | ● | ● |
 | 7.1 Laporan Kesehatan data | — | — | — | ● | ● |
 | 7.2 Laporan Keadaan AOI | — | — | ● | — | ● |
-| 8.1 Tentang | ● | ● | ● | ● | ● |
 | 8.2 Log | — | — | ◐ halaman Kejadian | ◐ halaman Data | ● + masuk/registrasi, unduhan, audit |
 | 8.3 Akun saya / Manajemen akun | — | ◐ milik sendiri | ◐ milik sendiri | ◐ milik sendiri | ● semua akun |
+| Peringatan email (M64): email + kecamatan langganan | — | ◐ milik sendiri | ◐ milik sendiri | ◐ milik sendiri | ● + status, email uji, kirim sekarang |
 | 8.4 Pengaturan aplikasi | — | — | — | — | ● |
 
 Batas waktu dihitung dari **hari ini**; scene Sentinel-1 terbaru tiap area
@@ -165,7 +237,10 @@ diubah M56; endpoint lain tidak berubah.
 | Metode | Path | Peran | Keterangan |
 |---|---|---|---|
 | GET | `/auth/session` | PUBLIC | `{authenticated, role_code, permissions, user}`; tidak pernah 401 |
-| POST | `/auth/register` | PUBLIC | `{email, username, password, password_confirm}` → 201 + cookie sesi. 5 per IP per jam. Dicatat `REGISTER` |
+| POST | `/auth/register` | PUBLIC | `{username, password, password_confirm, email?}` → 201 + cookie sesi. Email opsional (M64): bila diisi, dicek + email konfirmasi dikirim **setelah** username terbukti belum dipakai. 5 per IP per jam. Dicatat `REGISTER` |
+| GET | `/auth/notify` | USER | `{email, email_verified_at, all_regions, region_ids, mail_configured}` (M64) |
+| PUT | `/auth/email` | USER | `{email}` → disimpan hanya bila lolos pengecekan; `null` = hapus. 5 percobaan per pengguna per jam. Dicatat `EMAIL_SET` / `EMAIL_REJECTED` / `EMAIL_REMOVED` |
+| PUT | `/auth/notify` | USER | `{all_regions, region_ids}` → kecamatan langganan (yang bukan kecamatan AOI diabaikan) |
 | GET | `/auth/me` | USER | tidak berubah |
 
 ### 4.2 Citra Satelit (`api/routes/citra.py`)
@@ -208,7 +283,7 @@ Ambang dan teks band: `etl/band_catalog.py`, angka ambangnya dari
 | GET | `/disasters/{id}` | PUBLIC | `rain` (H-0..H-2) hanya untuk ANALYST+, selain itu `null` |
 | POST, PUT, DELETE | `/disasters…` | ANALYST | tidak berubah (hapus = soft delete) |
 | GET | `/disaster-types` | PUBLIC | sebelumnya USER |
-| GET | `/regions` | PUBLIC | peta kecamatan AOI Beranda; sebelumnya USER |
+| GET | `/regions` | PUBLIC | peta kecamatan AOI (Tentang) dan poligon pencocok Lokasi saya di Beranda (M63); sebelumnya USER |
 
 ### 4.5 Data (`api/routes/data.py`, DATA_ENGINEER)
 
@@ -236,7 +311,34 @@ di `logs/backfill/backfill_<id>.log`; hasil per tanggal tetap di `dataset_jobs`.
 | GET | `/logs/kejadian` | ANALYST | `v_log_kejadian` |
 | GET | `/admin/logs/login` | ADMIN | kini termasuk `REGISTER` |
 
-### 4.7 Batas waktu endpoint lama
+### 4.7 Pantau Lokasi (`api/routes/lokasi.py`, M63)
+
+| Metode | Path | Peran | Keterangan |
+|---|---|---|---|
+| GET | `/public/lokasi` | PUBLIC | kecamatan AOI + status singkat, jumlah indikator tidak normal, alert 7 hari tertinggi, tanggal data per satelit |
+| GET | `/public/lokasi/{region_id}` | PUBLIC | status + `abnormal` + semua kalimat, `stats` per band (nilai, sebelumnya, rentang biasa, ambang), `alerts`, `imagery` (scene Live terbaru; `cropped` = ada georeferensi) |
+| GET | `/public/lokasi/{region_id}/trend?days=30` | PUBLIC | deret harian 3 kelompok × 3 band (7–90 hari), batas waktu dari VIEW |
+| GET | `/public/lokasi/{region_id}/preview/{key}.png` | PUBLIC | PNG scene terbaru dipotong ke kecamatan (di luar poligon transparan); 404 `GRID_MISSING` untuk scene tanpa georeferensi |
+
+Angka dibaca lewat `v_public_lokasi_obs`, `v_public_lokasi_range`, dan
+`v_public_lokasi_alert` di bawah role pemanggil. Koneksi ETL hanya mencari
+Live Area yang menutupi kecamatan (bbox), path PNG, dan ambang BMKG, dan
+tidak satu pun dikirim ke klien.
+
+### 4.8 Peringatan email (`api/routes/admin_monitor.py`, ADMIN, M64)
+
+| Metode | Path | Peran | Keterangan |
+|---|---|---|---|
+| GET | `/admin/notify/status` | ADMIN | konfigurasi (tanpa sandi), jumlah pelanggan, terkirim/gagal 7 hari |
+| POST | `/admin/notify/test` | ADMIN | `{to?}` → email uji ke email admin sendiri (atau `to`) |
+| POST | `/admin/notify/run` | ADMIN | 202; satu putaran peringatan di latar (kunci advisory `notify`) |
+
+Admin juga bisa mengisi email saat membuat atau mengubah akun (`POST/PATCH /admin/users`, field `email`),
+dengan pengecekan yang sama. Daftar akun menampilkan `email_verified_at` dan `notify_regions`
+(-1 = semua kecamatan). Log: `user_activity_logs` aksi `EMAIL_ALERT_SENT` / `EMAIL_ALERT_FAILED`
+(detail: kecamatan, butir, tanggal data, subjek).
+
+### 4.9 Batas waktu endpoint lama
 
 `/live/areas/{id}/card|preview` dan `/hydromet/*`: USER 365 hari (sebelumnya
 30); ANALYST dan DATA_ENGINEER tanpa batas (sebelumnya ADMIN saja untuk
@@ -259,7 +361,8 @@ Kode spesifik: `NOT_AUTHENTICATED`, `SESSION_EXPIRED`, `ACCOUNT_INACTIVE`, `INVA
 `AOI_EMPTY`, `INVALID_ROI`, `HYDROMET_NOT_READY`, `REPORT_AUDIENCE`, `INVALID_PERIOD`, `FILE_MISSING`,
 `INVALID_SOURCE`, `INVALID_PAGES`, `INVALID_BAND`, `BACKFILL_RUNNING`, `OUTSIDE_RASTER_WINDOW`, `REASON_REQUIRED`,
 `NOT_REPROCESSABLE`, `INVALID_THRESHOLD`, `INVALID_SETTING`, `ENTITY_FORBIDDEN`, `IMPORT_NOT_SUPPORTED`,
-`INVALID_IMPORT_FILE`, `IMPORT_ROWS_INVALID`, `EMPTY_UPLOAD`, `UPLOAD_TOO_LARGE`.
+`INVALID_IMPORT_FILE`, `IMPORT_ROWS_INVALID`, `EMPTY_UPLOAD`, `UPLOAD_TOO_LARGE`, `GRID_MISSING`,
+`EMAIL_INVALID`, `EMAIL_UNREACHABLE`, `MAIL_NOT_CONFIGURED`, `MAIL_SEND_FAILED`.
 
 | HTTP | Kode umum (bila route tidak memberi kode spesifik) |
 |---|---|
@@ -293,6 +396,36 @@ sudah berjalan; idempoten, tidak mengubah baris data):
 python database/apply_schema.py --migrate m56_susunan_halaman_v2.sql
 ```
 
+Perubahan M63 (Pantau Lokasi) ada di `database/migrations/m63_pantau_lokasi.sql`.
+Isinya hanya VIEW + GRANT, idempoten:
+
+* `v_public_lokasi_obs`: angka per kecamatan AOI. Batas waktu sama dengan
+  `v_citra_obs_aoi` (PUBLIC 30 hari, USER 365 hari), tetapi dua observasi
+  terakhir per kecamatan × band selalu terlihat;
+* `v_public_lokasi_range`: persentil 2–98 per kecamatan × band, 365 hari;
+* `v_public_lokasi_alert`: alert hujan 7 hari tanpa kolom penanganan;
+* GRANT SELECT ketiganya ke `monitor_public`.
+
+```
+python database/apply_schema.py --migrate m63_pantau_lokasi.sql
+```
+
+Perubahan M64 (peringatan email) ada di `database/migrations/m64_peringatan_email.sql`. Idempoten, dan
+tidak mengubah baris yang ada. Email lama tetap tersimpan, tetapi `email_verified_at` NULL, jadi tidak
+dikirimi peringatan sampai pemiliknya menyimpannya ulang. Isinya:
+
+* `users.email_verified_at`, `users.notify_all_regions`;
+* tabel `user_notify_regions` dan `notify_sent` (kunci anti-duplikat);
+* fungsi `auth_get_own_notify`, `auth_email_available`, `auth_set_own_email`, `auth_set_own_notify`
+  (USER/PUBLIC) dan `notify_recipients` (hanya ETL);
+* `auth_register_user` menerima email NULL;
+* `monitor_etl` boleh SELECT `v_public_lokasi_*` dan SELECT/INSERT `notify_sent`;
+* pengaturan `notify.enabled` dan `notify.max_age_days`.
+
+```
+python database/apply_schema.py --migrate m64_peringatan_email.sql
+```
+
 ---
 
 ## 7. Pengujian
@@ -306,25 +439,49 @@ python database/apply_schema.py --migrate m56_susunan_halaman_v2.sql
 | `tests/test_diagram_api.py` | semua band, analisa daerah, PDF, peran, forecast (endpoint AOI/kecamatan/rerata beberapa kecamatan, validasi, pemilihan model musiman, batas fisik, deret pendek) |
 | `tests/test_data_api.py` | Data per satelit, backfill + log, EDA, log per halaman, laporan rentang bebas |
 | `tests/test_web_ui.py` | susunan halaman, alias hash lama, fragmen + skrip, kode galat, aturan desain |
+| `tests/test_notify.py` | Peringatan email (M64): jalur SMTP (STARTTLS → login → kirim; sandi aplikasi salah, penerima ditolak) dengan smtplib tiruan; email gagal cek tidak disimpan (tidak valid, tidak bisa menerima, SMTP belum diatur, dipakai akun lain → konfirmasi tidak dikirim), cek MX dengan resolver tiruan, langganan none/beberapa/semua, satu email untuk dua kecamatan dengan tiga lapis isi, data sama tidak dikirim ulang, data baru dikirim lagi, data > 7 hari tidak dikirim, `notify.enabled`, gambar inline CID. `conftest.py` memaksa `MAIL_BACKEND=file`: uji tidak pernah mengirim email sungguhan |
+| `tests/test_lokasi_api.py` | Pantau Lokasi (M63): batas waktu `v_public_lokasi_obs` per peran (dua observasi terakhir selalu terlihat), kalimat "yang tidak normal" + alert (tanggal = alert terbaru), tren, potongan PNG per kecamatan (transparan di luar poligon, lubang ikut transparan, grid ber-CRS UTM) |
 
 ### 7.1 Hasil uji terakhir
 
-Dijalankan 8 Oktober 2026 pada database `themonitor_dev` (PostgreSQL 18), di luar `tests/ui/` yang butuh browser:
+Dijalankan 19 Oktober 2026 (setelah M63 dan M64) pada database uji `themonitor_test` (PostgreSQL 18), di luar `tests/ui/` yang butuh browser:
 
 ```
-venv\Scripts\python -m pytest --ignore=tests/ui --junitxml=DOCS/hasil_uji/pytest.xml
+venv\Scripts\python -m pytest --ignore=tests/ui --ignore=tests/recovery --junitxml=DOCS/hasil_uji/pytest.xml
 ```
 
 | Lulus | Gagal | Dilewati | Waktu |
 |---|---|---|---|
-| 1.140 | 0 | 2 | 2 menit 18 detik |
+| 1.187 | 0 | 2 | 2 menit 13 detik |
 
 - Dua tes yang dilewati butuh shapefile COD-AB di `data/external/cod-ab-idn/` (`test_hydromet_aggregate::TestRegionsFromShapefile`).
 - Matriks GRANT (`tests/security/grant_matrix.sql`) ikut dijalankan lewat `tests/security/test_grant_matrix.py`.
 - Belum dijalankan: `tests/ui/` (browser headless) dan `tests/recovery/*.sh`.
 - Artefak: `DOCS/hasil_uji/pytest.xml` (JUnit) dan `pytest_output.txt`.
 
-Run pertama menemukan dua kegagalan yang langsung diperbaiki. Pertama, kode galat `OUTSIDE_RASTER_WINDOW` belum punya terjemahan di `web/js/ui.js`. Kedua, pemeriksa cakupan CSS tema di `tests/test_web_ui.py` memecah selektor pada koma di dalam `:is()`.
+Pemeriksaan M63/M64 di peramban dilakukan dengan Playwright (Chrome headless, sesi dan
+izin lokasi ditiru), bukan lewat `tests/ui/`. Yang diperiksa:
+* Beranda: pengunjung, pilih kecamatan, layar 375 px, pengguna di dalam/di luar wilayah, izin ditolak,
+  batas kecamatan gagal dimuat;
+* `Geo.regionAt` untuk poligon berlubang dan MultiPolygon;
+* alias `#sistem/tentang`;
+* Akun saya (email ditolak/tersimpan, pilihan kecamatan), registrasi, dan Admin (kolom email, panel email
+  peringatan, email uji);
+* tampilan email peringatan di lebar desktop dan HP.
+
+Semuanya tanpa galat JavaScript dan tanpa scroll horizontal. Pengiriman lewat SMTP Gmail sungguhan belum
+diuji (kredensial belum ada di `.env`); jalurnya diuji dengan smtplib tiruan (`tests/test_notify.py::TestSmtpBackend`).
+
+Pemeriksaan ulang M63/M64 menemukan dan memperbaiki:
+* alert hujan baru yang lebih ringan tidak diemailkan bila alert lama yang lebih parah masih dalam jendela
+  (kunci anti-duplikat kini tanggal alert terbaru);
+* "di luar wilayah" ditampilkan saat batas kecamatan gagal dimuat;
+* pembulatan NDVI/NDWI yang membuat nilai tampak sama dengan batas rentang biasanya;
+* pesan galat email yang tidak tampil di Akun saya;
+* tes `test_citra_api` yang memakai tanggal lokal dan bentrok dengan `test_diagram_api` antara
+  00.00–07.00 WIB.
+
+Run 8 Oktober 2026 (1.140 lulus) menemukan dua kegagalan yang langsung diperbaiki. Pertama, kode galat `OUTSIDE_RASTER_WINDOW` belum punya terjemahan di `web/js/ui.js`. Kedua, pemeriksa cakupan CSS tema di `tests/test_web_ui.py` memecah selektor pada koma di dalam `:is()`.
 
 ---
 
@@ -374,7 +531,7 @@ flowchart LR
     M -.mewarisi.-> D
 
     subgraph Orbit-U: The Monitor
-        uc1((Lihat Beranda & peta AOI))
+        uc1((Pantau lokasi di Beranda<br/>& peta AOI di Tentang))
         uc2((Lihat citra satelit<br/>dalam batas waktu peran))
         uc3((Unduh PDF citra))
         uc4((Lihat kejadian))
@@ -398,14 +555,18 @@ flowchart LR
         uc22((Job Hidromet harian))
         uc23((Siklus Live))
         uc24((Buat laporan periodik))
+        uc25((Lokasi saya:<br/>kecamatan dari lokasi perangkat))
+        uc26((Atur email & kecamatan<br/>peringatan))
+        uc27((Kirim peringatan email<br/>kondisi tidak normal))
+        uc28((Pantau & uji email peringatan))
     end
 
     P --- uc1 & uc2 & uc3 & uc4 & uc5
-    U --- uc6 & uc7 & uc8
+    U --- uc6 & uc7 & uc8 & uc25 & uc26
     A --- uc9 & uc10 & uc11 & uc12 & uc13
     D --- uc14 & uc15 & uc16 & uc17 & uc18
-    M --- uc19 & uc20 & uc21
-    S --- uc22 & uc23 & uc24
+    M --- uc19 & uc20 & uc21 & uc28
+    S --- uc22 & uc23 & uc24 & uc27
 ```
 
 Batas akses tiap use case: §3.1. Penegakannya di basis data: DATABASE.md §8.

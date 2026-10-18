@@ -1,5 +1,5 @@
 # api/routes/logs.py
-"""Log per halaman (INTERFACE.md §4.8, M56).
+"""Log per halaman (INTERFACE.md §4.6, M56).
 
 * ``/logs/data``     — DATA_ENGINEER: hanya log yang menyangkut halaman Data
   (VIEW ``v_log_data``: unduhan/backfill/ubah scene + audit tabel katalog).

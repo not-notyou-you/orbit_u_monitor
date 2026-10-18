@@ -11,6 +11,7 @@ Dijaga ``require_role("ADMIN")`` di api/main.py (prefix /api/admin).
     POST  /admin/scenes/{source}/{id}/reprocess  -> 202
     GET/PUT /admin/quality-thresholds, /admin/settings
     GET   /admin/pipeline/status, /admin/archive/stats; POST /admin/archive/verify
+    GET   /admin/notify/status; POST /admin/notify/test, /admin/notify/run  (M64)
 """
 
 from __future__ import annotations
@@ -267,7 +268,7 @@ _SETTING_RULES = {
     "water.vh_threshold_db": (float, -40, -5), "dataset.max_days": (int, 1, 3660),
     "hydromet.min_valid_fraction": (float, 0, 1), "hydromet.waiting_max_days": (int, 0, 30),
     "report.wait_hydromet_minutes": (float, 0, 240), "live.default_area_name": (str, 1, 100),
-    "report.timezone": (str, 1, 50),
+    "report.timezone": (str, 1, 50), "notify.max_age_days": (int, 1, 30),
 }
 
 
@@ -306,6 +307,58 @@ def update_settings(req: SettingsUpdate, sess: Session = Depends(get_session),
     if int(vals.get("live.retention_default", 6)) > int(vals.get("live.retention_max", 60)):
         raise ApiError(400, "live.retention_default must not exceed live.retention_max", "INVALID_SETTING")
     return out
+
+
+# --- peringatan email (M64) ----------------------------------------------------------
+
+@router.get("/notify/status", summary="Email alerts: configuration, subscribers, recent sends")
+def notify_status(sess: Session = Depends(get_session)) -> dict:
+    from etl.mailer import MailConfig
+    cfg = MailConfig.from_env()
+    subs = sess.execute(text("""
+        SELECT count(*) FILTER (WHERE email IS NOT NULL AND email_verified_at IS NOT NULL) AS with_email,
+               count(*) FILTER (WHERE email IS NOT NULL AND email_verified_at IS NOT NULL AND is_active
+                                AND (notify_all_regions OR EXISTS (SELECT 1 FROM user_notify_regions n
+                                                                   WHERE n.user_id = users.user_id))) AS subscribers
+        FROM users""")).mappings().one()
+    recent = sess.execute(text("""
+        SELECT action, count(*) AS n, max(logged_at) AS last_at FROM user_activity_logs
+        WHERE action IN ('EMAIL_ALERT_SENT', 'EMAIL_ALERT_FAILED') AND logged_at > now() - INTERVAL '7 days'
+        GROUP BY action""")).mappings().all()
+    return {"configured": cfg.configured, "backend": cfg.backend, "sender": cfg.sender or None,
+            "server": cfg.server or None, "base_url": cfg.base_url or None, "max_per_run": cfg.max_per_run,
+            "with_email": subs["with_email"], "subscribers": subs["subscribers"],
+            "last_7_days": {r["action"]: {"count": r["n"], "last_at": r["last_at"]} for r in recent}}
+
+
+class NotifyTestRequest(BaseModel):
+    to: str | None = None
+
+
+@router.post("/notify/test", summary="Send a test email (to the admin's own email by default)")
+def notify_test(req: NotifyTestRequest, sess: Session = Depends(get_session),
+                principal=Depends(current_principal)) -> dict:
+    from etl.mailer import EMAIL_RE, MailError, normalize
+    from etl.notify import send_test
+    from api.routes.auth import _mail_error
+    to = normalize(req.to) or sess.scalar(text("SELECT email FROM users WHERE user_id = :u"),
+                                          {"u": principal.user_id})
+    if not to or not EMAIL_RE.match(to):
+        raise ApiError(422, "No valid email address: set your own email in Akun saya or pass `to`", "EMAIL_INVALID")
+    try:
+        where = send_test(to, principal.full_name or principal.username)
+    except MailError as exc:
+        raise _mail_error(exc)
+    return {"sent": True, "to": to, "via": "file" if where != "smtp" else "smtp"}
+
+
+@router.post("/notify/run", status_code=202, summary="Run one email-alert round now (background)")
+def notify_run(etl=Depends(get_etl_db)) -> dict:
+    """Same as the scheduler hook after Hydromet/Live: only new, not yet sent
+    abnormal items are emailed, so running it twice sends nothing new."""
+    from etl import notify
+    threading.Thread(target=notify.run_quietly, args=(etl, "admin"), name="notify-admin", daemon=True).start()
+    return {"accepted": True}
 
 
 # --- status pipeline & arsip ----------------------------------------------------------

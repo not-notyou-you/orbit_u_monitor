@@ -1,8 +1,8 @@
 # Kamus Data — Orbit-U: The Monitor
 
-> Dibangkitkan otomatis oleh `tools/data_dictionary.py` dari katalog PostgreSQL (database `themonitor`, 2026-10-09 06:20 UTC). Jangan disunting manual; ubah `database/monitor_schema.sql` (termasuk `COMMENT ON`) lalu bangkitkan ulang.
+> Dibangkitkan otomatis oleh `tools/data_dictionary.py` dari katalog PostgreSQL (database `themonitor`, 2026-10-18 20:52 UTC). Jangan disunting manual; ubah `database/monitor_schema.sql` (termasuk `COMMENT ON`) lalu bangkitkan ulang.
 
-Jumlah: **41 tabel**, **19 VIEW**.
+Jumlah: **43 tabel**, **22 VIEW**.
 
 ## Daftar tabel
 
@@ -33,6 +33,7 @@ Jumlah: **41 tabel**, **19 VIEW**.
 | [`live_scene_metrics`](#live_scene_metrics) | Metrik numerik scene Live, satu baris per band x metrik (1NF, M31). Tetap ada setelah berkas scene dihapus retensi. |
 | [`live_scenes`](#live_scenes) | Satu scene Live (tanggal lintasan S1) per area. Tidak pernah dihapus: retensi hanya menghapus berkas dan mengisi deleted_at. Sengaja tanpa FK agar hidup lebih lama dari area/dataset. |
 | [`nasa_scenes`](#nasa_scenes) | Registri granule MODIS dan GPM (satu baris per sumber/produk/tile/tanggal). |
+| [`notify_sent`](#notify_sent) | Butir tidak normal yang sudah dikirim lewat email (M64). Kunci unik (pengguna, kecamatan, butir, tanggal data) mencegah pengiriman ulang data yang sama. |
 | [`processing_jobs`](#processing_jobs) | Eksekusi satu tahap pipeline (scene/granule x tahap x percobaan). Jangkar: scene S1, granule NASA, atau tidak keduanya untuk FUSION (M30). |
 | [`processing_logs`](#processing_logs) | Log pipeline terstruktur append-only: satu baris per kejadian tahap (STARTED/RUNNING/COMPLETED/FAILED). |
 | [`processing_stages`](#processing_stages) | Master tahap pipeline (S1/MODIS/GPM/FUSION/PREVIEW + HYDROMET_AGGREGATE, ALERT_CHECK, WATER_CHANGE, REPORT_BUILD). |
@@ -48,6 +49,7 @@ Jumlah: **41 tabel**, **19 VIEW**.
 | [`scene_job_state`](#scene_job_state) | Status per scene S1 di dalam satu dataset_job; dasar resume setelah proses mati. |
 | [`spectral_bands`](#spectral_bands) | Master band/variabel yang diamati per sumber; dipakai region_observations, alert_rules, quality_thresholds, live_scene_metrics. |
 | [`user_activity_logs`](#user_activity_logs) | Log aplikasi append-only: login, logout, unduhan, ekspor, aksi penting (RM4). |
+| [`user_notify_regions`](#user_notify_regions) | Langganan peringatan email per kecamatan (M64): tempat tinggal, beberapa, atau tidak sama sekali. Diubah pemiliknya lewat auth_set_own_notify(). |
 | [`users`](#users) | Akun pengguna yang login (USER s.d. ADMIN). Akun dinonaktifkan, tidak pernah dihapus. |
 
 ## administrative_regions
@@ -743,6 +745,28 @@ Registri granule MODIS dan GPM (satu baris per sumber/produk/tile/tanggal).
 - `nasa_scenes_pkey` (PK): `PRIMARY KEY (nasa_scene_id)`
 - `uq_nasa_scene` (UNIQUE): `UNIQUE (source, tile_id, product_short_name, acquisition_date)`
 
+## notify_sent
+
+Butir tidak normal yang sudah dikirim lewat email (M64). Kunci unik (pengguna, kecamatan, butir, tanggal data) mencegah pengiriman ulang data yang sama.
+
+| Kolom | Tipe | Null | Default | Kunci | Keterangan |
+|---|---|---|---|---|---|
+| `notify_id` | `bigint` | NOT NULL | `nextval('notify_sent_notify_id_seq'::regclass)` | PK | PK surrogate. |
+| `user_id` | `integer` | NOT NULL |  | FK→users, UNIQUE | FK -> users penerima. |
+| `region_id` | `integer` | NOT NULL |  | FK→administrative_regions, UNIQUE | FK -> administrative_regions (kecamatan). |
+| `item_key` | `character varying(20)` | NOT NULL |  | UNIQUE | Butir kalimat kondisi (mis. gpm_rain_7d, s1_vh, modis_flood) atau "alert" untuk alert hujan BMKG. |
+| `data_date` | `date` | NOT NULL |  | UNIQUE | Tanggal data yang menunjukkan kondisi tidak normal (tanggal observasi satelit atau alert). |
+| `level` | `smallint` | NOT NULL |  |  | Tingkat saat dikirim: 1 Waspada, 2 Tinggi. |
+| `sent_at` | `timestamp with time zone` | NOT NULL | `now()` |  | Waktu email terkirim. |
+
+**Constraint**
+
+- `notify_sent_level_check` (CHECK): `CHECK (((level >= 1) AND (level <= 2)))`
+- `notify_sent_region_id_fkey` (FK): `FOREIGN KEY (region_id) REFERENCES administrative_regions(region_id)`
+- `notify_sent_user_id_fkey` (FK): `FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE`
+- `notify_sent_pkey` (PK): `PRIMARY KEY (notify_id)`
+- `uq_notify_sent` (UNIQUE): `UNIQUE (user_id, region_id, item_key, data_date)`
+
 ## processing_jobs
 
 Eksekusi satu tahap pipeline (scene/granule x tahap x percobaan). Jangkar: scene S1, granule NASA, atau tidak keduanya untuk FUSION (M30).
@@ -1163,6 +1187,22 @@ Log aplikasi append-only: login, logout, unduhan, ekspor, aksi penting (RM4).
 - `user_activity_logs_user_id_fkey` (FK): `FOREIGN KEY (user_id) REFERENCES users(user_id)`
 - `user_activity_logs_pkey` (PK): `PRIMARY KEY (log_id)`
 
+## user_notify_regions
+
+Langganan peringatan email per kecamatan (M64): tempat tinggal, beberapa, atau tidak sama sekali. Diubah pemiliknya lewat auth_set_own_notify().
+
+| Kolom | Tipe | Null | Default | Kunci | Keterangan |
+|---|---|---|---|---|---|
+| `user_id` | `integer` | NOT NULL |  | FK→users, PK | FK -> users pelanggan. |
+| `region_id` | `integer` | NOT NULL |  | FK→administrative_regions, PK | FK -> administrative_regions (kecamatan AOI). |
+| `created_at` | `timestamp with time zone` | NOT NULL | `now()` |  | Waktu kecamatan dipilih. |
+
+**Constraint**
+
+- `user_notify_regions_region_id_fkey` (FK): `FOREIGN KEY (region_id) REFERENCES administrative_regions(region_id) ON DELETE CASCADE`
+- `user_notify_regions_user_id_fkey` (FK): `FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE`
+- `user_notify_regions_pkey` (PK): `PRIMARY KEY (user_id, region_id)`
+
 ## users
 
 Akun pengguna yang login (USER s.d. ADMIN). Akun dinonaktifkan, tidak pernah dihapus.
@@ -1182,7 +1222,9 @@ Akun pengguna yang login (USER s.d. ADMIN). Akun dinonaktifkan, tidak pernah dih
 | `created_by` | `integer` | NULL |  | FK→users | FK -> users: ADMIN yang membuat akun ini. NULL untuk admin pertama (create_admin.py). |
 | `created_at` | `timestamp with time zone` | NOT NULL | `now()` |  | Waktu akun dibuat. |
 | `updated_at` | `timestamp with time zone` | NOT NULL | `now()` |  | Waktu baris terakhir diubah (trigger). |
-| `email` | `character varying(254)` | NULL |  |  | Alamat email (unik, tanpa membedakan huruf besar). Wajib untuk akun hasil registrasi mandiri (M56); NULL untuk akun lama buatan ADMIN. |
+| `email` | `character varying(254)` | NULL |  |  | Alamat email (unik, tanpa membedakan huruf besar). Opsional (M64; wajib saat registrasi pada M56). Hanya disimpan bila lolos pengecekan: format, MX domain, dan email konfirmasi terkirim. |
+| `email_verified_at` | `timestamp with time zone` | NULL |  |  | Waktu email lolos pengecekan dan email konfirmasi terkirim (M64). NULL = email lama yang belum dicek; tidak dikirimi peringatan. |
+| `notify_all_regions` | `boolean` | NOT NULL | `false` |  | true = berlangganan peringatan email untuk SEMUA kecamatan AOI, termasuk yang ditambahkan kemudian (M64). |
 
 **Constraint**
 
@@ -1213,6 +1255,9 @@ Akun pengguna yang login (USER s.d. ADMIN). Akun dinonaktifkan, tidak pernah dih
 | `v_log_unduhan` | `log_id`, `logged_at`, `action`, `user_id`, `username`, `target_type`, `target_id`, `bytes_sent`, `ip_address`, `detail` | Log unduhan dan ekspor CSV dari user_activity_logs. ADMIN. |
 | `v_public_kejadian` | `event_id`, `disaster_type_code`, `disaster_type_name`, `region_id`, `pcode`, `region_name`, `village_name`, `lat`, `lon`, `event_date`, `event_end_date`, `description`, `impact_summary`, `info_source`, `is_verified` | Kejadian bencana 365 hari terakhir untuk PUBLIC, tanpa source_reference/recorded_by/verified_by (M56). Role login membaca disaster_events langsung tanpa batas waktu. |
 | `v_public_live_latest` | `area_id`, `area_name`, `live_scene_id`, `scene_date`, `status`, `area_status`, `interpretations`, `previews`, `source_status` | Scene Live terbaru per area aktif (READY/PARTIAL, berkas belum dihapus): status area, kalimat kondisi, manifest preview. PUBLIC+. |
+| `v_public_lokasi_alert` | `region_id`, `observation_date`, `severity`, `band_code`, `observed_value`, `threshold_value` | Alert hujan 7 hari terakhir per kecamatan AOI untuk Pantau Lokasi, tanpa kolom penanganan alert (M63). PUBLIC+. |
+| `v_public_lokasi_obs` | `region_id`, `pcode`, `region_name`, `obs_date`, `source_code`, `band_code`, `unit`, `value`, `valid_fraction`, `run_type` | Angka harian/per lintasan per kecamatan AOI untuk Pantau Lokasi di Beranda, batas waktu per role pemanggil seperti v_citra_obs_aoi; dua observasi terakhir per kecamatan × band selalu terlihat (M63). PUBLIC+. |
+| `v_public_lokasi_range` | `region_id`, `band_code`, `p02`, `p98`, `n_obs` | Rentang biasa (persentil 2–98, 365 hari s.d. observasi terakhir band) per kecamatan AOI × band untuk grafik dan kalimat Pantau Lokasi (M63). PUBLIC+. |
 | `v_ringkasan_kualitas` | `source_code`, `week_start`, `n_quality_metrics`, `avg_quality_score`, `n_fail`, `n_warning`, `n_quality_alerts`, `n_observations`, `avg_valid_fraction` | Per sumber per minggu (Senin): jumlah & rata-rata skor quality_metrics, FAIL/WARNING, quality_alerts, dan rata-rata valid_fraction region_observations. DATA_ENGINEER, ADMIN. |
 | `v_statistik_hari_ini` | `obs_date`, `region_id`, `pcode`, `region_name`, `rain_24h_mm`, `rain_72h_mm`, `rain_7d_mm`, `rain_30d_mm`, `gpm_run`, `bmkg_category`, `ndvi`, `ndvi_date`, `ndwi`, `ndwi_date`, `modis_flood_pct`, `modis_date` | Baris v_hujan_harian_kecamatan untuk tanggal terakhir yang lengkap (semua kecamatan in_aoi punya RAIN_24H) + NDVI/NDWI/FLOOD MODIS terakhir yang tersedia. USER+. |
 | `v_unduhan_per_role` | `log_date_wib`, `action`, `role_code`, `n_downloads`, `bytes_sent` | Jumlah dan volume unduhan/ekspor per tanggal WIB, jenis aksi, dan role pengunduh; tanpa nama pengguna. DATA_ENGINEER, ADMIN, ETL (laporan). |

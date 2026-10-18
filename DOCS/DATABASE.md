@@ -211,6 +211,11 @@ Akun login, dari USER sampai ADMIN. Akun tidak pernah dihapus, hanya dinonaktifk
 Trigger `trg_users_role_not_public` menolak akun ber-peran PUBLIC. Kolom penguncian (`failed_login_count`,
 `locked_until`) dijelaskan di §8.6.
 
+Email bersifat opsional (M64). Isinya unik tanpa membedakan huruf besar (`uq_users_email`).
+- `email_verified_at` diisi saat email lolos pengecekan aplikasi: format, domain punya server mail, dan email
+  konfirmasi terkirim. Email lama yang belum dicek bernilai NULL dan tidak dikirimi peringatan.
+- `notify_all_regions` = berlangganan peringatan untuk semua kecamatan AOI.
+
 ### 3.3 `satellite_sources`
 SENTINEL1, MODIS, GPM, dan FUSION (turunan). Kolom `source` berjenis VARCHAR di tabel warisan dihubungkan ke
 `source_code` lewat FK `ON UPDATE CASCADE`.
@@ -356,6 +361,20 @@ dibaca API tanpa menghitung ulang. Rumus dan jadwalnya ada di PIPELINE.md §14.
 
 Riwayat 365 hari disimpan, jadi model yang dipakai pada tanggal tertentu tetap bisa dilacak. Anak tabel
 terhapus bersama induknya (`ON DELETE CASCADE`).
+
+#### 4.2.10 `user_notify_regions`, `notify_sent`
+Peringatan email kondisi tidak normal (M64).
+
+- `user_notify_regions`: kecamatan yang dipilih pengguna, PK (`user_id`, `region_id`). Isinya bisa kosong,
+  satu kecamatan, atau banyak. "Semua kecamatan" disimpan sebagai `users.notify_all_regions`, bukan sebagai
+  banyak baris, supaya kecamatan yang nanti ditambahkan ke AOI ikut. Pengguna hanya mengubahnya lewat fungsi
+  `auth_set_own_notify` (§8.2).
+- `notify_sent`: satu baris = satu butir tidak normal (kalimat kondisi atau `alert`) untuk satu kecamatan dan
+  satu tanggal data yang sudah dikirim ke satu pengguna. `UNIQUE (user_id, region_id, item_key, data_date)`
+  adalah kunci anti-duplikat: data yang sama tidak dikirim dua kali, tetapi data baru dengan kondisi yang
+  sama tetap dikirim. Untuk butir `alert`, `data_date` adalah tanggal alert **terbaru** dalam 7 hari (bukan
+  yang terparah), supaya alert baru tetap terkirim. Ditulis job notifikasi (`etl/notify.py`) setelah email
+  terkirim.
 
 ### 4.3 Perkiraan volume
 
@@ -526,6 +545,9 @@ Rencana eksekusi aktual untuk kueri benchmark disimpan di `benchmark/results/exp
 | `v_citra_metrics` | Metrik scene yang terlihat lewat `v_citra_scenes` | PUBLIC+ |
 | `v_citra_obs_aoi` | Angka harian GPM/MODIS rata-rata AOI, batas waktu sama | PUBLIC+ |
 | `v_public_kejadian` | Kejadian 365 hari, tanpa `source_reference`/`recorded_by`/`verified_by` | PUBLIC |
+| `v_public_lokasi_obs` | Angka per kecamatan AOI untuk Pantau Lokasi (M63). Batas waktu sama dengan `v_citra_obs_aoi`, tetapi **dua observasi terakhir** per kecamatan × band selalu terlihat (pembanding kalimat kondisi) | PUBLIC+, ETL |
+| `v_public_lokasi_range` | Rentang biasa (persentil 2–98, 365 hari) per kecamatan × band | PUBLIC+, ETL |
+| `v_public_lokasi_alert` | Alert hujan 7 hari per kecamatan, tanpa kolom penanganan | PUBLIC+, ETL |
 | `v_live_scenes_recent` | Scene Live 30 hari yang berkasnya masih ada | USER+ |
 | `v_hujan_harian_kecamatan` | Hujan 24h/72h/7d/30d + kategori BMKG (RINGAN < 20, SEDANG < 50, LEBAT < 100, SANGAT_LEBAT < 150, EKSTREM) | USER+ |
 | `v_statistik_hari_ini` | Tanggal terakhir yang lengkap untuk semua kecamatan AOI + MODIS terakhir | USER+ |
@@ -597,7 +619,12 @@ Setiap fungsi mengembalikan data sesedikit mungkin:
 | `auth_session_user(user_id)` | Peran & status terkini setiap request |
 | `auth_get_token(prefix)` | Cari token Bearer sebelum pemiliknya diketahui |
 | `auth_change_own_password(hash)` | Ganti sandi sendiri. Baris ditentukan `app.user_id`, bukan argumen |
-| `auth_register_user(username, email, hash)` | Registrasi mandiri. Peran **dikunci USER** di dalam fungsi |
+| `auth_register_user(username, email, hash)` | Registrasi mandiri. Peran **dikunci USER** di dalam fungsi. Email boleh NULL (M64) |
+| `auth_email_available(email)` | Email belum dipakai akun lain. Dipanggil **sebelum** email konfirmasi dikirim (M64) |
+| `auth_get_own_notify()` | Email, status pengecekan, dan kecamatan langganan milik `app.user_id` (M64) |
+| `auth_set_own_email(email)` | Simpan/hapus email sendiri setelah lolos pengecekan di aplikasi (M64) |
+| `auth_set_own_notify(all, region_ids)` | Ganti kecamatan langganan sendiri; yang bukan kecamatan AOI diabaikan (M64) |
+| `notify_recipients()` | **Hanya `monitor_etl`**: akun aktif ber-email terverifikasi dengan kecamatannya. Satu-satunya jalan ETL membaca email (M64) |
 
 ### 8.3 Matriks GRANT
 
@@ -621,9 +648,12 @@ peran di atasnya.
 | `user_activity_logs` | I | | | | S | I |
 | `audit_log` | | | | | S | |
 | `band_forecasts`, `band_forecast_points`, `band_forecast_scores` | | | S | | | SID |
+| `user_notify_regions` | | | | | SID² | |
+| `notify_sent` | | | | | S | SI |
 
 ¹ ADMIN hanya mendapat SIU pada `alert_rules`, `quality_thresholds`, `disaster_types`, `app_settings`,
 `administrative_regions`, dan `regions_of_interest`.
+² Dipakai fungsi `auth_set_own_notify` (milik `monitor_admin`); pengguna tidak menyentuh tabelnya langsung.
 
 Tidak ada peran yang punya DELETE pada `users`, `disaster_events`, atau log. Penghapusan di tabel-tabel itu
 memakai soft delete atau tidak dilakukan sama sekali. Hak atas VIEW tercantum di §7. Sumber kebenaran

@@ -52,15 +52,19 @@ window.pageInit = function () {
 
   const diagrams = [
     { cap: "Use case diagram aktor Pengunjung", actor: ["P", "Pengunjung"], cases: [
-        ["p1", "Melihat Beranda dan peta AOI"], ["p2", "Melihat citra satelit 30 hari terakhir"], ["p3", "Mengunduh laporan PDF citra", 1],
-        ["p4", "Membandingkan dua tanggal scene", 1], ["p5", "Melihat kejadian bencana 365 hari"], ["p6", "Melihat halaman Tentang"],
-        ["p7", "Registrasi akun Relawan"], ["p8", "Login"], ["p9", "Validasi kata sandi dan batas registrasi", 1] ],
-      rel: [["p3", "p2", "extend"], ["p4", "p2", "extend"], ["p7", "p9", "include"]] },
+        ["p1", "Memantau kondisi kecamatan pilihan (Beranda)"], ["p2", "Melihat citra satelit 30 hari terakhir"], ["p3", "Mengunduh laporan PDF citra", 1],
+        ["p4", "Membandingkan dua tanggal scene", 1], ["p5", "Melihat kejadian bencana 365 hari"], ["p6", "Melihat halaman Tentang (peta AOI, tema)"],
+        ["p7", "Registrasi akun Relawan"], ["p8", "Login"], ["p9", "Validasi kata sandi dan batas registrasi", 1],
+        ["p10", "Mengecek email + mengirim konfirmasi (email opsional)", 1] ],
+      rel: [["p3", "p2", "extend"], ["p4", "p2", "extend"], ["p7", "p9", "include"], ["p10", "p7", "extend"]] },
     { cap: "Use case diagram aktor Relawan", actor: ["U", "Relawan"], cases: [
         ["u1", "Melihat 3D AOI"], ["u2", "Melihat citra satelit 365 hari"], ["u3", "Melihat hujan per kecamatan hari ini"],
         ["u4", "Melihat peringatan hujan aktif"], ["u5", "Mengganti kata sandi"], ["u6", "Membuat token API"], ["u7", "Mencabut token API"],
-        ["u8", "Logout"], ["u9", "Login", 1] ],
-      rel: [["u1", "u9", "include"], ["u3", "u9", "include"], ["u5", "u9", "include"], ["u6", "u9", "include"]] },
+        ["u8", "Logout"], ["u9", "Login", 1], ["u10", "Lokasi saya (deteksi kecamatan dari lokasi perangkat)"],
+        ["u11", "Mengatur email dan kecamatan peringatan"], ["u12", "Menerima peringatan email kondisi tidak normal"],
+        ["u13", "Mengecek email + mengirim konfirmasi", 1] ],
+      rel: [["u1", "u9", "include"], ["u3", "u9", "include"], ["u5", "u9", "include"], ["u6", "u9", "include"],
+            ["u10", "u9", "include"], ["u11", "u13", "include"]] },
     { cap: "Use case diagram aktor Analis", actor: ["A", "Analis"], cases: [
         ["a1", "Melihat keadaan terbaru semua band dan forecast 15 hari"], ["a2", "Menganalisis daerah per kecamatan"], ["a3", "Mengunduh PDF analisa daerah", 1],
         ["a4", "Acknowledge peringatan hujan"], ["a5", "Mengelola kejadian bencana"], ["a6", "Ekspor / impor kejadian Excel", 1],
@@ -76,13 +80,16 @@ window.pageInit = function () {
     { cap: "Use case diagram aktor Administrator", actor: ["M", "Administrator"], cases: [
         ["m1", "Mengelola akun pengguna"], ["m2", "Reset sandi / buka kunci akun", 1], ["m3", "Mengatur aturan peringatan"],
         ["m4", "Mengatur ambang mutu data"], ["m5", "Mengatur jenis bencana"], ["m6", "Menandai kecamatan AOI"], ["m7", "Mengelola Live Area"],
-        ["m8", "Menjalankan siklus Live sekarang", 1], ["m9", "Mengubah pengaturan aplikasi"], ["m10", "Melihat log masuk, unduhan, dan audit"] ],
-      rel: [["m2", "m1", "extend"], ["m8", "m7", "extend"]] },
+        ["m8", "Menjalankan siklus Live sekarang", 1], ["m9", "Mengubah pengaturan aplikasi"], ["m10", "Melihat log masuk, unduhan, dan audit"],
+        ["m11", "Mengisi email akun (dicek dulu)", 1], ["m12", "Memantau dan menguji email peringatan"] ],
+      rel: [["m2", "m1", "extend"], ["m8", "m7", "extend"], ["m11", "m1", "extend"]] },
     { cap: "Use case diagram aktor Scheduler", actor: ["S", "Scheduler"], cases: [
         ["s1", "Menjalankan Job Hidromet harian"], ["s2", "Agregasi zonal per kecamatan", 1], ["s3", "Mengevaluasi aturan peringatan", 1],
         ["s4", "Menjalankan siklus Live Sentinel-1"], ["s5", "Menghitung forecast tersimpan", 1], ["s6", "Memperbarui GPM Late → Final"],
-        ["s7", "Membuat laporan mingguan / bulanan"], ["s8", "Menghapus raster lebih dari 365 hari", 1] ],
-      rel: [["s1", "s2", "include"], ["s1", "s3", "include"], ["s1", "s5", "include"], ["s4", "s5", "include"], ["s1", "s8", "include"], ["s4", "s2", "include"]] },
+        ["s7", "Membuat laporan mingguan / bulanan"], ["s8", "Menghapus raster lebih dari 365 hari", 1],
+        ["s9", "Mengirim peringatan email kondisi tidak normal", 1] ],
+      rel: [["s1", "s2", "include"], ["s1", "s3", "include"], ["s1", "s5", "include"], ["s4", "s5", "include"], ["s1", "s8", "include"], ["s4", "s2", "include"],
+            ["s1", "s9", "include"], ["s4", "s9", "include"]] },
   ];
   const host = document.getElementById("uc");
   diagrams.forEach((d) => {
@@ -101,7 +108,7 @@ window.pageInit = function () {
   });
 
   const list = [
-    ["UC-01", "Melihat Beranda dan peta AOI", "Pengunjung+", "GET /api/regions, /api/public/*"],
+    ["UC-01", "Memantau kondisi kecamatan (Beranda: Informasi lokasi + panel pantau)", "Pengunjung+", "GET /api/public/lokasi…, /api/regions"],
     ["UC-02", "Melihat citra satelit (batas waktu per peran)", "Pengunjung+", "GET /api/citra/…"],
     ["UC-03", "Mengunduh laporan PDF citra", "Pengunjung+", "GET /api/citra/report.pdf"],
     ["UC-04", "Melihat kejadian bencana", "Pengunjung+", "GET /api/disasters"],
@@ -125,6 +132,10 @@ window.pageInit = function () {
     ["UC-22", "Menjalankan Job Hidromet harian", "Scheduler", "etl/hydromet_job.py"],
     ["UC-23", "Menjalankan siklus Live Sentinel-1", "Scheduler", "etl/live_cycle.py"],
     ["UC-24", "Membuat laporan periodik", "Scheduler", "etl/report_periodic.py"],
+    ["UC-25", "Lokasi saya (kecamatan dari lokasi perangkat)", "Relawan+", "web/js/geo.js; GET /api/regions"],
+    ["UC-26", "Mengatur email dan kecamatan peringatan", "Relawan+", "GET/PUT /api/auth/notify, PUT /api/auth/email"],
+    ["UC-27", "Mengirim peringatan email kondisi tidak normal", "Scheduler", "etl/notify.py"],
+    ["UC-28", "Memantau dan menguji email peringatan", "Administrator", "/api/admin/notify/*"],
   ];
   document.getElementById("list").innerHTML = "<tr><th>Kode</th><th>Use case</th><th>Aktor</th><th>Endpoint / modul</th></tr>" +
     list.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td><code>${r[3]}</code></td></tr>`).join("");
@@ -135,8 +146,8 @@ window.pageInit = function () {
       alt: ["4a. Kata sandi salah: sistem mencatat LOGIN_FAILED dan menambah hitungan gagal; setelah 5 kali akun dikunci 15 menit (ACCOUNT_LOCKED).", "3a. Akun nonaktif: sistem menolak dengan ACCOUNT_INACTIVE."],
       post: "Sesi aktif; setiap request berikutnya berjalan dengan SET LOCAL ROLE sesuai peran." },
     { id: "UC-05", name: "Registrasi akun Relawan", actor: "Pengunjung", pre: "Belum memiliki akun.",
-      main: ["Pengunjung membuka halaman Registrasi.", "Pengunjung mengisi email, nama pengguna, kata sandi, dan konfirmasi.", "Sistem memvalidasi kebijakan sandi (≥ 10 karakter) dan batas 5 registrasi per IP per jam.", "Sistem memanggil auth_register_user; peran dikunci USER di dalam fungsi.", "Sistem mencatat REGISTER dan langsung membuat sesi."],
-      alt: ["3a. Sandi tidak sesuai: PASSWORD_POLICY / PASSWORD_MISMATCH.", "4a. Nama pengguna atau email sudah dipakai: USERNAME_TAKEN / EMAIL_TAKEN.", "3b. Terlalu banyak registrasi: RATE_LIMITED."],
+      main: ["Pengunjung membuka halaman Registrasi.", "Pengunjung mengisi nama pengguna, kata sandi, konfirmasi, dan (opsional) email.", "Sistem memvalidasi kebijakan sandi (≥ 10 karakter), batas 5 registrasi per IP per jam, dan nama pengguna belum dipakai.", "Bila email diisi: sistem mengecek format, keunikan, server mail domain (MX), lalu mengirim email konfirmasi (extend).", "Sistem memanggil auth_register_user; peran dikunci USER di dalam fungsi.", "Sistem mencatat REGISTER dan langsung membuat sesi."],
+      alt: ["3a. Sandi tidak sesuai: PASSWORD_POLICY / PASSWORD_MISMATCH.", "3c. Nama pengguna sudah dipakai: USERNAME_TAKEN (sebelum email dicek, jadi konfirmasi tidak terkirim).", "4a. Email sudah dipakai, tidak valid, atau tidak bisa menerima email: EMAIL_TAKEN / EMAIL_INVALID / EMAIL_UNREACHABLE; akun tidak dibuat, pengunjung bisa memperbaiki atau mengosongkan email.", "3b. Terlalu banyak registrasi: RATE_LIMITED."],
       post: "Akun Relawan aktif dan pengguna masuk." },
     { id: "UC-02", name: "Melihat citra satelit", actor: "Pengunjung dan semua peran", pre: "Ada scene Live yang sudah diproses.",
       main: ["Pengguna membuka Citra Satelit dan memilih satelit.", "Sistem membaca v_citra_scenes, yang membatasi tanggal menurut peran (30 hari, 365 hari, atau semua).", "Pengguna memilih tanggal.", "Sistem menampilkan gambar, kalimat kondisi, dan tabel metrik per band dari v_citra_metrics."],
@@ -155,11 +166,19 @@ window.pageInit = function () {
       alt: ["2a. Rentang terlalu panjang: INVALID_DATE_RANGE.", "3a. Backfill hidromet lain sedang berjalan: BACKFILL_RUNNING (409).", "3b. Seluruh rentang S1 di luar jendela raster 1 tahun: OUTSIDE_RASTER_WINDOW."],
       post: "region_observations terisi untuk rentang tersebut." },
     { id: "UC-19", name: "Mengelola akun pengguna", actor: "Administrator", pre: "Administrator sudah login.",
-      main: ["Administrator membuka Sistem › Pengguna.", "Administrator membuat akun baru atau mengubah peran, nama, organisasi, status aktif.", "Sistem menyimpan ke users; trigger mencatat audit (hash sandi disensor)."],
-      alt: ["2a. Reset sandi atau buka kunci akun (extend).", "2b. Mengubah akun sendiri: CANNOT_MODIFY_SELF."],
+      main: ["Administrator membuka Sistem › Pengguna.", "Administrator membuat akun baru atau mengubah peran, nama, organisasi, status aktif, dan email (opsional).", "Sistem menyimpan ke users; trigger mencatat audit (hash sandi disensor)."],
+      alt: ["2a. Reset sandi atau buka kunci akun (extend).", "2b. Mengubah akun sendiri: CANNOT_MODIFY_SELF.", "2c. Email baru/berubah dicek dan dikirimi email konfirmasi; gagal = seluruh perubahan ditolak dengan EMAIL_INVALID / EMAIL_UNREACHABLE (extend)."],
       post: "Akun diperbarui; akun tidak pernah dihapus, hanya dinonaktifkan." },
+    { id: "UC-26", name: "Mengatur email dan kecamatan peringatan", actor: "Relawan, Analis, Data Engineer, Administrator", pre: "Pengguna sudah login.",
+      main: ["Pengguna membuka Sistem › Akun saya › Email & peringatan.", "Pengguna mengisi email lalu Simpan.", "Sistem mengecek format, keunikan (auth_email_available), dan server mail domain (MX).", "Sistem mengirim email konfirmasi; bila terkirim, email disimpan dengan email_verified_at (auth_set_own_email) dan dicatat EMAIL_SET.", "Pengguna memilih kecamatan: tidak ada, beberapa, atau semua, lalu Simpan pilihan (auth_set_own_notify)."],
+      alt: ["3a. Email tidak valid / tidak bisa menerima / dipakai akun lain: EMAIL_INVALID / EMAIL_UNREACHABLE / EMAIL_TAKEN; email tidak disimpan, EMAIL_REJECTED dicatat.", "4a. Pengiriman email belum diatur di server: MAIL_NOT_CONFIGURED.", "2a. Pengguna menghapus email: tidak menerima peringatan lagi (EMAIL_REMOVED).", "5a. Dari Beranda: tombol Terima peringatan email untuk kecamatan ini menambah satu kecamatan."],
+      post: "Bila email terverifikasi dan ada kecamatan, pengguna termasuk penerima notify_recipients()." },
+    { id: "UC-27", name: "Mengirim peringatan email kondisi tidak normal", actor: "Scheduler", pre: "Job Hidromet harian atau siklus Live selesai menyimpan data baru; notify.enabled = true; SMTP diatur.",
+      main: ["Sistem memegang kunci advisory notify.", "Sistem membaca penerima lewat notify_recipients().", "Sistem menghitung kondisi tiap kecamatan langganan dengan aturan yang sama dengan Beranda (v_public_lokasi_*, lokasi_interpret).", "Sistem memilih butir tidak normal yang tanggal datanya ≤ notify.max_age_days dan belum ada di notify_sent untuk pengguna itu.", "Sistem menyusun satu email per pengguna: Ringkasnya, Bukti (citra dipotong ke kecamatan + tabel), Detail teknis.", "Sistem mengirim lewat SMTP, menulis notify_sent, dan mencatat EMAIL_ALERT_SENT."],
+      alt: ["4a. Tidak ada butir baru: tidak ada email (data yang sama tidak dikirim dua kali).", "6a. Pengiriman gagal: EMAIL_ALERT_FAILED dicatat; butir dicoba lagi di putaran berikutnya.", "1a. Putaran lain sedang berjalan: menunggu sampai 10 menit, lalu SKIPPED_LOCKED."],
+      post: "Pengguna menerima bukti kondisi tidak normal tanpa membuka aplikasi." },
     { id: "UC-22", name: "Menjalankan Job Hidromet harian", actor: "Scheduler", pre: "Pukul 02:00 WIB.",
-      main: ["Scheduler mencoba advisory lock hydromet.", "Sistem mengambil tanggal yang belum COMPLETED.", "Sistem mengunduh GPM (Final → Late → Early) dan menghitung akumulasi 24h/72h/7d/30d.", "Sistem melakukan agregasi zonal per kecamatan ke region_observations (include).", "Sistem mengevaluasi alert_rules aktif dan menulis alert_events (include).", "Sistem mengunduh dan mengagregasi MODIS.", "Sistem menghitung forecast tersimpan dan menghapus raster lebih dari 365 hari (include)."],
+      main: ["Scheduler mencoba advisory lock hydromet.", "Sistem mengambil tanggal yang belum COMPLETED.", "Sistem mengunduh GPM (Final → Late → Early) dan menghitung akumulasi 24h/72h/7d/30d.", "Sistem melakukan agregasi zonal per kecamatan ke region_observations (include).", "Sistem mengevaluasi alert_rules aktif dan menulis alert_events (include).", "Sistem mengunduh dan mengagregasi MODIS.", "Sistem menghitung forecast tersimpan dan menghapus raster lebih dari 365 hari (include).", "Sistem menjalankan putaran peringatan email UC-27 (include)."],
       alt: ["1a. Lock dipegang proses lain: SKIPPED_LOCKED.", "3a. Granule belum terbit: WAITING_UPSTREAM, lalu FAILED setelah 3 hari.", "6a. MODIS gagal: hari tetap COMPLETED tanpa MODIS."],
       post: "Data harian dan peringatan hari itu tersedia." },
   ];

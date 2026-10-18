@@ -1,5 +1,5 @@
 window.SKRIPSI_DATA = {
- "generated": "2026-10-09 14:37",
+ "generated": "2026-10-19 04:00",
  "tables": {
   "administrative_regions": {
    "desc": "Batas wilayah resmi COD-AB Indonesia (BPS via OCHA/HDX): Kabupaten Lebak (level 2) dan kecamatannya (level 3). AOI GMLS = kecamatan in_aoi (M8).",
@@ -3309,6 +3309,94 @@ window.SKRIPSI_DATA = {
     }
    ]
   },
+  "notify_sent": {
+   "desc": "Butir tidak normal yang sudah dikirim lewat email (M64). Kunci unik (pengguna, kecamatan, butir, tanggal data) mencegah pengiriman ulang data yang sama.",
+   "cols": [
+    {
+     "n": "notify_id",
+     "t": "bigint",
+     "nn": true,
+     "d": "nextval('notify_sent_notify_id_seq'::regclass)",
+     "k": "PK",
+     "ds": "PK surrogate."
+    },
+    {
+     "n": "user_id",
+     "t": "integer",
+     "nn": true,
+     "d": "",
+     "k": "FK→users, UNIQUE",
+     "ds": "FK -> users penerima."
+    },
+    {
+     "n": "region_id",
+     "t": "integer",
+     "nn": true,
+     "d": "",
+     "k": "FK→administrative_regions, UNIQUE",
+     "ds": "FK -> administrative_regions (kecamatan)."
+    },
+    {
+     "n": "item_key",
+     "t": "character varying(20)",
+     "nn": true,
+     "d": "",
+     "k": "UNIQUE",
+     "ds": "Butir kalimat kondisi (mis. gpm_rain_7d, s1_vh, modis_flood) atau \"alert\" untuk alert hujan BMKG."
+    },
+    {
+     "n": "data_date",
+     "t": "date",
+     "nn": true,
+     "d": "",
+     "k": "UNIQUE",
+     "ds": "Tanggal data yang menunjukkan kondisi tidak normal (tanggal observasi satelit atau alert)."
+    },
+    {
+     "n": "level",
+     "t": "smallint",
+     "nn": true,
+     "d": "",
+     "k": "",
+     "ds": "Tingkat saat dikirim: 1 Waspada, 2 Tinggi."
+    },
+    {
+     "n": "sent_at",
+     "t": "timestamp with time zone",
+     "nn": true,
+     "d": "now()",
+     "k": "",
+     "ds": "Waktu email terkirim."
+    }
+   ],
+   "cons": [
+    {
+     "n": "notify_sent_level_check",
+     "type": "CHECK",
+     "def": "CHECK (((level >= 1) AND (level <= 2)))"
+    },
+    {
+     "n": "notify_sent_region_id_fkey",
+     "type": "FK",
+     "def": "FOREIGN KEY (region_id) REFERENCES administrative_regions(region_id)"
+    },
+    {
+     "n": "notify_sent_user_id_fkey",
+     "type": "FK",
+     "def": "FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE"
+    },
+    {
+     "n": "notify_sent_pkey",
+     "type": "PK",
+     "def": "PRIMARY KEY (notify_id)"
+    },
+    {
+     "n": "uq_notify_sent",
+     "type": "UNIQUE",
+     "def": "UNIQUE (user_id, region_id, item_key, data_date)"
+    }
+   ]
+  },
   "processing_jobs": {
    "desc": "Eksekusi satu tahap pipeline (scene/granule x tahap x percobaan). Jangkar: scene S1, granule NASA, atau tidak keduanya untuk FUSION (M30).",
    "cols": [
@@ -5352,6 +5440,52 @@ window.SKRIPSI_DATA = {
     }
    ]
   },
+  "user_notify_regions": {
+   "desc": "Langganan peringatan email per kecamatan (M64): tempat tinggal, beberapa, atau tidak sama sekali. Diubah pemiliknya lewat auth_set_own_notify().",
+   "cols": [
+    {
+     "n": "user_id",
+     "t": "integer",
+     "nn": true,
+     "d": "",
+     "k": "FK→users, PK",
+     "ds": "FK -> users pelanggan."
+    },
+    {
+     "n": "region_id",
+     "t": "integer",
+     "nn": true,
+     "d": "",
+     "k": "FK→administrative_regions, PK",
+     "ds": "FK -> administrative_regions (kecamatan AOI)."
+    },
+    {
+     "n": "created_at",
+     "t": "timestamp with time zone",
+     "nn": true,
+     "d": "now()",
+     "k": "",
+     "ds": "Waktu kecamatan dipilih."
+    }
+   ],
+   "cons": [
+    {
+     "n": "user_notify_regions_region_id_fkey",
+     "type": "FK",
+     "def": "FOREIGN KEY (region_id) REFERENCES administrative_regions(region_id) ON DELETE CASCADE"
+    },
+    {
+     "n": "user_notify_regions_user_id_fkey",
+     "type": "FK",
+     "def": "FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE"
+    },
+    {
+     "n": "user_notify_regions_pkey",
+     "type": "PK",
+     "def": "PRIMARY KEY (user_id, region_id)"
+    }
+   ]
+  },
   "users": {
    "desc": "Akun pengguna yang login (USER s.d. ADMIN). Akun dinonaktifkan, tidak pernah dihapus.",
    "cols": [
@@ -5465,7 +5599,23 @@ window.SKRIPSI_DATA = {
      "nn": false,
      "d": "",
      "k": "",
-     "ds": "Alamat email (unik, tanpa membedakan huruf besar). Wajib untuk akun hasil registrasi mandiri (M56); NULL untuk akun lama buatan ADMIN."
+     "ds": "Alamat email (unik, tanpa membedakan huruf besar). Opsional (M64; wajib saat registrasi pada M56). Hanya disimpan bila lolos pengecekan: format, MX domain, dan email konfirmasi terkirim."
+    },
+    {
+     "n": "email_verified_at",
+     "t": "timestamp with time zone",
+     "nn": false,
+     "d": "",
+     "k": "",
+     "ds": "Waktu email lolos pengecekan dan email konfirmasi terkirim (M64). NULL = email lama yang belum dicek; tidak dikirimi peringatan."
+    },
+    {
+     "n": "notify_all_regions",
+     "t": "boolean",
+     "nn": true,
+     "d": "false",
+     "k": "",
+     "ds": "true = berlangganan peringatan email untuk SEMUA kecamatan AOI, termasuk yang ditambahkan kemudian (M64)."
     }
    ],
    "cons": [
@@ -5749,6 +5899,45 @@ window.SKRIPSI_DATA = {
     "source_status"
    ],
    "desc": "Scene Live terbaru per area aktif (READY/PARTIAL, berkas belum dihapus): status area, kalimat kondisi, manifest preview. PUBLIC+."
+  },
+  {
+   "name": "v_public_lokasi_alert",
+   "cols": [
+    "region_id",
+    "observation_date",
+    "severity",
+    "band_code",
+    "observed_value",
+    "threshold_value"
+   ],
+   "desc": "Alert hujan 7 hari terakhir per kecamatan AOI untuk Pantau Lokasi, tanpa kolom penanganan alert (M63). PUBLIC+."
+  },
+  {
+   "name": "v_public_lokasi_obs",
+   "cols": [
+    "region_id",
+    "pcode",
+    "region_name",
+    "obs_date",
+    "source_code",
+    "band_code",
+    "unit",
+    "value",
+    "valid_fraction",
+    "run_type"
+   ],
+   "desc": "Angka harian/per lintasan per kecamatan AOI untuk Pantau Lokasi di Beranda, batas waktu per role pemanggil seperti v_citra_obs_aoi; dua observasi terakhir per kecamatan × band selalu terlihat (M63). PUBLIC+."
+  },
+  {
+   "name": "v_public_lokasi_range",
+   "cols": [
+    "region_id",
+    "band_code",
+    "p02",
+    "p98",
+    "n_obs"
+   ],
+   "desc": "Rentang biasa (persentil 2–98, 365 hari s.d. observasi terakhir band) per kecamatan AOI × band untuk grafik dan kalimat Pantau Lokasi (M63). PUBLIC+."
   },
   {
    "name": "v_ringkasan_kualitas",
@@ -6124,6 +6313,18 @@ window.SKRIPSI_DATA = {
    "mandatory": true
   },
   {
+   "parent": "administrative_regions",
+   "child": "notify_sent",
+   "fk": "region_id",
+   "mandatory": true
+  },
+  {
+   "parent": "users",
+   "child": "notify_sent",
+   "fk": "user_id",
+   "mandatory": true
+  },
+  {
    "parent": "nasa_scenes",
    "child": "processing_jobs",
    "fk": "nasa_scene_id",
@@ -6260,6 +6461,18 @@ window.SKRIPSI_DATA = {
    "child": "user_activity_logs",
    "fk": "user_id",
    "mandatory": false
+  },
+  {
+   "parent": "administrative_regions",
+   "child": "user_notify_regions",
+   "fk": "region_id",
+   "mandatory": true
+  },
+  {
+   "parent": "users",
+   "child": "user_notify_regions",
+   "fk": "user_id",
+   "mandatory": true
   },
   {
    "parent": "users",
@@ -6805,16 +7018,16 @@ window.SKRIPSI_DATA = {
   ]
  },
  "pytest": {
-  "tests": 1142,
+  "tests": 1189,
   "failures": 0,
   "errors": 0,
   "skipped": 2,
-  "time": 137.576,
-  "timestamp": "2026-10-08T13:54:17.159563+07:00",
+  "time": 132.96,
+  "timestamp": "2026-10-19T03:53:49.916033+07:00",
   "files": [
    {
     "file": "test_rbac_api",
-    "n": 153,
+    "n": 165,
     "fail": 0,
     "skip": 0
    },
@@ -6915,6 +7128,12 @@ window.SKRIPSI_DATA = {
     "skip": 0
    },
    {
+    "file": "test_data_api",
+    "n": 19,
+    "fail": 0,
+    "skip": 0
+   },
+   {
     "file": "test_etl_pipeline",
     "n": 19,
     "fail": 0,
@@ -6957,12 +7176,6 @@ window.SKRIPSI_DATA = {
     "skip": 0
    },
    {
-    "file": "test_data_api",
-    "n": 17,
-    "fail": 0,
-    "skip": 0
-   },
-   {
     "file": "test_pipeline_branching",
     "n": 17,
     "fail": 0,
@@ -6999,13 +7212,31 @@ window.SKRIPSI_DATA = {
     "skip": 0
    },
    {
+    "file": "test_notify",
+    "n": 14,
+    "fail": 0,
+    "skip": 0
+   },
+   {
     "file": "test_alert_engine",
     "n": 13,
     "fail": 0,
     "skip": 0
    },
    {
+    "file": "test_diagram_api",
+    "n": 13,
+    "fail": 0,
+    "skip": 0
+   },
+   {
     "file": "test_fusion_grid_pinned",
+    "n": 13,
+    "fail": 0,
+    "skip": 0
+   },
+   {
+    "file": "test_lokasi_api",
     "n": 13,
     "fail": 0,
     "skip": 0
@@ -7055,12 +7286,6 @@ window.SKRIPSI_DATA = {
    {
     "file": "test_s1_mosaic",
     "n": 9,
-    "fail": 0,
-    "skip": 0
-   },
-   {
-    "file": "test_diagram_api",
-    "n": 7,
     "fail": 0,
     "skip": 0
    },
@@ -7167,41 +7392,43 @@ window.SKRIPSI_DATA = {
    "report_types": 4,
    "administrative_regions": 29,
    "api_tokens": 1,
-   "app_settings": 11,
-   "audit_log": 338,
+   "app_settings": 13,
+   "audit_log": 348,
    "disaster_events": 0,
-   "band_forecasts": 110,
-   "band_forecast_points": 1560,
-   "band_forecast_scores": 454,
+   "band_forecasts": 891,
+   "band_forecast_points": 12555,
+   "band_forecast_scores": 3789,
    "cleanup_operations": 0,
-   "dataset_jobs": 1034,
+   "dataset_jobs": 1039,
    "live_areas": 1,
-   "processing_logs": 5778,
-   "generated_reports": 1,
+   "processing_logs": 5972,
+   "generated_reports": 3,
    "spectral_bands": 11,
    "processing_stages": 13,
    "quality_alerts": 14,
-   "region_observations": 72300,
+   "user_notify_regions": 0,
+   "notify_sent": 0,
+   "region_observations": 72640,
    "fusion_strategies": 3,
    "alert_rules": 4,
-   "data_lineage": 7991,
+   "data_lineage": 8049,
    "datasets": 2,
-   "live_events": 321,
+   "live_events": 387,
    "fusion_products": 0,
-   "live_scene_metrics": 1727,
-   "quality_metrics": 190,
+   "live_scene_metrics": 1793,
+   "users": 5,
+   "quality_metrics": 196,
    "regions_of_interest": 11,
    "roles": 5,
-   "scene_job_state": 147,
-   "users": 5,
-   "user_activity_logs": 28,
+   "scene_job_state": 150,
+   "user_activity_logs": 30,
    "satellite_sources": 4,
-   "satellite_scenes": 85,
-   "nasa_scenes": 2206,
+   "satellite_scenes": 88,
+   "nasa_scenes": 2218,
    "alert_events": 210,
-   "data_products": 15604,
-   "processing_jobs": 7873,
-   "live_scenes": 55,
+   "data_products": 15708,
+   "processing_jobs": 7922,
+   "live_scenes": 57,
    "dataset_source_config": 5,
    "quality_thresholds": 9,
    "disaster_types": 4
@@ -7220,9 +7447,9 @@ window.SKRIPSI_DATA = {
   ],
   "obs_range": [
    "2024-01-01",
-   "2026-10-07"
+   "2026-10-17"
   ],
-  "at": "2026-10-09 14:37",
+  "at": "2026-10-19 04:00",
   "indexes": [
    {
     "t": "administrative_regions",
@@ -7670,6 +7897,21 @@ window.SKRIPSI_DATA = {
     "def": "CREATE UNIQUE INDEX uq_nasa_scene ON public.nasa_scenes USING btree (source, tile_id, product_short_name, acquisition_date)"
    },
    {
+    "t": "notify_sent",
+    "n": "idx_notify_sent_time",
+    "def": "CREATE INDEX idx_notify_sent_time ON public.notify_sent USING btree (sent_at DESC)"
+   },
+   {
+    "t": "notify_sent",
+    "n": "notify_sent_pkey",
+    "def": "CREATE UNIQUE INDEX notify_sent_pkey ON public.notify_sent USING btree (notify_id)"
+   },
+   {
+    "t": "notify_sent",
+    "n": "uq_notify_sent",
+    "def": "CREATE UNIQUE INDEX uq_notify_sent ON public.notify_sent USING btree (user_id, region_id, item_key, data_date)"
+   },
+   {
     "t": "processing_jobs",
     "n": "idx_pjobs_params_gin",
     "def": "CREATE INDEX idx_pjobs_params_gin ON public.processing_jobs USING gin (parameters_json)"
@@ -7988,6 +8230,16 @@ window.SKRIPSI_DATA = {
     "t": "user_activity_logs",
     "n": "user_activity_logs_pkey",
     "def": "CREATE UNIQUE INDEX user_activity_logs_pkey ON public.user_activity_logs USING btree (log_id)"
+   },
+   {
+    "t": "user_notify_regions",
+    "n": "idx_user_notify_regions_region",
+    "def": "CREATE INDEX idx_user_notify_regions_region ON public.user_notify_regions USING btree (region_id)"
+   },
+   {
+    "t": "user_notify_regions",
+    "n": "user_notify_regions_pkey",
+    "def": "CREATE UNIQUE INDEX user_notify_regions_pkey ON public.user_notify_regions USING btree (user_id, region_id)"
    },
    {
     "t": "users",
@@ -8337,6 +8589,16 @@ window.SKRIPSI_DATA = {
     "priv": "INSERT,SELECT,UPDATE"
    },
    {
+    "role": "monitor_admin",
+    "obj": "notify_sent",
+    "priv": "SELECT"
+   },
+   {
+    "role": "monitor_etl",
+    "obj": "notify_sent",
+    "priv": "INSERT,SELECT"
+   },
+   {
     "role": "monitor_data_engineer",
     "obj": "processing_jobs",
     "priv": "SELECT"
@@ -8513,6 +8775,11 @@ window.SKRIPSI_DATA = {
    },
    {
     "role": "monitor_admin",
+    "obj": "user_notify_regions",
+    "priv": "DELETE,INSERT,SELECT"
+   },
+   {
+    "role": "monitor_admin",
     "obj": "users",
     "priv": "INSERT,SELECT,UPDATE"
    },
@@ -8622,6 +8889,36 @@ window.SKRIPSI_DATA = {
     "priv": "SELECT"
    },
    {
+    "role": "monitor_etl",
+    "obj": "v_public_lokasi_alert",
+    "priv": "SELECT"
+   },
+   {
+    "role": "monitor_public",
+    "obj": "v_public_lokasi_alert",
+    "priv": "SELECT"
+   },
+   {
+    "role": "monitor_etl",
+    "obj": "v_public_lokasi_obs",
+    "priv": "SELECT"
+   },
+   {
+    "role": "monitor_public",
+    "obj": "v_public_lokasi_obs",
+    "priv": "SELECT"
+   },
+   {
+    "role": "monitor_etl",
+    "obj": "v_public_lokasi_range",
+    "priv": "SELECT"
+   },
+   {
+    "role": "monitor_public",
+    "obj": "v_public_lokasi_range",
+    "priv": "SELECT"
+   },
+   {
     "role": "monitor_data_engineer",
     "obj": "v_ringkasan_kualitas",
     "priv": "SELECT"
@@ -8679,26 +8976,6 @@ window.SKRIPSI_DATA = {
   ],
   "members": [
    {
-    "role": "monitor_admin",
-    "member": "monitor_app"
-   },
-   {
-    "role": "monitor_data_engineer",
-    "member": "monitor_app"
-   },
-   {
-    "role": "monitor_analyst",
-    "member": "monitor_app"
-   },
-   {
-    "role": "monitor_user",
-    "member": "monitor_app"
-   },
-   {
-    "role": "monitor_public",
-    "member": "monitor_app"
-   },
-   {
     "role": "monitor_public",
     "member": "monitor_user"
    },
@@ -8717,6 +8994,26 @@ window.SKRIPSI_DATA = {
    {
     "role": "monitor_analyst",
     "member": "monitor_admin"
+   },
+   {
+    "role": "monitor_admin",
+    "member": "monitor_app"
+   },
+   {
+    "role": "monitor_data_engineer",
+    "member": "monitor_app"
+   },
+   {
+    "role": "monitor_analyst",
+    "member": "monitor_app"
+   },
+   {
+    "role": "monitor_user",
+    "member": "monitor_app"
+   },
+   {
+    "role": "monitor_public",
+    "member": "monitor_app"
    }
   ],
   "policies": [

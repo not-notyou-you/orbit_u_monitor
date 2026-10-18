@@ -278,6 +278,11 @@ baris FAILED beserta pesannya.
 | Laporan bulanan | tanggal 1, 03:30 / 03:45 | `report` |
 | Forecast tersimpan (jaring pengaman, §14.1) | 00:30, 06:30, 12:30, 18:30 | `forecast` |
 
+**Peringatan email (M64).** Ini bukan job tersendiri. `etl/notify.run_quietly` dipanggil di akhir Hidromet
+harian dan siklus Live, setelah datanya tersimpan, di bawah kunci `notify`. Galat di dalamnya hanya dicatat
+dan tidak pernah menggagalkan job datanya. Pembaruan Late → Final, backfill, dan proses ulang tidak
+memanggilnya, sehingga tanggal lampau tidak memicu email.
+
 Ada dua lapis penguncian:
 
 | Lapis | Mekanisme | Melindungi |

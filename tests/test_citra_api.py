@@ -4,7 +4,7 @@ VIEW v_citra_scenes, isi per satelit, perbandingan, dan laporan PDF."""
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import text
@@ -156,7 +156,10 @@ class TestDailyHydromet:
     @pytest.fixture
     def daily(self, db_client, synthetic_aoi):
         from etl import hydromet_aggregate as ha
-        today = date.today()
+        # Hari UTC, sama dengan region_observations.obs_date (M28). Dengan
+        # date.today() lokal, antara 00.00–07.00 WIB "3 hari lalu" di sini sama
+        # dengan "2 hari lalu" tests/test_diagram_api.py dan menimpa angkanya.
+        today = datetime.now(timezone.utc).date()
         days = {"baru": today - timedelta(days=3), "lama": today - timedelta(days=200), "kuno": today - timedelta(days=600)}
         with db_client.session() as sess:
             for d in days.values():

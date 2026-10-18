@@ -244,7 +244,9 @@ dan nilai observasi bisa ditimpa run GPM Final. Peringatan harus tetap menunjukk
 <tr><td><code>band_forecasts</code></td><td>forecast_id; (band_id, region_id, data_stamp)</td><td class=c>✓*</td><td class=c>✓*</td><td class="c y">✓</td><td>*<code>mae</code>, <code>skill</code> ringkasan dari <code>band_forecast_scores</code> (disengaja)</td></tr>
 <tr><td><code>band_forecast_points</code>, <code>band_forecast_scores</code></td><td>(forecast_id, step); (forecast_id, model)</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td>Titik dan skor dipisah ke dua tabel, bukan satu tabel, sehingga tidak ada multivalued dependency</td></tr>
 <tr><td><code>data_lineage</code></td><td>lineage_id; (parent_product_id, child_product_id)</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td>Satu baris per sisi graf; parameter JSONB dibaca utuh</td></tr>
-<tr><td><code>users</code></td><td>user_id; username; lower(email)</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td>—</td></tr>
+<tr><td><code>users</code></td><td>user_id; username; lower(email)</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td><code>notify_all_regions</code> menyimpan "semua kecamatan" sebagai satu fakta, bukan banyak baris langganan (M64)</td></tr>
+<tr><td><code>user_notify_regions</code></td><td>(user_id, region_id)</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td>Tabel asosiasi M:N pengguna–kecamatan; tidak ada atribut non-kunci selain <code>created_at</code></td></tr>
+<tr><td><code>notify_sent</code></td><td>notify_id; (user_id, region_id, item_key, data_date)</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td>Satu baris = satu butir terkirim; kunci alternatif sekaligus penjaga anti-duplikat email (M64)</td></tr>
 </table></div>
 </div>
 <p>4NF hanya menuntut tidak ada <i>multivalued dependency</i> (dua himpunan banyak-nilai yang saling bebas dalam satu tabel).

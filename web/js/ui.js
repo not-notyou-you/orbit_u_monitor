@@ -20,6 +20,7 @@ const UI = (() => {
     alarm: S(16, '<path d="M8 1 L15 14 L1 14 Z" fill="#ffd800" stroke="#000"/><rect x="7" y="5" width="2" height="5" fill="#000"/><rect x="7" y="11" width="2" height="2" fill="#000"/>'),
     user: S(16, '<rect x="5" y="1" width="6" height="6" fill="#ffd8a8" stroke="#000"/><rect x="2" y="9" width="12" height="6" fill="#000080" stroke="#000"/>'),
     door: S(16, '<rect x="3" y="1" width="9" height="14" fill="#808080" stroke="#000"/><rect x="9" y="8" width="2" height="2" fill="#ffd800"/><rect x="12" y="7" width="3" height="2" fill="#000"/>'),
+    pin: S(16, '<path d="M8 1 h3 v1 h1 v1 h1 v5 h-1 v1 h-1 v2 h-1 v2 h-1 v2 h-2 v-2 h-1 v-2 h-1 v-2 h-1 v-1 h-1 v-5 h1 v-1 h1 v-1 h3 z" fill="#ff3b3b" stroke="#000" stroke-width=".5"/><rect x="7" y="4" width="2" height="2" fill="#fff"/>'),
     help: S(16, '<rect x="1" y="1" width="14" height="14" fill="#fff" stroke="#000"/><path d="M5 5 h1 v-1 h4 v1 h1 v2 h-1 v1 h-2 v2 h-2 v-3 h2 v-1 h1 v-1 h-2 v1 h-2 z" fill="#000080"/><rect x="7" y="11" width="2" height="2" fill="#000080"/>'),
     info32: S(32, '<rect x="6" y="2" width="20" height="28" fill="#fff" stroke="#000"/><rect x="2" y="6" width="28" height="20" fill="#fff"/><rect x="2" y="6" width="1" height="20" fill="#000"/><rect x="29" y="6" width="1" height="20" fill="#000"/><rect x="14" y="7" width="4" height="4" fill="#000080"/><rect x="14" y="13" width="4" height="12" fill="#000080"/>'),
     warn32: S(32, '<path d="M16 2 L30 28 L2 28 Z" fill="#ffd800" stroke="#000" stroke-width="2"/><rect x="14" y="10" width="4" height="10" fill="#000"/><rect x="14" y="22" width="4" height="3" fill="#000"/>'),
@@ -103,6 +104,10 @@ const UI = (() => {
     INVALID_OLD_PASSWORD: 'Kata sandi lama salah.',
     USERNAME_TAKEN: 'Nama pengguna sudah dipakai.',
     EMAIL_TAKEN: 'Email ini sudah terdaftar. Masuk dengan akun tersebut, atau gunakan email lain.',
+    EMAIL_INVALID: 'Alamat email tidak valid atau domainnya tidak ada.',
+    EMAIL_UNREACHABLE: 'Alamat email ini tidak bisa menerima email (server mail domainnya tidak ditemukan atau menolak).',
+    MAIL_NOT_CONFIGURED: 'Pengiriman email belum diatur di server ini. Hubungi Administrator.',
+    MAIL_SEND_FAILED: 'Email konfirmasi gagal dikirim dari server. Coba lagi nanti.',
     PASSWORD_MISMATCH: 'Konfirmasi kata sandi tidak sama dengan kata sandi.',
     CANNOT_MODIFY_SELF: 'Anda tidak dapat menonaktifkan atau menurunkan peran akun sendiri.',
     TOKEN_ALREADY_REVOKED: 'Token ini sudah dicabut sebelumnya.',
@@ -122,6 +127,7 @@ const UI = (() => {
     REPORT_AUDIENCE: 'Laporan ini bukan untuk peran Anda.',
     INVALID_PERIOD: 'Periode tidak valid: laporan mingguan dimulai hari Senin, bulanan tanggal 1.',
     FILE_MISSING: 'Berkas tidak ditemukan di arsip.',
+    GRID_MISSING: 'Scene ini belum punya georeferensi, jadi citranya tidak bisa dipotong per kecamatan; yang tampil citra seluruh area.',
     INVALID_SOURCE: 'Sumber satelit tidak dikenal.',
     INVALID_PAGES: 'Pilih minimal satu halaman laporan: Ringkasan, Sentinel-1, MODIS, atau GPM.',
     INVALID_BAND: 'Band ini tidak dihitung per kecamatan (Sentinel-1 hanya tingkat AOI).',
@@ -381,7 +387,8 @@ const UI = (() => {
 
   // ------------------------------------------------------------------ grafik SVG di screen
   // series: [{label, cls, color?, forecast?:[{x,mean,lo,hi}], points:[{x:'YYYY-MM-DD', y}]}];
-  // opts: {bar, thresholds:{name:v}, forecast:{points:[{x,mean,lo,hi}]}, unit, selected}
+  // opts: {bar, thresholds:{name:v}, forecast:{points:[{x,mean,lo,hi}]}, unit, selected,
+  //        range:{lo, hi} = pita "rentang biasa" (persentil 2–98) di belakang garis}
   // `color` (opsional) mewarnai garis satu seri — dipakai Forecast, tempat setiap
   // band/kecamatan punya warna tetap. `forecast` per seri digambar dengan warna seri itu.
   function chartSVG(series, opts) {
@@ -395,6 +402,7 @@ const UI = (() => {
     let x0 = Math.min(...xs), x1 = Math.max(...xs);
     if (x1 === x0) { x0 -= 3 * 864e5; x1 += 3 * 864e5; }
     const thr = opts.thresholds || {};
+    const rng = opts.range && opts.range.lo !== null && opts.range.lo !== undefined && opts.range.hi !== null && opts.range.hi !== undefined ? opts.range : null;
     const ys = all.map(p => p.y).concat(fc.flatMap(p => [p.lo, p.hi, p.mean]).filter(v => v !== null && v !== undefined)).concat(Object.values(thr));
     let y0 = Math.min(...ys), y1 = Math.max(...ys);
     if (opts.bar || opts.zero) y0 = Math.min(0, y0);
@@ -415,6 +423,11 @@ const UI = (() => {
     // Label terakhir selalu tampil; label kelipatan step yang terlalu dekat dengannya dilewati supaya tidak bertumpuk.
     dates.forEach((d, k) => { if (k === dates.length - 1 || (k % step === 0 && dates.length - 1 - k >= step * 0.6))
       g += '<text class="axis" x="' + X(t(d)) + '" y="' + (H - 6) + '" text-anchor="middle">' + date(d, 'short') + '</text>'; });
+    // Pita tidak ikut menentukan skala (p98 hujan bisa puluhan kali nilai
+    // hari biasa); dipotong ke area plot, jadi pita penuh = semua dalam batas biasa.
+    if (rng && rng.hi >= y0 && rng.lo <= y1) g += '<rect class="rng" x="' + L + '" y="' + Y(Math.min(rng.hi, y1)) + '" width="' + (W - L - R) +
+      '" height="' + Math.max(1, Y(Math.max(rng.lo, y0)) - Y(Math.min(rng.hi, y1))) + '"><title>' +
+      esc('Rentang biasa ' + num(rng.lo, 2) + ' s.d. ' + num(rng.hi, 2) + (opts.unit ? ' ' + opts.unit : '')) + '</title></rect>';
     if (opts.selected) g += '<line class="sel" x1="' + X(t(opts.selected)) + '" x2="' + X(t(opts.selected)) + '" y1="' + T + '" y2="' + (H - B) + '"/>';
     Object.entries(thr).forEach(([name, v]) => {
       g += '<line class="thr" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/>' +

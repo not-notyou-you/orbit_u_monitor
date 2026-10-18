@@ -47,12 +47,12 @@ Orbit-U **tidak menggantikan** SIGAP DESA (PHP/MySQL milik GMLS). Data warga, KK
 
 ## 3. Pengguna dan Hak Akses
 
-Susunan halaman M56: Beranda → 3D AOI → Citra Satelit → Forecast (dulu Diagram, M61) → Kejadian → Data → Laporan → Sistem, plus Masuk (`/masuk`) dan Registrasi (`/daftar`).
+Susunan halaman M56 (+M63): Beranda (Pantau Lokasi) → Tentang → 3D AOI → Citra Satelit → Forecast (dulu Diagram, M61) → Kejadian → Data → Laporan → Sistem, plus Masuk (`/masuk`) dan Registrasi (`/daftar`).
 
 | Role | Akun | Kebutuhan |
 |---|---|---|
-| `PUBLIC` | Tanpa akun | Beranda, Citra Satelit **30 hari terakhir** (termasuk PDF), Kejadian **365 hari terakhir**, Sistem › Tentang |
-| `USER` | Registrasi mandiri `/daftar` | Semua milik PUBLIC + 3D AOI, Citra **365 hari**, seluruh riwayat kejadian, hujan per kecamatan + alert aktif, akun & token API sendiri |
+| `PUBLIC` | Tanpa akun | Beranda (pilih kecamatan; angka per kecamatan **30 hari terakhir**, M63), Tentang, Citra Satelit **30 hari terakhir** (termasuk PDF), Kejadian **365 hari terakhir** |
+| `USER` | Registrasi mandiri `/daftar` | Semua milik PUBLIC + 3D AOI, Citra **365 hari**, seluruh riwayat kejadian, hujan per kecamatan + alert aktif, akun & token API sendiri, Lokasi saya (M63), peringatan email per kecamatan pilihan (opsional, M64) |
 | `ANALYST` | Dibuat ADMIN | Semua milik USER + Citra semua tanggal, Forecast (semua band 30 hari + forecast 15 hari, analisa daerah + forecast + PDF, tren & evaluasi alert), kelola kejadian, acknowledge alert, Laporan Keadaan AOI, log halaman Kejadian |
 | `DATA_ENGINEER` | Dibuat ADMIN | Semua milik USER + Citra semua tanggal, Data (per satelit + backfill dengan log, unduh/fusion, dataset, proses, EDA), Laporan Kesehatan Data, log halaman Data |
 | `ADMIN` | Dibuat ADMIN | Semua akses + Sistem › Manajemen akun, Pengaturan aplikasi, seluruh log (masuk/registrasi, unduhan, audit) |
@@ -222,13 +222,15 @@ Keputusan rancangan awal (D1–D24) yang masih berlaku dirangkum; keputusan baru
 | M60 | **DATABASE.md, PIPELINE.md, DESIGN.md ditulis ulang dari kode** (8 Okt 2026). Versi lama sengaja dihapus pemilik proyek karena sudah tidak sesuai kode. Nomor bagian disusun mengikuti rujukan `§` yang sudah ada di kode, supaya rujukan itu tetap benar. Kode adalah sumber kebenaran; bila berbeda, dokumen yang diperbaiki. Dua docstring usang ikut dibetulkan: `etl/raster_retention.py` (730 → 365 hari, sesuai M58) dan `tools/data_dictionary.py` (catatan `docs/generated/`) | Dokumen lama yang tidak sesuai kode membingungkan pengembangan; bagian skripsi butuh artefak tahap DBSDLC |
 | M61 | **Halaman Diagram menjadi Forecast** (9 Okt 2026). Semua fitur Diagram dipertahankan; setiap grafik garis (Keadaan terbaru, Analisa daerah, serta CH-01 tren per kecamatan dan CH-03 rerata hujan di Tren & evaluasi alert) kini juga menampilkan forecast 15 hari dengan pita 80%, menyala bawaannya dan bisa dimatikan lewat sakelar di bawah grafik. Forecast dihitung dari **seluruh riwayat** deret di database (bukan hanya 30 hari yang digambar) oleh `etl/band_forecast.py`: lima model numpy (naive, SES, Holt teredam, klimatologi, klimatologi + anomali AR(1)) dipilih per deret lewat backtest rolling-origin setahun. Dipilih atas ARIMA/Prophet karena: tanpa dependensi baru (Prophet sulit dipasang di Windows, statsmodels tidak terpasang), data harian GPM/MODIS sejak Jan 2024 cukup untuk pola musiman, dan backtest membuktikan per deret apakah model mengalahkan "nilai terakhir berlanjut" — hasil uji pada data nyata: model musiman menang untuk akumulasi hujan dan genangan MODIS (skill 0,2–0,3), sedangkan NDVI/NDWI/Sentinel-1 berubah terlalu lambat untuk dikalahkan naive dalam 15 hari, dan UI menyatakannya sebagai keyakinan rendah. Endpoint `GET /api/diagram/forecast` satu deret per request supaya palang progres jujur; grafik data tampil lebih dulu. Hash `#diagram/…` dialihkan ke `#forecast/…`; path API `/api/diagram/*` dan izin `diagram.view` tidak diganti supaya peran, token, dan GRANT yang ada tetap berlaku | Diminta pemilik proyek: fitur Diagram ditingkatkan menjadi forecasting tanpa membuang yang sudah ada |
 | M62 | **Forecast dihitung saat data baru masuk dan disimpan** (9 Okt 2026). Sebelumnya (M61) forecast dihitung saat halaman dibuka dan hanya disimpan di memori proses: hilang saat server restart, dihitung ulang per worker, pengunjung pertama menunggu, dan tidak ada jejak model mana yang dipakai kapan. Sekarang `etl/forecast_store.py` menghitung 110 deret (10 band × rerata AOI + 10 kecamatan) di akhir Job Hidromet, backfill, dan setiap siklus Live, plus job `forecast_refresh` tiap 6 jam sebagai jaring pengaman, di bawah advisory lock `forecast`. Deret dilewati bila **cap data** bandnya tidak berubah. Hasil disimpan di tiga tabel 1NF: `band_forecasts`, `band_forecast_points`, `band_forecast_scores` (riwayat 365 hari). API membaca tabel itu dan hanya menghitung di tempat untuk rentang di masa lalu atau rerata beberapa kecamatan. Terukur: hitung penuh 5,6 s, panggilan tanpa data baru 0,1 s, API 2–17 ms per deret (sebelumnya 25–66 ms). Migrasi `database/migrations/m62_band_forecasts.sql`. Rumus lengkap di PIPELINE.md §14 | Diminta pemilik proyek: forecast harus efisien dan bisa ditelusuri, bukan dihitung ulang setiap halaman dibuka |
+| M63 | **Beranda menjadi Pantau Lokasi; isi Beranda lama menjadi menu Tentang** (16 Okt 2026). Beranda = landing singkat → Pantau lokasi. **Lokasi saya** hanya untuk pengguna yang sudah masuk: bila izin lokasi diberikan dan titik perangkat jatuh di kecamatan AOI, panel kecamatan itu tampil lebih dulu. Pengunjung, perangkat di luar wilayah, izin ditolak, atau peramban tanpa lokasi langsung ke **Informasi lokasi** (daftar + peta kecamatan berwarna status), dan pilihan di sana mengganti kecamatan yang dipantau. Panel pantau: kalimat kondisi + apa yang tidak normal (`etl/lokasi_interpret.py`, ambang tetap dari `etl/live_interpret.py`; setiap kalimat tidak normal dan alert hujan 7 hari ikut menaikkan status), citra scene Live terbaru **dipotong ke kecamatan** (`etl/region_crop.py`, georeferensi `previews.grid`, cache `data/_lokasi_cache`), angka terbaru + rentang biasa (persentil 2–98 setahun) + tren 30 hari. **Angka per kecamatan dibuka ke PUBLIC** lewat VIEW `v_public_lokasi_obs` (30 hari; dua observasi terakhir per band selalu terlihat), `v_public_lokasi_range`, `v_public_lokasi_alert` (tanpa kolom penanganan); USER tetap 365 hari. Endpoint `/api/public/lokasi…`. Geolokasi di `web/js/geo.js`: koordinat tidak dikirim ke server, izin tidak pernah diminta saat halaman dibuka (otomatis hanya bila sudah `granted`), butuh HTTPS. Tentang (`#tentang`) = sambutan, penjelasan, kartu halaman, tema, peta AOI, info aplikasi, sumber data; tab Sistem › Tentang dihapus dan `#sistem/tentang` dialihkan. Alert hujan aktif tidak lagi di halaman pertama sebagai tabel AOI, tetapi per kecamatan (lencana + kalimat). Migrasi DB berjalan: `database/migrations/m63_pantau_lokasi.sql` | Permintaan pemilik proyek: halaman pertama menjawab "bagaimana kondisi di lokasi saya", bukan menjelaskan aplikasi. Membuka angka per kecamatan ke pengunjung mengubah batas M56 (per kecamatan USER+): yang dibuka hanya 30 hari terakhir, sama dengan batas citra publik, dan ditegakkan di VIEW supaya lapis 3 (M14) tetap berlaku. Pencocokan titik di browser, bukan di server, supaya lokasi pengguna tidak pernah tercatat di log API |
+| M64 | **Peringatan email kondisi tidak normal per kecamatan** (19 Okt 2026). **Email dan kecamatan sama-sama opsional**; tanpa salah satunya pengguna tidak menerima peringatan dan tidak ada yang rusak. Email registrasi tidak lagi wajib (mengubah M56). Email disimpan hanya bila lolos pengecekan (`etl/mailer.py`): format, belum dipakai akun lain, domain punya server mail (MX via dnspython), dan email konfirmasi **berhasil dikirim**; gagal = tidak disimpan. Berlaku di Akun saya, registrasi, dan form akun Admin. Kecamatan: tidak ada, beberapa, atau semua (`users.notify_all_regions`, termasuk kecamatan yang ditambahkan kemudian) di `user_notify_regions`. Job `etl/notify.py` jalan setelah Job Hidromet harian dan siklus Live (dan tombol Admin): butir tidak normal dihitung dengan aturan Beranda (`etl/lokasi_data.py`, dipindah dari router agar API dan job memakai pembaca yang sama), dikirim bila tanggal datanya ≤ `notify.max_age_days` (7) hari dan belum ada di `notify_sent` (kunci pengguna × kecamatan × butir × tanggal data) — **setiap data baru yang tidak normal dikirim, data yang sama tidak pernah dua kali**, backfill lampau tidak memicu. Satu email per pengguna per putaran; isi berlapis untuk awam dan analis (Ringkasnya → Bukti: citra dipotong ke kecamatan inline + tabel nilai/ambang/rentang biasa → Detail teknis). `monitor_etl` membaca email hanya lewat `notify_recipients()`. SMTP dari `.env` (`MAIL_*`, standar library `smtplib`); `MAIL_BACKEND=file` menulis `.eml` tanpa mengirim, dan `tests/conftest.py` selalu memakainya. Migrasi DB berjalan: `database/migrations/m64_peringatan_email.sql` | Permintaan pemilik proyek: pengguna perlu tahu tanpa membuka aplikasi bahwa kecamatannya tidak normal, lengkap dengan bukti. Membatalkan butir "notifikasi email" di §8. Pengecekan sengaja sederhana (tanpa tautan verifikasi) atas permintaan pemilik; batasnya — kotak surat yang tidak ada di domain valid baru ketahuan dari pantulan — dicatat di INTERFACE.md. Kunci anti-duplikat per tanggal data, bukan per putaran job, karena siklus Live menghitung ulang semua scene empat kali sehari |
 ---
 
 ## 8. Anti Over-Engineering
 
 Setiap fitur harus lolos salah satu uji: (1) menjawab RM1–RM4, (2) syarat eksplisit tahap DBSDLC, atau (3) requirement role yang disepakati.
 
-**Sengaja tidak dibangun:** prediksi machine learning, OAuth/SSO, refresh token, notifikasi SMS/WhatsApp/email, mobile app, containerization, caching layer, load balancing, integrasi data warga SIGAP DESA, penggabungan dataset lintas AOI, reference layers.
+**Sengaja tidak dibangun:** prediksi machine learning, OAuth/SSO, refresh token, notifikasi SMS/WhatsApp (email **dibangun** sejak M64: peringatan kondisi tidak normal per kecamatan, opsional per pengguna), mobile app, containerization, caching layer, load balancing, integrasi data warga SIGAP DESA, penggabungan dataset lintas AOI, reference layers.
 
 **Utang teknis warisan yang diterima, tidak diperbaiki:** footprint S1 belum tercatat akurat (DataLab D17), dicatat sebagai keterbatasan. (Baris placeholder `NASA_AUX_*` **diperbaiki**, lihat M30.)
 
@@ -293,6 +295,28 @@ python scripts/import_disasters.py kejadian.csv --username <analis>
 # 7. Jalankan
 uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
+
+**Email peringatan (M64).** Isi `MAIL_*` di `.env` (contoh di `.env.example`). Untuk Gmail:
+aktifkan Verifikasi 2 Langkah, lalu buat **Sandi aplikasi** di myaccount.google.com/apppasswords. Isi
+`MAIL_PASSWORD` dengan sandi aplikasi itu (16 huruf tanpa spasi), bukan sandi akun Google. Kuota Gmail
+biasa ±500 penerima per hari. Isi juga `APP_BASE_URL` supaya email memuat tautan ke Beranda dan Akun saya.
+Coba tanpa mengirim apa pun:
+
+```
+python -m etl.notify --once --to-file        # .eml ke logs/mail
+python -m etl.notify --test alamat@anda.id   # satu email uji sungguhan
+```
+
+Tanpa `MAIL_*`, email pengguna tidak bisa disimpan dan tidak ada peringatan; bagian lain aplikasi tetap
+jalan. Peringatan dimatikan sementara lewat `notify.enabled` di Pengaturan aplikasi.
+
+**HTTPS untuk produksi (M63).** "Lokasi saya" di Beranda memakai Geolocation API,
+yang hanya ada di konteks aman: HTTPS, atau `http://localhost` saat
+pengembangan. Diakses lewat `http://<IP-LAN>:8000` dari ponsel, peramban
+menolak lokasi tanpa bertanya dan Beranda langsung ke Informasi lokasi.
+Pasang reverse proxy ber-TLS (nginx, Caddy, atau Cloudflare Tunnel) di depan
+uvicorn. Proxy itu **tidak boleh** mengirim `Permissions-Policy: geolocation=()`;
+bila header itu diatur, pakai `geolocation=(self)`.
 
 Nama DB `sentinel1_flood` warisan DataLab **diganti** menjadi `themonitor` di `.env.example`, `etl/config.py`, dan `database_client.from_env()`.
 

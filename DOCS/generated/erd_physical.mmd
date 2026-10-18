@@ -355,6 +355,15 @@ erDiagram
         text invalid_reason
         timestamptz created_at
     }
+    notify_sent {
+        bigint notify_id PK
+        integer user_id FK
+        integer region_id FK
+        varchar item_key
+        date data_date
+        smallint level
+        timestamptz sent_at
+    }
     processing_jobs {
         bigint job_id PK
         uuid job_uuid UK
@@ -581,6 +590,11 @@ erDiagram
         jsonb detail
         timestamptz logged_at
     }
+    user_notify_regions {
+        integer user_id PK,FK
+        integer region_id PK,FK
+        timestamptz created_at
+    }
     users {
         integer user_id PK
         smallint role_id FK
@@ -596,6 +610,8 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
         varchar email
+        timestamptz email_verified_at
+        boolean notify_all_regions
     }
     administrative_regions ||--o{ administrative_regions : "parent_region_id"
     users ||--o{ alert_events : "acknowledged_by"
@@ -648,6 +664,8 @@ erDiagram
     users ||--o{ nasa_scenes : "invalidated_by"
     regions_of_interest ||--|{ nasa_scenes : "region_id"
     satellite_sources ||--|{ nasa_scenes : "source"
+    administrative_regions ||--|{ notify_sent : "region_id"
+    users ||--|{ notify_sent : "user_id"
     nasa_scenes ||--o{ processing_jobs : "nasa_scene_id"
     satellite_scenes ||--o{ processing_jobs : "scene_id"
     processing_stages ||--|{ processing_jobs : "stage_id"
@@ -671,5 +689,7 @@ erDiagram
     satellite_scenes ||--o{ scene_job_state : "scene_id"
     satellite_sources ||--|{ spectral_bands : "source_id"
     users ||--o{ user_activity_logs : "user_id"
+    administrative_regions ||--|{ user_notify_regions : "region_id"
+    users ||--|{ user_notify_regions : "user_id"
     users ||--o{ users : "created_by"
     roles ||--|{ users : "role_id"

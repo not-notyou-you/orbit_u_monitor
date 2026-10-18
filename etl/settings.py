@@ -36,6 +36,9 @@ DEFAULTS: dict[str, Any] = {
     # M58: berkas raster dataset utama dan scene Live yang lebih tua dari ini
     # dihapus; angka per kecamatan dan metrik scene tetap disimpan.
     "storage.raster_retention_days": 365,
+    # M64: peringatan email. Data lebih tua dari max_age_days (backfill) tidak dikirim.
+    "notify.enabled": True,
+    "notify.max_age_days": 7,
 }
 
 

@@ -41,6 +41,15 @@ INSERT INTO gm_expected VALUES
     ('v_citra_scenes',           'S', 'S',   'S',   'S',   'S',    ''),
     ('v_citra_metrics',          'S', 'S',   'S',   'S',   'S',    ''),
     ('v_citra_obs_aoi',          'S', 'S',   'S',   'S',   'S',    ''),
+    -- Pantau Lokasi di Beranda (M63): angka per kecamatan, batas waktu di VIEW
+    -- etl S: job peringatan email membaca angka yang sama dengan Beranda (M64)
+    ('v_public_lokasi_obs',      'S', 'S',   'S',   'S',   'S',    'S'),
+    ('v_public_lokasi_range',    'S', 'S',   'S',   'S',   'S',    'S'),
+    ('v_public_lokasi_alert',    'S', 'S',   'S',   'S',   'S',    'S'),
+    -- peringatan email (M64): langganan hanya lewat fungsi auth_set_own_notify;
+    -- etl hanya mencatat butir terkirim
+    ('user_notify_regions',      '',  '',    '',    '',    'SID',  ''),
+    ('notify_sent',              '',  '',    '',    '',    'S',    'SI'),
     -- live_areas: PUBLIC hanya GRANT kolom (diuji di bagian 2)
     ('live_areas',               '',  'S',   'S',   'S',   'SIU',  'SIU'),
     ('live_scenes',              '',  'S',   'S',   'S',   'SIU',  'SIU'),
@@ -282,6 +291,18 @@ BEGIN
         ('monitor_etl',     NULL, 'SELECT auth_register_user(''gm_reg'', ''gm_reg@example.org'', ''x'')', 'DENIED'),
         -- Kejadian (M56): PUBLIC hanya lewat VIEW; USER baca tabel tanpa tulis.
         ('monitor_public',  NULL, 'SELECT * FROM disaster_events', 'DENIED'),
+        -- M63: angka per kecamatan hanya lewat VIEW Pantau Lokasi, bukan tabelnya
+        ('monitor_public',  NULL, 'SELECT * FROM region_observations', 'DENIED'),
+        ('monitor_public',  NULL, 'SELECT * FROM v_public_lokasi_obs', 'OK'),
+        ('monitor_public',  NULL, 'SELECT * FROM alert_events', 'DENIED'),
+        -- M64: email pengguna hanya sampai ke ETL lewat notify_recipients();
+        -- pengguna biasa tidak bisa memanggilnya atau membaca langganan orang lain.
+        ('monitor_etl',     NULL, 'SELECT * FROM notify_recipients()', 'OK'),
+        ('monitor_etl',     NULL, 'SELECT email FROM users', 'DENIED'),
+        ('monitor_user',    NULL, 'SELECT * FROM notify_recipients()', 'DENIED'),
+        ('monitor_user',    NULL, 'SELECT * FROM user_notify_regions', 'DENIED'),
+        ('monitor_public',  NULL, 'SELECT auth_set_own_email(''x@example.org'')', 'DENIED'),
+        ('monitor_public',  NULL, 'SELECT auth_email_available(''x@example.org'')', 'OK'),
         ('monitor_user',    NULL, 'SELECT count(*) FROM disaster_events', 'OK'),
         ('monitor_user',    NULL, 'UPDATE disaster_events SET is_verified = true WHERE false', 'DENIED'),
         -- Citra (M56): PUBLIC tidak membaca live_scenes langsung.

@@ -34,12 +34,14 @@ flowchart TB
         dj[Job Dataset<br/>on-demand]
         rp[Laporan periodik]
         fc[Forecast tersimpan]
+        nt[Peringatan email<br/>kondisi tidak normal]
         sch --> hj & lc & rp & fc
+        hj & lc --> nt
     end
     subgraph STORE [Penyimpanan]
         direction LR
         fs[(Filesystem data/<br/>COG, HDF5, PNG, PDF)]
-        db[(PostgreSQL 18 + PostGIS<br/>41 tabel, 19 VIEW<br/>GRANT, RLS, audit)]
+        db[(PostgreSQL 18 + PostGIS<br/>43 tabel, 22 VIEW<br/>GRANT, RLS, audit)]
     end
     subgraph APP [Lapisan aplikasi]
         direction LR
@@ -48,6 +50,8 @@ flowchart TB
     end
     U([Pengguna 5 peran])
     X([Skrip lain via token API])
+    M[(Server SMTP<br/>mis. Gmail)]
+    nt -->|email + bukti| M --> U
     SRC --> ETL
     ETL -->|monitor_etl| db
     ETL --> fs
@@ -81,10 +85,13 @@ flowchart LR
     subgraph I [Internet]
         prov[CDSE, NASA Earthdata]
         cdn[CDN tile peta & DEM]
+        smtp[Server SMTP<br/>STARTTLS 587]
     end
-    br -- HTTP --> api
+    br -- "HTTPS (reverse proxy; wajib untuk lokasi perangkat)" --> api
     br --> cdn
     sch -- HTTPS --> prov
+    sch -- "SMTP: peringatan email" --> smtp
+    api -- "SMTP: email konfirmasi" --> smtp
 </pre></div>
 </div>
 

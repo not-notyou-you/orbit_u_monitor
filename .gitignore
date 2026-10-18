@@ -252,3 +252,6 @@ benchmark/data/
 
 # Bukti tangkapan layar UI (±19 MB) disimpan lokal, tidak di repo
 tests/screenshots/
+
+# Profil browser yang dipakai DOCS/referensi/unduh_pdf.py (cache, cookie, sesi login)
+DOCS/referensi/pdf/.browser/

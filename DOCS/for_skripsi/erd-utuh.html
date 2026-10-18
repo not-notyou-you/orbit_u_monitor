@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ERD Utuh per Modul</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/data.js"></script>
+<script src="assets/erdsvg.js"></script>
+<script src="assets/common.js"></script>
+<style>
+  .ctl { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; background: var(--paper); border: 1px solid var(--line);
+         border-radius: 8px; padding: 10px 14px; font-size: 13.5px; position: sticky; top: 0; z-index: 5; }
+  .ctl button { font: 13px var(--sans); border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 4px 10px; border-radius: 5px; cursor: pointer; }
+  .sw { display: inline-block; width: 14px; height: 14px; vertical-align: -2px; margin-right: 6px; border-radius: 3px; }
+  .fig .body.big { max-height: 85vh; overflow: auto; }
+</style>
+</head>
+<body data-bab="4">
+<main>
+<header class="page">
+  <div class="stage">DBSDLC 4b–4c · ERD keseluruhan</div>
+  <h1>ERD utuh dan ERD per modul</h1>
+  <p class="lede" id="lede"></p>
+</header>
+
+<h2>Saran pembagian modul</h2>
+<p>Basis data dibagi menjadi <b>6 modul</b>. Dasarnya tiga hal: (1) tabel dalam satu modul melayani satu pertanyaan bisnis yang sama,
+(2) relasi di dalam modul lebih banyak daripada relasi keluar, dan (3) setiap modul bisa dikaitkan ke rumusan masalah RM1–RM4.
+Modul rujukan (M2) diletakkan di tengah ERD utuh karena paling banyak dirujuk modul lain.</p>
+<div class="fig" data-kind="Tabel" data-cap="Pembagian modul basis data">
+<div class="body"><table class="t" id="mods"></table></div>
+</div>
+
+<h2>Hubungan antarmodul</h2>
+<div class="fig" data-cap="Peta hubungan antarmodul (angka = jumlah foreign key antarmodul)" data-from="Katalog PostgreSQL">
+<div class="body white" id="overview"></div>
+</div>
+
+<div class="ctl">
+  <b>Tampilan ERD:</b>
+  <label><input type="radio" name="mode" value="keys" checked> kolom kunci saja (PK, FK, UK)</label>
+  <label><input type="radio" name="mode" value="all"> semua kolom</label>
+  <label><input type="checkbox" id="book" checked> sembunyikan FK pencatat (created_by, updated_by, invalidated_by, generated_by, verified_by)</label>
+  <button id="reset">Kembalikan tata letak awal</button>
+  <span style="color:var(--muted)">Geser tabel atau judul modul dengan mouse untuk merapikan garis; posisi diingat peramban.</span>
+</div>
+
+<h2>ERD utuh</h2>
+<div class="fig" data-cap="ERD fisik keseluruhan basis data Orbit-U: The Monitor, diwarnai per modul" data-from="Katalog PostgreSQL database themonitor">
+<div class="body white big" id="whole"></div>
+</div>
+
+<h2>ERD per modul</h2>
+<p>Tabel modul lain yang berelasi ditampilkan dengan garis putus-putus dan hanya kolom yang terlibat; kode modulnya tertulis di pojok kanan atas.</p>
+<div id="permod"></div>
+
+<script>
+window.pageInit = function () {
+  const D = window.SKRIPSI_DATA, M = ERDSVG.MODULES, esc = Skripsi.esc;
+  const nT = Object.keys(D.tables).length;
+  const covered = M.flatMap((m) => m.tables);
+  const missing = Object.keys(D.tables).filter((t) => !covered.includes(t));
+  document.getElementById("lede").innerHTML = `Satu ERD utuh untuk ${nT} tabel dan ${D.rels.length} foreign key, dengan warna berbeda untuk setiap modul,
+    ditambah ERD per modul dengan warna yang sama. Semua digambar langsung dari skema yang berjalan.` +
+    (missing.length ? ` <b style="color:#b3261e">Tabel belum masuk modul: ${missing.join(", ")}</b>` : "");
+
+  const relCount = (m) => {
+    let inside = 0, out = 0;
+    D.rels.forEach((r) => {
+      const a = m.tables.includes(r.parent), b = m.tables.includes(r.child);
+      if (a && b) inside++; else if (a || b) out++;
+    });
+    return [inside, out];
+  };
+  const rm = { M1: "RM4", M2: "RM1", M3: "RM1, RM2", M4: "RM1, RM2", M5: "RM1, RM3", M6: "RM1, RM3" };
+  document.getElementById("mods").innerHTML = "<tr><th>Modul</th><th>Warna</th><th>Tabel</th><th class=c>Jumlah</th><th class=c>Relasi dalam / keluar</th><th class=c>RM</th><th>Fungsi</th></tr>" +
+    M.map((m) => { const [i, o] = relCount(m); return `<tr><td><b>${m.id}</b> ${m.name}</td><td><span class="sw" style="background:${m.color}"></span><code>${m.color}</code></td>
+      <td>${m.tables.map((t) => `<code>${t}</code>`).join(", ")}</td><td class=c>${m.tables.length}</td><td class=c>${i} / ${o}</td><td class=c>${rm[m.id]}</td><td>${esc(m.desc)}</td></tr>`; }).join("") +
+    `<tr class=sub><td>Total</td><td></td><td></td><td class=c>${covered.length}</td><td class=c>${D.rels.length} FK</td><td></td><td></td></tr>`;
+
+  // peta antarmodul
+  (function overview() {
+    const NS = "http://www.w3.org/2000/svg";
+    const el = (t, a, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.append(e); return e; };
+    const BW = 270, BH = 64, GX = 340, GY = 150;
+    const W = GX * 2 + BW + 40, H = GY * (ERDSVG.GRID.length - 1) + BH + 40;
+    const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, "font-family": "Arial, sans-serif" });
+    el("rect", { width: W, height: H, fill: "#fff" }, svg);
+    const pos = {};
+    ERDSVG.GRID.forEach((row, r) => row.forEach((id, c) => (pos[id] = { x: 20 + c * GX, y: 20 + r * GY })));
+    const pair = {};
+    D.rels.forEach((r) => {
+      const a = ERDSVG.MOD_OF[r.parent], b = ERDSVG.MOD_OF[r.child];
+      if (!a || !b || a === b) return;
+      const k = [a.id, b.id].sort().join("-");
+      pair[k] = (pair[k] || 0) + 1;
+    });
+    Object.entries(pair).forEach(([k, n]) => {
+      const [a, b] = k.split("-"), A = pos[a], B = pos[b];
+      const x1 = A.x + BW / 2, y1 = A.y + BH / 2, x2 = B.x + BW / 2, y2 = B.y + BH / 2;
+      el("line", { x1, y1, x2, y2, stroke: "#9aa0a6", "stroke-width": 1 + Math.min(n, 8) * 0.6 }, svg);
+      const mx = x1 + (x2 - x1) * 0.5, my = y1 + (y2 - y1) * 0.5 + (Math.abs(y2 - y1) < 2 && Math.abs(x2 - x1) > GX + 10 ? -12 : 0);
+      el("circle", { cx: mx, cy: my, r: 11, fill: "#fff", stroke: "#9aa0a6" }, svg);
+      const t = el("text", { x: mx, y: my + 4, "text-anchor": "middle", "font-size": 11, "font-weight": "bold" }, svg); t.textContent = n;
+    });
+    M.forEach((m) => {
+      const p = pos[m.id];
+      el("rect", { x: p.x, y: p.y, width: BW, height: BH, rx: 8, fill: m.tint, stroke: m.color, "stroke-width": 2 }, svg);
+      el("rect", { x: p.x, y: p.y, width: 10, height: BH, fill: m.color }, svg);
+      const t1 = el("text", { x: p.x + 20, y: p.y + 26, "font-size": 13, "font-weight": "bold", fill: m.color }, svg); t1.textContent = `${m.id} ${m.name}`;
+      const t2 = el("text", { x: p.x + 20, y: p.y + 46, "font-size": 11.5, fill: "#333" }, svg); t2.textContent = `${m.tables.length} tabel`;
+    });
+    document.getElementById("overview").append(svg);
+  })();
+
+  const state = () => ({ mode: document.querySelector("input[name=mode]:checked").value, hideBook: document.getElementById("book").checked });
+  const key = (base, s) => `v6.${base}.${s.mode}.${s.hideBook ? 1 : 0}`;
+
+  // siapkan wadah ERD per modul sekali, supaya penomoran gambar tetap
+  const permod = document.getElementById("permod");
+  M.forEach((m) => {
+    const fig = document.createElement("div");
+    fig.className = "fig"; fig.dataset.cap = `ERD modul ${m.id} ${m.name}`; fig.dataset.from = "Katalog PostgreSQL";
+    fig.innerHTML = `<div class="body white" id="erd-${m.id}"></div>`;
+    permod.append(fig);
+  });
+
+  function draw() {
+    const s = state();
+    ERDSVG.render(document.getElementById("whole"), { tables: covered, mode: s.mode, hideBook: s.hideBook, key: key("whole", s), layout: ERDSVG.layoutWhole });
+    M.forEach((m) => {
+      ERDSVG.render(document.getElementById("erd-" + m.id), {
+        tables: m.tables, ext: ERDSVG.externals(m, s.hideBook), mode: s.mode, hideBook: s.hideBook, key: key(m.id, s),
+        layout: ERDSVG.layoutOne(m), legendModules: [m, ...M.filter((x) => x !== m && Object.keys(ERDSVG.externals(m, s.hideBook)).some((t) => x.tables.includes(t)))],
+      });
+    });
+  }
+  document.querySelectorAll("input[name=mode], #book").forEach((i) => (i.onchange = draw));
+  document.getElementById("reset").onclick = () => {
+    const s = state();
+    ERDSVG.reset(key("whole", s)); M.forEach((m) => ERDSVG.reset(key(m.id, s)));
+    draw();
+  };
+  draw();
+};
+</script>
+</main>
+</body>
+</html>

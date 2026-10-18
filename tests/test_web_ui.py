@@ -3,8 +3,9 @@
 Tidak menjalankan browser (lihat tests/ui/screenshots.py untuk itu). Yang diuji:
 * setiap tujuan dan tab router (js/app.js) punya fragmen pages/*.html dan skrip
   js/*.js, dan keduanya tersaji lewat FastAPI;
-* susunan halaman = rancangan pemilik proyek (M56): Beranda, 3D AOI, Citra,
-  Forecast (dulu Diagram, M61), Kejadian, Data, Laporan, Sistem;
+* susunan halaman = rancangan pemilik proyek (M56): Beranda (Pantau Lokasi,
+  M63), Tentang (M63), 3D AOI, Citra, Forecast (dulu Diagram, M61), Kejadian,
+  Data, Laporan, Sistem;
 * hash susunan lama (M53 dan sebelumnya) masih dipetakan ALIASES;
 * setiap kode error yang dilempar API punya terjemahan Indonesia di js/ui.js (M21);
 * fragmen tidak memuat border-radius / blur / emoji (DESIGN.md §2, §6, §8);
@@ -26,12 +27,13 @@ WEB = ROOT / "web"
 
 # Halaman entry di luar aplikasi: Masuk dan Daftar (INTERFACE §2 halaman 0 dan -0).
 PUBLIC_PAGES = {"/masuk": "login", "/daftar": "register"}
-# Delapan halaman rancangan pemilik proyek (INTERFACE §2, M56).
-DESTINATIONS = {"beranda", "aoi-3d", "citra", "forecast", "kejadian", "data", "laporan", "sistem"}
+# Sembilan halaman rancangan pemilik proyek (INTERFACE §2, M56; Tentang jadi menu sendiri, M63).
+DESTINATIONS = {"beranda", "tentang", "aoi-3d", "citra", "forecast", "kejadian", "data", "laporan", "sistem"}
 # Hash susunan lama yang harus tetap hidup lewat ALIASES (M53 dan sebelumnya).
 LEGACY_HASHES = {"diagram", "kondisi", "kondisi/citra", "kondisi/kecamatan", "kondisi/relief", "riwayat",
                  "riwayat/grafik", "riwayat/laporan", "pengaturan", "pengaturan/akses", "akun",
-                 "pantauan", "hari-ini", "statistik", "analitik", "katalog", "buat-dataset", "admin"}
+                 "pantauan", "hari-ini", "statistik", "analitik", "katalog", "buat-dataset", "admin",
+                 "sistem/tentang"}
 
 APP_JS = (WEB / "js" / "app.js").read_text(encoding="utf-8")
 
@@ -156,8 +158,9 @@ def test_entry_pages_load_theme_before_body():
         for key in THEMES - {"o95"}:
             assert f"css/tema/{key}.css" in head, (f, key)
         assert head.index("css/tema/umum.css") > head.index("css/pages.css"), f
-    home = (WEB / "pages" / "home.html").read_text(encoding="utf-8")
-    assert 'id="hoThemes"' in home and "css/tema/pilihan.css" in (WEB / "app.html").read_text(encoding="utf-8")
+    # Pilihan tema pindah bersama isi Beranda lama ke Tentang (M63).
+    about = (WEB / "pages" / "about.html").read_text(encoding="utf-8")
+    assert 'id="abThemes"' in about and "css/tema/pilihan.css" in (WEB / "app.html").read_text(encoding="utf-8")
 
 
 def test_no_token_in_local_storage():
@@ -170,7 +173,7 @@ def test_no_token_in_local_storage():
 
 def test_entry_pages_served(api_client):
     for path in ("/", "/masuk", "/daftar", "/app", "/pages/login.html", "/pages/register.html", "/js/app.js",
-                 "/js/home.js", "/js/citra-state.js", "/css/main.css", "/css/pages.css", "/css/terrain3d.css",
+                 "/js/home.js", "/js/about.js", "/js/geo.js", "/js/citra-state.js", "/css/main.css", "/css/pages.css", "/css/terrain3d.css",
                  "/js/theme.js", "/css/tema/umum.css", "/css/tema/pilihan.css",
                  "/assets/img/favicon.svg", "/assets/img/logo.svg"):
         r = api_client.get(path)
