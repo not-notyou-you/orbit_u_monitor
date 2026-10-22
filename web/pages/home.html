@@ -7,6 +7,7 @@
        Informasi lokasi tampil lebih dulu dan panel pantau di bawahnya, untuk
        kecamatan yang dipilih.
      Panel pantau (#hoPantau) satu elemen yang dipindah js/home.js ke tempatnya.
+     Tema tampilan (#hoTheme) selalu paling bawah.
      Isi beranda sebelum M63 ada di Tentang (#tentang). -->
 
 <!-- landing -->
@@ -73,4 +74,12 @@
     (persentil 2–98 setahun terakhir). Tren 30 hari: pita = rentang biasa.</p>
   <div class="readouts pl-stats" id="hoStats"></div>
   <div class="deck" id="hoTrend" style="margin-top:8px"></div>
+</fieldset>
+
+<!-- tema tampilan (M57): empat pilihan, Kertas Mint bawaan -->
+<fieldset id="hoTheme">
+  <legend id="hoThemeLegend">Tema tampilan</legend>
+  <div class="tema-pick" id="hoThemes" role="radiogroup" aria-labelledby="hoThemeLegend"></div>
+  <p class="tema-pick-note">Hanya mengubah tampilan; isi, data, dan menu tetap sama.
+    Pilihan disimpan di peramban ini dan berlaku di semua halaman.</p>
 </fieldset>

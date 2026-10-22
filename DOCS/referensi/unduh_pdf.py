@@ -26,6 +26,7 @@ Keluaran (default di folder pdf/ di samping file RIS):
 Jalankan ulang kapan saja: PDF yang sudah ada dan valid dilewati.
 """
 import argparse
+import base64
 import csv
 import logging
 import os
@@ -187,6 +188,20 @@ def s_crossref(doi, judul, cfg):
             or ln.get("intended-application") == "text-mining"]
 
 
+def s_sciencedirect(doi, judul, cfg):
+    """Elsevier: PII dari Crossref -> URL PDF ScienceDirect (terbuka bila OA / akses kampus;
+    biasanya perlu --browser karena Cloudflare)."""
+    if not (doi or "").startswith("10.1016/"):
+        return []
+    j = get_json("sciencedirect", f"https://api.crossref.org/works/{quote(doi)}")
+    for ln in ((j or {}).get("message") or {}).get("link") or []:
+        m = re.search(r"PII:(S[0-9X]+)", ln.get("URL") or "")
+        if m:
+            return [f"https://www.sciencedirect.com/science/article/pii/{m.group(1)}"
+                    "/pdfft?isDTMRedir=true&download=true"]
+    return []
+
+
 def s_mdpi(doi, judul, cfg):
     """MDPI memblokir www.mdpi.com untuk skrip (403), tapi CDN mdpi-res.com tidak.
     DOI 10.3390/rs17081368 -> remotesensing-17-01368.pdf (vol 17, issue 08, artikel 1368)."""
@@ -317,7 +332,7 @@ def s_scholar(doi, judul, cfg):
 
 SUMBER = [
     ("mdpi", s_mdpi), ("unpaywall", s_unpaywall), ("openalex", s_openalex), ("semantic", s_semantic),
-    ("crossref", s_crossref), ("europepmc", s_europepmc), ("core", s_core),
+    ("crossref", s_crossref), ("sciencedirect", s_sciencedirect), ("europepmc", s_europepmc), ("core", s_core),
     ("doaj", s_doaj), ("zenodo", s_zenodo), ("arxiv", s_arxiv),
     ("semantic-judul", s_semantic_judul), ("doi", s_doi), ("scholar", s_scholar),
 ]
@@ -454,6 +469,8 @@ def buka_browser(cfg):
     cfg.ctx = cfg.pw.chromium.launch_persistent_context(
         str(cfg.profil), headless=False, accept_downloads=True,
         args=["--disable-blink-features=AutomationControlled"])
+    # Tab penjaga: menutup tab terakhir menutup seluruh Chromium (dan cookie-nya).
+    cfg.penjaga = cfg.ctx.pages[0] if cfg.ctx.pages else cfg.ctx.new_page()
 
 
 def unduh_browser(url, tujuan, cfg):
@@ -473,6 +490,32 @@ def unduh_browser(url, tujuan, cfg):
                 pdf.update(data=resp.body(), url=resp.url)
             except Exception:
                 pass
+
+    def selesai():
+        """Tangkapan dari penampil PDF Chrome kadang cuma stub kecil; ambil ulang pakai cookie browser."""
+        if len(pdf["data"]) < MIN_PDF:
+            # fetch() dari dalam halaman: lewat jaringan browser asli, lolos Cloudflare
+            try:
+                b64 = page.evaluate("""async u => {
+                    const r = await fetch(u, {credentials: 'include'});
+                    const b = new Uint8Array(await r.arrayBuffer());
+                    let s = ''; for (let i = 0; i < b.length; i += 32768)
+                        s += String.fromCharCode.apply(null, b.subarray(i, i + 32768));
+                    return btoa(s);
+                }""", pdf["url"])
+                data = base64.b64decode(b64)
+                if data[:5] == b"%PDF-":
+                    pdf["data"] = data
+            except Exception as ex:
+                log.debug("      fetch dalam halaman gagal: %s", ex)
+            if len(pdf["data"]) < MIN_PDF:
+                try:
+                    r = cfg.ctx.request.get(pdf["url"], timeout=60_000)
+                    if r.ok and r.body()[:5] == b"%PDF-":
+                        pdf["data"] = r.body()
+                except Exception:
+                    pass
+        return pdf["url"], simpan_pdf(pdf["data"], tujuan)
 
     def unduhan(dl):
         tmp = tujuan.with_suffix(".dl")
@@ -512,7 +555,7 @@ def unduh_browser(url, tujuan, cfg):
     try:
         buka(url)
         if tunggu_pdf(3):
-            return pdf["url"], simpan_pdf(pdf["data"], tujuan)
+            return selesai()
         if kena_tantangan():
             log.info("      >>> CAPTCHA di browser! Selesaikan di jendela Chromium "
                      "(menunggu s/d %d detik)", cfg.tunggu)
@@ -528,14 +571,21 @@ def unduh_browser(url, tujuan, cfg):
                     break
                 page.wait_for_timeout(1000)
             if tunggu_pdf(3):
-                return pdf["url"], simpan_pdf(pdf["data"], tujuan)
+                return selesai()
             if kena_tantangan():
                 raise Gagal("browser: CAPTCHA tidak terselesaikan")
+        try:
+            page.wait_for_load_state("networkidle", timeout=15_000)
+        except Exception:
+            pass
         links = page.evaluate(r"""() => {
             const m = document.querySelector('meta[name=citation_pdf_url]');
             const a = [...document.querySelectorAll('a[href]')].map(x => x.href).filter(h =>
               /\.pdf($|\?)|\/article\/download\/|\/pdfft|\/doi\/pdf\/|\/epdf\/|stamp\.jsp|\/article\/pdf/i.test(h));
-            return [...new Set([m && m.content].concat(a).filter(Boolean))].slice(0, 6);
+            const dom = h => { try { return new URL(h).hostname.split('.').slice(-2).join('.'); } catch (e) { return ''; } };
+            const sini = dom(location.href);
+            const b = a.filter(h => dom(h) === sini);
+            return [...new Set([m && m.content].concat(b).filter(Boolean))].slice(0, 6);
         }""")
         log.debug("      link PDF di halaman: %s", links)
         for ln in links:
@@ -551,9 +601,9 @@ def unduh_browser(url, tujuan, cfg):
             buka(ln)
             if tunggu_pdf(8):
                 break
-        if not pdf:
+        if not pdf and not tunggu_pdf(10):  # redirect PDF lambat (mis. ScienceDirect pdfft)
             raise Gagal("browser: tidak menemukan PDF di halaman")
-        return pdf["url"], simpan_pdf(pdf["data"], tujuan)
+        return selesai()
     except Gagal:
         raise
     except Exception as ex:

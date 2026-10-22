@@ -1,10 +1,11 @@
 // web/js/theme.js — pilihan tema tampilan (M57).
 //
-// Empat tema: Orbital 95 (bawaan, DESIGN.md) dan tiga tema dari konsep
+// Empat tema: Orbital 95 (tema dasar, DESIGN.md) dan tiga tema dari konsep
 // DOCS/design tambahan/ (konsep38 → Kertas Mint, konsep41 → Mika Pasir,
-// konsep44 → Piksel Marun). Tema hanya mengganti tampilan: struktur halaman,
-// router, dan data tidak berubah. CSS-nya ada di css/tema/ dan seluruhnya
-// tercakup html[data-theme="…"], jadi Orbital 95 tetap persis seperti dulu.
+// konsep44 → Piksel Marun). Kertas Mint dipakai bila peramban belum punya
+// pilihan. Tema hanya mengganti tampilan: struktur halaman, router, dan data
+// tidak berubah. CSS-nya ada di css/tema/ dan seluruhnya tercakup
+// html[data-theme="…"], jadi Orbital 95 tetap persis seperti dulu.
 //
 // Dimuat di <head> SEBELUM <body> diurai, supaya atribut data-theme sudah ada
 // saat halaman pertama kali digambar (tanpa kedipan tema bawaan). Pilihan
@@ -12,11 +13,14 @@
 'use strict';
 (function () {
   const KEY = 'orbit-u.tema';
-  const DEFAULT = 'o95';
+  // BASE = tema tanpa css/tema/ (tanpa kelas tema-alt); DEFAULT = tema yang
+  // dipakai bila belum ada pilihan tersimpan.
+  const BASE = 'o95';
+  const DEFAULT = 'mint';
   const LIST = [
-    { key: 'o95', name: 'Orbital 95', note: 'bawaan',
+    { key: 'o95', name: 'Orbital 95',
       desc: 'Jendela abu-abu berbevel ala Windows 95; data di layar CRT hijau.' },
-    { key: 'mint', name: 'Kertas Mint',
+    { key: 'mint', name: 'Kertas Mint', note: 'bawaan',
       desc: 'Kertas berpetak mint, garis navy tegas, dan bayangan keras.',
       font: 'Nunito:wght@400;600;700;800' },
     { key: 'pasir', name: 'Mika Pasir',
@@ -43,11 +47,11 @@
   }
 
   function apply(key) {
-    const t = LIST.find(x => x.key === key) || LIST[0];
+    const t = LIST.find(x => x.key === key) || LIST.find(x => x.key === DEFAULT);
     const html = document.documentElement;
     html.dataset.theme = t.key;
     // Satu kelas untuk semua tema non-bawaan: struktur bersama css/tema/umum.css.
-    html.classList.toggle('tema-alt', t.key !== DEFAULT);
+    html.classList.toggle('tema-alt', t.key !== BASE);
     loadFont(t);
     return t.key;
   }

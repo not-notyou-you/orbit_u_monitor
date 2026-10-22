@@ -1,0 +1,175 @@
+NOTULEN WAWANCARA GMLS (Gugus Mitigasi Lebak Selatan)
+=====================================================
+
+Tanggal & tempat : 16 Oktober 2026, daring melalui Zoom Meeting
+Narasumber       : Anis Faisal Reza ("Abah Lala"), Ketua dan pendiri GMLS
+Bentuk           : wawancara singkat, tanpa rekaman; catatan ditulis cepat
+                   lalu dirapikan ulang dan dikonfirmasi pewawancara.
+
+Profil singkat GMLS (dari profil resmi, lampiran profil.jpeg)
+- Komunitas masyarakat lokal, berdomisili di Desa Panggarangan, Kecamatan
+  Panggarangan, Kabupaten Lebak, bergerak di bidang mitigasi bencana.
+- Wilayah Lebak Selatan multi-bahaya: banjir, pergerakan tanah, longsor,
+  gempa, dan tsunami; perhatian utama pada potensi gempa-tsunami di selatan Jawa.
+- GMLS resmi berdiri 13 Oktober 2020; Abah Lala memulai kegiatannya sejak 2015.
+- Inisiasi GMLS dipromosikan oleh U-Inspire Indonesia.
+- 5 November 2020 (World Tsunami Awareness Day): Desa Panggarangan dicanangkan
+  sebagai salah satu dari 7 desa di Indonesia yang diusulkan mendapat
+  pengakuan Tsunami Ready dari IOC-UNESCO.
+
+
+A. PROFIL DAN KERJA SAMA
+------------------------
+
+P: Sejak kapan terlibat di GMLS, dan apa tantangan kerjanya?
+J: Abah Lala memulai kegiatan mitigasi di Lebak Selatan sejak 2015, sebelum
+   GMLS resmi berdiri pada 2020.
+   Mitigasi bencana tidak sesederhana mengajar dan mengedukasi masyarakat.
+   Masalahnya mencakup infrastruktur, ekonomi, edukasi, dan teknologi.
+
+P: Bagaimana bentuk kerja sama GMLS dengan UMN?
+J: Kerja sama resmi melalui LPPM dengan MoU ke UMN. Kolaborasi dipimpin
+   Fakultas Teknik dan Informatika (FTI) dan didukung sangat besar oleh
+   Fakultas Ilmu Komunikasi (FIKOM).
+
+P: Proyek apa saja yang sedang/akan diluncurkan bersama UMN?
+J: Payung kerja samanya "Humanity Project GMLS x UMN", berisi:
+   1. SIGAP DESA - web sistem informasi geografis untuk pendataan penduduk
+      di daerah rawan bencana.
+   2. GMLS Logify - aplikasi mobile manajemen pengungsian dan logistik di
+      daerah bencana.
+   3. Are You In Sys - aplikasi mobile
+      yang menyalurkan informasi dari berbagai lembaga pemerintah ke desa.
+      Datanya dari BMKG, termasuk radar cuaca dan prediksi cuaca, dan sudah
+      punya fitur pelaporan bencana.
+   4. GMLS Info Hub - website rujukan informasi resmi dan valid tentang GMLS.
+
+P: Prinsip apa yang GMLS pegang dalam kerja sama dengan kampus?
+J: Jangan melihat masyarakat hanya sebagai objek penelitian.
+
+
+B. SISTEM YANG BERJALAN SEKARANG
+--------------------------------
+
+P: Bencana apa yang menjadi fokus pemantauan GMLS?
+J: Gempa bumi dan tsunami, serta aliran sungai (banjir).
+
+P: Dari mana GMLS mendapat informasi cuaca dan bencana?
+J: Dari lembaga pemerintah, terutama BMKG (termasuk radar cuaca), yang
+   disalurkan lewat aplikasi Are You In Sys.
+
+P: Apa peran GMLS dalam peringatan bencana?
+J: GMLS hanya memberi peringatan. GMLS tidak membuat pernyataan atau
+   penetapan status bencana; untuk itu GMLS mengikuti pemerintah.
+
+P: Bagaimana kejadian bencana dicatat sekarang?
+J: GMLS sejauh ini tidak melakukan pendataan kejadian sendiri. Data
+   kejadian 5 tahun ke belakang tersedia dari lembaga resmi pemerintah,
+   lengkap dengan jumlah korban dan warga terdampak. Lembaga dan jenis
+   datanya belum sempat disebutkan.
+
+
+C. MASALAH YANG DIRASAKAN
+-------------------------
+
+P: Bagaimana kualitas data bencana dari pemerintah?
+J: Narasumber (Abah Lala) sudah memeriksa data bencana BNPB dan menilai datanya sangat
+   tidak rapi/tidak konsisten ("serampangan").
+
+
+D. MASUKAN UNTUK SISTEM ORBIT-U: THE MONITOR
+--------------------------------------------
+
+P: Apa tanggapan GMLS terhadap sistem yang diusulkan?
+J: 1. Fungsinya sejalan (beririsan) dengan aplikasi Are You In Sys yang
+      sudah menampilkan prediksi cuaca dan pelaporan bencana.
+   2. Satelit Himawari seharusnya lebih cepat (citra tiap ~10 menit),
+      diusulkan untuk dipakai; akan dicoba dicari tahu bersama.
+   3. Pengguna umumnya hanya ingin tahu keamanan dirinya di lokasinya saat
+      itu, tidak perlu kondisi satu daerah. Informasi sebaiknya berdasarkan
+      lokasi pengguna.
+
+
+E. CATATAN UNTUK PENGEMBANGAN (tafsiran pencatat, bukan ucapan narasumber)
+-------------------------------------------------------------------------
+- Istilah di sistem harus tetap "peringatan", bukan "penetapan/status
+  bencana", sesuai posisi GMLS.
+- Rencana impor ~100 kejadian dari GMLS perlu ditinjau: GMLS tidak punya
+  catatan sendiri; sumbernya data pemerintah yang dinilai tidak rapi.
+- Perlu kejelasan pembagian peran dengan Are You In Sys agar tidak
+  tumpang tindih.
+- Himawari dan peringatan berbasis lokasi pengguna menjadi kandidat
+  pengembangan berikutnya.
+- Fokus GMLS (gempa-tsunami) berbeda dari fokus sistem (hujan, banjir,
+  longsor); perlu disebut sebagai batasan.
+
+Status pertanyaan instrumen yang belum ditanyakan (disaring 22 Okt 2026)
+-----------------------------------------------------------------------
+Dianggap TERJAWAB oleh jawaban lain:
+- Sumber data kejadian: GMLS tidak mencatat sendiri dan merujuk data
+  pemerintah (bagian B). Data diambil peneliti langsung dari sumber resmi
+  (BNPB/BPBD Lebak), jadi lembaganya tidak perlu ditanyakan.
+- Alur peringatan: informasi dari BMKG lewat Are You In Sys; GMLS hanya
+  memberi peringatan dan mengikuti pemerintah (bagian B).
+- Ambang hujan 50/100/150 mm: itu ambang BMKG, lembaga yang diikuti GMLS.
+- Ambang longsor: GMLS tidak menetapkan ambang sendiri; diisi dari
+  literatur/pemerintah, bukan dari GMLS.
+- Jenis bencana: fokus gempa-tsunami dan banjir (bagian B); sistem ini
+  mencakup hidrometeorologi, dicatat sebagai batasan.
+- Wilayah kerja: Lebak Selatan, berbasis Desa/Kec. Panggarangan (profil);
+  AOI sistem = 10 kecamatan Lebak Selatan (asumsi peneliti).
+
+TIDAK PERLU ditanyakan:
+- Legalitas GMLS: tidak diperlukan; GMLS bermitra resmi dengan UMN
+  (MoU melalui LPPM) dan objek studi sudah disetujui program studi.
+- Isian formulir kejadian, verifikasi kejadian, isi laporan rutin: GMLS
+  tidak mencatat kejadian dan tidak membuat laporan rutin sendiri.
+  Data resmi pemerintah dianggap terverifikasi oleh sumbernya.
+- Batas data untuk publik dan frekuensi pemantauan: keputusan rancangan,
+  tidak bergantung pada jawaban GMLS.
+
+MASIH DITANYAKAN (cukup di awal sesi UAT, +/- 5 menit):
+1. Pembagian 5 peran (Pengunjung, Relawan, Analis, Data Engineer,
+   Administrator): siapa di GMLS yang cocok di tiap peran? Jawabannya
+   sekaligus menentukan peserta UAT.
+2. (konfirmasi peta) Apakah 10 kecamatan di peta AOI sudah sesuai wilayah
+   kerja GMLS?
+
+
+LAMPIRAN: CATATAN MENTAH (asli, tidak diubah)
+---------------------------------------------
+sejah berkecimpuing di 2015 tidak sesederhana mengajar dan mengedukasi masyarakat
+
+maslah nya bisa mencakup infrastruktur, ekonomi, edukasi, dan teknilogi
+
+bekerjasama melalui LPPM dan MoU ke UMN
+
+project kerja sama humanity project GMLS x UMN yang akan di luncurkan :
+
+web informasi geografis pendataan penduduk di daerah rawan, SIGAP DESA
+
+mobile app, GLMS logify, manajemen pengungsian dan logistik daerah bencana
+
+mobile app, are you insys, menyediakan infromasi dari berbagai lembaga pemerintah ke desa
+
+GLMS info hub, website rujukan informasi valid mengenai GLMS
+
+kolaborasi di pimpin oleh FTI di dukung sangat besar oleh FiKom
+
+jangan melihat masyarakat hanya sebagai objek penelitian
+
+ini inline dengan aplikasi are you insys untuk melihat prediksi cuaca, di sana sudah ada pelaporan bencana
+
+abah lala sudah cek ke BNPB, data bencana mereka sangat serampangan
+
+satelit himawari harus nya lebih cepet, gimana kalau pakai itu, nanti kita coba cari tau
+
+fokus ke gempa bumi dan tsunami, aliran sungai
+
+are you insys, dapat dari data BMKG, ada radar cuaca
+
+lokasi pengguna di saat itu bagaimana berdasarkan data yang di dapat, pengguna hanya ingin tau keamanan diri saja tidak perlu satu daerah nya
+
+GMLS hanya akan memberi peringatan bukan pernyataan ataupun penetapan bencana, GLMS mengikuti dari pemerintah saja
+
+untuk pencatatan nya bencana nya bagaimana ? data 5 tahun kebelakang ada, ada korban dan terdampak, sejauh ini tidak ada pendataan sendiri

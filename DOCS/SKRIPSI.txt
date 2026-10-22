@@ -92,6 +92,7 @@ sistem.
 Data conversion and loading merupakan tahapan untuk mentransfer semua data yang ada ke dalam basis data baru dan
 mengonversi aplikasi yang ada untuk dijalankan pada basis data yang baru. Tahapan ini hanya diperlukan ketika sistem
 basis data yang baru mengganti sistem basis data yang lama.
+
  Testing
 Testing merupakan proses untuk menjalankan sistem basis data dengan maksud menemukan kesalahan karena sebelum
 digunakan sistem basis data yang baru dikembangkan harus diuji secara menyeluruh. Contoh kriteria yang dapat
@@ -101,6 +102,7 @@ b) Kinerja sistem dengan praktik kerja pengguna (Performance)
 c) Toleransi sistem terhadap kesalahan pengguna (Robustness)
 d) Dapat dipulihkan (Recoverability)
 e) Mudah beradaptasi (Adaptability)
+
 Versi: 1.1 © Program Studi Sistem Informasi - UMN
 B. Metode Penelitian
  Metode Pengumpulan Data

@@ -128,10 +128,12 @@ def _selectors(css: str) -> list[str]:
     return [s.strip() for s in re.findall(r"([^{}]+)\{", css) if s.strip()]
 
 
-def test_themes_listed_with_orbital95_default():
-    """Empat tema (M57); Orbital 95 tetap bawaan bila belum ada pilihan."""
+def test_themes_listed_with_mint_default():
+    """Empat tema (M57); Kertas Mint bawaan bila belum ada pilihan (M65).
+    Orbital 95 tetap tema dasar: satu-satunya tanpa kelas tema-alt."""
     assert set(re.findall(r"\{ key: '([\w-]+)'", THEME_JS)) == THEMES
-    assert "const DEFAULT = 'o95';" in THEME_JS
+    assert "const DEFAULT = 'mint';" in THEME_JS
+    assert "const BASE = 'o95';" in THEME_JS
     for key in THEMES - {"o95"}:
         assert (WEB / "css" / "tema" / f"{key}.css").is_file(), key
 
@@ -158,9 +160,11 @@ def test_entry_pages_load_theme_before_body():
         for key in THEMES - {"o95"}:
             assert f"css/tema/{key}.css" in head, (f, key)
         assert head.index("css/tema/umum.css") > head.index("css/pages.css"), f
-    # Pilihan tema pindah bersama isi Beranda lama ke Tentang (M63).
+    # Pilihan tema ada di Beranda (M65; M63–M64 di Tentang).
+    home = (WEB / "pages" / "home.html").read_text(encoding="utf-8")
     about = (WEB / "pages" / "about.html").read_text(encoding="utf-8")
-    assert 'id="abThemes"' in about and "css/tema/pilihan.css" in (WEB / "app.html").read_text(encoding="utf-8")
+    assert 'id="hoThemes"' in home and "tema-pick" not in about
+    assert "css/tema/pilihan.css" in (WEB / "app.html").read_text(encoding="utf-8")
 
 
 def test_no_token_in_local_storage():

@@ -15,22 +15,23 @@
 'use strict';
 
 window.Pages = window.Pages || {};
-const ASSET_V = '6.18';
+const ASSET_V = '6.19';
 
 // `lede` = keterangan halaman; tidak lagi ditampilkan di jendela (dihapus atas
 // permintaan pemilik proyek), disimpan sebagai dokumentasi rute.
 const ROUTES = [
   {
     hash: 'beranda', file: 'home', title: 'Beranda', icon: 'globe', perm: ['home.view'],
-    lede: 'Pantau lokasi: kondisi kecamatan tempat Anda berada (pengguna yang masuk, dengan izin lokasi) atau yang Anda pilih — kalimat kondisi, citra satelit kecamatan itu, dan angkanya.',
-    desc: 'Pantau lokasi: kondisi satu kecamatan, citra satelitnya, dan angka 30 hari terakhir.',
+    lede: 'Pantau lokasi: kondisi kecamatan tempat Anda berada (pengguna yang masuk, dengan izin lokasi) atau yang Anda pilih — kalimat kondisi, citra satelit kecamatan itu, dan angkanya. Tema tampilan dipilih di bagian bawah.',
+    desc: 'Pantau lokasi: kondisi satu kecamatan, citra satelitnya, dan angka 30 hari terakhir; pilihan tema tampilan.',
   },
   {
-    // M63: isi Beranda lama (sambutan, penjelasan, kartu halaman, tema, peta
-    // AOI) digabung dengan Sistem › Tentang menjadi menu sendiri.
+    // M63: isi Beranda lama (sambutan, penjelasan, kartu halaman, peta AOI)
+    // digabung dengan Sistem › Tentang menjadi menu sendiri. Tema tampilan
+    // kembali ke Beranda (M65).
     hash: 'tentang', file: 'about', title: 'Tentang', icon: 'help', perm: ['about.view'],
-    lede: 'Apa aplikasi ini, batasannya, halaman untuk peran Anda, tema tampilan, peta AOI, sumber data, dan versi.',
-    desc: 'Apa aplikasi ini, batasannya, halaman per peran, tema tampilan, peta AOI, dan sumber data.',
+    lede: 'Apa aplikasi ini, batasannya, halaman untuk peran Anda, peta AOI, sumber data, dan versi.',
+    desc: 'Apa aplikasi ini, batasannya, halaman per peran, peta AOI, dan sumber data.',
   },
   {
     hash: 'aoi-3d', file: 'terrain3d', title: '3D AOI', icon: 'satellite', perm: ['aoi3d.view'], css: true,

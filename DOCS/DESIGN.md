@@ -164,7 +164,9 @@ surut). Palet ini juga selalu disertai legenda berteks (PIPELINE.md §4.1).
 
 ## 9. Tema Tambahan (M57)
 
-Orbital 95 adalah tema **bawaan**. Tiga tema lain diambil dari konsep di `DOCS/design tambahan/`:
+Orbital 95 adalah tema **dasar** (satu-satunya tanpa `css/tema/`), tetapi tema **bawaan** sejak M65 adalah
+Kertas Mint: dipakai bila peramban belum menyimpan pilihan. Tiga tema lain diambil dari konsep di
+`DOCS/design tambahan/`:
 
 | Kunci | Nama | Konsep |
 |---|---|---|
@@ -172,7 +174,7 @@ Orbital 95 adalah tema **bawaan**. Tiga tema lain diambil dari konsep di `DOCS/d
 | `pasir` | Mika Pasir | konsep41 |
 | `piksel` | Piksel Marun | konsep44 |
 
-- Tema dipilih di Tentang (sebelum M63 di Beranda), lalu diterapkan `web/js/theme.js` sebagai `data-theme` di `<html>` **sebelum**
+- Tema dipilih di bagian bawah Beranda (M65; M63–M64 di Tentang), lalu diterapkan `web/js/theme.js` sebagai `data-theme` di `<html>` **sebelum**
   `<body>` diurai, sehingga tidak ada kedipan tema bawaan.
 - Pilihan disimpan di `localStorage` (`orbit-u.tema`) per peramban, bukan per akun.
 - CSS tema ada di `web/css/tema/`: `umum.css` (struktur bersama, tercakup `html.tema-alt`) ditambah satu

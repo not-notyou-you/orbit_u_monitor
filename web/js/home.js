@@ -15,6 +15,8 @@
 // Panel pantau satu kecamatan: kalimat kondisi (normal/tidak + apa yang tidak
 // normal) → citra scene terbaru dipotong ke kecamatan → angka terbaru + tren
 // 30 hari terhadap rentang biasa. Sumber: GET /api/public/lokasi[/{id}[/trend]].
+//
+// Paling bawah: pemilih tema tampilan (js/theme.js; M65, sebelumnya di Tentang).
 'use strict';
 Pages['home'] = (() => {
   const PICK_KEY = 'orbit-u.lokasi';
@@ -30,6 +32,7 @@ Pages['home'] = (() => {
     st = { root, ctx, map: null, layers: {}, me: null, token: 0, items: [], geo: null, current: null, stopWatch: null };
     UI.$$('[data-icon]', root).forEach(el => { el.innerHTML = UI.icon(el.dataset.icon); });
     renderHero(root, ctx.me);
+    renderThemes(root);
 
     const [list, geo] = await Promise.all([
       API.get('/api/public/lokasi').catch(e => { UI.showError('Daftar lokasi gagal dimuat', e); return { items: [] }; }),
@@ -62,6 +65,7 @@ Pages['home'] = (() => {
   function destroy() {
     if (st && st.map) st.map.remove();
     if (st && st.stopWatch) st.stopWatch();
+    if (st && st.onTheme) document.removeEventListener('orbit-u:tema', st.onTheme);
     st = null;
   }
 
@@ -80,6 +84,40 @@ Pages['home'] = (() => {
       const first = UI.$$('.pl-sec', root).find(el => !el.hidden);
       if (first) scrollTo(first);
     });
+  }
+
+  // ---------------------------------------------------------- tema tampilan
+  // Satu kartu radio per tema di js/theme.js. Memilih langsung menerapkan
+  // tema ke seluruh aplikasi (atribut data-theme di <html>), tanpa memuat ulang.
+  function renderThemes(root) {
+    const box = UI.$('#hoThemes', root);
+    if (!box || !window.Theme) { const fs = UI.$('#hoTheme', root); if (fs) fs.hidden = true; return; }
+    const cur = Theme.get();
+    box.innerHTML = Theme.LIST.map(t =>
+      '<label class="tp-opt' + (t.key === cur ? ' on' : '') + '">' +
+        '<input type="radio" name="hoTema" value="' + t.key + '"' + (t.key === cur ? ' checked' : '') + '>' +
+        '<span class="tp-prev tp-' + t.key + '" aria-hidden="true"><span class="tp-win">' +
+          '<span class="tp-bar"><i></i><i></i><i></i></span>' +
+          '<span class="tp-body"><span class="tp-ln"></span><span class="tp-ln s"></span><span class="tp-btn"></span></span>' +
+        '</span></span>' +
+        '<span class="tp-text"><span class="tp-name">' + UI.esc(t.name) +
+          (t.note ? ' <small>(' + UI.esc(t.note) + ')</small>' : '') +
+          '<span class="tp-check" aria-hidden="true">dipakai</span></span>' +
+        '<span class="tp-desc">' + UI.esc(t.desc) + '</span></span>' +
+      '</label>').join('');
+    const mark = k => UI.$$('.tp-opt', box).forEach(l => {
+      const inp = UI.$('input', l), on = inp.value === k;
+      l.classList.toggle('on', on); inp.checked = on;
+    });
+    box.addEventListener('change', e => {
+      if (e.target.name !== 'hoTema') return;
+      mark(Theme.set(e.target.value));
+      const t = Theme.LIST.find(x => x.key === e.target.value);
+      st && st.ctx.setStatus('Tema: ' + (t ? t.name : e.target.value));
+    });
+    // Tema diganti dari tab lain → kartu yang terpilih ikut.
+    st.onTheme = e => mark(e.detail);
+    document.addEventListener('orbit-u:tema', st.onTheme);
   }
 
   // ------------------------------------------------------------- geolokasi

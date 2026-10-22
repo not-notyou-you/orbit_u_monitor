@@ -1,7 +1,8 @@
 // js/about.js — Tentang (#tentang, INTERFACE.md §2 halaman 1b, M63).
 //
 // Isi Beranda sebelum M63 dipindah ke sini: sambutan → penjelasan → kartu
-// halaman per peran → tema tampilan → peta AOI dengan daftar kecamatan,
+// halaman per peran → peta AOI dengan daftar kecamatan (tema tampilan
+// pindah ke Beranda),
 // ditambah isi Sistem › Tentang lama (versi API dan status basis data dari
 // GET /api/health, sumber data, tabel akses per peran untuk Administrator).
 // Alert hujan aktif tidak di sini lagi: Beranda (Pantau Lokasi) menandainya
@@ -20,14 +21,12 @@ Pages['about'] = (() => {
     UI.$('#abRoles', root).hidden = Auth.role() !== 'ADMIN';
     renderHero(root, ctx.me);
     renderNav(root, ctx.me);
-    renderThemes(root);
     await Promise.all([renderStrip(root), renderMap(root), renderInfo(root)]);
     ctx.setStatus(ctx.me ? 'Siap · masuk sebagai ' + (ctx.me.full_name || ctx.me.username) : 'Siap · pengunjung');
   }
 
   function destroy() {
     if (st && st.map) st.map.remove();
-    if (st && st.onTheme) document.removeEventListener('orbit-u:tema', st.onTheme);
     st = null;
   }
 
@@ -73,40 +72,6 @@ Pages['about'] = (() => {
     return '<a class="navcard" href="' + href + '"' + (ext ? ' target="_blank" rel="noopener"' : '') + '>' +
       UI.icon(icon) + '<span class="nc-body"><span class="nc-title">' + UI.esc(title) + '</span>' +
       '<span class="nc-desc">' + UI.esc(desc) + '</span></span></a>';
-  }
-
-  // ---------------------------------------------------------- tema tampilan
-  // Satu kartu radio per tema di js/theme.js. Memilih langsung menerapkan
-  // tema ke seluruh aplikasi (atribut data-theme di <html>), tanpa memuat ulang.
-  function renderThemes(root) {
-    const box = UI.$('#abThemes', root);
-    if (!box || !window.Theme) { const fs = UI.$('#abTheme', root); if (fs) fs.hidden = true; return; }
-    const cur = Theme.get();
-    box.innerHTML = Theme.LIST.map(t =>
-      '<label class="tp-opt' + (t.key === cur ? ' on' : '') + '">' +
-        '<input type="radio" name="abTema" value="' + t.key + '"' + (t.key === cur ? ' checked' : '') + '>' +
-        '<span class="tp-prev tp-' + t.key + '" aria-hidden="true"><span class="tp-win">' +
-          '<span class="tp-bar"><i></i><i></i><i></i></span>' +
-          '<span class="tp-body"><span class="tp-ln"></span><span class="tp-ln s"></span><span class="tp-btn"></span></span>' +
-        '</span></span>' +
-        '<span class="tp-text"><span class="tp-name">' + UI.esc(t.name) +
-          (t.note ? ' <small>(' + UI.esc(t.note) + ')</small>' : '') +
-          '<span class="tp-check" aria-hidden="true">dipakai</span></span>' +
-        '<span class="tp-desc">' + UI.esc(t.desc) + '</span></span>' +
-      '</label>').join('');
-    const mark = k => UI.$$('.tp-opt', box).forEach(l => {
-      const inp = UI.$('input', l), on = inp.value === k;
-      l.classList.toggle('on', on); inp.checked = on;
-    });
-    box.addEventListener('change', e => {
-      if (e.target.name !== 'abTema') return;
-      mark(Theme.set(e.target.value));
-      const t = Theme.LIST.find(x => x.key === e.target.value);
-      st && st.ctx.setStatus('Tema: ' + (t ? t.name : e.target.value));
-    });
-    // Tema diganti dari tab lain → kartu yang terpilih ikut.
-    st.onTheme = e => mark(e.detail);
-    document.addEventListener('orbit-u:tema', st.onTheme);
   }
 
   // ---------------------------------------------------------- strip status

@@ -20,7 +20,7 @@ Status:
 | D. Rancangan Sistem/Aplikasi | Terjawab |
 | D. Middleware / API Database | Sebagian: API ada, `docs/api_examples.md` tidak ada |
 | C.2 Master ≥ 10, transaksi ≥ 100 | Terjawab |
-| C.1 Legalitas objek studi ≥ 2 tahun | Belum ada bukti di project |
+| C.1 Legalitas objek studi ≥ 2 tahun | Tidak diperlukan (22 Okt 2026): GMLS mitra resmi UMN (MoU melalui LPPM) dan objek studi sudah disetujui program studi. GMLS berdiri 13 Okt 2020 (`lampiran/profil.jpeg`, notulensi) |
 | A. Tahap DBSDLC: implementasi, loading, keamanan | Terjawab |
 | A. Tahap DBSDLC: perencanaan, analisis, desain konseptual dan logikal, UML | Sebagian (8 Okt 2026): DATABASE.md, PIPELINE.md, DESIGN.md ditulis ulang dari kode (M60). UML di INTERFACE.md §9. Belum: bukti fact-finding GMLS |
 | A. Testing 5 kriteria | Sebagian: uji teknis lulus 1.140/1.140 (8 Okt 2026); diulang 19 Okt 2026 setelah M63/M64: 1.187/1.187 (INTERFACE.md §7.1, `DOCS/hasil_uji/`); uji pengguna (UAT/SUS) belum ada |
@@ -124,7 +124,7 @@ Semua baris MySQL di `timing.csv` dan `features.csv` berstatus "belum dijalankan
 ### e. Data yang kosong padahal fiturnya inti
 
 - **`disaster_events` berisi 0 baris.** Halaman Kejadian, evaluasi alert (hit/miss/false alarm), dan RM4 bergantung pada tabel ini. Saat ini evaluasi alert pada data produksi tidak punya pembanding.
-- `fusion_products` 0, `api_tokens` 0, `cleanup_operations` 0. Ketiganya masih wajar, tetapi fitur fusion dan token API belum terbukti dengan data nyata.
+- ~~`fusion_products` 0, `api_tokens` 0~~ Terbukti 22 Okt 2026: dataset #3 "Fusion AOI GMLS Okt 2026" (S1 + MODIS + GPM PROCESSED, CO_OCCURRENCE, 1–16 Okt 2026, AOI GMLS) selesai `COMPLETED`: 6/6 scene S1, **4 HDF5** (4, 9, 12, 16 Okt), masing-masing berisi grup `sentinel1` (VV, VH), `modis` (FLOOD, NDVI, NDWI + umur data), `gpm` (24h/72h/7d). Tercatat di `fusion_products`, `data_products` (tier FUSED) dan 12 baris `data_lineage` ke produk FUSED. `api_tokens` 1. `cleanup_operations` 0 masih wajar.
 - README menyebut `region_observations` "±79.000 baris". Isi sebenarnya 68.120. Angka ini perlu diselaraskan.
 
 ### f. Testing kriteria pengguna
@@ -133,7 +133,7 @@ Kriteria **Learnability** dan **Adaptability** belum punya artefak, misalnya ske
 
 ### g. Prasyarat objek studi (C.1)
 
-Tidak ada bukti legalitas GMLS atau bukti bahwa GMLS sudah beroperasi ≥ 2 tahun, misalnya SK, akta, atau surat keterangan.
+~~Belum ada bukti.~~ Tidak diperlukan (22 Okt 2026): GMLS bermitra resmi dengan UMN (MoU melalui LPPM) dan objek studi sudah disetujui program studi. Sebagai informasi, profil resmi menyebut GMLS berdiri 13 Oktober 2020.
 
 ### h. Acuan penelitian terdahulu (E)
 

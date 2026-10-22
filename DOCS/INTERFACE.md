@@ -40,8 +40,8 @@ ber-akun diantar ke `/masuk?next=…`.
 |---|---|---|---|
 | 0 | Masuk | `/masuk` | `login` — nama pengguna + kata sandi, panel manfaat akun Relawan |
 | -0 | Registrasi | `/daftar` | `register` — nama pengguna, kata sandi, konfirmasi, email **opsional** (M64; dicek dan dikirimi email konfirmasi bila diisi) |
-| 1 | Beranda (Pantau Lokasi, M63) | `#beranda` | `home` — landing singkat → Lokasi saya (USER+, izin lokasi, di dalam AOI) → Informasi lokasi (daftar + peta kecamatan berwarna status) → panel pantau satu kecamatan: kalimat kondisi + yang tidak normal, citra dipotong ke kecamatan, angka terbaru + tren 30 hari |
-| 1b | Tentang (M63; dulu Sistem › Tentang dan isi Beranda lama) | `#tentang` | `about` — sambutan, penjelasan + batasan, kartu halaman per peran, pilihan tema tampilan (Orbital 95 bawaan, Kertas Mint, Mika Pasir, Piksel Marun — M57), peta AOI + daftar kecamatan, info aplikasi, sumber data, tabel akses per peran (ADMIN) |
+| 1 | Beranda (Pantau Lokasi, M63) | `#beranda` | `home` — landing singkat → Lokasi saya (USER+, izin lokasi, di dalam AOI) → Informasi lokasi (daftar + peta kecamatan berwarna status) → panel pantau satu kecamatan: kalimat kondisi + yang tidak normal, citra dipotong ke kecamatan, angka terbaru + tren 30 hari → pilihan tema tampilan (Kertas Mint bawaan, Orbital 95, Mika Pasir, Piksel Marun — M57, M65) |
+| 1b | Tentang (M63; dulu Sistem › Tentang dan isi Beranda lama) | `#tentang` | `about` — sambutan, penjelasan + batasan, kartu halaman per peran, peta AOI + daftar kecamatan, info aplikasi, sumber data, tabel akses per peran (ADMIN) |
 | 2 | 3D AOI | `#aoi-3d` | `terrain3d` — citra di atas relief DEM |
 | 3 | Citra Satelit | `#citra/…` | `ringkasan` (`citra`), `sentinel-1` / `modis` / `gpm` (`citra-sat`, satelit dari `tab.source`), `laporan` (`citra-report`) |
 | 4 | Forecast (dulu Diagram, M61) | `#forecast/…` | `terbaru` + `analisa-daerah` (`diagram`, mode dari `tab.mode`; setiap grafik garis + forecast 15 hari dengan sakelar di bawahnya), `evaluasi` (`analytics`; CH-01 tren per kecamatan dan CH-03 rerata hujan juga diberi forecast) |

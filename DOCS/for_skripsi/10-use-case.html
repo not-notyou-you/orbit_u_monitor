@@ -53,7 +53,7 @@ window.pageInit = function () {
   const diagrams = [
     { cap: "Use case diagram aktor Pengunjung", actor: ["P", "Pengunjung"], cases: [
         ["p1", "Memantau kondisi kecamatan pilihan (Beranda)"], ["p2", "Melihat citra satelit 30 hari terakhir"], ["p3", "Mengunduh laporan PDF citra", 1],
-        ["p4", "Membandingkan dua tanggal scene", 1], ["p5", "Melihat kejadian bencana 365 hari"], ["p6", "Melihat halaman Tentang (peta AOI, tema)"],
+        ["p4", "Membandingkan dua tanggal scene", 1], ["p5", "Melihat kejadian bencana 365 hari"], ["p6", "Melihat halaman Tentang (peta AOI)"],
         ["p7", "Registrasi akun Relawan"], ["p8", "Login"], ["p9", "Validasi kata sandi dan batas registrasi", 1],
         ["p10", "Mengecek email + mengirim konfirmasi (email opsional)", 1] ],
       rel: [["p3", "p2", "extend"], ["p4", "p2", "extend"], ["p7", "p9", "include"], ["p10", "p7", "extend"]] },

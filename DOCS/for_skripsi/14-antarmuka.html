@@ -119,7 +119,7 @@ flowchart TD
 <tr><td>Lampu status</td><td>Hijau OK, amber sibuk, merah gagal; selalu didampingi teks</td></tr>
 <tr><td>Dialog</td><td>Semua pesan memakai dialog modal; tidak ada toast</td></tr>
 <tr><td>Taskbar</td><td>Tetap di bawah: tombol Mulai (menu per peran), tombol tugas, tray akun</td></tr>
-<tr><td>Tema</td><td>Orbital 95 (bawaan), Kertas Mint, Mika Pasir, Piksel Marun (M57)</td></tr>
+<tr><td>Tema</td><td>Kertas Mint (bawaan, M65), Orbital 95, Mika Pasir, Piksel Marun (M57); dipilih di Beranda</td></tr>
 </table></div>
 </div>
 
@@ -177,9 +177,10 @@ window.pageInit = function () {
     { cap: "Wireframe halaman Beranda (Pantau Lokasi, M63)", title: "Beranda", menu: "Beranda", lede: "Kondisi kecamatan Anda: kalimat kondisi, citra kecamatan itu, dan angkanya.",
       blocks: [[0, 0, 12, 1.6, "Landing: sambutan singkat + Pantau lokasi ↓ + bukan peringatan dini resmi", "box"], [0, 1.7, 12, 1.4, "Lokasi saya: Anda berada di Kec. X · akurasi (pengguna masuk, izin lokasi)", "box"],
         [0, 3.2, 3.5, 3.6, "Informasi lokasi: daftar kecamatan + status", "table"], [3.5, 3.2, 8.5, 3.6, "Peta kecamatan berwarna status", "map"],
-        [0, 6.9, 12, 1.6, "Panel pantau: STATUS + yang tidak normal + tanggal data", "screen"], [0, 8.6, 6, 3.4, "Citra dipotong ke kecamatan (9 tile)", "img"], [6, 8.6, 6, 3.4, "Angka terbaru + tren 30 hari (pita rentang biasa)", "chart"]] },
-    { cap: "Wireframe halaman Tentang (isi Beranda sebelum M63)", title: "Tentang", menu: "Tentang", lede: "Apa aplikasi ini, batasannya, halaman per peran, tema, peta AOI, dan sumber data.",
-      blocks: [[0, 0, 12, 2, "Sambutan, penjelasan, dan batasan", "box"], [0, 2, 7, 4, "Kartu halaman sesuai peran", "cards", 4], [7, 2, 5, 6, "Peta AOI kecamatan", "map"], [0, 6, 7, 2, "Tema tampilan", "cards", 4], [0, 8, 6, 4, "Info aplikasi (peran, server, versi)", "table"], [6, 8, 6, 4, "Sumber data + tabel akses (ADMIN)", "table"]] },
+        [0, 6.9, 12, 1.6, "Panel pantau: STATUS + yang tidak normal + tanggal data", "screen"], [0, 8.6, 6, 2.1, "Citra dipotong ke kecamatan (9 tile)", "img"], [6, 8.6, 6, 2.1, "Angka terbaru + tren 30 hari (pita rentang biasa)", "chart"],
+        [0, 10.7, 12, 1.3, "Tema tampilan: 4 kartu pilihan, Kertas Mint bawaan (M65)", "box"]] },
+    { cap: "Wireframe halaman Tentang (isi Beranda sebelum M63)", title: "Tentang", menu: "Tentang", lede: "Apa aplikasi ini, batasannya, halaman per peran, peta AOI, dan sumber data.",
+      blocks: [[0, 0, 12, 2, "Sambutan, penjelasan, dan batasan", "box"], [0, 2, 7, 6, "Kartu halaman sesuai peran", "cards", 4], [7, 2, 5, 6, "Peta AOI kecamatan", "map"], [0, 8, 6, 4, "Info aplikasi (peran, server, versi)", "table"], [6, 8, 6, 4, "Sumber data + tabel akses (ADMIN)", "table"]] },
     { cap: "Wireframe halaman Citra Satelit per satelit", title: "Citra Satelit", menu: "Citra Satelit", tabs: ["Ringkasan", "Sentinel-1", "MODIS", "GPM", "Laporan PDF"], tab: 1, lede: "Pilih tanggal scene; bandingkan dua tanggal bila perlu.",
       blocks: [[0, 0, 3, 12, "Daftar tanggal (batas peran)", "table"], [3, 0, 4.5, 6, "Gambar scene (lightbox)", "img"], [7.5, 0, 4.5, 6, "Gambar pembanding", "img"], [3, 6, 9, 2, "Kalimat kondisi", "screen"], [3, 8, 9, 4, "Tabel metrik per band × metrik + selisih", "screen"]] },
     { cap: "Wireframe halaman Forecast", title: "Forecast", menu: "Forecast", tabs: ["Keadaan terbaru", "Analisa daerah", "Tren & evaluasi alert"], lede: "Semua band 30 hari terakhir dengan forecast 15 hari.", tray: "analis · Analis",
