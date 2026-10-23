@@ -174,7 +174,8 @@ def _decorator(title: str, generated_at: datetime):
         canvas.saveState()
         canvas.setFont(rg._FONTS["body"], 8)
         canvas.setFillColor(colors.grey)
-        canvas.drawString(0.75 * inch, A4[1] - 0.55 * inch, f"Orbit-U: The Monitor — {title}")
+        off = rg.draw_logo(canvas, 0.75 * inch, A4[1] - 0.55 * inch - 3, 13)
+        canvas.drawString(0.75 * inch + off, A4[1] - 0.55 * inch, f"Orbit-U: The Monitor — {title}")
         canvas.drawRightString(A4[0] - 0.75 * inch, A4[1] - 0.55 * inch,
                                f"Dibuat {generated_at.astimezone(WIB):%Y-%m-%d %H:%M} WIB")
         canvas.setStrokeColor(colors.HexColor("#DDDDDD"))

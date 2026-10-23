@@ -1,6 +1,6 @@
 # Kamus Data — Orbit-U: The Monitor
 
-> Dibangkitkan otomatis oleh `tools/data_dictionary.py` dari katalog PostgreSQL (database `themonitor`, 2026-10-18 20:52 UTC). Jangan disunting manual; ubah `database/monitor_schema.sql` (termasuk `COMMENT ON`) lalu bangkitkan ulang.
+> Dibangkitkan otomatis oleh `tools/data_dictionary.py` dari katalog PostgreSQL (database `themonitor`, 2026-10-23 07:01 UTC). Jangan disunting manual; ubah `database/monitor_schema.sql` (termasuk `COMMENT ON`) lalu bangkitkan ulang.
 
 Jumlah: **43 tabel**, **22 VIEW**.
 
@@ -24,7 +24,7 @@ Jumlah: **43 tabel**, **22 VIEW**.
 | [`dataset_source_config`](#dataset_source_config) | Konfigurasi pemrosesan per (dataset, sumber). ETL membaca tabel ini untuk memutuskan sumber dan level yang dijalankan. |
 | [`datasets`](#datasets) | Dataset historis (Katalog, DATA_ENGINEER), dataset Live Area, dan dataset sistem HYDROMET_AOI. |
 | [`disaster_events`](#disaster_events) | Catatan kejadian bencana (GMLS, BPBD, input ANALYST). Tanpa data pribadi. Soft delete. |
-| [`disaster_types`](#disaster_types) | Master jenis bencana. ADMIN dapat menambah jenis tanpa ubah kode (uji adaptability). |
+| [`disaster_types`](#disaster_types) | Master jenis bencana. ADMIN dapat menambah jenis tanpa ubah kode. |
 | [`fusion_products`](#fusion_products) | Registri stack HDF5 multi-sensor (S1 + MODIS + GPM) per dataset per tanggal per level. |
 | [`fusion_strategies`](#fusion_strategies) | Master strategi fusion (M9). Dirujuk datasets.fusion_strategy dan fusion_products.fusion_strategy lewat strategy_code. |
 | [`generated_reports`](#generated_reports) | Laporan PDF mingguan/bulanan yang dibuat (M18). Akses dibatasi RLS per audiens (tahap keamanan). |
@@ -516,7 +516,7 @@ Catatan kejadian bencana (GMLS, BPBD, input ANALYST). Tanpa data pribadi. Soft d
 
 ## disaster_types
 
-Master jenis bencana. ADMIN dapat menambah jenis tanpa ubah kode (uji adaptability).
+Master jenis bencana. ADMIN dapat menambah jenis tanpa ubah kode.
 
 | Kolom | Tipe | Null | Default | Kunci | Keterangan |
 |---|---|---|---|---|---|

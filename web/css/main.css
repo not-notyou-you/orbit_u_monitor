@@ -375,7 +375,7 @@ html:not(.tema-alt) .v-alert:not(.screen-inner *, .leaflet-container *, .chart-t
 }
 .taskbar .start { font-weight: 700; min-width: 0; padding: 2px 6px; min-height: 22px; }
 .taskbar .start:active:not(:disabled), .taskbar .start[aria-expanded="true"] { padding: 3px 5px 1px 7px; }
-.taskbar .start svg { width: 16px; height: 16px; }
+.taskbar .start svg, .taskbar .start .start-logo { width: 16px; height: 16px; border-radius: 50%; flex: none; }
 /* Checkbox "Garis wilayah" di pojok kiri taskbar, tepat setelah Mulai:
    saklar global varian pratinjau bergaris wilayah (web/js/ui.js). */
 .tb-check {

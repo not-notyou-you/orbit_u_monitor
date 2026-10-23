@@ -1,3 +1,11 @@
+Ketentuan skripsi peminatan Database, jalur Design and Implementation. Acuan: Pedoman Penelitian Skripsi
+Prodi SI versi 1.3 (ketentuan_skripsi/Pedoman Penelitian Skripsi Prodi SI_1.3.pdf), bagian VII.
+
+Jalur Design and Implementation (Pedoman 1.3, Tabel 4)
+- Fokus: requirement, conceptual-logical-physical design, integritas, security, dan implementasi.
+- Luaran wajib: ERD/schema, data dictionary, DDL, constraints, role/access, database fungsional.
+- Evaluasi minimum: requirement/user review, integrity, functional, security, query, backup/recovery.
+
 A. Alur Penelitian Skripsi
  Analisis sistem yang sedang berjalan (As-Is System Analysis)
  Identifikasi Masalah
@@ -19,7 +27,6 @@ oleh sebuah sistem basis data dari perspektif peran pekerjaan tertentu (seperti 
 perusahaan (seperti pemasaran, personalia, atau pengendalian stok). Pandangan pengguna juga sangat membantu dalam
 pengembangan sistem basis data yang relatif kompleks dengan memungkinkan persyaratan dipecah menjadi bagianbagian yang dapat dikelola.
  Requirement Collection and Analysis
-Versi: 1.1 © Program Studi Sistem Informasi - UMN
 Requirement collection and analysis merupakan proses mengumpulkan dan menganalisis informasi tentang bagian dari
 organisasi yang akan didukung oleh sistem basis data, dan menggunakan informasi ini untuk mengidentifikasi persyaratan
 untuk sistem yang baru. Dalam proses pengumpulan informasi tahapan ini menggunakan teknik pencarian fakta atau
@@ -48,7 +55,6 @@ b) Logical Database Design
 Logical database design merupakan proses membangun model data yang digunakan dalam suatu perusahaan
 berdasarkan pada model data tertentu, tetapi tidak tergantung pada DBMS dan pertimbangan fisik lainnya. Berikut
 adalah tahapan dalam perancangan logical database design:
-Versi: 1.1 © Program Studi Sistem Informasi - UMN
  Identifikasi jenis entitas (strong atau weak) dan multiplicity
  Normalisasi
  Memeriksa batasan integritas (constraint)
@@ -75,7 +81,6 @@ d) Merekomendasikan seleksi dan menghasilkan laporan
  Pemodelan Sistem
 Pada tahap ini dilakukan pemodelan fungsional dari sistem dalam bentuk use case diagram, activity diagram, dan class
 diagram (optional jika sudah ada ERD).
-Versi: 1.1 © Program Studi Sistem Informasi - UMN
  Desain Antarmuka
 Pada tahap ini dilakukan perancangan tampilan dari sistem yang akan digunakan oleh pengguna untuk memproses suatu
 basis data
@@ -94,16 +99,15 @@ mengonversi aplikasi yang ada untuk dijalankan pada basis data yang baru. Tahapa
 basis data yang baru mengganti sistem basis data yang lama.
 
  Testing
-Testing merupakan proses untuk menjalankan sistem basis data dengan maksud menemukan kesalahan karena sebelum
-digunakan sistem basis data yang baru dikembangkan harus diuji secara menyeluruh. Contoh kriteria yang dapat
-digunakan untuk melakukan evaluasi meliputi hal-hal berikut :
-a) Dapat dipelajari (Learnability)
-b) Kinerja sistem dengan praktik kerja pengguna (Performance)
-c) Toleransi sistem terhadap kesalahan pengguna (Robustness)
-d) Dapat dipulihkan (Recoverability)
-e) Mudah beradaptasi (Adaptability)
+Testing merupakan proses untuk menjalankan sistem basis data dengan maksud menemukan kesalahan sebelum digunakan.
+Evaluasi minimum jalur Design and Implementation (Pedoman 1.3, Tabel 4):
+a) Requirement/user review
+b) Integrity
+c) Functional
+d) Security
+e) Query
+f) Backup/recovery
 
-Versi: 1.1 © Program Studi Sistem Informasi - UMN
 B. Metode Penelitian
  Metode Pengumpulan Data
 a) Observasi
@@ -129,11 +133,14 @@ b. Jumlah record minimal 100 pada tabel transaksi
 c. Jika master table tidak sampai 10 masih diperbolehkan dengan kondisi terdapat jumlah transaksi minimal 300 record
 d. Jumlah master table harus dapat menangani pertumbuhan data tanpa mengorbankan kinerja dan integritas data.
 3. Ketentuan Database Tidak Terstruktur: mengikuti ketentuan pada peminatan big data analytics
-Versi: 1.1 © Program Studi Sistem Informasi - UMN
 D. Hasil Akhir Penelitian
- Rancangan Database – Rekomendasi DBMS
- Rancangan Sistem atau Aplikasi (optional)
- Middleware atau API Database (API Developer)
+ Rancangan conceptual, logical, dan physical database, data dictionary, DDL, constraints, indexing, security, dan
+rekomendasi DBMS.
+ Implementasi basis data atau prototype yang dapat diuji; antarmuka aplikasi bersifat opsional apabila bukan bagian
+utama kontribusi.
+ API atau middleware jika penelitian berfokus pada integrasi.
+ Benchmark, migration report, integrity report, security test, atau evidence lain sesuai jalur.
+ Source code/script, query, konfigurasi, dataset description, dan README untuk mendukung reproduksi.
 E. Alternatif Penelitian Skripsi Peminatan Database
  Topik tentang komparasi teknologi database
  Ada objek studi kasus

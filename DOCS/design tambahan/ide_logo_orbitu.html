@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Latar Jejak Lintasan</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Latar video "Jejak Lintasan": biru gelap, makin cerah ke tengah (horizontal), tiga jejak
+   lintasan kuning/magenta/sian, bola planet sewarna yang sesekali melintas mengikuti jejaknya.
+   Dua panggung 16:9: susunan mobile (mockup kiri, penjelasan kanan) dan desktop (layar atas, penjelasan bawah). */
+:root { --bg: #eef1f5; --ink: #141826; --muted: #5a6275; --line: #d3d9e3;
+  --disp: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif; --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif; }
+@media (prefers-color-scheme: dark) { :root { --bg: #11141c; --ink: #e8ebf2; --muted: #a2a9ba; --line: #2a3040; color-scheme: dark; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); padding: 32px max(16px, env(safe-area-inset-left, 0px)) 56px; }
+.wrap { max-width: 1100px; margin: 0 auto; display: grid; gap: 36px; }
+h1 { font-family: var(--disp); font-size: clamp(28px, 4.5vw, 44px); margin: 0; }
+h2 { font-family: var(--disp); font-size: 22px; margin: 0; }
+.lede { color: var(--muted); max-width: 72ch; margin: 10px 0 0; }
+section { display: grid; gap: 12px; }
+.ctrl button { font: inherit; font-weight: 700; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--ink); color: var(--bg); cursor: pointer; }
+
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; container-type: inline-size;
+  box-shadow: 0 10px 30px rgba(0,0,0,.2);
+  background: linear-gradient(180deg, #050b24 0%, #0c1d55 30%, #1a3a8c 50%, #0c1d55 70%, #050b24 100%); }
+.stage { --glow: 0 0 0 .12cqw rgba(120,220,255,.55), 0 0 2.2cqw .4cqw rgba(63,200,255,.45), 0 1.5cqw 4cqw rgba(0,0,0,.45);
+  --glow-card: 0 0 0 .12cqw rgba(255,255,255,.7), 0 0 2cqw .3cqw rgba(255,90,210,.35), 0 0 4cqw .6cqw rgba(63,200,255,.25); }
+.stage > svg.bg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.trail { stroke-dasharray: 2 16; stroke-linecap: round; animation: dash 2.4s linear infinite; }
+@keyframes dash { to { stroke-dashoffset: -72; } }
+.content { position: absolute; inset: 0; transition: opacity .5s; }
+.card { position: absolute; padding: 1.6cqw 1.9cqw; border-radius: 1.2cqw; background: rgba(255,255,255,.95); color: #141826; box-shadow: var(--glow-card); }
+.card .k { font-size: .85cqw; letter-spacing: .14em; text-transform: uppercase; color: #b0127a; font-weight: 700; }
+.card .t { font-family: var(--disp); font-weight: 800; font-size: 2cqw; line-height: 1.15; margin: .5cqw 0; }
+.card .d { font-size: 1.15cqw; line-height: 1.5; color: #4b5266; }
+.step { display: inline-flex; gap: .6cqw; align-items: center; margin-bottom: .6cqw; font-weight: 700; font-size: 1cqw; color: #141826; }
+.step b { width: 1.8cqw; height: 1.8cqw; border-radius: 50%; background: #141826; color: #fff; display: grid; place-items: center; font-size: .95cqw; }
+/* mobile: ponsel kiri, kartu kanan */
+.m .phone { position: absolute; left: 20%; top: 7%; height: 86%; aspect-ratio: 412 / 839; border-radius: 2cqw; background: #0b0b0f; padding: .55cqw; box-shadow: var(--glow); }
+.m .phone img { width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 1.5cqw; display: block; }
+.m .card { left: 47%; top: 30%; width: 34%; }
+/* desktop: layar atas, kartu bawah */
+.d .screen { position: absolute; left: 50%; top: 5%; width: 60%; transform: translateX(-50%); border-radius: 1cqw; background: #0b0b0f; padding: .5cqw; box-shadow: var(--glow); }
+.d .screen .bar { display: flex; gap: .45cqw; padding: .2cqw .4cqw .55cqw; }
+.d .screen .bar i { width: .7cqw; height: .7cqw; border-radius: 50%; background: #3a3f52; }
+.d .screen img { width: 100%; display: block; border-radius: .4cqw; }
+.d .card { left: 50%; transform: translateX(-50%); bottom: 4.5%; width: 60%; display: grid; grid-template-columns: auto 1fr; gap: .4cqw 1.6cqw; align-items: start; }
+.d .card .step { grid-row: span 3; margin: .3cqw 0 0; }
+.d .card .t { margin: 0; }
+
+.intro { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; pointer-events: none; color: #fff; }
+.intro .row { display: flex; align-items: center; gap: 2.2cqw; }
+/* Glow navy gelap di belakang logo dan semua tulisan pembuka agar terpisah dari jejak lintasan. */
+.intro { --navy-glow: 0 0 .4cqw #020718, 0 0 1cqw #020718, 0 0 2cqw #020718, 0 0 3.5cqw #020718, 0 0 5.5cqw rgba(2,7,24,.9); }
+.intro .row { position: relative; isolation: isolate; }
+.intro .row::before { content: ''; position: absolute; inset: -4cqw -6cqw; border-radius: 50%; background: radial-gradient(closest-side, rgba(2,7,24,.85), rgba(2,7,24,.5) 60%, transparent); z-index: -1; }
+.intro img { width: 12cqw; height: 12cqw; filter: invert(1) drop-shadow(0 0 .6cqw #020718) drop-shadow(0 0 1.5cqw #020718) drop-shadow(0 0 3cqw #020718) drop-shadow(0 0 5cqw #020718); }
+.intro .tt { font-family: var(--disp); font-weight: 800; font-size: 4.6cqw; line-height: 1; text-shadow: var(--navy-glow); }
+.intro .st { font-size: 1.6cqw; margin-top: .8cqw; opacity: .9; text-shadow: var(--navy-glow); }
+.intro .vt { position: absolute; bottom: 14%; left: 0; right: 0; text-align: center; font-family: var(--disp); font-weight: 700; font-size: 2.4cqw; }
+.intro .vt span { display: inline-block; padding: .6cqw 2cqw; border-radius: 99cqw; border: .15cqw solid currentColor; text-shadow: var(--navy-glow);
+  background: rgba(2,7,24,.8); box-shadow: 0 0 1cqw #020718, 0 0 2.5cqw #020718, 0 0 5cqw rgba(2,7,24,.9); }
+.stage.play .content { opacity: 0; }
+.stage.play .intro { opacity: 1; }
+.stage.play .intro img { animation: pop 1s cubic-bezier(.2,1.4,.4,1) both; }
+.stage.play .intro .tt { animation: up .7s .9s both; }
+.stage.play .intro .st { animation: up .7s 1.5s both; }
+.stage.play .intro .vt { animation: up .7s 2.4s both; }
+@keyframes pop { from { transform: scale(0) rotate(-90deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes up { from { transform: translateY(1.5cqw); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .stage * { animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Latar Jejak Lintasan</h1>
+    <p class="lede">Biru gelap yang makin cerah ke tengah (pita terang mendatar), tiga jejak lintasan kuning, magenta, dan sian, dan bola planet sewarna
+      yang sesekali melintas mengikuti jejaknya. Di bawah ini latar yang sama dengan dua susunan: mobile (ponsel kiri, penjelasan kanan)
+      dan desktop (layar atas, penjelasan bawah). Tekan <b>Putar pembuka</b> untuk melihat urutan logo → judul → subjudul → judul video.</p>
+  </header>
+
+  <section>
+    <h2>Susunan mobile</h2>
+    <div class="stage m">
+      <div class="content">
+        <div class="phone"><img src="pratinjau_layar.png" alt="Layar Beranda Orbit-U di ponsel"></div>
+        <div class="card"><div class="step"><b>2</b>Langkah 2 dari 8</div><div class="k">Kecamatan Bayah</div>
+          <div class="t">Status kecamatan tampil di sini</div>
+          <div class="d">Kalimat kondisi merangkum radar Sentinel-1, citra MODIS, dan hujan GPM. NORMAL berarti semua indikator masih di bawah ambang waspada, jadi tidak ada hal yang perlu diwaspadai hari ini.</div></div>
+      </div>
+      <div class="intro"><div class="row"><img src="../../web/assets/img/logo.svg" alt="Logo Orbit-U">
+        <div><div class="tt">ORBIT-U: Lebak Selatan</div><div class="st">Pemantauan dari Sentinel-1, GPM, dan MODIS</div></div></div>
+        <div class="vt"><span>Lokasi saya: kondisi kecamatan Anda</span></div></div>
+    </div>
+    <div class="ctrl"><button type="button">Putar pembuka</button></div>
+  </section>
+
+  <section>
+    <h2>Susunan desktop</h2>
+    <div class="stage d">
+      <div class="content">
+        <div class="screen"><div class="bar"><i></i><i></i><i></i></div><img src="pratinjau_desktop.png" alt="Layar Beranda Orbit-U di desktop"></div>
+        <div class="card"><div class="step"><b>2</b></div><div class="k">Kecamatan Bayah</div>
+          <div class="t">Status kecamatan tampil di sini</div>
+          <div class="d">Kalimat kondisi merangkum radar Sentinel-1, citra MODIS, dan hujan GPM. NORMAL berarti semua indikator masih di bawah ambang waspada.</div></div>
+      </div>
+      <div class="intro"><div class="row"><img src="../../web/assets/img/logo.svg" alt="Logo Orbit-U">
+        <div><div class="tt">ORBIT-U: Lebak Selatan</div><div class="st">Pemantauan dari Sentinel-1, GPM, dan MODIS</div></div></div>
+        <div class="vt"><span>Lokasi saya: kondisi kecamatan Anda</span></div></div>
+    </div>
+    <div class="ctrl"><button type="button">Putar pembuka</button></div>
+  </section>
+</div>
+
+<script>
+// Tiga jejak lintasan: gelombang sinus melintang bingkai, fase berbeda.
+const TRACKS = [
+  { col: '#ffd23f', amp: 300, ph: 0.0, dur: 9, begin: [0, 7, 14, 21] },
+  { col: '#ff3fbf', amp: 300, ph: 2.1, dur: 10, begin: [2.5, 9.5, 16.5, 23.5] },
+  { col: '#3fe6ff', amp: 300, ph: 4.2, dur: 8.5, begin: [5, 12, 19, 26] },
+];
+function pathD(t) {
+  let d = '';
+  for (let x = -120; x <= 2040; x += 15) d += (d ? 'L' : 'M') + x + ' ' + (540 + t.amp * Math.sin((x / 1920) * 2 * Math.PI + t.ph)).toFixed(1);
+  return d;
+}
+function bgSVG(uid) {
+  const grid = Array.from({ length: 9 }, (_, i) => `<line x1="0" y1="${i * 135}" x2="1920" y2="${i * 135}"/>`).join('') +
+    Array.from({ length: 17 }, (_, i) => `<line x1="${i * 120}" y1="0" x2="${i * 120}" y2="1080"/>`).join('');
+  const stars = Array.from({ length: 40 }, (_, i) => `<circle cx="${(i * 377 + 91) % 1920}" cy="${(i * 211 + 37) % 1080}" r="${i % 3 * .8 + .8}" fill="#fff" opacity="${.1 + (i % 4) * .08}"/>`).join('');
+  const defs = TRACKS.map((t, i) => `<path id="${uid}p${i}" d="${pathD(t)}"/>` +
+    `<radialGradient id="${uid}g${i}"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="${t.col}"/><stop offset="1" stop-color="${t.col}" stop-opacity="0"/></radialGradient>`).join('');
+  const lines = TRACKS.map((t, i) => `<use href="#${uid}p${i}" fill="none" stroke="${t.col}" stroke-opacity=".18" stroke-width="2"/>` +
+    `<use class="trail" href="#${uid}p${i}" fill="none" stroke="${t.col}" stroke-opacity=".75" stroke-width="4"/>`).join('');
+  // Bola planet: lewat sekali per siklus 28 detik, lalu menghilang sampai siklus berikutnya.
+  const planets = TRACKS.map((t, i) => t.begin.map(b => `
+    <g opacity="0">
+      <circle r="46" fill="url(#${uid}g${i})" opacity=".55"/>
+      <circle r="17" fill="${t.col}"/><circle r="17" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width="2"/>
+      <ellipse rx="30" ry="8" fill="none" stroke="${t.col}" stroke-width="3" transform="rotate(-20)"/>
+      <animateMotion dur="${t.dur}s" begin="${b}s;indefinite" repeatCount="1" fill="remove" rotate="0"><mpath href="#${uid}p${i}"/></animateMotion>
+      <set attributeName="opacity" to="1" begin="${b}s" dur="${t.dur}s"/>
+    </g>`).join('')).join('');
+  return `<svg class="bg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs>${defs}</defs>` +
+    `<g stroke="#9fc3ff" stroke-opacity=".06">${grid}</g>${stars}${lines}${planets}</svg>`;
+}
+document.querySelectorAll('.stage').forEach((st, k) => st.insertAdjacentHTML('afterbegin', bgSVG('s' + k)));
+// Ulangi siklus planet setiap 28 detik dengan memasang ulang latar.
+setInterval(() => document.querySelectorAll('.stage').forEach((st, k) => { st.querySelector('svg.bg').outerHTML = bgSVG('s' + k); }), 28000);
+document.querySelectorAll('section').forEach(sec => {
+  const st = sec.querySelector('.stage'), btn = sec.querySelector('button');
+  if (!st || !btn) return;
+  let timer;
+  btn.addEventListener('click', () => {
+    st.classList.remove('play'); void st.offsetWidth; st.classList.add('play');
+    btn.textContent = 'Memutar…'; clearTimeout(timer);
+    timer = setTimeout(() => { st.classList.remove('play'); btn.textContent = 'Putar pembuka'; }, 5200);
+  });
+});
+</script>
+</body>
+</html>

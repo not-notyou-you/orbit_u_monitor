@@ -263,7 +263,9 @@ def test_inline_images_and_layers():
     assert "Waspada di Uji" in subject and "cid:r1_gpm_rain_7d" in html
     msg = mailer.build_message(cfg, "a@example.org", subject, text_, html, images)
     related = [p for p in msg.walk() if p.get_content_type() == "image/png"]
-    assert len(related) == 1 and related[0]["Content-ID"] == "<r1_gpm_rain_7d>"
+    # Bukti citra + logo di pita judul (cid:orbitu-logo, dilampirkan mailer.build_message).
+    assert sorted(p["Content-ID"] for p in related) == ["<orbitu-logo>", "<r1_gpm_rain_7d>"]
+    assert "cid:orbitu-logo" in html
     assert "90 mm" in text_ and "waspada 75 mm" in text_ and "0 s.d. 120 mm" in text_
 
 

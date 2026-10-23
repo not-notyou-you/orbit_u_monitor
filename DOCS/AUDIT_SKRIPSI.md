@@ -1,5 +1,7 @@
 # Audit Output Project terhadap SKRIPSI.txt
 
+Acuan: Pedoman Penelitian Skripsi Prodi SI versi 1.3, peminatan Database, jalur Design and Implementation (ringkasannya di SKRIPSI.txt). Ketentuan versi lama yang tidak ada di 1.3 tidak dinilai.
+
 Diperiksa: 8 Oktober 2026. Objek: folder `themonitor/` dan database `themonitor` yang sedang berjalan (localhost:5432).
 
 Yang dinilai adalah **output project**: kode, skema, data di database, hasil uji, dan artefak yang dihasilkan. Naskah skripsi tidak dinilai. Klaim di `DOCS/README.md` hanya dihitung kalau berkasnya benar-benar ada di repo atau datanya benar-benar ada di database.
@@ -18,12 +20,12 @@ Status:
 | D. Rancangan Database | Terjawab (8 Okt 2026): skema + DATABASE.md + `DOCS/generated/data_dictionary.md` dan `erd_physical.mmd` (38 tabel, 19 VIEW; dibangkitkan ulang 19 Okt 2026 setelah M63/M64: 43 tabel, 22 VIEW) |
 | D. Rekomendasi DBMS | Terjawab (8 Okt 2026): PostgreSQL dan MySQL 8.0 diuji, rekomendasi di [PERBANDINGAN_DBMS.md](PERBANDINGAN_DBMS.md). Acuan penelitian terdahulu belum ada |
 | D. Rancangan Sistem/Aplikasi | Terjawab |
-| D. Middleware / API Database | Sebagian: API ada, `docs/api_examples.md` tidak ada |
+| D. API / middleware | Tidak wajib: pedoman 1.3 mewajibkannya hanya bila penelitian berfokus pada integrasi. API tetap ada (`api/`, OpenAPI `/docs`) |
 | C.2 Master ≥ 10, transaksi ≥ 100 | Terjawab |
 | C.1 Legalitas objek studi ≥ 2 tahun | Tidak diperlukan (22 Okt 2026): GMLS mitra resmi UMN (MoU melalui LPPM) dan objek studi sudah disetujui program studi. GMLS berdiri 13 Okt 2020 (`lampiran/profil.jpeg`, notulensi) |
 | A. Tahap DBSDLC: implementasi, loading, keamanan | Terjawab |
-| A. Tahap DBSDLC: perencanaan, analisis, desain konseptual dan logikal, UML | Sebagian (8 Okt 2026): DATABASE.md, PIPELINE.md, DESIGN.md ditulis ulang dari kode (M60). UML di INTERFACE.md §9. Belum: bukti fact-finding GMLS |
-| A. Testing 5 kriteria | Sebagian: uji teknis lulus 1.140/1.140 (8 Okt 2026); diulang 19 Okt 2026 setelah M63/M64: 1.187/1.187 (INTERFACE.md §7.1, `DOCS/hasil_uji/`); uji pengguna (UAT/SUS) belum ada |
+| A. Tahap DBSDLC: perencanaan, analisis, desain konseptual dan logikal, UML | Sebagian (8 Okt 2026): DATABASE.md, PIPELINE.md, DESIGN.md ditulis ulang dari kode (M60). UML di INTERFACE.md §9. Fact-finding GMLS: wawancara 16 Okt 2026 (`lampiran/notulensiGMLS.txt`, DATABASE.md §2.4). Belum: hasil isian lembar tinjauan kebutuhan dari GMLS (requirement/user review, disiapkan 23 Okt 2026) |
+| A. Testing: evaluasi minimum Tabel 4 | Sebagian: integrity, functional, security, query, dan backup/recovery punya bukti (pytest 1.187/1.187 pada 19 Okt 2026, INTERFACE.md §7, `DOCS/hasil_uji/`, `benchmark/`). Requirement/user review belum |
 
 ---
 
@@ -76,9 +78,11 @@ Angka di bawah dihitung langsung dari database:
 
 - Ada 1.142 test pytest (berhasil dikumpulkan; seluruh suite tidak dijalankan pada audit ini).
 - Ada uji keamanan GRANT (`tests/security/`).
-- **Recoverability** diuji lewat [backup_restore.sh](../tests/recovery/backup_restore.sh), [kill_and_resume.sh](../tests/recovery/kill_and_resume.sh), dan `recovery_backfill.py`.
-- **Robustness** diuji lewat test ketahanan unduhan, circuit breaker, dan konkurensi.
-- **Performance** diukur oleh benchmark.
+- **Backup/recovery** diuji lewat [backup_restore.sh](../tests/recovery/backup_restore.sh), [kill_and_resume.sh](../tests/recovery/kill_and_resume.sh), dan `recovery_backfill.py`. Dijalankan 23 Okt 2026, lulus: restore salinan produksi identik isi, dan backfill pulih setelah `kill -9`. Ini memenuhi evaluasi minimum backup/recovery jalur Design and Implementation (pedoman 1.3, Tabel 4). Rincian di INTERFACE.md §7.2 dan `DOCS/hasil_uji/`. Backup harian terjadwal (M66, PIPELINE.md §13): tugas didaftarkan pemilik 23 Okt 2026, run uji 11:11 berhasil (`LastTaskResult` 0, dump 5 MB), jadwal berikutnya 24 Okt 01:30.
+- **Integrity**: PK/FK, CHECK, UNIQUE, dan trigger di skema; diuji `test_database`, `test_schema_comments`, `test_audit`.
+- **Functional**: skenario black-box per fitur (`test_*_api`, `test_alert_engine`, `test_notify`, dan lainnya).
+- **Security**: matriks GRANT/VIEW/RLS (`tests/security/grant_matrix.sql`), `test_rbac_api`, `test_auth`, `test_credentials`.
+- **Query**: benchmark Q1–Q6 (`benchmark/results/`).
 
 ---
 
@@ -127,9 +131,9 @@ Semua baris MySQL di `timing.csv` dan `features.csv` berstatus "belum dijalankan
 - ~~`fusion_products` 0, `api_tokens` 0~~ Terbukti 22 Okt 2026: dataset #3 "Fusion AOI GMLS Okt 2026" (S1 + MODIS + GPM PROCESSED, CO_OCCURRENCE, 1–16 Okt 2026, AOI GMLS) selesai `COMPLETED`: 6/6 scene S1, **4 HDF5** (4, 9, 12, 16 Okt), masing-masing berisi grup `sentinel1` (VV, VH), `modis` (FLOOD, NDVI, NDWI + umur data), `gpm` (24h/72h/7d). Tercatat di `fusion_products`, `data_products` (tier FUSED) dan 12 baris `data_lineage` ke produk FUSED. `api_tokens` 1. `cleanup_operations` 0 masih wajar.
 - README menyebut `region_observations` "±79.000 baris". Isi sebenarnya 68.120. Angka ini perlu diselaraskan.
 
-### f. Testing kriteria pengguna
+### f. Requirement/user review
 
-Kriteria **Learnability** dan **Adaptability** belum punya artefak, misalnya skenario uji pengguna, kuesioner (SUS/UAT), atau hasilnya. Selain itu belum ada laporan hasil pytest yang tersimpan (misalnya file JUnit atau ringkasan lulus/gagal).
+Evaluasi minimum pertama di Tabel 4. Kebutuhan sudah dikumpulkan lewat wawancara GMLS 16 Okt 2026 (`lampiran/notulensiGMLS.txt`), tetapi belum ada bukti GMLS meninjau kebutuhan dan rancangan yang dihasilkan. Bahan tinjauan: `lampiran/Lembar_Tinjauan_Kebutuhan_GMLS.docx`/`.pdf`.
 
 ### g. Prasyarat objek studi (C.1)
 
@@ -177,7 +181,7 @@ Urutan disusun dari yang paling berdampak dan paling murah.
 7. **Simpan hasil testing sebagai artefak:**
    - Jalankan `pytest --junitxml=DOCS/hasil_uji/pytest.xml` saat suite lain tidak sedang berjalan (memori mesin 14 GB), lalu simpan ringkasannya.
    - Jalankan `tests/recovery/*.sh` dan catat hasilnya.
-   - Untuk Learnability dan Adaptability: susun skenario tugas per peran, lakukan UAT/SUS dengan 3–5 orang dari GMLS, dan simpan hasilnya di `DOCS/hasil_uji/`.
+   - Untuk requirement/user review: minta GMLS meninjau kebutuhan dan batasan sistem (lembar tinjauan atau konfirmasi singkat), lalu simpan buktinya di `DOCS/lampiran/`.
 8. **Lengkapi bukti dan rapikan dokumen:**
    - Simpan bukti legalitas dan lama operasi GMLS, serta bukti review model bersama GMLS (notulen), di `DOCS/lampiran/`.
    - Selaraskan angka di README (79.000 → angka aktual).

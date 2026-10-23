@@ -3,15 +3,23 @@
    Orbital 95 dari main.css (DESIGN.md); tanpa sudut membulat, tanpa blur. */
 
 /* ---------------------------------------------------------------- hero (Beranda) */
-.hero { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.hero { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
 .hero .hero-logo {
-  width: 64px; height: 64px; flex: none; display: block; image-rendering: pixelated; padding: 2px; background: var(--crt);
-  box-shadow: inset -1px -1px var(--hilite), inset 1px 1px var(--shadow), inset -2px -2px var(--light), inset 2px 2px var(--dark);
+  /* Logo Nusantara (bulat, hitam putih): tanpa bingkai kotak dan tanpa glow. */
+  width: 112px; height: 112px; flex: none; display: block; border-radius: 50%;
 }
 .hero .hero-text { flex: 1 1 320px; min-width: 0; }
-.hero .hero-name { font-size: 22px; line-height: 1.1; margin: 0 0 2px; }
-.hero .hero-tag { color: var(--text-mut); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 700; margin: 0 0 8px; }
+.hero .hero-name {
+  font-size: 34px; line-height: 1.1; margin: 0 0 4px;
+}
+.hero .hero-tag { color: var(--text-mut); text-transform: uppercase; letter-spacing: .08em; font-size: 13px; font-weight: 700; margin: 0 0 10px; }
 .hero .hero-lede { margin: 0 0 10px; line-height: 1.5; max-width: 70ch; }
+/* Beranda: sambutan dan peringatan memakai seluruh lebar jendela. */
+.hero .hero-text { flex: 1 1 0; }
+/* Sambutan dan peringatan sebagai satu blok teks polos, lebar penuh. */
+.hero .hero-box { box-sizing: border-box; width: 100%; margin: 0 0 10px; line-height: 1.5; }
+.hero .hero-box > p { max-width: none; margin: 0; }
+.hero .hero-box > p + p { margin-top: 6px; }
 .hero-strip { margin-top: 8px; }
 .hero-strip .screen-inner { min-height: 0; padding: 8px 10px; }
 .hero-strip .hs-line { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin: 0; }
@@ -71,7 +79,8 @@
 
 @media (max-width: 640px) {
   .compare-row { grid-template-columns: 1fr; }
-  .hero .hero-name { font-size: 18px; }
+  .hero .hero-name { font-size: 26px; }
+  .hero .hero-logo { width: 80px; height: 80px; }
 }
 
 /* Tabel panjang di dalam layar (riwayat backfill per tanggal). */

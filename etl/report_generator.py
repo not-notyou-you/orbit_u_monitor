@@ -2746,6 +2746,20 @@ def _kv_table(pairs: list[tuple[str, str]], S: _Styles) -> Table:
     return t
 
 
+# Logo Nusantara di kepala halaman PDF. PNG dibuat dari web/assets/img/logo.svg
+# (reportlab tidak membaca SVG); sudut di luar lingkaran transparan.
+LOGO_PNG = Path(__file__).resolve().parents[1] / "web" / "assets" / "img" / "logo.png"
+
+
+def draw_logo(canvas, x: float, y: float, size: float) -> float:
+    """Gambar logo dengan sudut kiri-bawah di (x, y). Mengembalikan lebar yang
+    terpakai termasuk jarak ke teks, atau 0 bila berkas logo tidak ada."""
+    if not LOGO_PNG.exists():
+        return 0.0
+    canvas.drawImage(str(LOGO_PNG), x, y, width=size, height=size, mask="auto")
+    return size + 4
+
+
 def _make_page_decorator(dataset_name: str, generated_at: datetime, font: str = "Helvetica"):
     """Header/footer (report.md, "Header/Footer: Page number, dataset name,
     generation date") -- digambar lewat canvas langsung."""
@@ -2753,7 +2767,8 @@ def _make_page_decorator(dataset_name: str, generated_at: datetime, font: str = 
         canvas.saveState()
         canvas.setFont(font, 8)
         canvas.setFillColor(colors.grey)
-        canvas.drawString(0.75 * inch, A4[1] - 0.55 * inch, f"Orbit-U DataLab — {dataset_name}")
+        off = draw_logo(canvas, 0.75 * inch, A4[1] - 0.55 * inch - 3, 13)
+        canvas.drawString(0.75 * inch + off, A4[1] - 0.55 * inch, f"Orbit-U DataLab — {dataset_name}")
         canvas.drawRightString(A4[0] - 0.75 * inch, A4[1] - 0.55 * inch, f"Generated {generated_at:%Y-%m-%d}")
         canvas.setStrokeColor(colors.HexColor("#DDDDDD"))
         canvas.line(0.75 * inch, A4[1] - 0.62 * inch, A4[0] - 0.75 * inch, A4[1] - 0.62 * inch)

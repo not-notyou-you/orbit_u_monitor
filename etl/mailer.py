@@ -40,6 +40,8 @@ logger = logging.getLogger(__name__)
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 SENDER_NAME = "Orbit-U: The Monitor"
+# Logo di pita judul email (notify_email._page merujuknya sebagai cid:orbitu-logo).
+LOGO_PNG = Path(__file__).resolve().parents[1] / "web" / "assets" / "img" / "logo.png"
 
 
 class MailError(Exception):
@@ -115,6 +117,8 @@ def build_message(cfg: MailConfig, to: str, subject: str, text: str, html: str |
     domain = (cfg.sender.split("@", 1)[1] if "@" in cfg.sender else "localhost")
     msg["Message-ID"] = make_msgid(domain=domain)
     msg.set_content(text)
+    if html and "cid:orbitu-logo" in html and LOGO_PNG.exists():
+        images = list(images or []) + [("orbitu-logo", LOGO_PNG.read_bytes())]
     if html:
         msg.add_alternative(html, subtype="html")
         if images:

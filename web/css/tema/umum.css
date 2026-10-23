@@ -328,7 +328,7 @@ html.tema-alt .banner {
 }
 html.tema-alt .banner.raised { background: var(--t-card-solid); }
 html.tema-alt .hero .hero-logo, html.tema-alt .hero-logo {
-  box-shadow: var(--t-shadow-btn); border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
+  box-shadow: var(--t-shadow-btn); border: var(--t-bw-ctl) solid var(--t-line); border-radius: 50%;
   padding: 0; overflow: hidden;
 }
 html.tema-alt .hero .hero-name { font-weight: 800; text-transform: var(--t-head-tf); letter-spacing: var(--t-head-ls); }

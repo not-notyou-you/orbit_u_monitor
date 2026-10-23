@@ -65,7 +65,7 @@ html[data-theme="pasir"] button, html[data-theme="pasir"] .btn { font-weight: 50
 html[data-theme="pasir"] .tabs [role=tab][aria-selected="true"] { box-shadow: inset 0 3px 0 var(--p-acc); }
 html[data-theme="pasir"] .screen-inner { font-weight: 500; }
 html[data-theme="pasir"] .readout .r-val { font-weight: 600; }
-html[data-theme="pasir"] .hero .hero-logo { border: 0; border-radius: 10px; }
+html[data-theme="pasir"] .hero .hero-logo { border: 0; border-radius: 50%; }
 
 /* Taskbar mengambang seperti ".foot" konsep: kapsul di tengah bawah, logo
    empat kotak menggantikan ikon satelit di tombol Mulai. */
@@ -79,13 +79,7 @@ html[data-theme="pasir"] .taskbar .start[aria-expanded="true"] {
 }
 html[data-theme="pasir"] .taskbar .start:hover, html[data-theme="pasir"] .taskbar .start[aria-expanded="true"] { background: var(--t-hover); }
 html[data-theme="pasir"] .taskbar .start svg { display: none; }
-html[data-theme="pasir"] .taskbar .start::before {
-  content: ""; width: 20px; height: 20px; flex: none; border-radius: 2px;
-  background: linear-gradient(var(--p-tx), var(--p-tx)) 0 0 / 9px 9px no-repeat,
-              linear-gradient(var(--p-acc), var(--p-acc)) 11px 0 / 9px 9px no-repeat,
-              linear-gradient(var(--p-acc), var(--p-acc)) 0 11px / 9px 9px no-repeat,
-              linear-gradient(var(--p-tx), var(--p-tx)) 11px 11px / 9px 9px no-repeat;
-}
+html[data-theme="pasir"] .taskbar .start .start-logo { width: 20px; height: 20px; }
 html[data-theme="pasir"] .tb-check, html[data-theme="pasir"] .tray { background: transparent; border-color: transparent; height: 28px; }
 html[data-theme="pasir"] .task-buttons button { background: transparent; border-color: transparent; min-height: 28px; }
 html[data-theme="pasir"] .task-buttons button[aria-pressed="true"] { box-shadow: inset 0 -3px 0 var(--p-acc); }

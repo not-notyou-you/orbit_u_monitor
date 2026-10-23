@@ -456,8 +456,26 @@ venv\Scripts\python -m pytest --ignore=tests/ui --ignore=tests/recovery --junitx
 
 - Dua tes yang dilewati butuh shapefile COD-AB di `data/external/cod-ab-idn/` (`test_hydromet_aggregate::TestRegionsFromShapefile`).
 - Matriks GRANT (`tests/security/grant_matrix.sql`) ikut dijalankan lewat `tests/security/test_grant_matrix.py`.
-- Belum dijalankan: `tests/ui/` (browser headless) dan `tests/recovery/*.sh`.
+- Belum dijalankan: `tests/ui/` (browser headless). `tests/recovery/*.sh` dijalankan terpisah (§7.2).
 - Artefak: `DOCS/hasil_uji/pytest.xml` (JUnit) dan `pytest_output.txt`.
+
+### 7.2 Hasil uji backup dan recovery
+
+Dijalankan 23 Oktober 2026, PostgreSQL 18.6. Sumbernya `themonitor_dev`, salinan database produksi
+(`createdb -T themonitor`) dengan 44 tabel dan 146.541 baris. Artefak: `DOCS/hasil_uji/backup_restore.txt`
+dan `kill_and_resume.txt`.
+
+| Uji | Hasil |
+|---|---|
+| `backup_restore.sh`: `pg_dump -Fc` → DB kosong → `pg_restore` → bandingkan jumlah | **Lulus.** Dump 5,1 MB (DB 67 MB) dalam 2 s, restore 4 s. Jumlah tabel, VIEW, fungsi, trigger, policy, GRANT, dan baris per tabel identik |
+| Isi hasil restore (kueri manual, tercantum di berkas hasil) | **Identik.** MD5 seluruh baris di 44 tabel, `last_value` 39 sequence, versi ekstensi, constraint (PK 44, FK 80, UNIQUE 36, CHECK 68), dan 163 index sama |
+| `grant_matrix.sql` pada DB hasil restore | **Lulus** (Part 1–3), setelah 3 laporan asli dikosongkan. Dengan laporan asli, Part 2 gagal karena uji menghitung semua baris `generated_reports`. Hasil di DB sumber sama persis, jadi ini bukan cacat restore |
+| `kill_and_resume.sh`: backfill dibunuh `kill -9`, lalu dijalankan ulang | **Lulus 3/3 run.** Saat dibunuh, 8/10 tanggal selesai. Run ulang hanya mengerjakan 2 tanggal sisa, tanpa job ganda dan tanpa nilai salah, dan 40 GeoTIFF bisa dibuka utuh. Run ketiga: 0 dikerjakan. Jeda sebelum kill dinaikkan dari 4 s ke 10 s. Dengan 4 s, proses dibunuh sebelum ada tanggal yang selesai, sehingga syarat "sebagian selesai" tidak bisa diuji |
+| Backup terjadwal (PIPELINE.md §13): perintah tugas dijalankan sekali secara manual | **Berhasil.** 5,0 MB dalam 1,3 s, terbaca `pg_restore -l` (1.330 entri) |
+
+Batas yang diuji: pemulihan logis penuh (RPO ≤ 24 jam dengan backup harian) dan pemulihan proses ETL. Yang
+tidak diuji: point-in-time recovery (`archive_mode = off`) dan backup berkas raster. Raster bisa dibangkitkan ulang
+dari sumber NASA/ESA lewat backfill, dan angkanya tetap tersimpan di database (PIPELINE.md §9).
 
 Pemeriksaan M63/M64 di peramban dilakukan dengan Playwright (Chrome headless, sesi dan
 izin lokasi ditiru), bukan lewat `tests/ui/`. Yang diperiksa:

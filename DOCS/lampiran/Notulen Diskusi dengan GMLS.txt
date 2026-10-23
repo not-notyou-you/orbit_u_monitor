@@ -1,0 +1,48 @@
+Diskusi dengan Pihak GMLS (Abah Lala / Pak Anis) 
+Jumat, 16 Oktober 2026
+=====================================================
+
+Sigap Desa -> Infografis, pendataan penduduk
+GMLS Logeva -> management tempat pengungsian, 
+Are You Insist -> data input dari masyarakat bisa melaporkan kejadian
+
+---
+Mobile App (sudah ada)--> GIS, peta lokasi user berada, wilayah rawan bencana, potensi risiko (apakah user sedang berada di zona rawan bencana). Potensi cuaca (dari BMKG). 
+*) Akan lebih baik bisa ditambahkan prediksi cuaca atau bencana ke depan.
+*) Fitur laporan sangat berguna --> untuk pelaporan, estimasi, dan deep learning berbasis data.
+*) Kenapa tidak coba akses satelit Himawari (statis) -> update data lebih cepat --> coba dieksplor.
+*) Sentinel juga dipakai BMKG, kalau terjadi bencana untuk membuat peta lokasi bencana, dampak, dsb.
+
+
+Are You Insists? --> pakai API BMKG dan peta BNPM.
+- Informasi cuaca
+- Notifikasi jika terjadi gempa bumi
+- Notifikasi dini tsunami
+
+Bencana yang menjadi concert utama?
+- Semua bencana menjadi concern, tidak terbatas di gempa dan tsunami.
+- Masyarakat yang tinggal di dekat sungai, berpotensi banjir.
+- Info dari BMKG menggunakan radar, hanya potensi area hujan dan banjir.
+Yang lebih dibutuhkan masyarakat, informasi ini lebih bermanfaat misalnya ada awan di atas mereka tinggal, berpotensi hujan lebat, bisa banjir bandang ke hilir atau tanah longsor, informasi ini akan lebih bermanfaat disampaikan kepada user dan menjadi notifitkasi.
+- Kenaikan air laut, bisa berpotensi banjir rob, dsb.
+
+Website referensi banyak, terutama untuk vulkanik gunung, tapi interfacenya sulit dipahami orang awam.
+Masyarakat perlu interface yang lebih sederhana, mudah dipahami.
+
+Apakah di GMLS sudah ada penanggung jawab/PIC untuk menginfokan / pemgumuman soal bencana.
+- Saat ini belum ada untuk informasi potensi bencana. 
+- Ini ranah pemerintah.
+- Sebagai masyarakat tetap berhak untuk mendapatkan informasi sendiri.
+- Sehingga sistem yang dibuat bukan sebagai pengarah secara langsung, tetapi sebagai "peringatan/rekomendasi" dan perlu berhati - hati dalam menyusun kalimat peringatan di dalam website
+
+Untuk data dampak bencana, harus merujuk ke data resmi dari pemerintah. Sayangnya, saat ini belum ada.
+Ini menjadi dasar untuk membangun app Are you Insist, sehingga masyarakat bisa melapor lewat app tersebut.
+
+
+Dokumentasi 4 aplikasi yang akan diluncurkan
+- Trip 2 Humanity Project
+- Melissa Ashley 
+- Bulan Desember launching
+
+
+

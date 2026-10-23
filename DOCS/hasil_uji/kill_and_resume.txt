@@ -1,0 +1,24 @@
+# kill_and_resume.sh — 2026-10-23 11:02:55 +0700
+[setup] test database rebuilt with 3 synthetic kecamatan
+[1] backfill dimulai, akan dibunuh setelah 10 detik
+[1] proses dibunuh; log:
+[4/10] 2024-01-04 COMPLETED (1s) 12 observations, 0 new alerts, GPM run L
+[5/10] 2024-01-05 COMPLETED (1s) 12 observations, 0 new alerts, GPM run L
+[6/10] 2024-01-06 COMPLETED (1s) 12 observations, 0 new alerts, GPM run L
+[7/10] 2024-01-07 COMPLETED (1s) 12 observations, 0 new alerts, GPM run L
+[8/10] 2024-01-08 COMPLETED (1s) 12 observations, 0 new alerts, GPM run L
+[check] completed=8/10 pending=2 observations=96 duplicate_job_dates=0 wrong_values=0 final_tifs=32
+[check] OK
+[2] perintah yang sama dijalankan ulang
+[INFO] 10 days in range, 8 already done, 2 to do
+[1/2] 2024-01-09 COMPLETED (0s) 12 observations, 0 new alerts, GPM run L
+[2/2] 2024-01-10 COMPLETED (0s) 12 observations, 0 new alerts, GPM run L
+[check] completed=10/10 pending=0 observations=120 duplicate_job_dates=0 wrong_values=0 final_tifs=40
+[check] OK
+[3] dijalankan sekali lagi: tidak ada yang dikerjakan
+[INFO] 10 days in range, 10 already done, 0 to do
+[OK] kill_and_resume lulus
+# kode keluar: 0, durasi total: 18 s
+
+# Diulang 2x lagi dengan skrip yang sama: kedua run dibunuh pada 8/10, lalu 10/10, kode keluar 0 (3/3 lulus).
+# Riwayat: sebelum 23 Okt 2026 skrip memakai sleep 4 dan gagal di mesin ini (completed=0/10 saat dibunuh: impor modul belum selesai).

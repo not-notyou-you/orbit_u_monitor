@@ -23,10 +23,10 @@ LOG=tests/recovery/_work_run1.log
 
 "$PY" "$HELPER" setup
 
-echo "[1] backfill dimulai, akan dibunuh setelah 4 detik"
+echo "[1] backfill dimulai, akan dibunuh setelah 10 detik"
 "$PY" "$HELPER" run "${RANGE[@]}" --delay 1.0 > "$LOG" 2>&1 &
 PID=$!
-sleep 4
+sleep 10   # 4 s terlalu cepat: impor modul di Windows belum selesai, 0 tanggal COMPLETED (23 Okt 2026)
 if command -v taskkill >/dev/null 2>&1; then
     taskkill //F //PID "$(ps -p $PID -o winpid= 2>/dev/null || echo $PID)" >/dev/null 2>&1 || kill -9 $PID
 else

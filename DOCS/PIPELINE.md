@@ -397,11 +397,40 @@ dengan seed).
 
 - **Uji restore:** `tests/recovery/backup_restore.sh` menjalankan `pg_dump -Fc` dari database uji, me-restore
   ke database kosong, lalu membandingkan jumlah baris per tabel, jumlah objek, dan GRANT. Skrip ini menolak
-  berjalan pada database produksi `themonitor`.
+  berjalan pada database produksi `themonitor`. Hasil 23 Okt 2026 (lulus, restore 4 s): INTERFACE.md §7.2.
 - **Membandingkan dua mesin:** `database/db_manifest.sql` (baca saja, aman untuk produksi).
-- **Backup produksi:** `etl/scheduler.py` menyebut `pg_dump` pukul 01:30 lewat cron OS, di luar APScheduler.
-  **Skrip dan jadwal cron-nya belum ada di repo.** Ini harus dibuat terpisah, misalnya Task Scheduler
-  Windows yang memanggil `pg_dump -Fc`.
+- **Backup produksi (M66):** tugas Windows Task Scheduler **"Orbit-U backup harian"**, di luar APScheduler,
+  sesuai `etl/scheduler.py`.
+
+  | Butir | Nilai |
+  |---|---|
+  | Jadwal | Setiap hari 01:30. Kalau komputer mati, dijalankan begitu menyala (`StartWhenAvailable`) |
+  | Isi | `pg_dump -Fc` database `themonitor` ke `backups\harian\themonitor_YYYYMMDD_HHmm.dump` |
+  | Verifikasi | `pg_restore -l` atas berkas baru. Gagal dump → berkas dihapus, kode keluar 1. Gagal baca → kode keluar 2 |
+  | Retensi | 14 hari. Dump manual di `backups\` (di luar `harian\`) tidak tersentuh |
+  | Sandi | Dibaca dari `.env` (`DB_PASSWORD`) saat tugas berjalan, tanpa berkas kredensial baru |
+  | RPO / RTO | RPO ≤ 24 jam. RTO ±4 s untuk restore database (INTERFACE.md §7.2) |
+  | Ukuran | 5,0 MB per dump, 1,3 s (23 Okt 2026) |
+
+  Tugas didaftarkan manual oleh pemilik, di PowerShell biasa (tidak perlu Administrator):
+
+  ```powershell
+  $cmd = @'
+  $ErrorActionPreference='Stop'; $r='D:\NOT-NOTYOU-YOU\themonitor'; $b='C:\Program Files\PostgreSQL\18\bin\'; $d=$r+'\backups\harian'; New-Item -ItemType Directory -Force $d | Out-Null; $env:PGPASSWORD=(((Get-Content ($r+'\.env')) -match '^DB_PASSWORD=') -replace '^DB_PASSWORD=','').Trim(); $f=$d+'\themonitor_'+(Get-Date -f yyyyMMdd_HHmm)+'.dump'; & ($b+'pg_dump.exe') -h localhost -p 5432 -U postgres -Fc -d themonitor -f $f; if($LASTEXITCODE){Remove-Item $f -EA 0; exit 1}; & ($b+'pg_restore.exe') -l $f | Out-Null; if($LASTEXITCODE){exit 2}; Get-ChildItem ($d+'\themonitor_*.dump') | Where-Object LastWriteTime -lt (Get-Date).AddDays(-14) | Remove-Item
+  '@
+  $action   = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "' + $cmd.Trim() + '"')
+  $trigger  = New-ScheduledTaskTrigger -Daily -At 01:30
+  $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+  Register-ScheduledTask -TaskName 'Orbit-U backup harian' -Action $action -Trigger $trigger -Settings $settings -Description 'Orbit-U: pg_dump harian themonitor, retensi 14 hari (PIPELINE.md 13)'
+  ```
+
+  Cek: `Start-ScheduledTask 'Orbit-U backup harian'`, lalu `Get-ScheduledTaskInfo 'Orbit-U backup harian'`
+  (`LastTaskResult` 0 = berhasil) dan lihat berkas baru di `backups\harian\`. Tugas ini hanya berjalan saat
+  pengguna login. Supaya tetap berjalan tanpa login, ubah di Task Scheduler ke "Run whether user is logged on
+  or not".
+- **Batas:** backup disimpan di komputer yang sama. Ini melindungi dari kerusakan database dan salah hapus,
+  tetapi tidak dari kehilangan atau rusaknya komputer. Untuk itu, salin `backups\harian\` ke penyimpanan lain
+  secara berkala.
 
 ---
 

@@ -1,0 +1,54 @@
+# backup_restore.sh — 2026-10-23 07:40:37 +0700
+# PostgreSQL 18.6, sumber themonitor_dev = salinan themonitor (createdb -T) pada waktu yang sama
+[1] pg_dump themonitor_dev
+    ukuran dump: 5.1M, 2 s
+[2] DB kosong themonitor_restore_test
+NOTICE:  database "themonitor_restore_test" does not exist, skipping
+[3] pg_restore
+    restore selesai dalam 4 s
+[4] bandingkan isi
+    fungsi = 830
+    grant = 235
+    policy = 3
+    tabel = 44
+    trigger = 29
+    view = 24
+    44 tabel, 146541 baris — identik dengan sumber
+HASIL: PASS
+# kode keluar: 0
+
+# ---- [6] Pemeriksaan lanjutan (manual, 23 Okt 2026): ISI identik, bukan hanya jumlah ----
+# Dijalankan pada themonitor_dev dan themonitor_restore_test (dipertahankan dengan KEEP=1),
+# hasil kedua DB di-sort lalu di-diff. Kueri yang dipakai:
+#   -- Checksum isi: MD5 atas semua baris (urut teks baris) per tabel public.
+#   SELECT format('SELECT %L || count(*) || ''|'' || coalesce(md5(string_agg(t::text, E''\n'' ORDER BY t::text)), ''-'') FROM public.%I t',
+#                 'isi|' || tablename || '|', tablename)
+#   FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename
+#   \gexec
+#   SELECT 'sequence|' || schemaname || '.' || sequencename || '|' || coalesce(last_value::text, 'null') FROM pg_sequences WHERE schemaname = 'public' ORDER BY 1;
+#   SELECT 'ekstensi|' || extname || '|' || extversion FROM pg_extension ORDER BY 1;
+#   SELECT 'constraint|' || contype::text || '|' || count(*) FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace WHERE n.nspname = 'public' GROUP BY contype ORDER BY 1;
+#   SELECT 'index|public|' || count(*) FROM pg_indexes WHERE schemaname = 'public';
+#   SELECT 'rls_aktif|' || relname || '|' || relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND relrowsecurity ORDER BY 1;
+# Hasil: 94 baris pembanding, diff KOSONG -> IDENTIK.
+#   isi       : 44 tabel, MD5 seluruh baris per tabel sama
+#   sequence  : 39 sequence, last_value sama (ID baru setelah restore tidak bentrok)
+#   ekstensi  : postgis 3.6.2, pgcrypto 1.4, plpgsql 1.0
+#   constraint: PK 44, FK 80, UNIQUE 36, CHECK 68, NOT NULL 351
+#   index     : 163 (termasuk GIST spasial)
+#   RLS aktif : api_tokens, generated_reports
+
+# ---- [7] Hak akses per peran BERFUNGSI di DB hasil restore ----
+#   psql -v ON_ERROR_STOP=1 -d themonitor_restore_test -f tests/security/grant_matrix.sql
+# Run 1 (isi apa adanya): Part 1 OK (390 sel objek x role); Part 2 GAGAL:
+#   "reports RLS: analyst sees 3 hydromet rows, expected 1"
+#   "reports RLS: data engineer sees 2 data-health rows, expected 1"
+# Penyebab: uji menyisipkan 1 laporan contoh per jenis lalu menghitung SEMUA baris, sedangkan
+# salinan produksi sudah berisi 2 HYDROMET_WEEKLY + 1 DATAHEALTH_WEEKLY (2+1=3, 1+1=2).
+# Pada DB sumber themonitor_dev hasilnya sama persis -> bukan cacat restore. Uji silang
+# (analis melihat 0 data-health, data engineer 0 hidromet) tetap lulus.
+# Run 2 (3 laporan dikosongkan di DB restore sekali pakai):
+#   NOTICE:  Part 1 OK: 390 object x role cells match DATABASE.md §8.3
+#   NOTICE:  Part 2 OK: column grants, RLS, append-only, auth functions, role windows
+#   NOTICE:  Part 3 OK: monitor_app has no privileges without SET ROLE
+#   kode keluar: 0

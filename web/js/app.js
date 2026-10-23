@@ -15,7 +15,7 @@
 'use strict';
 
 window.Pages = window.Pages || {};
-const ASSET_V = '6.19';
+const ASSET_V = '6.24';
 
 // `lede` = keterangan halaman; tidak lagi ditampilkan di jendela (dihapus atas
 // permintaan pemilik proyek), disimpan sebagai dokumentasi rute.
@@ -244,7 +244,7 @@ const Shell = (() => {
   // ---------------------------------------------------------------- taskbar
   function taskbarHTML(publicMode) {
     return '<nav class="taskbar" aria-label="Taskbar">' +
-      '<button type="button" class="start" id="startBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="startMenu">' + UI.icon('satellite') + '<span>Mulai</span></button>' +
+      '<button type="button" class="start" id="startBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="startMenu"><img class="start-logo" src="assets/img/logo.svg" alt="" width="16" height="16"><span>Mulai</span></button>' +
       '<label class="tb-check" for="admToggle" title="Tampilkan batas dan nama kecamatan di atas setiap pratinjau citra">' +
         '<input type="checkbox" id="admToggle"><span>Garis wilayah</span></label>' +
       '<div class="task-buttons" id="taskButtons" role="toolbar" aria-label="Halaman yang pernah dibuka"></div>' +

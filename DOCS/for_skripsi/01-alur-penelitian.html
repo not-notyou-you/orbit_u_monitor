@@ -13,12 +13,12 @@
 <header class="page">
   <div class="stage">Bab 3 · Metodologi penelitian</div>
   <h1>Alur penelitian dan metode</h1>
-  <p class="lede">Alur penelitian mengikuti Database System Development Life Cycle (DBSDLC) sesuai SKRIPSI.txt bagian A,
-  dengan metode pengumpulan data, identifikasi masalah, dan perancangan dari bagian B.</p>
+  <p class="lede">Alur penelitian mengikuti Database System Development Life Cycle (DBSDLC) sesuai Pedoman Penelitian Skripsi 1.3 bagian VII
+  (peminatan Database, jalur Design and Implementation), dengan metode pengumpulan data, identifikasi masalah, dan perancangan dari bagian VII.A.</p>
 </header>
 
 <h2>Diagram alur penelitian</h2>
-<div class="fig" data-cap="Alur penelitian berdasarkan DBSDLC" data-from="SKRIPSI.txt bagian A; DATABASE.md">
+<div class="fig" data-cap="Alur penelitian berdasarkan DBSDLC" data-from="Pedoman Penelitian Skripsi 1.3 bagian VII; DATABASE.md">
 <div class="body white"><pre class="mermaid">
 flowchart TD
     S([Mulai]) --> A1[Analisis sistem yang sedang berjalan<br/><i>As-Is System Analysis</i>]
@@ -43,15 +43,15 @@ flowchart TD
     PR -. umpan balik pengguna .-> UI
     PR --> IM[9. Implementation<br/>FastAPI, ETL Python, Web]
     IM --> DL[10. Data Conversion & Loading<br/>COD-AB, backfill GPM/MODIS/Sentinel-1]
-    DL --> TS[11. Testing<br/>learnability, performance, robustness,<br/>recoverability, adaptability]
+    DL --> TS[11. Testing<br/>requirement/user review, integrity, functional,<br/>security, query, backup/recovery]
     TS --> OK{Lolos?}
     OK -- tidak --> IM
-    OK -- ya --> E([Selesai: rancangan basis data,<br/>rekomendasi DBMS, aplikasi & API])
+    OK -- ya --> E([Selesai: rancangan basis data,<br/>rekomendasi DBMS, basis data fungsional])
 </pre></div>
 </div>
 
 <h2>Kerangka metode penelitian</h2>
-<div class="fig" data-cap="Kerangka metode penelitian" data-from="SKRIPSI.txt bagian B">
+<div class="fig" data-cap="Kerangka metode penelitian" data-from="Pedoman Penelitian Skripsi 1.3 bagian VII.A">
 <div class="body white"><pre class="mermaid">
 flowchart LR
     subgraph M1 [Metode pengumpulan data]
@@ -72,10 +72,10 @@ flowchart LR
     end
     subgraph H [Hasil akhir]
         direction TB
-        h1[Rancangan database]
+        h1[Rancangan conceptual, logical,<br/>physical; data dictionary, DDL]
         h2[Rekomendasi DBMS]
-        h3[Rancangan aplikasi]
-        h4[Middleware / REST API]
+        h3[Implementasi basis data<br/>yang dapat diuji]
+        h4[Bukti evaluasi: integrity,<br/>security, recovery, query]
     end
     M1 --> M2 --> M3 --> H
 </pre></div>
@@ -97,7 +97,7 @@ flowchart LR
 <tr><td class=c>8</td><td>Prototyping</td><td>Aplikasi web berjalan</td><td><code>web/</code>, <code>api/</code></td></tr>
 <tr><td class=c>9</td><td>Implementation</td><td>ETL, API, scheduler</td><td><code>etl/</code>, <code>api/</code></td></tr>
 <tr><td class=c>10</td><td>Data Conversion &amp; Loading</td><td>Pemuatan COD-AB, backfill 3 satelit</td><td><code>scripts/</code>, PIPELINE.md §10</td></tr>
-<tr><td class=c>11</td><td>Testing</td><td>pytest, matriks GRANT, recovery, UAT/SUS</td><td><code>tests/</code>, <code>DOCS/hasil_uji/</code></td></tr>
+<tr><td class=c>11</td><td>Testing</td><td>Requirement/user review, integrity, functional, security, query, backup/recovery</td><td><code>tests/</code>, <code>benchmark/</code>, <code>DOCS/hasil_uji/</code>, <code>DOCS/lampiran/</code></td></tr>
 </table></div>
 </div>
 </main>

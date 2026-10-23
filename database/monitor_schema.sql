@@ -311,7 +311,7 @@ CREATE TABLE disaster_types (
     indicator_bands  VARCHAR(100),
     is_active        BOOLEAN      NOT NULL DEFAULT true
 );
-COMMENT ON TABLE  disaster_types IS 'Master jenis bencana. ADMIN dapat menambah jenis tanpa ubah kode (uji adaptability).';
+COMMENT ON TABLE  disaster_types IS 'Master jenis bencana. ADMIN dapat menambah jenis tanpa ubah kode.';
 COMMENT ON COLUMN disaster_types.disaster_type_id IS 'PK surrogate.';
 COMMENT ON COLUMN disaster_types.type_code        IS 'Alternate key: BANJIR | BANJIR_BANDANG | LONGSOR | KEKERINGAN.';
 COMMENT ON COLUMN disaster_types.type_name        IS 'Label UI.';

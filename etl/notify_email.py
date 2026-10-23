@@ -277,6 +277,8 @@ def _page(body: str, accent: str = "#0b4f9c") -> str:
             "style='max-width:640px;width:100%;background:#ffffff;font-family:Segoe UI,Arial,sans-serif;"
             "font-size:14px;line-height:1.5;color:#111'>"
             f"<tr><td style='background:{accent};color:#fff;padding:10px 16px;font-weight:bold'>"
+            "<img src='cid:orbitu-logo' alt='' width='24' height='24' "
+            "style='vertical-align:middle;margin-right:8px;border:0'>"
             "Orbit-U: The Monitor · Pantauan Hidrometeorologi Lebak Selatan</td></tr>"
             f"<tr><td style='padding:16px'>{body}</td></tr>"
             "</table></td></tr></table></body></html>")

@@ -104,10 +104,11 @@ Teknik pencarian fakta yang dipakai sesuai metode di SKRIPSI.txt bagian B:
 |---|---|---|
 | Pemeriksaan dokumen | Ambang hujan BMKG; batas wilayah COD-AB (BPS/OCHA); spesifikasi produk ESA dan NASA | `alert_rules` (50/100/150 mm), `administrative_regions`, `spectral_bands.valid_min/max` |
 | Penelitian | Kode dan skema Orbit-U: The DataLab (README §5) | Tabel warisan §4.1 |
-| Wawancara / observasi | *[diisi penulis: tanggal, narasumber GMLS, ringkasan temuan]* | *[diisi penulis]* |
+| Wawancara | 16 Okt 2026, daring (Zoom), Anis Faisal Reza ("Abah Lala"), Ketua GMLS. GMLS memperhatikan semua bencana; info cuaca dari BMKG lewat Are You In Sys belum spesifik ke lokasi warga; GMLS hanya memberi peringatan, bukan penetapan; GMLS tidak mencatat kejadian sendiri dan menilai data BNPB tidak rapi; tampilan harus mudah bagi orang awam; informasi paling berguna bila spesifik ke lokasi dan dikirim sebagai notifikasi | Lokasi saya di Beranda dan `user_notify_regions`/`notify_sent` (lokasi + notifikasi); kalimat "bukan peringatan dini resmi" dan status Waspada/Tinggi (peringatan, bukan penetapan); `disaster_events.info_source` + `is_verified` (kejadian dari sumber resmi); `band_forecasts` (prediksi); batasan: gempa, tsunami, rob, Himawari |
 
-Bukti wawancara dan observasi (notulen, foto, surat) disimpan di `DOCS/lampiran/`. Baris ketiga belum bisa
-diisi dari kode.
+Bukti wawancara: `DOCS/lampiran/notulensiGMLS.txt`. Tinjauan kebutuhan oleh GMLS (requirement/user review)
+memakai lembar tinjauan yang menelusuri tiap kebutuhan ke pokok wawancara; hasil isiannya disimpan di
+`DOCS/lampiran/` setelah dikembalikan GMLS.
 
 **5W1H sistem yang diusulkan:**
 
@@ -255,8 +256,7 @@ Bobot skor 50/30/20 tetap berupa konstanta kode. `CHECK` memastikan `fail_below 
 `fail_above ≥ warn_above`.
 
 ### 3.9 `disaster_types`
-BANJIR, BANJIR_BANDANG, LONGSOR, KEKERINGAN. ADMIN bisa menambah jenis tanpa mengubah kode. Ini dipakai
-sebagai uji *adaptability*.
+BANJIR, BANJIR_BANDANG, LONGSOR, KEKERINGAN. ADMIN bisa menambah jenis tanpa mengubah kode.
 
 ### 3.10 `alert_rules`
 | Aturan | Band | Ambang | Severity | Aktif |

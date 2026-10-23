@@ -14,7 +14,7 @@
   <div class="stage">Daftar isi</div>
   <h1>Visual Skripsi — Orbit-U: The Monitor</h1>
   <p class="lede">Semua gambar dan tabel yang dibutuhkan naskah skripsi, mengikuti urutan tahap DBSDLC di
-  <code>DOCS/SKRIPSI.txt</code>. Isinya dibangun dari kode, skema, database, hasil benchmark, dan hasil uji project ini.
+  Pedoman Penelitian Skripsi 1.3 (ringkasan: <code>DOCS/SKRIPSI.txt</code>). Isinya dibangun dari kode, skema, database, hasil benchmark, dan hasil uji project ini.
   Setiap gambar bisa diunduh sebagai SVG/PNG, setiap tabel bisa disalin langsung ke Word, dan diagram Mermaid
   bisa disalin sumbernya untuk dirapikan di draw.io (Arrange → Insert → Advanced → Mermaid) atau mermaid.live.</p>
 </header>
@@ -33,7 +33,7 @@ atau data berubah, bangkitkan ulang kamus data lalu berkas ini:</p>
 venv\Scripts\python DOCS\for_skripsi\build_data.py</code></pre>
 <p class="note">Diagram Mermaid dan grafik dimuat dari CDN (jsdelivr, cdnjs), jadi halaman perlu internet saat pertama dibuka.
 Bagian bertanda <span class="pill warn">diisi penulis</span> berisi hal yang tidak bisa diturunkan dari kode, misalnya
-hasil wawancara GMLS, alur kerja manual sebelum sistem ada, dan hasil UAT/SUS.</p>
+hasil wawancara GMLS, alur kerja manual sebelum sistem ada, dan hasil tinjauan kebutuhan oleh GMLS.</p>
 
 <script>
 window.pageInit = function () {
@@ -53,7 +53,7 @@ window.pageInit = function () {
     ["12-sequence-class.html", "12. Sequence & class diagram", "Sequence diagram login/acknowledge/backfill dan class diagram domain inti."],
     ["13-arsitektur.html", "13. Arsitektur & alur data", "Arsitektur sistem, pipeline ETL per satelit, jadwal scheduler, dan tier artefak."],
     ["14-antarmuka.html", "14. Desain antarmuka", "Peta situs, navigasi per peran, dan wireframe halaman utama."],
-    ["15-testing.html", "15. Testing", "Ringkasan uji per kriteria, hasil pytest, skenario recovery, serta templat UAT/SUS."],
+    ["15-testing.html", "15. Testing", "Evaluasi minimum jalur Design and Implementation, hasil pytest, dan skenario backup/recovery."],
   ];
   document.getElementById("cards").innerHTML = items.map(([h, b, s]) => `<a href="${h}"><b>${b}</b><span>${s}</span></a>`).join("");
   const rows = [
@@ -61,7 +61,7 @@ window.pageInit = function () {
     ["Identifikasi masalah", "Tabel 5W1H, diagram masalah", "2", "ok", "Dari DATABASE.md §2.4"],
     ["Database planning", "Mission statement & objectives", "3", "ok", "DATABASE.md §2.1–2.2"],
     ["System definition", "Diagram batas sistem, user views", "3", "ok", "DATABASE.md §2.3"],
-    ["Requirement collection", "Tabel fact-finding", "3", "warn", "Baris wawancara/observasi diisi penulis"],
+    ["Requirement collection", "Tabel fact-finding", "3", "ok", "Wawancara GMLS 16 Okt 2026, DATABASE.md §2.4"],
     ["Conceptual design", "ERD Chen, kunci, domain", "4", "ok", "Skema"],
     ["Logical design", "ERD Crow's Foot, multiplicity, normalisasi", "5–6", "ok", "Skema + DATABASE.md §5"],
     ["Physical design", "ERD fisik, kamus data, indeks, keamanan", "7–8", "ok", "Katalog PostgreSQL"],
@@ -69,7 +69,7 @@ window.pageInit = function () {
     ["Pemodelan sistem", "Use case, activity, sequence, class", "10–12", "ok", "Kode api/ dan etl/"],
     ["Implementasi & loading", "Arsitektur, pipeline ETL, jadwal", "13", "ok", "PIPELINE.md"],
     ["Desain antarmuka & prototyping", "Peta situs, wireframe", "14", "ok", "web/ + INTERFACE.md (screenshot diambil dari aplikasi)"],
-    ["Testing", "Ringkasan uji, pytest, recovery, UAT/SUS", "15", "warn", "UAT/SUS belum dilakukan"],
+    ["Testing", "Evaluasi minimum, pytest, backup/recovery", "15", "warn", "Requirement/user review oleh GMLS belum ada"],
   ];
   document.getElementById("status").innerHTML = "<tr><th>Tahap DBSDLC</th><th>Visual</th><th class=c>Halaman</th><th>Status</th><th>Sumber / catatan</th></tr>" +
     rows.map(([a, b, c, s, d]) => `<tr><td>${a}</td><td>${b}</td><td class=c>${c}</td><td>${s === "ok" ? '<span class="pill ok">siap</span>' : '<span class="pill warn">diisi penulis</span>'}</td><td>${d}</td></tr>`).join("");

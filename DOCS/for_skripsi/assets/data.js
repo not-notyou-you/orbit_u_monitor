@@ -1,5 +1,5 @@
 window.SKRIPSI_DATA = {
- "generated": "2026-10-19 04:00",
+ "generated": "2026-10-23 14:01",
  "tables": {
   "administrative_regions": {
    "desc": "Batas wilayah resmi COD-AB Indonesia (BPS via OCHA/HDX): Kabupaten Lebak (level 2) dan kecamatannya (level 3). AOI GMLS = kecamatan in_aoi (M8).",
@@ -2242,7 +2242,7 @@ window.SKRIPSI_DATA = {
    ]
   },
   "disaster_types": {
-   "desc": "Master jenis bencana. ADMIN dapat menambah jenis tanpa ubah kode (uji adaptability).",
+   "desc": "Master jenis bencana. ADMIN dapat menambah jenis tanpa ubah kode.",
    "cols": [
     {
      "n": "disaster_type_id",
@@ -7393,43 +7393,43 @@ window.SKRIPSI_DATA = {
    "administrative_regions": 29,
    "api_tokens": 1,
    "app_settings": 13,
-   "audit_log": 348,
+   "audit_log": 353,
    "disaster_events": 0,
-   "band_forecasts": 891,
-   "band_forecast_points": 12555,
-   "band_forecast_scores": 3789,
+   "band_forecasts": 1045,
+   "band_forecast_points": 14685,
+   "band_forecast_scores": 4499,
    "cleanup_operations": 0,
-   "dataset_jobs": 1039,
+   "dataset_jobs": 1042,
    "live_areas": 1,
-   "processing_logs": 5972,
+   "processing_logs": 6361,
    "generated_reports": 3,
    "spectral_bands": 11,
    "processing_stages": 13,
-   "quality_alerts": 14,
+   "quality_alerts": 16,
    "user_notify_regions": 0,
    "notify_sent": 0,
-   "region_observations": 72640,
+   "region_observations": 72780,
    "fusion_strategies": 3,
    "alert_rules": 4,
-   "data_lineage": 8049,
-   "datasets": 2,
-   "live_events": 387,
-   "fusion_products": 0,
+   "data_lineage": 8135,
+   "datasets": 3,
+   "live_events": 423,
+   "fusion_products": 4,
    "live_scene_metrics": 1793,
    "users": 5,
-   "quality_metrics": 196,
+   "quality_metrics": 208,
    "regions_of_interest": 11,
    "roles": 5,
-   "scene_job_state": 150,
-   "user_activity_logs": 30,
+   "scene_job_state": 156,
+   "user_activity_logs": 39,
    "satellite_sources": 4,
-   "satellite_scenes": 88,
-   "nasa_scenes": 2218,
+   "satellite_scenes": 89,
+   "nasa_scenes": 2228,
    "alert_events": 210,
-   "data_products": 15708,
-   "processing_jobs": 7922,
+   "data_products": 15836,
+   "processing_jobs": 7951,
    "live_scenes": 57,
-   "dataset_source_config": 5,
+   "dataset_source_config": 8,
    "quality_thresholds": 9,
    "disaster_types": 4
   },
@@ -7447,9 +7447,9 @@ window.SKRIPSI_DATA = {
   ],
   "obs_range": [
    "2024-01-01",
-   "2026-10-17"
+   "2026-10-19"
   ],
-  "at": "2026-10-19 04:00",
+  "at": "2026-10-23 14:01",
   "indexes": [
    {
     "t": "administrative_regions",
@@ -8976,26 +8976,6 @@ window.SKRIPSI_DATA = {
   ],
   "members": [
    {
-    "role": "monitor_public",
-    "member": "monitor_user"
-   },
-   {
-    "role": "monitor_user",
-    "member": "monitor_analyst"
-   },
-   {
-    "role": "monitor_user",
-    "member": "monitor_data_engineer"
-   },
-   {
-    "role": "monitor_data_engineer",
-    "member": "monitor_admin"
-   },
-   {
-    "role": "monitor_analyst",
-    "member": "monitor_admin"
-   },
-   {
     "role": "monitor_admin",
     "member": "monitor_app"
    },
@@ -9014,6 +8994,26 @@ window.SKRIPSI_DATA = {
    {
     "role": "monitor_public",
     "member": "monitor_app"
+   },
+   {
+    "role": "monitor_public",
+    "member": "monitor_user"
+   },
+   {
+    "role": "monitor_user",
+    "member": "monitor_analyst"
+   },
+   {
+    "role": "monitor_user",
+    "member": "monitor_data_engineer"
+   },
+   {
+    "role": "monitor_data_engineer",
+    "member": "monitor_admin"
+   },
+   {
+    "role": "monitor_analyst",
+    "member": "monitor_admin"
    }
   ],
   "policies": [
