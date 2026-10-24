@@ -22,6 +22,21 @@ html.tema-alt body {
 html.tema-alt h1, html.tema-alt h2, html.tema-alt h3, html.tema-alt h4 { font-size: 13px; }
 html.tema-alt a { color: var(--t-link); }
 html.tema-alt ::selection { background: var(--t-acc); color: var(--t-acc-tx); }
+/* Scrollbar: ukuran, jalur, dan pegangan dari --t-sb-* tiap tema. Pegangan
+   diberi jarak dari tepi lewat border transparan; garis tepinya inset
+   box-shadow. Tanpa tombol panah. Firefox hanya mengenal warna dan ketebalan. */
+html.tema-alt ::-webkit-scrollbar { width: var(--t-sb-size); height: var(--t-sb-size); background: transparent; }
+html.tema-alt ::-webkit-scrollbar-track { background: var(--t-sb-track); border-radius: var(--t-sb-r); box-shadow: var(--t-sb-track-shadow); }
+html.tema-alt ::-webkit-scrollbar-thumb {
+  background: var(--t-sb-thumb) padding-box; border: var(--t-sb-gap) solid transparent;
+  border-radius: var(--t-sb-r); box-shadow: var(--t-sb-thumb-shadow);
+}
+html.tema-alt ::-webkit-scrollbar-thumb:hover { background-color: var(--t-sb-thumb-hover); }
+html.tema-alt ::-webkit-scrollbar-thumb:active { background-color: var(--t-sb-thumb-active); }
+html.tema-alt ::-webkit-scrollbar-corner { background: transparent; }
+@supports (-moz-appearance: none) {
+  html.tema-alt { scrollbar-color: var(--t-sb-thumb) var(--t-sb-track); scrollbar-width: var(--t-sb-ff-width); }
+}
 html.tema-alt .skip-link { background: var(--t-card-solid); border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2); }
 
 /* Kelas bevel dipakai langsung di markup (raised/sunken/pressed). */

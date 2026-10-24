@@ -33,3 +33,24 @@
 
 /* Slider di panel kontrol: lebar penuh kolom, bukan lebar bawaan peramban. */
 .control-panel input[type="range"] { width: 100%; }
+
+/* M69: peta direntang setinggi panel kiri. Tanpa ini panel kontrol lebih
+   tinggi daripada peta dan menyisakan ruang kosong di bawah peta. Kanvas
+   ikut berubah ukuran lewat ResizeObserver di terrain3d.js. */
+@media (min-width: 800px) {
+  .t3-layout { align-items: stretch; }
+  /* Sebaliknya di layar tinggi: kelompok terakhir panel ikut memanjang
+     supaya kedua kolom selalu rata bawah. */
+  .t3-layout .control-panel { display: flex; flex-direction: column; }
+  .t3-layout .control-panel > fieldset:last-child { flex: 1; margin-bottom: 0; }
+  .t3-layout .deck > .screen,
+  .t3-layout .deck > .screen > .screen-inner { flex: 1; display: flex; flex-direction: column; }
+  .t3-layout .deck .scr-body { flex: 1; display: flex; flex-direction: column; }
+  .t3-layout .t3-wrap { flex: 1; }
+  .t3-layout .t3-map { flex: 1; height: auto; min-height: clamp(320px, 55vh, 760px); }
+}
+/* Ponsel: peta dulu, kontrol di bawahnya (dulu peta baru muncul setelah
+   menggulir melewati seluruh panel). */
+@media (max-width: 799px) {
+  .t3-layout .deck { order: -1; }
+}

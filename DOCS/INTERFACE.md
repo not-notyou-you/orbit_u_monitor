@@ -38,17 +38,17 @@ ber-akun diantar ke `/masuk?next=…`.
 
 | # | Halaman | Hash | Tab (berkas `pages/*.html` + `js/*.js`) |
 |---|---|---|---|
-| 0 | Masuk | `/masuk` | `login` — nama pengguna + kata sandi, panel manfaat akun Relawan |
+| 0 | Masuk | `/masuk` | `login` — nama pengguna + kata sandi, panel manfaat akun Relawan ("Ingin daftar sebagai relawan?") |
 | -0 | Registrasi | `/daftar` | `register` — nama pengguna, kata sandi, konfirmasi, email **opsional** (M64; dicek dan dikirimi email konfirmasi bila diisi) |
-| 1 | Beranda (Pantau Lokasi, M63) | `#beranda` | `home` — landing singkat → Lokasi saya (USER+, izin lokasi, di dalam AOI) → Informasi lokasi (daftar + peta kecamatan berwarna status) → panel pantau satu kecamatan: kalimat kondisi + yang tidak normal, citra dipotong ke kecamatan, angka terbaru + tren 30 hari → pilihan tema tampilan (Kertas Mint bawaan, Orbital 95, Mika Pasir, Piksel Marun — M57, M65) |
-| 1b | Tentang (M63; dulu Sistem › Tentang dan isi Beranda lama) | `#tentang` | `about` — sambutan, penjelasan + batasan, kartu halaman per peran, peta AOI + daftar kecamatan, info aplikasi, sumber data, tabel akses per peran (ADMIN) |
-| 2 | 3D AOI | `#aoi-3d` | `terrain3d` — citra di atas relief DEM |
-| 3 | Citra Satelit | `#citra/…` | `ringkasan` (`citra`), `sentinel-1` / `modis` / `gpm` (`citra-sat`, satelit dari `tab.source`), `laporan` (`citra-report`) |
-| 4 | Forecast (dulu Diagram, M61) | `#forecast/…` | `terbaru` + `analisa-daerah` (`diagram`, mode dari `tab.mode`; setiap grafik garis + forecast 15 hari dengan sakelar di bawahnya), `evaluasi` (`analytics`; CH-01 tren per kecamatan dan CH-03 rerata hujan juga diberi forecast) |
-| 5 | Kejadian | `#kejadian/…` | `lihat` (`disasters-view`), `kelola` (`disasters`) |
-| 6 | Data | `#data/…` | `ringkasan` (`data-home`), `sentinel-1` / `gpm` / `modis` (`data-source`), `unduh` (`create-dataset`), `tersimpan` (`catalog`), `proses` (`process`), `eda` (`eda`) |
-| 7 | Laporan | `#laporan/…` | `kesehatan-data` + `keadaan-aoi` (`reports`, jenis dari `tab.kind`) |
-| 8 | Sistem | `#sistem/…` | `log` (`logs`), `akun` (`account`), `pengguna` (`admin`, kelompok `akses`), `pengaturan` (`admin`, kelompok `pengaturan`) |
+| 1 | Beranda (Pantau Lokasi, M63, M66) | `#beranda` | `home` — landing singkat tanpa tombol → Lokasi saya (USER+, izin lokasi, di dalam AOI) → Informasi lokasi (daftar kecamatan → KPI Pantau lokasi: status, update terakhir, luas daerah → peta berwarna status) → pilihan tema tampilan (Kertas Mint bawaan, Orbital 95, Mika Pasir, Piksel Marun — M57, M65) → Detail lokasi (satu satelit: pilihan satelit + channel, citra dipotong ke kecamatan dengan panah ‹ ›, angka terbaru + tren 30 hari satelit itu) |
+| 1b | Tentang (M63, M66; dulu Sistem › Tentang dan isi Beranda lama) | `#tentang` | `about` — logo (⅓) + "Apa ini" (⅔), "Yang perlu diketahui" (lima kartu berjajar), info aplikasi (tautan `/docs` hanya untuk yang masuk), sumber data, tabel akses per peran (ADMIN) |
+| 2 | 3D AOI (M69) | `#aoi-3d` | `terrain3d` — citra di atas relief DEM; panel kiri dua kelompok (citra yang ditempel, relief & kamera), peta direntang setinggi panel sehingga kedua kolom rata bawah; di ponsel peta tampil lebih dulu |
+| 3 | Citra Satelit | `#citra/…` | `ringkasan` (`citra`; tiga kartu satelit berjajar, pilihan Live Area hanya ADMIN), `sentinel-1` / `modis` / `gpm` (`citra-sat`, satelit dari `tab.source`; ⅔ penjelasan · ⅓ tanggal (dropdown, lima baris terlihat), CH-01 gambar, CH-02 kondisi & band selebar jendela, CH-03 per kecamatan; angka per band di modal gambar: ⅔ gambar + penjelasan · ⅓ tabel tanggal × band, Sebelumnya/Berikutnya menelusuri band lalu tanggal), `laporan` (`citra-report`) |
+| 4 | Forecast (dulu Diagram, M61, M67) | `#forecast/…` | `terbaru` + `analisa-daerah` (`diagram`, mode dari `tab.mode`; setiap grafik garis + forecast 15 hari dengan sakelar di bawahnya). Keadaan terbaru (M70): chip band di atas grafik; tabel forecast (kiri) dan rincian band (kanan) berdampingan, hanya band terpilih, model & penjelasan terlipat per baris. Analisa daerah (M70): kartu 2×2 Kecamatan · Band / Tanggal · Unduh di atas grafik (kecamatan lebih dari 8 lewat dialog "Semua kecamatan"); memuat bagian terlipat "Evaluasi alert & kejadian" (`analytics.js` sebagai pembantu: heatmap hujan, kejadian × hujan + forecast, POD/FAR, riwayat alert — dulu tab `evaluasi`) |
+| 5 | Kejadian (M68) | `#kejadian` | satu halaman `disasters` untuk semua peran: saringan satu baris, lencana ringkasan (jumlah, terverifikasi, per jenis; juga saring cepat), peta dan daftar berdampingan yang saling menyorot; catat/ubah/hapus dan Excel hanya untuk `disasters.manage`. `#kejadian/lihat` dan `#kejadian/kelola` dialihkan. M73: lencana "Alert hujan aktif · n kecamatan" (`alerts.view`) membuka daftar alert per kecamatan dengan "Tandai dibaca…" per baris dan "Tandai semua" (`alerts.acknowledge`) |
+| 6 | Data (M67, M74) | `#data/…` | `ringkasan` (`data-home` + `process.js`: satu baris status [berjalan / perlu tindakan], tabel dataset utama per satelit dengan Kelola →, kotak "sedang berjalan" hanya bila ada yang bergerak), `satelit` (`data-source`; Sentinel-1 / MODIS / GPM dipilih di dalam tab, segmen ketiga `#data/satelit/gpm`; backfill satu baris; tab Riwayat per tanggal · Data tersimpan; aksi item lewat klik baris), `dataset` (`catalog`; pemilih + aksi satu baris; `#data/dataset/baru` = wizard `create-dataset`; rincian 4 tab, Ringkasan dua kolom), `eda` (`eda`; pilihan data satu baris) |
+| 7 | Laporan (M68) | `#laporan/…` | `kesehatan-data` + `keadaan-aoi` (`reports`, jenis dari `tab.kind`): kartu laporan mingguan dan bulanan terakhir, saringan satu baris (langsung berlaku), rentang bebas dan buat ulang periode lewat dialog, buat ulang per baris (ADMIN) |
+| 8 | Sistem (M67) | `#sistem/…` | `log` (`logs`), `akun` (`account`), `pengguna` (`admin`, kelompok `akses`: akun + semua token terlipat), `pengaturan` (`admin`, kelompok `pengaturan`, M74: Live Area & penjadwal [temuan + jadwal + jalankan siklus Live] · Penyimpanan [per tier; produk per sumber | verifikasi + jumlah baris] · Wilayah & aturan [ROI gabungan terlipat; aturan alert / ambang QA / jenis bencana sebagai tab; satu Excel] · Aplikasi). Akun saya: kisi dua kolom + token selebar halaman |
 
 Isi per halaman:
 
@@ -88,19 +88,27 @@ Isi per halaman:
   `administrative_regions.in_aoi`.
   * Urutan bagian menurut keadaan:
     * **Lokasi saya** tampil hanya bila pengguna sudah masuk, izin lokasi
-      diberikan, dan titik perangkat jatuh di dalam poligon kecamatan AOI. Panel
-      pantau tampil di dalamnya, Informasi lokasi di bawahnya.
+      diberikan, dan titik perangkat jatuh di dalam poligon kecamatan AOI. KPI
+      dan Detail lokasi lalu menampilkan kecamatan itu.
     * Pengunjung, perangkat di luar wilayah, izin ditolak, peramban tanpa lokasi,
-      atau koneksi tidak aman: **Informasi lokasi** lebih dulu. Panel pantau
-      muncul di bawahnya untuk kecamatan yang dipilih (pilihan terakhir diingat
-      di `localStorage` `orbit-u.lokasi`).
-  * Panel pantau berisi tiga bagian:
-    * **kalimat kondisi**: status Normal/Waspada/Tinggi/Tidak tersedia + daftar
-      "yang tidak normal" + alert hujan 7 hari + tanggal data per satelit
+      atau koneksi tidak aman: KPI dan Detail lokasi menampilkan kecamatan yang
+      dipilih (pilihan terakhir diingat di `localStorage` `orbit-u.lokasi`).
+    * Urutan halaman selalu: Informasi lokasi → Tema tampilan → Detail lokasi.
+  * **Pantau lokasi** (M66) bukan bagian sendiri: tiga KPI di dalam Informasi
+    lokasi, di bawah daftar kecamatan dan di atas peta:
+    * **Status** Normal/Waspada/Tinggi/Tidak tersedia + alasannya
       (`etl/lokasi_interpret.py`, ambang dari `etl/live_interpret.py`);
-    * **citra**: scene Live terbaru dipotong ke kecamatan (`etl/region_crop.py`);
-    * **statistik**: angka terbaru tiap band + pengamatan sebelumnya + rentang
-      biasa, lalu grafik 30 hari dengan pita rentang biasa.
+    * **Update terakhir**: tanggal + jam:menit WIB angka kecamatan terakhir
+      dihitung (`updated_at` = max `region_observations.computed_at`);
+    * **Luas daerah** (km²), sumber data BPS (COD-AB).
+  * **Detail lokasi** (M66) menampilkan satu satelit sekaligus:
+    * kiri: pilihan satelit (lencana Waspada/Tinggi bila ada butir tidak
+      normal dari satelit itu) dan channel-nya;
+    * kanan: citra channel terpilih dari scene Live terbaru dipotong ke
+      kecamatan (`etl/region_crop.py`), panah ‹ › berganti satelit, legenda,
+      dan kalimat kondisi channel itu;
+    * di bawahnya: angka terbaru tiap band satelit itu + pengamatan sebelumnya
+      + rentang biasa, lalu grafik 30 hari dengan pita rentang biasa.
   * Izin dan kompatibilitas perangkat (`web/js/geo.js`):
     * Koordinat tidak dikirim ke server; titik dicocokkan di browser dengan
       `GET /api/regions`.
@@ -125,9 +133,12 @@ Isi per halaman:
   yang bisa diambil, keterbatasan), daftar tanggal dalam batas peran, gambar
   PNG (perbesar dengan lightbox), kalimat kondisi, tabel angka per band ×
   metrik, penjelasan + ambang tiap band, dan **perbandingan 2 tanggal**
-  (gambar berdampingan + kolom selisih). Tab GPM untuk USER+ juga memuat
-  "Hujan per kecamatan hari ini" (fragmen `statistics`, termasuk acknowledge
-  alert untuk Analis).
+  (gambar berdampingan + kolom selisih). Tab GPM untuk USER+ memuat
+  "Hujan per kecamatan" untuk **tanggal yang dipilih** (M73): peta koroplet
+  kategori BMKG dan tabel yang bisa diurutkan (24 jam, 72 jam, 7 hari, 30 hari,
+  kategori), saling menyorot; Excel terlipat. Alert aktif tinggal satu baris
+  pemberitahuan yang menaut ke Kejadian (daftar dan "tandai dibaca" ada di sana).
+  Fragmen `statistics` dihapus.
 * **3.5 Laporan PDF**: centang Ringkasan / Sentinel-1 / MODIS / GPM (satu,
   beberapa, atau semua), tanggal scene, pembanding opsional → satu PDF.
 * **4.1 Keadaan terbaru**: semua band dalam satu grafik, satu warna per band,
@@ -269,7 +280,7 @@ klimatologi, klimatologi + anomali AR(1)), dipilih lewat backtest setahun. Sejak
 dan per kecamatan dihitung saat data baru masuk (`etl/forecast_store.py`) dan disimpan di
 `band_forecasts`; endpoint membacanya bila masih berlaku dan hanya menghitung di tempat untuk rentang di
 masa lalu atau rerata beberapa kecamatan. Rumus lengkap, jadwal, dan ukuran waktu: PIPELINE.md §14. UI meminta satu deret per request (3 paralel, antrean
-`UI.forecastQueue` dipakai bersama tab Forecast dan Tren & evaluasi alert) dan menampilkan palang
+`UI.forecastQueue` dipakai bersama tab Forecast dan bagian Evaluasi alert & kejadian) dan menampilkan palang
 progres + perkiraan sisa waktu; grafik data tampil lebih dulu.
 
 Ambang dan teks band: `etl/band_catalog.py`, angka ambangnya dari
@@ -316,14 +327,15 @@ di `logs/backfill/backfill_<id>.log`; hasil per tanggal tetap di `dataset_jobs`.
 | Metode | Path | Peran | Keterangan |
 |---|---|---|---|
 | GET | `/public/lokasi` | PUBLIC | kecamatan AOI + status singkat, jumlah indikator tidak normal, alert 7 hari tertinggi, tanggal data per satelit |
-| GET | `/public/lokasi/{region_id}` | PUBLIC | status + `abnormal` + semua kalimat, `stats` per band (nilai, sebelumnya, rentang biasa, ambang), `alerts`, `imagery` (scene Live terbaru; `cropped` = ada georeferensi) |
+| GET | `/public/lokasi/{region_id}` | PUBLIC | status + `abnormal` + semua kalimat, `stats` per band (nilai, sebelumnya, rentang biasa, ambang), `alerts`, `imagery` (scene Live terbaru; `cropped` = ada georeferensi), `updated_at` (waktu angka kecamatan terakhir dihitung, M66) |
 | GET | `/public/lokasi/{region_id}/trend?days=30` | PUBLIC | deret harian 3 kelompok × 3 band (7–90 hari), batas waktu dari VIEW |
 | GET | `/public/lokasi/{region_id}/preview/{key}.png` | PUBLIC | PNG scene terbaru dipotong ke kecamatan (di luar poligon transparan); 404 `GRID_MISSING` untuk scene tanpa georeferensi |
 
 Angka dibaca lewat `v_public_lokasi_obs`, `v_public_lokasi_range`, dan
 `v_public_lokasi_alert` di bawah role pemanggil. Koneksi ETL hanya mencari
-Live Area yang menutupi kecamatan (bbox), path PNG, dan ambang BMKG, dan
-tidak satu pun dikirim ke klien.
+Live Area yang menutupi kecamatan (bbox), path PNG, ambang BMKG, dan
+stempel waktu `updated_at`; selain stempel waktu itu, tidak satu pun dikirim
+ke klien.
 
 ### 4.8 Peringatan email (`api/routes/admin_monitor.py`, ADMIN, M64)
 
@@ -511,13 +523,14 @@ keinginan pemilik proyek.
 
 | # | Pertanyaan | Keputusan |
 |---|---|---|
-| Q1 | Fitur yang tidak disebut rancangan | Hujan per kecamatan masuk Citra › GPM; alert aktif di Beranda; Tren & evaluasi alert jadi tab ketiga Diagram |
+| Q1 | Fitur yang tidak disebut rancangan | Hujan per kecamatan masuk Citra › GPM; alert aktif di Kejadian (M73); Tren & evaluasi alert jadi tab ketiga Diagram |
 | Q2 | Dasar "30 hari / 1 tahun" | Dihitung dari hari ini; scene terbaru selalu tampil |
 | Q3 | PDF Citra untuk pengunjung | Boleh, dengan batas 30 hari yang sama |
 | Q4 | Manajemen akun | Semua peran login: akun sendiri; ADMIN: semua akun |
 | Q5 | Verifikasi email | Tidak; akun langsung aktif, dibatasi 5 registrasi per IP per jam |
 | Q6 | "Hapus data" di halaman Data | Soft delete (nonaktifkan + alasan, bisa dipulihkan), sesuai M23/M24 |
 | Q7 | Data Engineer melihat Diagram | Tidak, sesuai rancangan |
+| Q8 | Tabel panjang dan tabel di ponsel (M72) | Paling banyak 8 baris terlihat, sisanya digulir dengan header menempel; di layar ≤ 600 px setiap baris jadi kartu. Berlaku untuk semua tabel lewat `js/ui.js`, kecuali matriks `.heat` |
 
 ---
 

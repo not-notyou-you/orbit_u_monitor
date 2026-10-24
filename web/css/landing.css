@@ -6,20 +6,14 @@
 /* ---------------------------------------------------------------- hero */
 .hero { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
 .hero .hero-logo {
-  /* Logo Nusantara (bulat, hitam putih): tanpa bingkai kotak. Glow biru gelap
-     mengikuti bentuk logo (drop-shadow), bukan kotak gambarnya. */
+  /* Logo Nusantara (bulat, hitam putih): tanpa bingkai kotak dan tanpa glow. */
   width: 112px; height: 112px; flex: none; display: block; border-radius: 50%;
-  filter: drop-shadow(0 0 6px rgba(16, 52, 140, .9)) drop-shadow(0 0 16px rgba(10, 32, 96, .7));
 }
 .hero .hero-text { flex: 1 1 320px; min-width: 0; }
-.hero .hero-name {
-  font-size: 34px; line-height: 1.1; margin: 0 0 4px; letter-spacing: .01em;
-  text-shadow: 0 0 6px rgba(16, 52, 140, .85), 0 0 16px rgba(10, 32, 96, .65);
-}
+.hero .hero-name { font-size: 34px; line-height: 1.1; margin: 0 0 4px; letter-spacing: .01em; }
 .hero .hero-tag {
   color: var(--text-mut); text-transform: uppercase; letter-spacing: .08em;
   font-size: 13px; font-weight: 700; margin: 0 0 10px;
-  text-shadow: 0 0 8px rgba(16, 52, 140, .55);
 }
 .hero .hero-lede { margin: 0 0 10px; line-height: 1.5; max-width: 62ch; }
 .hero .btn-row { margin-top: 2px; }

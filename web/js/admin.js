@@ -11,6 +11,21 @@
 // di dalamnya adalah segmen ketiga hash: #pengaturan/jejak/audit. Halaman ini
 // tinggal merender baris bagian + panelnya, dan mengikuti `ctx.sub`. Fungsi
 // perender tiap bagian tidak berubah; hanya cara masuknya.
+//
+// M67: bagian Pengaturan 9 → 5 dan Manajemen akun tanpa sub-tab. Beberapa
+// perender lama digabung dalam satu bagian (parts): Ringkasan = temuan +
+// status pipeline + picu job, Penyimpanan = disk + arsip, Wilayah & aturan,
+// Pengguna + token (token terlipat). Tiap perender menulis ke wadahnya
+// sendiri (box), jadi yang memuat ulang dirinya tidak menimpa tetangganya.
+// Daftar Scene dihapus: aksi per scene sudah ada di Data › Satelit.
+//
+// M74: Pengaturan 5 → 4 bagian. Ringkasan dihapus: job terakhir, progres, dan
+// backfill hidromet sudah ada di Data › Ringkasan/Satelit, laporan di halaman
+// Laporan, log di Sistem › Log, alert di Kejadian. Yang tersisa (temuan,
+// penjadwal, jalankan siklus Live) pindah ke atas Live Area. Penyimpanan:
+// bilah per tier, lalu produk per sumber (kiri) dan verifikasi + jumlah baris
+// (kanan) berdampingan. Wilayah & aturan: ROI gabungan dilipat, tiga tabel aturan jadi tab
+// kecil, satu kotak Excel.
 'use strict';
 Pages['admin'] = (() => {
   const ROLES = [['USER', 'Relawan (USER)'], ['ANALYST', 'Analis (ANALYST)'], ['DATA_ENGINEER', 'Data Engineer'], ['ADMIN', 'Administrator']];
@@ -24,27 +39,25 @@ Pages['admin'] = (() => {
   // M56: dua kelompok di bawah Sistem. Log (masuk, unduhan, audit) pindah ke
   // Sistem › Log (js/logs.js); kelompok `jejak` tetap ada untuk hash lama.
   const SECTIONS = {
-    pengaturan: [{ key: 'ringkasan', title: 'Ringkasan' }, { key: 'pipeline', title: 'Pipeline' },
-                 { key: 'scene', title: 'Scene' }, { key: 'live', title: 'Live Area' },
-                 { key: 'penyimpanan', title: 'Penyimpanan' }, { key: 'arsip', title: 'Arsip' },
-                 { key: 'wilayah', title: 'Wilayah' }, { key: 'aturan', title: 'Aturan & ambang' },
-                 { key: 'aplikasi', title: 'Aplikasi' }],
-    akses: [{ key: 'pengguna', title: 'Pengguna' }, { key: 'token', title: 'Token API' }],
+    pengaturan: [{ key: 'live', title: 'Live Area & penjadwal' }, { key: 'penyimpanan', title: 'Penyimpanan' },
+                 { key: 'wilayah', title: 'Wilayah & aturan' }, { key: 'aplikasi', title: 'Aplikasi' }],
+    akses: [{ key: 'pengguna', title: 'Pengguna' }],
     jejak: [{ key: 'masuk', title: 'Log Masuk' }, { key: 'unduhan', title: 'Log Unduhan' },
             { key: 'audit', title: 'Audit' }],
   };
   // Kelompok → tab router di bawah #sistem.
   const GROUP_TAB = { pengaturan: 'pengaturan', akses: 'pengguna', jejak: 'log' };
   const TABS = {
-    ringkasan: tabSummary, pengguna: tabUsers, scene: tabScenes, live: tabLive, wilayah: tabRegions,
-    aturan: tabRules, pipeline: tabPipeline, arsip: tabArchive, penyimpanan: tabStorage,
-    aplikasi: tabSettings, token: tabTokens,
+    live: () => parts([['attn', tabAttention], ['live', tabLive]]), aplikasi: tabSettings,
+    penyimpanan: () => parts([['storage', tabStorage], ['archive', tabArchive]]),
+    wilayah: () => parts([['regions', tabRegions], ['rules', tabRules]]),
+    pengguna: () => parts([['users', tabUsers], ['tokens', tabTokens, 'Semua token API']]),
     masuk: () => tabLog('login'), unduhan: () => tabLog('download'), audit: tabAudit,
   };
   // Kelompok yang memuat sebuah bagian — dipakai Ringkasan untuk menyusun hash
   // tujuan "Buka →" tanpa perlu tahu susunannya.
   const groupOf = key => Object.keys(SECTIONS).find(g => SECTIONS[g].some(t => t.key === key)) || 'pengaturan';
-  const hashOf = key => '#sistem/' + GROUP_TAB[groupOf(key)] + (key === 'ringkasan' ? '' : '/' + key);
+  const hashOf = key => '#sistem/' + GROUP_TAB[groupOf(key)] + '/' + key;
   let st = null;
 
   // Kelompoknya datang dari router (ctx.tab), bagiannya dari segmen ketiga
@@ -69,8 +82,11 @@ Pages['admin'] = (() => {
     await render();
   }
 
+  // Bagian lama yang digabung (M67) → bagian yang sekarang memuatnya.
+  const MERGED = { ringkasan: 'live', pipeline: 'live', scene: 'live', arsip: 'penyimpanan', aturan: 'wilayah', token: 'pengguna' };
   function sectionKey(group, sub) {
     const list = SECTIONS[group] || SECTIONS.pengaturan;
+    sub = MERGED[sub] || sub;
     return (list.find(t => t.key === sub) || list[0]).key;
   }
 
@@ -98,6 +114,16 @@ Pages['admin'] = (() => {
   }
 
   const panel = () => UI.$('#adPanel', st.root);
+  // Wadah satu perender di dalam bagian gabungan; di luar itu = seluruh panel.
+  const box = name => UI.$('#adPart-' + name, st.root) || panel();
+  // Bagian gabungan: [nama, perender, judul lipatan?]. Perender dijalankan
+  // berurutan, masing-masing ke wadahnya; yang berjudul dirender terlipat.
+  async function parts(list) {
+    panel().innerHTML = list.map(([name, , fold]) => fold
+      ? '<details class="ad-fold"><summary>' + UI.esc(fold) + '</summary><div class="ad-part" id="adPart-' + name + '"></div></details>'
+      : '<div class="ad-part" id="adPart-' + name + '"></div>').join('');
+    for (const [, fn] of list) await fn();
+  }
   const pg = k => st.page[k] || 1;
   async function users() { if (!st.users) st.users = (await API.get('/api/admin/users?limit=500')).items; return st.users; }
   const userOpts = list => '<option value="">Semua pengguna</option>' + list.map(u => '<option value="' + u.user_id + '">' + UI.esc(u.username) + '</option>').join('');
@@ -174,18 +200,18 @@ Pages['admin'] = (() => {
   }
   const btn = (attr, label) => '<button type="button" class="small" ' + attr + '>' + UI.esc(label) + '</button>';
   const filterBar = inner => '<form class="ct-filters" novalidate style="display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-bottom:8px">' + inner + '<button type="submit">Terapkan</button></form>';
-  function bindFilter(fn) { const f = UI.$('form.ct-filters', panel()); if (f) f.addEventListener('submit', ev => { ev.preventDefault(); fn(); }); }
-  function bindPager(key, fn) { UI.$$('[data-page]', panel()).forEach(b => b.addEventListener('click', () => { st.page[key] = Number(b.dataset.page); fn(); })); }
+  function bindFilter(fn, root) { const f = UI.$('form.ct-filters', root || panel()); if (f) f.addEventListener('submit', ev => { ev.preventDefault(); fn(); }); }
+  function bindPager(key, fn, root) { UI.$$('[data-page]', root || panel()).forEach(b => b.addEventListener('click', () => { st.page[key] = Number(b.dataset.page); fn(); })); }
 
   // ================================================================ 1. Pengguna
   async function tabUsers() {
-    const p = panel();
+    const p = box('users');
     if (!UI.$('#auQ', p)) {
       p.innerHTML = filterBar('<div class="field" style="margin:0"><label for="auQ">Cari</label><input type="search" id="auQ" placeholder="nama / pengguna"></div>' +
         '<div class="field" style="margin:0"><label for="auRole">Peran</label><select id="auRole"><option value="">Semua</option>' + ROLES.map(([v, l]) => '<option value="' + v + '">' + l + '</option>').join('') + '</select></div>' +
         '<div class="field" style="margin:0"><label for="auAct">Status</label><select id="auAct"><option value="">Semua</option><option value="true">Aktif</option><option value="false">Nonaktif</option></select></div>') +
         '<div class="btn-row" style="margin-bottom:8px"><button type="button" class="default" id="auNew">Buat akun…</button></div><div id="auList"></div>';
-      bindFilter(() => { st.page.users = 1; tabUsers(); });
+      bindFilter(() => { st.page.users = 1; tabUsers(); }, p);
       UI.$('#auNew', p).addEventListener('click', createUser);
     }
     const r = await API.get('/api/admin/users' + API.qs({ q: UI.$('#auQ', p).value, role_code: UI.$('#auRole', p).value, is_active: UI.$('#auAct', p).value, limit: 50, offset: (pg('users') - 1) * 50 }));
@@ -207,7 +233,7 @@ Pages['admin'] = (() => {
     UI.$$('[data-unlock]', p).forEach(b => b.addEventListener('click', () => UI.busy(b, async () => {
       try { await API.post('/api/admin/users/' + b.dataset.unlock + '/unlock'); tabUsers(); } catch (e) { UI.showError('Buka kunci', e); }
     })));
-    bindPager('users', tabUsers);
+    bindPager('users', tabUsers, p);
   }
   async function createUser() {
     const r = await formDialog('Buat akun', [
@@ -236,86 +262,28 @@ Pages['admin'] = (() => {
     if (r) UI.info('Reset kata sandi', 'Kata sandi "' + u.username + '" diganti.');
   }
 
-  // ================================================================ 2. Scene
-  async function tabScenes() {
-    const p = panel();
-    if (!UI.$('#asSrc', p)) {
-      p.innerHTML = '<div class="layout"><div class="control-panel">' +
-        '<form id="asF" novalidate><fieldset><legend>Filter scene</legend>' +
-        '<div class="field"><label for="asSrc">Sumber</label><select id="asSrc"><option value="S1">Sentinel-1</option><option value="MODIS">MODIS</option><option value="GPM">GPM</option></select></div>' +
-        '<div class="field-row"><div class="field"><label for="asFrom">Dari</label><input type="date" id="asFrom"></div><div class="field"><label for="asTo">Sampai</label><input type="date" id="asTo"></div></div>' +
-        '<label class="check"><input type="checkbox" id="asInv" checked> Sertakan yang dinonaktifkan</label>' +
-        '<div class="btn-row end"><button type="submit">Terapkan</button></div></fieldset></form>' +
-        '<form id="aiF" novalidate><fieldset><legend>Picu ingestion</legend>' +
-        '<div class="field"><label for="aiJob">Jenis job</label><select id="aiJob"><option value="HYDROMET">Hidromet (GPM + MODIS) rentang tanggal</option><option value="LIVE">Siklus Live sekarang</option></select></div>' +
-        '<div class="field-row" id="aiDates"><div class="field"><label for="aiFrom">Dari</label><input type="date" id="aiFrom"></div><div class="field"><label for="aiTo">Sampai</label><input type="date" id="aiTo"></div></div>' +
-        '<div class="field hidden" id="aiAreaBox"><label for="aiArea">Live Area</label><select id="aiArea"></select></div>' +
-        '<span class="err" id="aiErr"></span><span class="hint">Mengunduh data satelit (Hidromet ≤ 366 hari, berjalan di bawah kunci "hydromet").</span>' +
-        '<div class="btn-row end"><button type="submit" id="aiGo">Jalankan…</button></div></fieldset></form>' +
-        '</div><div class="deck" id="asList"></div></div>';
-      UI.$('#asF', p).addEventListener('submit', ev => { ev.preventDefault(); st.page.scenes = 1; tabScenes(); });
-      const job = UI.$('#aiJob', p);
-      job.addEventListener('change', () => { UI.$('#aiDates', p).classList.toggle('hidden', job.value !== 'HYDROMET'); UI.$('#aiAreaBox', p).classList.toggle('hidden', job.value !== 'LIVE'); });
-      API.get('/api/live/areas').then(a => { UI.$('#aiArea', p).innerHTML = a.map(x => '<option value="' + x.area_id + '">' + UI.esc(x.name) + '</option>').join(''); }).catch(() => {});
-      UI.$('#aiF', p).addEventListener('submit', ingest);
-    }
-    const src = UI.$('#asSrc', p).value;
-    const r = await API.get('/api/scenes' + API.qs({ source: src, include_invalid: UI.$('#asInv', p).checked || undefined,
-      date_from: UI.$('#asFrom', p).value ? UI.$('#asFrom', p).value + 'T00:00:00Z' : '', date_to: UI.$('#asTo', p).value ? UI.$('#asTo', p).value + 'T23:59:59Z' : '',
-      limit: 100, offset: (pg('scenes') - 1) * 100 }));
-    const id = s => src === 'S1' ? s.scene_id : s.nasa_scene_id;
-    UI.$('#asList', p).innerHTML = UI.screenHTML({ channel: 'CH-01 · SCENE ' + src, rec: UI.int(r.total) + ' BARIS', recCls: 'off', body: UI.tableHTML(
-      (src === 'S1' ? [{ label: 'ID', key: 'scene_id' }, { label: 'Produk', get: s => s.product_identifier.slice(0, 40) + '…' }, { label: 'Akuisisi', get: s => UI.dateTime(s.acquisition_datetime) },
-        { label: 'Orbit', get: s => (s.orbit_direction === 'ASCENDING' ? 'naik' : s.orbit_direction === 'DESCENDING' ? 'turun' : '—') + ' · rel ' + (s.relative_orbit ?? '—') }]
-        : [{ label: 'ID', key: 'nasa_scene_id' }, { label: 'Produk', key: 'product_short_name' }, { label: 'Tile', key: 'tile_id' }, { label: 'Tanggal', get: s => UI.date(s.acquisition_date) }, { label: 'Run', key: 'run_type' }])
-      .concat([{ label: 'Valid', html: true, get: s => s.is_valid ? 'YA' : '<span class="v-amber">TIDAK</span>' + (s.invalid_reason ? '<br><span class="v-dim">' + UI.esc(s.invalid_reason) + '</span>' : '') },
-        { label: 'Aksi', html: true, get: s => btn('data-val="' + id(s) + '"', s.is_valid ? 'Nonaktifkan…' : 'Pulihkan') + ' ' + btn('data-rep="' + id(s) + '"', 'Proses ulang…') }]),
-      r.items, { empty: 'TIDAK ADA SCENE' }) + UI.pagerHTML(r.total, 100, (pg('scenes') - 1) * 100) });
-    const find = x => r.items.find(s => String(id(s)) === x);
-    UI.$$('[data-val]', p).forEach(b => b.addEventListener('click', () => setValidity(src, find(b.dataset.val), id)));
-    UI.$$('[data-rep]', p).forEach(b => b.addEventListener('click', () => reprocess(src, find(b.dataset.rep), id)));
-    bindPager('scenes', tabScenes);
-  }
-  async function setValidity(src, s, id) {
-    if (s.is_valid) {
-      const r = await formDialog('Nonaktifkan scene #' + id(s), [{ id: 'reason', label: 'Alasan (wajib)', type: 'textarea', required: true, minlength: 3 }],
-        v => API.patch('/api/admin/scenes/' + src + '/' + id(s), { is_valid: false, reason: v.reason }),
-        { ok: 'Nonaktifkan', message: 'Scene dinonaktifkan (soft delete), tidak dihapus. Data turunannya tidak dipakai lagi sampai dipulihkan.' });
-      if (r) tabScenes();
-    } else {
-      if (!await UI.confirm('Pulihkan scene', 'Pulihkan scene #' + id(s) + ' menjadi valid kembali?', 'Pulihkan')) return;
-      try { await API.patch('/api/admin/scenes/' + src + '/' + id(s), { is_valid: true }); tabScenes(); } catch (e) { UI.showError('Pulihkan scene', e); }
-    }
-  }
-  async function reprocess(src, s, id) {
-    const what = src === 'S1' ? 'Scene Live tanggal itu dicoba ulang (unduh MODIS/GPM yang gagal).' : 'Job Hidromet tanggal itu diulang: COG yang belum Final dibangun ulang (dapat mengunduh granule NASA).';
-    if (!await UI.confirm('Proses ulang', 'Proses ulang ' + src + ' #' + id(s) + '?\n\n' + what, 'Proses ulang')) return;
-    try { const r = await API.post('/api/admin/scenes/' + src + '/' + id(s) + '/reprocess'); UI.info('Proses ulang', r.message || 'Diterima; berjalan di latar belakang.'); }
-    catch (e) { UI.showError('Proses ulang', e); }
-  }
-  async function ingest(ev) {
-    ev.preventDefault();
-    const p = panel(), job = UI.$('#aiJob', p).value, a = UI.$('#aiFrom', p).value, b = UI.$('#aiTo', p).value;
-    let msg = '';
-    if (job === 'HYDROMET') {
-      if (!a || !b) msg = 'Isi kedua tanggal.'; else if (a > b) msg = 'Tanggal akhir sebelum tanggal awal.';
-      else if ((UI.parseDate(b) - UI.parseDate(a)) / 864e5 + 1 > 366) msg = 'Maksimal 366 hari.';
-    }
-    UI.$('#aiErr', p).textContent = msg; if (msg) return;
-    const body = job === 'HYDROMET' ? { job, date_from: a, date_to: b } : { job, area_id: Number(UI.$('#aiArea', p).value) };
-    if (!await UI.confirm('Picu ingestion', job === 'HYDROMET'
-      ? 'Jalankan job Hidromet ' + UI.date(a) + ' – ' + UI.date(b) + '? Sistem akan mengunduh granule GPM dan MODIS (±130 detik per tanggal) dan menulis observasi + alert.'
-      : 'Jalankan siklus Live sekarang? Sistem akan mencari dan mengunduh scene Sentinel-1 baru beserta MODIS/GPM.', 'Jalankan')) return;
-    await UI.busy(UI.$('#aiGo', p), async () => {
-      try { const r = await API.post('/api/admin/ingest', body); UI.info('Picu ingestion', r.message || 'Diterima (202); berjalan di latar belakang. Pantau di tab Pipeline.'); }
-      catch (e) { UI.showError('Picu ingestion', e); }
+  // ================================================================ 2. Jalankan siklus Live
+  // Backfill hidromet per rentang ada di Data › Satelit (M74), jadi di sini
+  // tinggal siklus Live sekarang untuk satu area.
+  async function runLive(btn, areas) {
+    if (!areas.length) return;
+    const v = await UI.dialog({ title: 'Jalankan siklus Live sekarang', kind: 'question',
+      message: 'Sistem mencari dan mengunduh scene Sentinel-1 baru beserta MODIS/GPM untuk area ini, di latar belakang.',
+      body: areas.length > 1 ? '<div class="field"><label for="rlArea">Live Area</label><select id="rlArea">' +
+        areas.map(x => '<option value="' + x.area_id + '">' + UI.esc(x.name) + '</option>').join('') + '</select></div>' : '',
+      buttons: [{ label: 'Jalankan', value: 'ok', default: true }, { label: 'Batal', value: null, cancel: true }],
+      collect: win => { const el = UI.$('#rlArea', win); return el ? Number(el.value) : areas[0].area_id; } });
+    if (!v || v === 'cancel') return;
+    await UI.busy(btn, async () => {
+      try { const r = await API.post('/api/admin/ingest', { job: 'LIVE', area_id: v }); UI.info('Siklus Live', r.message || 'Diterima; berjalan di latar belakang. Pantau di Data › Ringkasan.'); }
+      catch (e) { UI.showError('Siklus Live', e); }
     });
   }
 
   // ================================================================ 3. Live Area
   async function tabLive() {
     const [areas, maxA] = await Promise.all([API.get('/api/live/areas'), API.get('/api/admin/settings').then(s => (s.items.find(x => x.setting_key === 'live.max_areas') || {}).setting_value).catch(() => 5)]);
-    panel().innerHTML = '<div class="btn-row" style="margin-bottom:8px"><button type="button" class="default" id="alNew"' + (areas.length >= (maxA || 5) ? ' disabled' : '') + '>Tambah Live Area…</button>' +
+    box('live').innerHTML = '<div class="btn-row" style="margin-bottom:8px"><button type="button" class="default" id="alNew"' + (areas.length >= (maxA || 5) ? ' disabled' : '') + '>Tambah Live Area…</button>' +
       '<span class="mut">' + UI.int(areas.length) + ' dari maksimal ' + UI.int(maxA || 5) + ' area.</span></div>' +
       UI.screenHTML({ channel: 'CH-01 · LIVE AREA', body: UI.tableHTML([
         { label: 'Nama', key: 'name' }, { label: 'Lokasi', key: 'location_label' }, { label: 'Scene di kartu', cls: 'r', get: a => a.retention + ' scene' },
@@ -324,8 +292,8 @@ Pages['admin'] = (() => {
         { label: 'Aksi', html: true, get: a => btn('data-ed="' + a.area_id + '"', 'Ubah…') + ' ' + btn('data-del="' + a.area_id + '"', 'Hapus…') },
       ], areas, { empty: 'BELUM ADA LIVE AREA' }) });
     const find = id => areas.find(a => String(a.area_id) === id);
-    UI.$('#alNew', panel()).addEventListener('click', addArea);
-    UI.$$('[data-ed]', panel()).forEach(b => b.addEventListener('click', async () => {
+    UI.$('#alNew', box('live')).addEventListener('click', addArea);
+    UI.$$('[data-ed]', box('live')).forEach(b => b.addEventListener('click', async () => {
       const a = find(b.dataset.ed);
       const r = await formDialog('Ubah Live Area', [{ id: 'name', label: 'Nama', required: true, value: a.name, maxlength: 200 },
         { id: 'retention', label: 'Scene di kartu & prakiraan (1–60)', type: 'number', min: 1, max: 60, required: true, value: a.retention, hint: 'Hanya tampilan. Berkas scene disimpan 1 tahun lalu dihapus otomatis; angkanya tetap.' },
@@ -333,7 +301,7 @@ Pages['admin'] = (() => {
         v => API.patch('/api/live/areas/' + a.area_id, v));
       if (r) tabLive();
     }));
-    UI.$$('[data-del]', panel()).forEach(b => b.addEventListener('click', async () => {
+    UI.$$('[data-del]', box('live')).forEach(b => b.addEventListener('click', async () => {
       const a = find(b.dataset.del);
       if (!await UI.confirm('Hapus Live Area', 'Hapus "' + a.name + '"? Semua berkas scene-nya dihapus permanen; log tetap disimpan.', 'Hapus')) return;
       try { await API.del('/api/live/areas/' + a.area_id); tabLive(); } catch (e) { UI.showError('Hapus Live Area', e); }
@@ -353,19 +321,18 @@ Pages['admin'] = (() => {
   async function tabRegions() {
     const [r, geo] = await Promise.all([API.get('/api/admin/regions'), API.get('/api/regions?all=true').catch(() => null)]);
     const kec = r.items.filter(x => x.admin_level === 3);
-    panel().innerHTML = '<div class="layout wide-left"><div class="control-panel">' +
+    box('regions').innerHTML = '<div class="layout wide-left"><div class="control-panel">' +
       '<fieldset><legend>Kecamatan dalam AOI GMLS</legend><div class="listbox" id="arList" style="max-height:340px">' +
       kec.map(x => '<label><input type="checkbox" data-aoi="' + x.region_id + '"' + (x.in_aoi ? ' checked' : '') + '> ' + UI.esc(x.region_name) + '<span class="sub">' + UI.num(x.area_km2, 0) + ' km²</span></label>').join('') +
       '</div><p class="mut" style="margin:4px 0 0;font-size:11px">Mengubah centang langsung membangun ulang ROI AOI dan dataset HYDROMET_AOI. Minimal satu kecamatan.</p></fieldset>' +
-      '<form id="arRoi" novalidate><fieldset><legend>ROI gabungan kecamatan</legend><div class="listbox" style="max-height:200px">' +
+      '<details class="ad-fold"><summary>Buat ROI gabungan kecamatan</summary><form id="arRoi" novalidate><fieldset><legend>ROI gabungan kecamatan</legend><div class="listbox" style="max-height:200px">' +
       kec.map(x => '<label><input type="checkbox" data-roi="' + x.region_id + '"> ' + UI.esc(x.region_name) + '</label>').join('') + '</div>' +
       '<div class="field"><label for="arName">Nama ROI</label><input type="text" id="arName" maxlength="100"></div>' +
       '<div class="field"><label for="arCode">Kode (opsional, A–Z 0–9 _)</label><input type="text" id="arCode" maxlength="20"></div><span class="err" id="arErr"></span>' +
-      '<div class="btn-row end"><button type="submit" id="arGo">Buat ROI</button></div></fieldset></form><div id="arExcel"></div></div>' +
+      '<div class="btn-row end"><button type="submit" id="arGo">Buat ROI</button></div></fieldset></form></details></div>' +
       '<div class="deck">' + UI.screenHTML({ channel: 'CH-01 · KECAMATAN KAB. LEBAK (COD-AB)', flush: true, rec: UI.int(kec.filter(x => x.in_aoi).length) + ' DALAM AOI', recCls: 'off', body: '<div class="map tall" id="arMap" role="img" aria-label="Peta kecamatan; AOI ditandai label ★"></div>' }) +
       '<div class="legend" style="color:var(--text)"><span><i style="background:#33ff99"></i>★ DALAM AOI</span><span><i style="background:transparent"></i>DI LUAR AOI</span></div></div></div>';
-    Excel.mount(UI.$('#arExcel', panel()), ['kecamatan'], { onImported: tabRegions });
-    st.map = Maps.create(UI.$('#arMap', panel()));
+    st.map = Maps.create(UI.$('#arMap', box('regions')));
     if (st.map && geo) {
       const inAoi = new Set(kec.filter(x => x.in_aoi).map(x => x.region_id));
       const layer = L.geoJSON(geo, { style: f => inAoi.has(f.properties.region_id) ? { color: '#33ff99', weight: 1, fillColor: '#33ff99', fillOpacity: 0.4 } : { color: '#1a9960', weight: 1, fillOpacity: 0 },
@@ -376,18 +343,18 @@ Pages['admin'] = (() => {
         } }).addTo(st.map);
       setTimeout(() => { if (st && st.map) { st.map.invalidateSize(); st.map.fitBounds(layer.getBounds()); } }, 100);
     }
-    UI.$$('[data-aoi]', panel()).forEach(c => c.addEventListener('change', async () => {
+    UI.$$('[data-aoi]', box('regions')).forEach(c => c.addEventListener('change', async () => {
       const name = kec.find(x => String(x.region_id) === c.dataset.aoi).region_name;
       if (!await UI.confirm('Ubah AOI', (c.checked ? 'Masukkan ' : 'Keluarkan ') + name + (c.checked ? ' ke' : ' dari') + ' AOI GMLS? ROI AOI dan dataset HYDROMET_AOI dibangun ulang; data kecamatan ini mulai/berhenti dihitung pada job hidromet berikutnya.', 'Ubah')) { c.checked = !c.checked; return; }
       try { await API.patch('/api/admin/regions/' + c.dataset.aoi, { in_aoi: c.checked }); tabRegions(); }
       catch (e) { c.checked = !c.checked; UI.showError('Ubah AOI', e); }
     }));
-    UI.$('#arRoi', panel()).addEventListener('submit', async ev => {
+    UI.$('#arRoi', box('regions')).addEventListener('submit', async ev => {
       ev.preventDefault();
-      const ids = UI.$$('[data-roi]:checked', panel()).map(c => Number(c.dataset.roi)), name = UI.$('#arName', panel()).value.trim(), code = UI.$('#arCode', panel()).value.trim();
+      const ids = UI.$$('[data-roi]:checked', box('regions')).map(c => Number(c.dataset.roi)), name = UI.$('#arName', box('regions')).value.trim(), code = UI.$('#arCode', box('regions')).value.trim();
       const msg = !ids.length ? 'Pilih minimal satu kecamatan.' : name.length < 2 ? 'Isi nama ROI (minimal 2 karakter).' : code && !/^[A-Z0-9_]{2,20}$/.test(code) ? 'Kode: 2–20 karakter A–Z, 0–9, _.' : '';
-      UI.$('#arErr', panel()).textContent = msg; if (msg) return;
-      await UI.busy(UI.$('#arGo', panel()), async () => {
+      UI.$('#arErr', box('regions')).textContent = msg; if (msg) return;
+      await UI.busy(UI.$('#arGo', box('regions')), async () => {
         try { const r2 = await API.post('/api/admin/rois', { region_ids: ids, name, region_code: code || null }); UI.info('ROI gabungan', 'ROI "' + (r2.name || name) + '" dibuat dan tersedia di Buat Dataset dan Live Area.'); tabRegions(); }
         catch (e) { UI.showError('ROI gabungan', e); }
       });
@@ -397,25 +364,34 @@ Pages['admin'] = (() => {
   // ================================================================ 5. Aturan & ambang
   async function tabRules() {
     const [rules, th, types] = await Promise.all([API.get('/api/alert-rules'), API.get('/api/admin/quality-thresholds'), API.get('/api/disaster-types?include_inactive=true')]);
-    panel().innerHTML =
-      '<div class="btn-row" style="margin-bottom:8px"><button type="button" id="rrNew">Tambah aturan alert…</button><button type="button" id="rtNew">Tambah jenis bencana…</button></div>' +
-      UI.screenHTML({ channel: 'CH-01 · ATURAN ALERT', body: UI.tableHTML([
+    const tab = st.rulesTab || 'alert';
+    const pane = (k, html) => '<div data-pane="' + k + '"' + (k === tab ? '' : ' hidden') + '>' + html + '</div>';
+    box('rules').innerHTML = '<div class="tabs" role="tablist" aria-label="Aturan" style="margin-top:8px">' +
+        [['alert', 'Aturan alert (' + rules.items.length + ')'], ['qa', 'Ambang kualitas data (' + th.items.length + ')'], ['jenis', 'Jenis bencana (' + types.items.length + ')']].map(([k, l]) =>
+          '<button type="button" role="tab" data-tab="' + k + '" aria-selected="' + (k === tab) + '"' + (k === tab ? '' : ' tabindex="-1"') + '>' + UI.esc(l) + '</button>').join('') + '</div>' +
+      '<div class="raised tabpanel" role="tabpanel">' +
+      pane('alert', '<div class="btn-row" style="margin-bottom:8px"><button type="button" id="rrNew">Tambah aturan alert…</button>' +
+        '<span class="mut">Aturan tidak dihapus; nonaktifkan bila tidak dipakai. Aturan aktif wajib punya ambang.</span></div>' +
+        UI.screenHTML({ channel: 'ATURAN ALERT', body: UI.tableHTML([
         { label: 'Kode', key: 'rule_code' }, { label: 'Bencana', key: 'disaster_type_code' }, { label: 'Band', key: 'band_code' },
         { label: 'Ambang', cls: 'r', get: x => x.comparator + ' ' + (x.threshold_value === null ? UI.NA : UI.num(x.threshold_value, 1)) },
         { label: 'Tingkat', get: x => (SEV.find(s => s[0] === x.severity) || [0, x.severity])[1] }, { label: 'Rujukan', key: 'reference_source' },
         { label: 'Aktif', get: x => x.is_active ? 'YA' : 'TIDAK' }, { label: 'Aksi', html: true, get: x => btn('data-rule="' + x.rule_id + '"', 'Ubah…') },
-      ], rules.items) + '<p class="v-dim" style="margin:6px 0 0;font-size:11px">Aturan tidak dihapus; nonaktifkan bila tidak dipakai. Aturan aktif wajib punya ambang.</p>' }) +
-      '<div style="height:8px"></div>' + UI.screenHTML({ channel: 'CH-02 · AMBANG KUALITAS DATA (QA)', body: UI.tableHTML([
+      ], rules.items) })) +
+      pane('qa', UI.screenHTML({ channel: 'AMBANG KUALITAS DATA (QA)', body: UI.tableHTML([
         { label: 'Band', key: 'band_code' }, { label: 'Metrik', key: 'metric_name' },
         { label: 'Waspada <', cls: 'r', get: x => UI.num(x.warn_below, 3) }, { label: 'Gagal <', cls: 'r', get: x => UI.num(x.fail_below, 3) },
         { label: 'Waspada >', cls: 'r', get: x => UI.num(x.warn_above, 3) }, { label: 'Gagal >', cls: 'r', get: x => UI.num(x.fail_above, 3) },
         { label: 'Rujukan', key: 'reference' }, { label: 'Aktif', get: x => x.is_active ? 'YA' : 'TIDAK' }, { label: 'Aksi', html: true, get: x => btn('data-th="' + x.threshold_id + '"', 'Ubah…') },
-      ], th.items) }) +
-      '<div style="height:8px"></div>' + UI.screenHTML({ channel: 'CH-03 · JENIS BENCANA', body: UI.tableHTML([
+      ], th.items) })) +
+      pane('jenis', '<div class="btn-row" style="margin-bottom:8px"><button type="button" id="rtNew">Tambah jenis bencana…</button></div>' +
+        UI.screenHTML({ channel: 'JENIS BENCANA', body: UI.tableHTML([
         { label: 'Kode', key: 'type_code' }, { label: 'Nama', key: 'type_name' }, { label: 'Kategori', key: 'category' }, { label: 'Band indikator', key: 'indicator_bands' },
         { label: 'Aktif', get: x => x.is_active ? 'YA' : 'TIDAK' }, { label: 'Aksi', html: true, get: x => btn('data-type="' + x.disaster_type_id + '"', 'Ubah…') },
-      ], types.items) }) + '<div id="rrExcel" style="margin-top:8px;max-width:420px"></div>';
-    Excel.mount(UI.$('#rrExcel', panel()), ['alert_rules', 'disaster_types'], { onImported: tabRules });
+      ], types.items) })) + '</div>' +
+      '<details class="ad-fold"><summary>Ekspor / impor Excel (kecamatan, aturan alert, jenis bencana)</summary><div id="rrExcel"></div></details>';
+    UI.bindTabs(UI.$('.tabs', box('rules')), k => { st.rulesTab = k; UI.$$('[data-pane]', box('rules')).forEach(el => { el.hidden = el.dataset.pane !== k; }); });
+    Excel.mount(UI.$('#rrExcel', box('rules')), ['kecamatan', 'alert_rules', 'disaster_types'], { onImported: () => parts([['regions', tabRegions], ['rules', tabRules]]) });
     const typeOpts = types.items.filter(t => t.is_active).map(t => [t.type_code, t.type_name]);
     const ruleFields = x => [
       ...(x ? [] : [{ id: 'rule_code', label: 'Kode aturan', required: true, pattern: '^[A-Z0-9_]{3,40}$', patternMsg: '3–40 karakter A–Z, 0–9, _.' },
@@ -426,13 +402,13 @@ Pages['admin'] = (() => {
       { id: 'reference_source', label: 'Rujukan', required: true, value: x ? x.reference_source : '', maxlength: 150 },
       { id: 'is_active', label: 'Aktif', type: 'checkbox', value: x ? x.is_active : true }];
     const ruleExtra = (id, v) => id === 'threshold_value' && v.is_active && v.threshold_value === null ? 'Aturan aktif wajib punya ambang.' : '';
-    UI.$('#rrNew', panel()).addEventListener('click', async () => { if (await formDialog('Tambah aturan alert', ruleFields(null), v => API.post('/api/alert-rules', v), { extra: ruleExtra })) tabRules(); });
-    UI.$$('[data-rule]', panel()).forEach(b => b.addEventListener('click', async () => {
+    UI.$('#rrNew', box('rules')).addEventListener('click', async () => { if (await formDialog('Tambah aturan alert', ruleFields(null), v => API.post('/api/alert-rules', v), { extra: ruleExtra })) tabRules(); });
+    UI.$$('[data-rule]', box('rules')).forEach(b => b.addEventListener('click', async () => {
       const x = rules.items.find(r => String(r.rule_id) === b.dataset.rule);
       if (await formDialog('Ubah aturan ' + x.rule_code, ruleFields(x), v => API.put('/api/alert-rules/' + x.rule_id, v), { extra: ruleExtra,
         message: 'Perubahan ambang berlaku pada pengecekan alert berikutnya dan tercatat di audit.' })) tabRules();
     }));
-    UI.$$('[data-th]', panel()).forEach(b => b.addEventListener('click', async () => {
+    UI.$$('[data-th]', box('rules')).forEach(b => b.addEventListener('click', async () => {
       const x = th.items.find(t => String(t.threshold_id) === b.dataset.th);
       const f = ['warn_below', 'fail_below', 'warn_above', 'fail_above'].map(k => ({ id: k, label: { warn_below: 'Waspada bila di bawah', fail_below: 'Gagal bila di bawah', warn_above: 'Waspada bila di atas', fail_above: 'Gagal bila di atas' }[k], type: 'number', step: 'any', value: x[k] }))
         .concat([{ id: 'reference', label: 'Rujukan', value: x.reference }, { id: 'is_active', label: 'Aktif', type: 'checkbox', value: x.is_active }]);
@@ -441,60 +417,35 @@ Pages['admin'] = (() => {
     const typeFields = x => [...(x ? [] : [{ id: 'type_code', label: 'Kode', required: true, pattern: '^[A-Z0-9_]{3,30}$', patternMsg: '3–30 karakter A–Z, 0–9, _.' }]),
       { id: 'type_name', label: 'Nama', required: true, minlength: 2, value: x ? x.type_name : '' }, { id: 'category', label: 'Kategori', value: x ? x.category : 'HIDROMETEOROLOGI' },
       { id: 'indicator_bands', label: 'Band indikator', value: x ? x.indicator_bands : '', hint: 'mis. RAIN_24H, VH, FLOOD' }, { id: 'is_active', label: 'Aktif', type: 'checkbox', value: x ? x.is_active : true }];
-    UI.$('#rtNew', panel()).addEventListener('click', async () => { if (await formDialog('Tambah jenis bencana', typeFields(null), v => API.post('/api/disaster-types', v))) tabRules(); });
-    UI.$$('[data-type]', panel()).forEach(b => b.addEventListener('click', async () => {
+    UI.$('#rtNew', box('rules')).addEventListener('click', async () => { if (await formDialog('Tambah jenis bencana', typeFields(null), v => API.post('/api/disaster-types', v))) tabRules(); });
+    UI.$$('[data-type]', box('rules')).forEach(b => b.addEventListener('click', async () => {
       const x = types.items.find(t => String(t.disaster_type_id) === b.dataset.type);
       if (await formDialog('Ubah jenis ' + x.type_code, typeFields(x), v => API.put('/api/disaster-types/' + x.disaster_type_id, v))) tabRules();
     }));
   }
 
-  // ================================================================ 6. Pipeline
-  async function tabPipeline() {
-    const s = await API.get('/api/admin/pipeline/status');
-    const main = await API.get('/api/data/activity').catch(() => null);
-    const areas = s.live_areas || [];
-    const logs = (await Promise.all(areas.map(a => API.get('/api/live/areas/' + a.area_id + '/activity?limit=50').catch(() => []))))
-      .flatMap((l, i) => l.map(x => Object.assign({ area: areas[i].name }, x))).sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1)).slice(0, 50);
-    const cred = s.credentials || {};
-    const warn = Object.entries(cred).filter(([, ok]) => !ok).map(([k]) => k);
-    panel().innerHTML = UI.mainActivityHTML(main) + (warn.length ? '<div class="banner raised" role="alert">' + UI.icon('warn32') + '<div class="b-body"><b>Kredensial belum diisi:</b> ' + UI.esc(warn.join(', ')) + '. Job yang membutuhkannya akan gagal.</div></div>' : '') +
-      '<div class="readouts" style="margin-bottom:8px">' +
-        UI.readoutHTML('HIDROMET TERAKHIR', UI.esc(UI.date(s.hydromet && s.hydromet.last_completed)), 'WAITING ' + UI.int(s.hydromet && s.hydromet.waiting) + ' · GAGAL ' + UI.int(s.hydromet && s.hydromet.failed), s.hydromet && s.hydromet.failed ? 'v-amber' : '') +
-        UI.readoutHTML('ANTREAN DATASET', UI.int((s.queue || {}).dataset_jobs_queued), 'JOB MENUNGGU') +
-        UI.readoutHTML('DILEWATI (KUNCI) 7 HARI', UI.int((s.skipped_locked_7d || []).length), 'SKIPPED_LOCKED') +
-        UI.readoutHTML('KREDENSIAL', warn.length ? 'KURANG' : 'LENGKAP', 'NASA · COPERNICUS', warn.length ? 'v-alert' : '') + '</div>' +
-      '<div class="cols-2">' + UI.screenHTML({ channel: 'CH-01 · JOB TERAKHIR PER JENIS', body: UI.tableHTML([
-        { label: 'Jenis', key: 'kind' }, { label: 'Job', key: 'job_id' }, { label: 'Status', key: 'status' }, { label: 'Tanggal data', get: j => UI.date(j.date_range_start) },
-        { label: 'Mulai', get: j => UI.dateTime(j.started_at) }, { label: 'Selesai', get: j => j.completed_at ? UI.dateTime(j.completed_at) : '' }], s.latest_jobs || []) }) +
-      UI.screenHTML({ channel: 'CH-02 · LIVE AREA & LAPORAN', body: UI.tableHTML([{ label: 'Area', key: 'name' }, { label: 'Status', key: 'status' }, { label: 'Diperiksa', get: a => UI.dateTime(a.last_checked_at) }], areas) +
-        UI.tableHTML([{ label: 'Laporan', key: 'report_code' }, { label: 'Periode', get: r => UI.date(r.period_start) }, { label: 'Status', key: 'status' }, { label: 'Dibuat', get: r => UI.dateTime(r.generated_at) }], s.reports || [], { empty: 'BELUM ADA LAPORAN' }) }) + '</div>' +
-      '<div style="height:8px"></div>' + UI.screenHTML({ channel: 'CH-03 · JADWAL PENJADWAL', body: (s.scheduler || []).length ? UI.tableHTML([{ label: 'Job', get: x => x.id || x.name }, { label: 'Berikutnya', get: x => UI.dateTime(x.next_run_time || x.next) }, { label: 'Jadwal', get: x => x.trigger || '' }], s.scheduler)
-        : UI.emptyHTML('PENJADWAL TIDAK AKTIF DI PROSES INI (SCHEDULER_ENABLED=false)') }) +
-      '<div style="height:8px"></div>' + UI.screenHTML({ channel: 'CH-04 · LOG 50 TERAKHIR (LIVE + PIPELINE)', body: '<div class="scr-log" style="max-height:320px">' + (logs.length ? logs.map(x =>
-        '<div><span class="v-dim">' + UI.esc(UI.dateTime(x.timestamp)) + '</span> [' + UI.esc(x.area) + '] ' + UI.esc(x.stage || x.module || '') + ' <span class="' + (/FAIL|ERROR/.test(x.status) ? 'v-alert' : /RUN|START/.test(x.status) ? 'v-amber' : '') + '">' + UI.esc(x.status || '') + '</span> ' + UI.esc(x.message || '') + '</div>').join('') : UI.emptyHTML()) + '</div>' });
-  }
-
   // ================================================================ 7. Arsip
   async function tabArchive() {
     const s = await API.get('/api/admin/archive/stats');
-    panel().innerHTML = '<div class="layout"><div class="control-panel"><form id="avF" novalidate><fieldset><legend>Verifikasi checksum</legend>' +
-      '<div class="field"><label for="avN">Ukuran sampel (1–500)</label><input type="number" id="avN" min="1" max="500" value="50"></div>' +
-      '<div class="field"><label for="avS">Sumber</label><select id="avS"><option value="">Semua</option><option>SENTINEL1</option><option>MODIS</option><option>GPM</option><option>FUSION</option></select></div>' +
-      '<span class="hint">Membaca berkas acak dan membandingkan SHA-256 dengan katalog. Tidak mengubah data.</span>' +
-      '<div class="btn-row end"><button type="submit" id="avGo">Verifikasi</button></div></fieldset></form></div><div class="deck">' +
-      UI.screenHTML({ channel: 'CH-01 · PRODUK PER SUMBER × TIER', body: UI.tableHTML([{ label: 'Sumber', key: 'source' }, { label: 'Tier', key: 'tier' },
+    box('archive').innerHTML = '<div class="cols-2" style="margin-top:8px;align-items:start">' +
+      UI.screenHTML({ channel: 'PRODUK PER SUMBER × TIER (KATALOG)', body: UI.tableHTML([{ label: 'Sumber', key: 'source' }, { label: 'Tier', key: 'tier' },
         { label: 'Produk', cls: 'r', get: x => UI.int(x.n) }, { label: 'MB', cls: 'r', get: x => UI.num(x.mb, 1) }, { label: 'Tidak valid', cls: 'r', get: x => UI.int(x.invalid) }], s.products) }) +
-      UI.screenHTML({ channel: 'CH-02 · JUMLAH BARIS', body: '<dl class="kv">' + Object.entries(s.rows || {}).map(([k, v]) => '<dt>' + UI.esc(k) + '</dt><dd class="num">' + UI.int(v) + '</dd>').join('') +
+      '<div><form id="avF" novalidate><fieldset style="margin:0"><legend>Verifikasi checksum</legend>' +
+      '<div class="field-row"><div class="field"><label for="avN">Ukuran sampel (1–500)</label><input type="number" id="avN" min="1" max="500" value="50"></div>' +
+      '<div class="field"><label for="avS">Sumber</label><select id="avS"><option value="">Semua</option><option>SENTINEL1</option><option>MODIS</option><option>GPM</option><option>FUSION</option></select></div></div>' +
+      '<span class="hint">Membaca berkas acak dan membandingkan SHA-256 dengan katalog. Tidak mengubah data.</span>' +
+      '<div class="btn-row end"><button type="submit" id="avGo">Verifikasi</button></div></fieldset></form><div id="avOut" style="margin-top:8px"></div>' +
+      UI.screenHTML({ channel: 'JUMLAH BARIS BASIS DATA', body: '<dl class="kv kv-2">' + Object.entries(s.rows || {}).map(([k, v]) => '<dt>' + UI.esc(k) + '</dt><dd class="num">' + UI.int(v) + '</dd>').join('') +
         '<dt>rentang hidromet</dt><dd>' + UI.esc(s.hydromet_span && s.hydromet_span.first ? UI.date(s.hydromet_span.first) + ' – ' + UI.date(s.hydromet_span.last) : UI.NA) + '</dd></dl>' }) +
-      '<div id="avOut"></div></div></div>';
-    UI.$('#avF', panel()).addEventListener('submit', async ev => {
+      '</div></div>';
+    UI.$('#avF', box('archive')).addEventListener('submit', async ev => {
       ev.preventDefault();
-      const n = Number(UI.$('#avN', panel()).value);
+      const n = Number(UI.$('#avN', box('archive')).value);
       if (!(n >= 1 && n <= 500)) { UI.showError('Verifikasi', 'Ukuran sampel 1–500.'); return; }
-      await UI.busy(UI.$('#avGo', panel()), async () => {
+      await UI.busy(UI.$('#avGo', box('archive')), async () => {
         try {
-          const r = await API.post('/api/admin/archive/verify', { limit: n, source: UI.$('#avS', panel()).value || null });
-          UI.$('#avOut', panel()).innerHTML = UI.screenHTML({ channel: 'CH-03 · HASIL VERIFIKASI', rec: (r.missing.length || r.mismatch.length) ? '● MASALAH' : '● OK', recCls: (r.missing.length || r.mismatch.length) ? 'live' : 'off',
+          const r = await API.post('/api/admin/archive/verify', { limit: n, source: UI.$('#avS', box('archive')).value || null });
+          UI.$('#avOut', box('archive')).innerHTML = UI.screenHTML({ channel: 'HASIL VERIFIKASI', rec: (r.missing.length || r.mismatch.length) ? '● MASALAH' : '● OK', recCls: (r.missing.length || r.mismatch.length) ? 'live' : 'off',
             body: '<p class="scr-text" style="margin:0">DIPERIKSA ' + UI.int(r.checked) + ' · COCOK ' + UI.int(r.ok) + ' · <span class="' + (r.missing.length ? 'v-alert' : '') + '">HILANG ' + UI.int(r.missing.length) + '</span> · <span class="' + (r.mismatch.length ? 'v-alert' : '') + '">BEDA ' + UI.int(r.mismatch.length) + '</span></p>' +
               (r.missing.length || r.mismatch.length ? '<div class="scr-log">' + r.missing.map(x => '<div class="v-alert">HILANG ' + UI.esc(JSON.stringify(x)) + '</div>').join('') + r.mismatch.map(x => '<div class="v-alert">BEDA ' + UI.esc(JSON.stringify(x)) + '</div>').join('') + '</div>' : '') });
         } catch (e) { UI.showError('Verifikasi', e); }
@@ -513,35 +464,19 @@ Pages['admin'] = (() => {
     const empty = Object.keys(s.tiers || {}).length - tiers.length;
     const part = s.partial_downloads || {};
 
-    panel().innerHTML =
-      '<div class="readouts" style="margin-bottom:8px">' +
-        UI.readoutHTML('TOTAL DI DISK', UI.esc((s.total || {}).size_human || UI.NA), 'SELURUH DATASET') +
-        UI.readoutHTML('TIER TERPAKAI', UI.int(tiers.length), 'KOSONG ' + UI.int(empty)) +
-        UI.readoutHTML('UNDUHAN TERPUTUS', UI.int(part.file_count), UI.esc(part.size_human || '0 MB'),
-          part.file_count ? 'v-amber' : '') +
-      '</div>' +
-      UI.screenHTML({ channel: 'CH-01 · PENYIMPANAN PER TIER', rec: UI.esc((s.total || {}).size_human || ''), recCls: 'off',
-        body: tiers.length ? tiers.map(([name, t]) =>
+    box('storage').innerHTML =
+      UI.screenHTML({ channel: 'PENYIMPANAN PER TIER', rec: UI.esc(((s.total || {}).size_human || '') + ' · ' + tiers.length + ' TIER TERISI' + (empty ? ', ' + empty + ' KOSONG' : '')), recCls: 'off',
+        body: (tiers.length ? tiers.map(([name, t]) =>
           UI.barHTML(name, t.size_mb, totalMb, t.size_human) +
           '<p class="v-dim" style="margin:0 0 4px 116px;font-size:11px">' + UI.int(t.file_count) + ' berkas' +
           (t.description ? ' · ' + UI.esc(t.description) : '') +
           (Object.keys(t.sources || {}).length ? ' · ' + Object.entries(t.sources).map(([k, v]) =>
             UI.esc((UI.SOURCE_LABEL[k] || k) + ' ' + v.size_human)).join(' · ') : '') +
           ' · <a href="#" data-stier="' + UI.esc(name) + '">daftar berkas</a></p>').join('')
-          : UI.emptyHTML('BELUM ADA BERKAS DI DISK') }) +
-      '<div style="height:8px"></div>' +
-      '<div class="cols-2">' +
-        UI.screenHTML({ channel: 'CH-02 · PER SATELIT', body: UI.tableHTML([
-          { label: 'Sumber', get: x => UI.SOURCE_LABEL[x.src] || x.src },
-          { label: 'Berkas', cls: 'r', get: x => UI.int(x.file_count) },
-          { label: 'Ukuran', cls: 'r', get: x => x.size_human },
-        ], Object.entries(s.by_source || {}).map(([src, v]) => Object.assign({ src: src }, v)),
-          { empty: 'BELUM ADA BERKAS PER SATELIT' }) }) +
-        UI.screenHTML({ channel: 'CH-03 · UNDUHAN TERPUTUS (.part)', rec: part.file_count ? '● ADA' : '● TIDAK ADA', recCls: part.file_count ? '' : 'off',
-          body: '<p class="scr-text" style="margin:0">' + UI.int(part.file_count) + ' BERKAS · ' + UI.esc(part.size_human || '0 MB') + '</p>' +
-            '<p class="v-dim" style="margin:4px 0 0;font-size:11px">Berkas .part adalah unduhan yang terhenti; pipeline melanjutkannya sendiri pada siklus berikutnya.' +
+          : UI.emptyHTML('BELUM ADA BERKAS DI DISK')) +
+          '<p class="scr-text ' + (part.file_count ? 'v-amber' : 'v-dim') + '" style="margin:6px 0 0;font-size:11px">Unduhan terputus (.part): ' + UI.int(part.file_count) +
+            ' berkas · ' + UI.esc(part.size_human || '0 MB') + '. Pipeline melanjutkannya sendiri pada siklus berikutnya.' +
             (part.file_count ? ' <a href="#" data-stier="partial">daftar berkas</a>' : '') + '</p>' }) +
-      '</div>' +
       '<div id="stFiles"></div>';
 
     bindStorageFiles();
@@ -551,20 +486,20 @@ Pages['admin'] = (() => {
   // dulu dan dibatasi 500 baris — sama seperti daftar berkas di Katalog, yang
   // tanpa batas itu pernah membekukan tab.
   function bindStorageFiles() {
-    UI.$$('[data-stier]', panel()).forEach(a => a.addEventListener('click', async ev => {
+    UI.$$('[data-stier]', box('storage')).forEach(a => a.addEventListener('click', async ev => {
       ev.preventDefault();
       const tier = a.dataset.stier;
-      const box = UI.$('#stFiles', panel());
-      box.innerHTML = '<div style="height:8px"></div>' + UI.screenHTML({ channel: 'BERKAS ' + tier.toUpperCase(), body: UI.loadingHTML() });
+      const out = UI.$('#stFiles', box('storage'));
+      out.innerHTML = '<div style="height:8px"></div>' + UI.screenHTML({ channel: 'BERKAS ' + tier.toUpperCase(), body: UI.loadingHTML() });
       try {
         const r = await API.get('/api/storage/files/' + encodeURIComponent(tier));
         const rows = (r.directories || []).flatMap(d => (d.files || []).map(f => ({ dir: d.path, name: f.name, size_mb: f.size_mb })));
-        box.innerHTML = '<div style="height:8px"></div>' + UI.screenHTML({
+        out.innerHTML = '<div style="height:8px"></div>' + UI.screenHTML({
           channel: 'BERKAS TIER ' + tier.toUpperCase(), rec: UI.int(rows.length) + ' BERKAS', recCls: 'off',
           body: UI.tableHTML([{ label: 'Nama', key: 'name' }, { label: 'MB', cls: 'r', get: x => UI.num(x.size_mb, 2) },
             { label: 'Folder', key: 'dir' }], rows.slice(0, 500), { empty: 'TIDAK ADA BERKAS' }) +
             (rows.length > 500 ? '<p class="v-dim" style="margin:6px 0 0;font-size:11px">Menampilkan 500 dari ' + UI.int(rows.length) + ' berkas.</p>' : '') });
-      } catch (e) { box.innerHTML = ''; UI.showError('Daftar berkas', e); }
+      } catch (e) { out.innerHTML = ''; UI.showError('Daftar berkas', e); }
     }));
   }
 
@@ -631,7 +566,7 @@ Pages['admin'] = (() => {
     const [s, ns] = await Promise.all([API.get('/api/admin/settings'), API.get('/api/admin/notify/status').catch(() => null)]);
     // M64: keadaan pengiriman email peringatan + uji kirim.
     const sent = ns && ns.last_7_days.EMAIL_ALERT_SENT, fail = ns && ns.last_7_days.EMAIL_ALERT_FAILED;
-    const mail = !ns ? '' : UI.screenHTML({ channel: 'CH-00 · EMAIL PERINGATAN', rec: ns.configured ? '● SIAP' : '● BELUM DIATUR',
+    const mail = !ns ? '' : UI.screenHTML({ channel: 'EMAIL PERINGATAN', rec: ns.configured ? '● SIAP' : '● BELUM DIATUR',
       recCls: ns.configured ? 'live' : 'off', body:
         '<dl class="kv">' + [['PENGIRIM', ns.sender || '—'], ['SERVER', ns.backend === 'file' ? 'berkas .eml (MAIL_BACKEND=file)' : (ns.server || '—')],
           ['TAUTAN', ns.base_url || '— (APP_BASE_URL kosong: email tanpa tautan)'], ['PELANGGAN', UI.int(ns.subscribers) + ' akun (' + UI.int(ns.with_email) + ' ber-email)'],
@@ -641,10 +576,10 @@ Pages['admin'] = (() => {
         '<button type="button" class="small" id="ntRun"' + (ns.configured ? '' : ' disabled') + '>Kirim peringatan sekarang</button></div>' +
         '<p class="scr-text v-dim" style="margin:6px 0 0;font-size:11px">Kredensial SMTP di .env (MAIL_*). Peringatan otomatis dikirim setelah Job Hidromet harian dan siklus Live; ' +
         'data yang sama tidak dikirim dua kali. Matikan lewat notify.enabled di bawah.</p>' });
-    panel().innerHTML = mail + UI.screenHTML({ channel: 'CH-01 · APP_SETTINGS', body: UI.tableHTML([
+    panel().innerHTML = mail + '<div style="height:8px"></div>' + UI.screenHTML({ channel: 'APP_SETTINGS', body: UI.tableHTML([
       { label: 'Kunci', key: 'setting_key' }, { label: 'Nilai', get: x => JSON.stringify(x.setting_value) }, { label: 'Keterangan', key: 'description' },
       { label: 'Diubah', get: x => UI.dateTime(x.updated_at) }, { label: 'Aksi', html: true, get: x => btn('data-set="' + UI.esc(x.setting_key) + '"', 'Ubah…') },
-    ], s.items) }) + '<div id="asExcel" style="margin-top:8px;max-width:420px"></div>';
+    ], s.items) }) + '<details class="ad-fold"><summary>Ekspor / impor Excel</summary><div id="asExcel"></div></details>';
     Excel.mount(UI.$('#asExcel', panel()), ['app_settings'], { onImported: tabSettings });
     const tb = UI.$('#ntTest', panel()), rb = UI.$('#ntRun', panel());
     if (tb) tb.addEventListener('click', () => UI.busy(tb, async () => {
@@ -670,12 +605,12 @@ Pages['admin'] = (() => {
 
   // ================================================================ 12. Token API
   async function tabTokens() {
-    const p = panel();
+    const p = box('tokens');
     if (!UI.$('#atUser', p)) {
       const us = await users();
       p.innerHTML = filterBar('<div class="field" style="margin:0"><label for="atUser">Pemilik</label><select id="atUser">' + userOpts(us) + '</select></div>' +
         '<div class="field" style="margin:0"><label for="atAct">Status</label><select id="atAct"><option value="">Semua</option><option value="true">Aktif</option><option value="false">Dicabut/kedaluwarsa</option></select></div>') + '<div id="atList"></div>';
-      bindFilter(() => { st.page.tokens = 1; tabTokens(); });
+      bindFilter(() => { st.page.tokens = 1; tabTokens(); }, p);
     }
     const r = await API.get('/api/admin/tokens' + API.qs({ user_id: UI.$('#atUser', p).value, active: UI.$('#atAct', p).value, limit: 50, offset: (pg('tokens') - 1) * 50 }));
     UI.$('#atList', p).innerHTML = UI.screenHTML({ channel: 'CH-01 · SEMUA TOKEN API', rec: UI.int(r.total) + ' TOKEN', recCls: 'off', body: UI.tableHTML([
@@ -689,83 +624,61 @@ Pages['admin'] = (() => {
       if (!await UI.confirm('Cabut token', 'Cabut token "' + t.name + '" milik ' + t.username + '? Skrip yang memakainya langsung ditolak.', 'Cabut')) return;
       try { await API.del('/api/auth/tokens/' + t.token_id); tabTokens(); } catch (e) { UI.showError('Cabut token', e); }
     }));
-    bindPager('tokens', tabTokens);
+    bindPager('tokens', tabTokens, p);
   }
 
-  // ================================================================ 0. Ringkasan
-  // Pintu masuk Pengaturan (M53): satu layar yang menjawab "apa yang perlu saya
-  // kerjakan hari ini". Tidak ada aksi tulis di sini — hanya temuan beserta
-  // tautan ke bagian yang menanganinya. Tiap sumber gagal sendiri-sendiri.
-  async function tabSummary() {
-    const p = panel();
-    const [pipe, alerts, userList, main] = await Promise.all([
+  // ================================================================ 0. Perlu perhatian + penjadwal
+  // Bagian atas "Live Area & penjadwal" (M74; dulu bagian Ringkasan): hanya
+  // temuan yang butuh tindakan dan jadwal penjadwal. Job terakhir, progres
+  // dataset utama, laporan, dan log tidak diulang — tempatnya Data, Laporan,
+  // dan Sistem › Log. Tiap sumber gagal sendiri-sendiri.
+  async function tabAttention() {
+    const p = box('attn');
+    const [pipe, alerts, userList] = await Promise.all([
       API.get('/api/admin/pipeline/status').catch(() => null),
       API.get('/api/alerts?status=active&limit=200').then(r => r.items || []).catch(() => null),
       users().catch(() => null),
-      API.get('/api/data/activity').catch(() => null),
     ]);
-
     const hy = (pipe && pipe.hydromet) || {};
     const areas = (pipe && pipe.live_areas) || [];
     const cred = (pipe && pipe.credentials) || {};
     const credMissing = Object.keys(cred).filter(k => !cred[k]);
     const areaBad = areas.filter(a => a.status && /FAIL|ERROR|STALE/i.test(a.status));
     const locked = (userList || []).filter(u => u.is_locked);
-    const queued = ((pipe && pipe.queue) || {}).dataset_jobs_queued;
 
-    // Temuan: hanya hal yang butuh tindakan, paling mendesak dulu.
+    // Temuan: hanya hal yang butuh tindakan, paling mendesak dulu. [kelas, teks, saran, tujuan hash]
     const findings = [];
     if (!pipe) findings.push(['v-alert', 'Status pipeline tidak dapat dibaca.', 'Periksa LINK di taskbar; API atau basis data mungkin tidak terjangkau.', null]);
     if (credMissing.length) findings.push(['v-alert', 'Kredensial belum diisi: ' + credMissing.join(', ') + '.',
       'Job yang membutuhkannya akan gagal. Isi di .env lalu jalankan ulang server.', null]);
     if (hy.failed) findings.push(['v-alert', UI.int(hy.failed) + ' job hidromet berstatus FAILED.',
-      'Lihat sebabnya di log pipeline, lalu picu ulang rentang tanggalnya.', 'pipeline']);
+      'Lihat riwayat per tanggal, lalu jalankan backfill ulang rentangnya.', '#data/satelit/gpm']);
     if (areaBad.length) findings.push(['v-amber', UI.int(areaBad.length) + ' Live Area bermasalah: ' + areaBad.map(a => a.name).join(', ') + '.',
-      'Coba ulang sumber yang gagal dari Operasi → Live Area.', 'live']);
+      'Periksa areanya di tabel di bawah.', null]);
     if (hy.waiting) findings.push(['v-amber', UI.int(hy.waiting) + ' job menunggu data hulu (WAITING_UPSTREAM).',
-      'Normal bila granule penyedia belum terbit; menetap berhari-hari berarti ada masalah.', 'pipeline']);
+      'Normal bila granule penyedia belum terbit; menetap berhari-hari berarti ada masalah.', null]);
     if (alerts === null) findings.push(['v-amber', 'Daftar alert tidak dapat dibaca.', 'Coba muat ulang halaman.', null]);
     else if (alerts.length) findings.push(['v-amber', UI.int(alerts.length) + ' alert hujan belum ditandai dibaca.',
-      'Penandaan dilakukan di Kondisi → Hujan per kecamatan, oleh Analis atau Administrator.', null]);
-    if (locked.length) findings.push(['', UI.int(locked.length) + ' akun terkunci.',
-      'Buka kuncinya di Pengguna & akses → Pengguna.', 'pengguna']);
+      'Ditinjau dan ditandai di halaman Kejadian oleh Analis atau Administrator.', '#kejadian']);
+    if (locked.length) findings.push(['', UI.int(locked.length) + ' akun terkunci.', 'Buka kuncinya di Manajemen akun.', hashOf('pengguna')]);
     if (!areas.length) findings.push(['', 'Belum ada Live Area.',
-      'Tanpa Live Area, halaman publik dan Kondisi tidak punya scene untuk ditampilkan.', 'live']);
+      'Tanpa Live Area, Beranda dan Citra Satelit tidak punya scene untuk ditampilkan.', null]);
 
-    p.innerHTML = UI.mainActivityHTML(main) +
-      '<div class="readouts" style="margin-bottom:8px">' +
-        UI.readoutHTML('PERLU PERHATIAN', UI.int(findings.length),
-          findings.length ? 'LIHAT DAFTAR DI BAWAH' : 'TIDAK ADA', findings.length ? 'v-amber' : '') +
-        UI.readoutHTML('HIDROMET TERAKHIR', UI.esc(hy.last_completed ? UI.date(hy.last_completed) : UI.NA),
-          'OBSERVASI ' + UI.esc(hy.last_observation_date ? UI.date(hy.last_observation_date) : UI.NA), 'v-cyan') +
-        UI.readoutHTML('ALERT AKTIF', alerts === null ? UI.NA : UI.int(alerts.length),
-          alerts === null ? 'TIDAK DAPAT DIBACA' : 'BELUM DITANDAI DIBACA', alerts && alerts.length ? 'v-amber' : '') +
-        UI.readoutHTML('ANTREAN DATASET', queued === undefined || queued === null ? UI.NA : UI.int(queued), 'JOB MENUNGGU') +
-      '</div>' +
-      UI.screenHTML({ channel: 'CH-00 · PERLU PERHATIAN', rec: findings.length ? '● CHECK' : '● NOMINAL', recCls: findings.length ? '' : 'live',
+    const sched = (pipe && pipe.scheduler) || [];
+    p.innerHTML = '<div class="ad-attn">' +
+      UI.screenHTML({ channel: 'PERLU PERHATIAN', rec: findings.length ? UI.int(findings.length) + ' TEMUAN' : '● NORMAL', recCls: findings.length ? '' : 'live',
         body: findings.length
           ? '<ul class="findings">' + findings.map(f =>
               '<li><b class="' + f[0] + '">' + UI.esc(f[1]) + '</b><br><span class="v-dim">' + UI.esc(f[2]) + '</span>' +
-              (f[3] ? ' <button type="button" class="link-btn" data-goto="' + f[3] + '">Buka →</button>' : '') + '</li>').join('') + '</ul>'
+              (f[3] ? ' <a href="' + f[3] + '">Buka →</a>' : '') + '</li>').join('') + '</ul>'
           : UI.emptyHTML('TIDAK ADA TEMUAN. SISTEM BERJALAN NORMAL.') }) +
-      '<div style="height:8px"></div>' +
-      '<div class="cols-2">' +
-        UI.screenHTML({ channel: 'CH-01 · JOB TERAKHIR PER JENIS', body: UI.tableHTML([
-          { label: 'Jenis', key: 'kind' },
-          { label: 'Status', html: true, get: j => '<span class="' + (/FAIL/i.test(j.status || '') ? 'v-alert' : /QUEUED|RUNNING|WAITING/i.test(j.status || '') ? 'v-amber' : '') + '">' + UI.esc(j.status || UI.NA) + '</span>' },
-          { label: 'Tanggal data', get: j => UI.date(j.date_range_start) },
-          { label: 'Selesai', get: j => j.completed_at ? UI.dateTime(j.completed_at) : '' },
-        ], (pipe && pipe.latest_jobs) || [], { empty: 'BELUM ADA JOB' }) }) +
-        UI.screenHTML({ channel: 'CH-02 · LIVE AREA', body: UI.tableHTML([
-          { label: 'Area', key: 'name' },
-          { label: 'Status', html: true, get: a => '<span class="' + (/FAIL|ERROR/i.test(a.status || '') ? 'v-alert' : '') + '">' + UI.esc(a.status || UI.NA) + '</span>' },
-          { label: 'Diperiksa', get: a => UI.dateTime(a.last_checked_at) },
-        ], areas, { empty: 'BELUM ADA LIVE AREA' }) }) +
+      UI.screenHTML({ channel: 'PENJADWAL', rec: sched.length ? UI.int(sched.length) + ' JOB' : '● TIDAK AKTIF', recCls: 'off',
+        body: (sched.length ? UI.tableHTML([
+          { label: 'Job', get: x => x.id || x.name }, { label: 'Berikutnya', get: x => UI.dateTime(x.next_run_time || x.next) }, { label: 'Jadwal', get: x => x.trigger || '' }], sched)
+          : '<p class="scr-text v-dim" style="margin:0">Penjadwal tidak aktif di proses ini (SCHEDULER_ENABLED=false). Siklus Live dan Job Hidromet dijalankan proses lain atau manual.</p>') +
+          '<div class="btn-row end" style="margin-top:6px"><button type="button" class="small" id="aiLive"' + (areas.length ? '' : ' disabled') + '>Jalankan siklus Live sekarang…</button></div>' }) +
       '</div>';
-
-    // "Buka →" sekarang berpindah lewat hash, jadi bagian yang dituju bisa
-    // dibagikan dan tombol Kembali peramban mengembalikan admin ke Ringkasan.
-    UI.$$('[data-goto]', p).forEach(b => b.addEventListener('click', () => st.ctx.go(hashOf(b.dataset.goto))));
+    UI.$('#aiLive', p).addEventListener('click', ev => runLive(ev.currentTarget, areas));
   }
 
   return { init, destroy, onSub };

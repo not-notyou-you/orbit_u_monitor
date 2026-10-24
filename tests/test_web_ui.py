@@ -29,11 +29,17 @@ WEB = ROOT / "web"
 PUBLIC_PAGES = {"/masuk": "login", "/daftar": "register"}
 # Sembilan halaman rancangan pemilik proyek (INTERFACE §2, M56; Tentang jadi menu sendiri, M63).
 DESTINATIONS = {"beranda", "tentang", "aoi-3d", "citra", "forecast", "kejadian", "data", "laporan", "sistem"}
-# Hash susunan lama yang harus tetap hidup lewat ALIASES (M53 dan sebelumnya).
+# Hash susunan lama yang harus tetap hidup lewat ALIASES (M53 dan sebelumnya, M67).
 LEGACY_HASHES = {"diagram", "kondisi", "kondisi/citra", "kondisi/kecamatan", "kondisi/relief", "riwayat",
                  "riwayat/grafik", "riwayat/laporan", "pengaturan", "pengaturan/akses", "akun",
                  "pantauan", "hari-ini", "statistik", "analitik", "katalog", "buat-dataset", "admin",
-                 "sistem/tentang"}
+                 "sistem/tentang",
+                 # M67: tab Forecast/Data dan bagian Sistem yang digabung
+                 "forecast/evaluasi", "data/sentinel-1", "data/modis", "data/gpm", "data/proses",
+                 "data/tersimpan", "data/unduh", "sistem/pengaturan/pipeline", "sistem/pengaturan/ringkasan", "sistem/pengaturan/scene",
+                 "sistem/pengaturan/arsip", "sistem/pengaturan/aturan", "sistem/pengguna/token",
+                 # M68: Kejadian satu halaman
+                 "kejadian/lihat", "kejadian/kelola"}
 
 APP_JS = (WEB / "js" / "app.js").read_text(encoding="utf-8")
 
@@ -121,10 +127,10 @@ ENTRY_HTML = ("app.html", "masuk.html", "daftar.html")
 
 
 def _selectors(css: str) -> list[str]:
-    """Selektor tingkat atas tiap blok aturan; isi @media/@keyframes ikut diurai."""
+    """Selektor tingkat atas tiap blok aturan; isi @media/@supports/@keyframes ikut diurai."""
     css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
     css = re.sub(r"@keyframes[^{]+\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", "", css)
-    css = re.sub(r"@media[^{]+\{", "", css)
+    css = re.sub(r"@(?:media|supports)[^{]+\{", "", css)
     return [s.strip() for s in re.findall(r"([^{}]+)\{", css) if s.strip()]
 
 

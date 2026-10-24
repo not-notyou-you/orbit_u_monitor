@@ -295,6 +295,27 @@ html:not(.tema-alt) .v-alert:not(.screen-inner *, .leaflet-container *, .chart-t
 .scr-table tbody tr:hover td { background: rgba(51, 255, 153, .06); }
 .scr-table tr.sel td { background: rgba(77, 225, 255, .12); }
 .table-wrap { overflow-x: auto; }
+/* M72: lebih dari 8 baris → .table-wrap digulir (tinggi dari js/ui.js), header menempel. */
+.table-wrap.tw-scroll { overflow-y: auto; }
+.tw-scroll thead th { position: sticky; top: 0; z-index: 5; background: var(--crt); box-shadow: inset 0 -1px var(--phos-dim); }
+.tw-scroll .roles thead th { background: var(--face); }
+/* M72: di layar sempit setiap baris tabel jadi kartu, bukan gulir ke samping.
+   Label kolom dari data-label (diisi js/ui.js). */
+@media (max-width: 600px) {
+  table.tc, table.tc tbody, table.tc tr, table.tc td { display: block; width: auto; }
+  table.tc thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table.tc tr { border: 1px solid var(--crt-grid); padding: 4px 6px; margin: 0 0 6px; }
+  .roles.tc tr { border-color: var(--shadow); }
+  table.tc td, table.tc td.r { display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+    text-align: right; border: 0; padding: 2px 0; min-width: 0; overflow-wrap: anywhere; }
+  table.tc td::before { content: attr(data-label); flex: 0 0 auto; max-width: 45%; text-align: left;
+    color: var(--phos-dim); text-transform: uppercase; letter-spacing: .06em; font-size: 11px; font-weight: 700; }
+  .roles.tc td::before { color: var(--text-mut); }
+  table.tc td[data-label=""]::before { display: none; }
+  table.tc td[data-label=""] { justify-content: flex-start; text-align: left; }
+  .table-wrap:has(> table.tc) { overflow-x: visible; }
+  .table-wrap.tw-scroll:has(> table.tc) { overflow-y: auto; }
+}
 
 /* Readout */
 .readouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
@@ -570,3 +591,47 @@ html:not(.tema-alt) .v-alert:not(.screen-inner *, .leaflet-container *, .chart-t
 .heat th { color: var(--phos-dim); font-weight: 400; padding: 0 2px; text-align: right; }
 .heat td { width: 18px; height: 16px; padding: 0; border: 1px solid var(--crt); text-align: center; font-size: 9px; }
 .heat td.na { background: transparent; outline: 1px dotted var(--crt-grid); }
+
+/* ------------------------------------------------------------- scrollbar
+   Orbital 95: scrollbar Windows 95 ramping — jalur abu-abu muda, pegangan
+   dan tombol panah berbevel raised (§3). Di layar CRT pegangannya fosfor
+   redup di atas hitam, tanpa tombol. Firefox tidak mengenal
+   ::-webkit-scrollbar, jadi hanya mendapat warnanya. Tema lain mengatur
+   scrollbarnya sendiri di css/tema/. */
+html:not(.tema-alt) ::-webkit-scrollbar { width: 14px; height: 14px; }
+html:not(.tema-alt) ::-webkit-scrollbar-track { background: var(--light); }
+html:not(.tema-alt) ::-webkit-scrollbar-thumb,
+html:not(.tema-alt) ::-webkit-scrollbar-button:single-button {
+  background-color: var(--face);
+  box-shadow: inset -1px -1px var(--dark), inset 1px 1px var(--light),
+              inset -2px -2px var(--shadow), inset 2px 2px var(--hilite);
+}
+html:not(.tema-alt) ::-webkit-scrollbar-button:single-button {
+  display: block; width: 14px; height: 14px; background-repeat: no-repeat; background-position: center;
+}
+html:not(.tema-alt) ::-webkit-scrollbar-button:single-button:active {
+  box-shadow: inset 0 0 0 1px var(--shadow); background-position: calc(50% + 1px) calc(50% + 1px);
+}
+html:not(.tema-alt) ::-webkit-scrollbar-button:single-button:vertical:decrement {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='4' shape-rendering='crispEdges'%3E%3Cpath d='M0 4h7L3.5 0z'/%3E%3C/svg%3E");
+}
+html:not(.tema-alt) ::-webkit-scrollbar-button:single-button:vertical:increment {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='4' shape-rendering='crispEdges'%3E%3Cpath d='M0 0h7L3.5 4z'/%3E%3C/svg%3E");
+}
+html:not(.tema-alt) ::-webkit-scrollbar-button:single-button:horizontal:decrement {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='7' shape-rendering='crispEdges'%3E%3Cpath d='M4 0v7L0 3.5z'/%3E%3C/svg%3E");
+}
+html:not(.tema-alt) ::-webkit-scrollbar-button:single-button:horizontal:increment {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='7' shape-rendering='crispEdges'%3E%3Cpath d='M0 0v7L4 3.5z'/%3E%3C/svg%3E");
+}
+html:not(.tema-alt) ::-webkit-scrollbar-corner { background: var(--face); }
+html:not(.tema-alt) .screen-inner ::-webkit-scrollbar { width: 8px; height: 8px; }
+html:not(.tema-alt) .screen-inner ::-webkit-scrollbar-track { background: var(--crt); }
+html:not(.tema-alt) .screen-inner ::-webkit-scrollbar-thumb { background: var(--crt-grid); box-shadow: none; }
+html:not(.tema-alt) .screen-inner ::-webkit-scrollbar-thumb:hover { background: var(--phos-dim); }
+html:not(.tema-alt) .screen-inner ::-webkit-scrollbar-button { display: none; }
+html:not(.tema-alt) .screen-inner ::-webkit-scrollbar-corner { background: var(--crt); }
+@supports (-moz-appearance: none) {
+  html:not(.tema-alt) { scrollbar-color: var(--face) var(--light); }
+  html:not(.tema-alt) .screen-inner { scrollbar-color: var(--phos-dim) var(--crt); }
+}

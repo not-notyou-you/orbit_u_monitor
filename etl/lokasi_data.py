@@ -57,6 +57,16 @@ def obs(sess, region_id: int | None = None) -> dict[int, tuple[dict, dict]]:
     return out
 
 
+def updated_at(etl, region_id: int):
+    """Kapan angka kecamatan ini terakhir dihitung (max ``computed_at``).
+
+    Dibaca lewat monitor_etl karena VIEW publik tidak memuat kolom waktu
+    hitung; yang keluar hanya satu stempel waktu, bukan angkanya."""
+    with etl.session() as s:
+        return s.scalar(text("SELECT max(computed_at) FROM region_observations WHERE region_id = :r"),
+                        {"r": region_id})
+
+
 def ranges(sess, region_id: int | None = None) -> dict[int, dict]:
     rows = sess.execute(text(
         "SELECT * FROM v_public_lokasi_range" + (" WHERE region_id = :r" if region_id else "")),

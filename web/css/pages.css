@@ -24,6 +24,26 @@
 .hero-strip .screen-inner { min-height: 0; padding: 8px 10px; }
 .hero-strip .hs-line { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin: 0; }
 .hero-strip .hs-more { margin-left: auto; }
+/* Tentang (M66): logo di sepertiga kiri, "Apa ini" di dua pertiga kanan; lalu
+   "Yang perlu diketahui" selebar jendela dengan lima kartu berjajar. */
+.hero.ab-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 20px; align-items: center; margin-bottom: 8px; }
+.ab-logo { display: grid; place-items: center; }
+.ab-hero .hero-logo { width: 100%; max-width: 220px; height: auto; }
+.ab-what { min-width: 0; }
+.ab-what p { line-height: 1.5; margin: 0 0 8px; }
+.ab-what p:last-child { margin-bottom: 0; }
+.ab-h { font-size: 15px; margin: 6px 0 4px; }
+.know-cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.know-card { padding: 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; }
+.know-card svg { width: 32px; height: 32px; display: block; }
+.know-card p { margin: 0; line-height: 1.45; font-size: 12px; }
+@media (max-width: 980px) { .know-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .hero.ab-hero { grid-template-columns: minmax(0, 1fr); }
+  .ab-hero .hero-logo { max-width: 120px; }
+  .know-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 420px) { .know-cards { grid-template-columns: minmax(0, 1fr); } }
 .facts { margin: 0; padding-left: 18px; }
 .facts li { margin-bottom: 6px; line-height: 1.5; }
 .facts li:last-child { margin-bottom: 0; }
@@ -41,7 +61,47 @@
 .sat-card .sat-sentence, .sat-card .sat-about { margin: 0; font-size: 11px; line-height: 1.45; }
 .kv.kv-light dt { color: var(--text-mut); }
 
+/* Citra › Ringkasan (M66): tiga kartu satelit berjajar mendatar. */
+.ci-area { max-width: 320px; }
+.ci-window { font-size: 11px; margin: 0 0 8px; }
+.sat-cards.ci-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) { .sat-cards.ci-cards { grid-template-columns: minmax(0, 1fr); } }
+
 /* ---------------------------------------------------------------- citra per satelit */
+/* M66: 2/3 penjelasan · 1/3 tanggal di atas; 2/3 kondisi & band · 1/3 angka di bawah. */
+.cs-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 8px; align-items: start; }
+.cs-split > fieldset { margin: 0; min-width: 0; }
+.cs-split + .deck { margin-top: 8px; }
+.cs-about .kv dd { line-height: 1.45; }
+.cs-cond { margin: 4px 0 0; }
+/* Dropdown tanggal: tertutup sampai ditekan; lima baris terlihat, sisanya digulir. */
+.dd { position: relative; }
+.dd-btn { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 8px; text-align: left; }
+.dd-btn::after { content: ""; border: 5px solid transparent; border-top-color: currentColor; margin-top: 5px; flex: none; }
+.dd-btn .sub { margin-left: auto; font-size: 11px; opacity: .75; }
+.dd-list { position: absolute; left: 0; right: 0; top: calc(100% + 2px); z-index: 20; max-height: calc(5 * 26px + 4px); }
+.dd-list[hidden] { display: none; }
+#csDates.dd-list button { height: 26px; min-height: 26px; box-sizing: border-box; align-items: center; }
+/* Modal citra (M66): ⅔ gambar + penjelasan, ⅓ tabel angka tanggal × band.
+   Kaki: navigasi di kiri (posisi di tengahnya), Tutup di kanan, satu baris. */
+.lb-bar { display: flex; align-items: center; gap: 12px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--shadow); }
+.lb-nav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.lb-nav button { min-width: 120px; }
+.lb-pos { text-align: center; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-bar > .btn-row.end { margin: 0 0 0 8px; padding-left: 16px; border-left: 1px solid var(--shadow); flex: none; }
+@media (max-width: 640px) {
+  .lb-bar { flex-direction: column; align-items: stretch; }
+  .lb-nav { grid-template-columns: 1fr 1fr; }
+  .lb-pos { grid-column: 1 / -1; grid-row: 1; white-space: normal; }
+  .lb-nav button { min-width: 0; }
+  .lb-bar > .btn-row.end { justify-content: stretch; margin: 0; padding-left: 0; border-left: 0; }
+  .lb-bar > .btn-row.end button { flex: 1; }
+}
+.dialog.xwide:has(.lb-split) { max-width: 1200px; }
+.lb-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 8px; align-items: start; }
+.lb-split .lb-main, .lb-split .lb-side { min-width: 0; }
+@media (max-width: 760px) { .lb-split { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 900px) { .cs-split { grid-template-columns: minmax(0, 1fr); } }
 .listbox.tall { max-height: 320px; }
 .compare-grid { display: flex; flex-direction: column; gap: 8px; }
 .compare-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -111,32 +171,44 @@
 .pl-help { margin-top: 6px; font-size: 12px; }
 .pl-help summary { cursor: pointer; }
 .pl-help p { margin: 4px 0 0; line-height: 1.5; max-width: 80ch; }
-.pl-list { max-height: 340px; }
+/* Informasi lokasi (M66): pilihan kecamatan sebagai kisi di atas peta. */
+.pl-list { max-height: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 2px; }
 .pl-list button { display: flex; align-items: center; gap: 6px; }
 .pl-list .pl-name { flex: 1; min-width: 0; text-align: left; }
+#hoInfo > .screen { margin-top: 8px; }
+/* Pantau lokasi (M66): KPI di dalam Informasi lokasi, di atas peta. */
+.pl-kpi { margin-top: 10px; }
+.pl-kpi .pl-h { margin-top: 0; margin-bottom: 4px; }
 .pl-badge { font-size: 10px; font-weight: 700; letter-spacing: .06em; padding: 0 4px; border: 1px solid currentColor; white-space: nowrap; }
 .pl-list button[aria-selected="true"] .pl-badge, .pl-list button:hover .pl-badge { color: #fff; }
 .pl-legend { color: var(--text); }
 .pl-h { font-size: 13px; margin: 12px 0 2px; }
 .pl-sub { font-size: 11px; margin: 0 0 6px; line-height: 1.5; }
-.pl-status { margin: 0; font-size: 14px; line-height: 1.5; }
-.pl-abn { margin: 0; padding-left: 18px; line-height: 1.5; }
-.pl-abn li { margin-bottom: 3px; }
-.pl-all { margin-top: 8px; }
-.pl-all summary { cursor: pointer; }
+/* Pantau lokasi: tanggal + jam update terakhir harus muat tanpa terpotong. */
+#hoKpi .r-val { font-size: 24px; white-space: normal; }
+/* Detail lokasi: pilihan satelit/channel di kiri, citra satu satelit di kanan. */
+.pl-detail { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 8px; align-items: start; }
+.pl-radios .check { gap: 6px; padding: 2px 0; }
+.pl-radios .check .pl-name { flex: 1; min-width: 0; }
+.pl-viewer { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px; gap: 6px; align-items: center; }
+.pl-viewer { grid-template-columns: 48px minmax(0, 1fr) 48px; }
+.pl-nav { min-width: 0; height: 100%; min-height: 96px; padding: 0; display: grid; place-items: center; }
+.pl-nav svg { width: 28px; height: 56px; fill: none; stroke: currentColor; stroke-width: 5; stroke-linecap: square; stroke-linejoin: miter; }
+.pl-img button.thumb { padding: 0; min-width: 0; background: #000; box-shadow: none; display: block; width: 100%; }
+.pl-img button.thumb:active:not(:disabled) { padding: 0; }
+.pl-img img { display: block; width: 100%; height: auto; max-height: 460px; object-fit: contain; }
+.pl-img .noimg { min-height: 220px; display: grid; place-items: center; color: var(--phos-dim); border: 1px dashed var(--crt-grid); text-align: center; padding: 8px; }
 .pl-stats .readout .r-val { font-size: 22px; }
 .pl-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
 .pl-chart { min-width: 0; }
 .pl-chart .lbl { margin: 0 0 2px; display: flex; align-items: center; gap: 4px; }
 .chart .rng { fill: var(--phos); fill-opacity: .1; }
-/* Layar sentuh: baris daftar dan tombol lokasi cukup besar untuk jari. */
+@media (max-width: 760px) { .pl-detail { grid-template-columns: minmax(0, 1fr); } }
+/* Layar sentuh: baris daftar, pilihan, dan tombol lokasi cukup besar untuk jari. */
 @media (pointer: coarse) {
-  .pl-list button { min-height: 40px; }
-  #hoGeo button, #hoMine button, #hoHeroBtns .btn, #hoHeroBtns button { min-height: 40px; }
+  .pl-list button, .pl-radios .check { min-height: 40px; }
+  #hoGeo button, #hoMine button { min-height: 40px; }
 }
-/* Potongan per kecamatan kecil dan tegak: di ponsel dua kolom cukup terbaca
-   (main.css menurunkan .tiles ke satu kolom di bawah 420px). */
-@media (max-width: 420px) { #hoCitra .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* ---------------------------------------------------------------- Akun saya: email & peringatan (M64) */
 .pl-checks { max-height: 220px; padding: 4px; }
@@ -144,3 +216,120 @@
 .pl-warn { margin: 0 0 6px; padding: 4px 6px; border: 1px solid var(--amber); font-size: 11px; }
 .pl-sub-note { margin: 6px 0 0; font-size: 11px; }
 @media (pointer: coarse) { .pl-checks .check { min-height: 36px; } }
+
+/* ---------------------------------------------------------------- M67: Forecast, Data, Sistem */
+/* Bagian terlipat: penjelasan panjang, log, dan daftar sekunder tertutup bawaannya. */
+.ad-fold { margin: 8px 0 0; }
+.ad-fold > summary { cursor: pointer; font-weight: 700; padding: 4px 0; }
+.ad-fold[open] > summary { margin-bottom: 6px; }
+.dg-help > summary { font-weight: 400; font-size: 12px; color: var(--phos-dim); }
+.ad-part + .ad-part, .ad-part + .ad-fold { margin-top: 12px; }
+/* Pemilih satelit di Data › Satelit: satu baris tombol, yang aktif ditekan. */
+.seg { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 8px; }
+.seg a { display: inline-flex; align-items: center; padding: 4px 14px; border: 1px solid var(--text); color: var(--text); text-decoration: none; font-weight: 700; }
+.seg a[aria-current] { background: var(--select); border-color: var(--select); color: #fff; }
+.seg a:focus-visible { outline: 1px dotted var(--text); outline-offset: 2px; }
+/* Data › Ringkasan: kendali proses dalam satu baris tipis. */
+@media (pointer: coarse) { .seg a { min-height: 40px; } }
+
+/* ---------------------------------------------------------------- M68: Kejadian & Laporan */
+/* Saringan satu baris (dipakai Kejadian dan Laporan): label di atas, rata bawah. */
+.dz-bar, .rp-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; margin: 0 0 8px; }
+.dz-filter { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: flex-end; flex: 1; min-width: 0; margin: 0; }
+.dz-filter .field { margin: 0; }
+.dz-filter input[type=date] { width: 140px; }
+.dz-note { font-size: 11px; color: var(--text-mut); margin: 0 0 6px; }
+/* Lencana ringkasan = saring cepat. */
+.dz-chips { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin: 0 0 8px; }
+.dz-total { margin-right: 6px; }
+.dz-chip[aria-pressed="false"] { opacity: 1; text-decoration: none; }
+.dz-chip[aria-pressed="true"] { background: var(--select); color: #fff; }
+.dz-dot { display: inline-block; width: 9px; height: 9px; border-radius: 0; border: 1px solid #000; margin-right: 4px; vertical-align: -1px; }
+/* Peta dan daftar berdampingan, sama tinggi; daftar menggulir sendiri. */
+.dz-split { display: grid; grid-template-columns: minmax(0, 45fr) minmax(0, 55fr); gap: 8px; align-items: stretch; }
+.dz-split .map { height: 480px; }
+.dz-list { max-height: 480px; overflow: auto; }
+.dz-row { cursor: pointer; }
+.dz-row:hover, .dz-row.dz-on, .dz-row:focus { background: var(--select); color: #fff; outline: none; }
+.dz-row:hover .v-amber, .dz-row.dz-on .v-amber, .dz-row:focus .v-amber,
+.dz-row:hover .v-dim, .dz-row.dz-on .v-dim, .dz-row:focus .v-dim { color: inherit; }
+@media (max-width: 900px) { .dz-split { grid-template-columns: minmax(0, 1fr); } .dz-split .map { height: 320px; } .dz-list { max-height: none; } }
+/* Laporan: dua kartu terbaru, lalu saringan + aksi. */
+.rp-latest { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 8px; }
+.rp-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; min-width: 0; }
+.rp-card-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rp-card-text b { font-size: 15px; }
+.rp-card-text .mut { font-size: 11px; }
+.rp-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+@media (max-width: 640px) { .rp-latest { grid-template-columns: minmax(0, 1fr); } .rp-actions { margin-left: 0; } }
+
+/* M70 Forecast: dua tabel berdampingan (forecast | rincian band) dan empat
+   kartu 2×2 Analisa daerah di atas grafik. */
+.dg-tables { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; align-items: stretch; }
+.dg-tables > .screen { display: flex; flex-direction: column; }
+.dg-tables > .screen > .screen-inner { flex: 1; }
+.dg-more > summary { font-size: 11px; font-weight: 400; color: var(--phos-dim); cursor: pointer; }
+.dg-more p { margin: 2px 0 0; font-size: 11px; font-weight: 400; color: var(--phos-dim); white-space: normal; }
+.dg-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+.dg-cards > fieldset { margin: 0; }
+.dg-bandlist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 12px; }
+.dg-bandlist > p { grid-column: 1 / -1; }
+.dg-cards .region-pick { max-height: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 12px; }
+.dg-csv { display: flex; gap: 6px; align-items: flex-end; flex-wrap: wrap; }
+.dg-csv .field { flex: 1; min-width: 140px; margin: 0; }
+.dg-all { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 16px; max-height: 60vh; overflow: auto; }
+@media (max-width: 799px) {
+  .dg-tables, .dg-cards, .dg-cards .region-pick, .dg-bandlist, .dg-all { grid-template-columns: minmax(0, 1fr); }
+}
+
+
+/* M73 GPM: hujan per kecamatan — peta (kiri) dan tabel (kanan) berdampingan. */
+.cs-rain { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: start; }
+.cs-rain .map { height: 340px; }
+.cs-rain-legend { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 6px; font-size: 11px; }
+.cs-rrow { cursor: pointer; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--phos); }
+.dz-chip.dz-alert { border-color: var(--amber); color: var(--amber); font-weight: 700; }
+.cs-rain-sort { display: none; margin: 0 0 6px; }
+@media (max-width: 799px) { .cs-rain { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .cs-rain-sort { display: block; } }
+
+/* M74 Data › Ringkasan: satu baris status di atas tabel per satelit. */
+.dh-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin: 0 0 8px; padding: 6px 10px;
+  border: 1px solid var(--shadow); background: var(--face); font-size: 13px; }
+.dh-status .mut { font-size: 11px; margin-left: auto; }
+
+/* M74 Data › Satelit: pemilih satelit + backfill satu baris; saringan satu baris. */
+.ds-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; }
+.ds-top .seg { margin: 0; }
+.ds-bf, .ds-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 8px; }
+.ds-bf .field, .ds-filter .field { margin: 0; }
+.ds-bf-lbl { align-self: center; }
+.ds-bf .err { flex-basis: 100%; text-align: right; }
+.ds-help { font-size: 11px; margin: 6px 0 8px; }
+.ds-filter { margin: 0 0 8px; }
+.ds-filter .ds-q { flex: 1; min-width: 160px; }
+.ds-row { cursor: pointer; }
+
+/* M74 Data › Dataset: pemilih + aksi satu baris; Ringkasan dua kolom. */
+.ct-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 8px; margin: 0 0 6px; }
+.ct-bar .field { margin: 0; }
+.ct-pick { min-width: 240px; flex: 0 1 340px; }
+.ct-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.ct-sum { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: start; }
+@media (max-width: 799px) { .ct-sum { grid-template-columns: minmax(0, 1fr); } .ct-acts { margin-left: 0; } }
+
+/* M74 Sistem › Pengaturan › Live Area & penjadwal: temuan | penjadwal. */
+.ad-attn { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 8px; align-items: stretch; margin-bottom: 8px; }
+@media (max-width: 799px) { .ad-attn { grid-template-columns: minmax(0, 1fr); } }
+
+/* M74 Akun saya: kisi dua kolom, baris disamakan tingginya. */
+.ac-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 8px; align-items: stretch; }
+.ac-grid > fieldset, .ac-grid > form > fieldset { height: calc(100% - 8px); box-sizing: border-box; }
+.ac-regs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+@media (max-width: 799px) { .ac-grid, .ac-regs { grid-template-columns: minmax(0, 1fr); } }
+/* M74: daftar pendek dua pasang kolom (Penyimpanan › jumlah baris). */
+.kv.kv-2 { grid-template-columns: max-content 1fr max-content 1fr; font-size: 13px; }
+.kv.kv-2 dt { font-size: 11px; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .kv.kv-2 { grid-template-columns: max-content 1fr; } }

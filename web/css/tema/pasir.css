@@ -41,6 +41,11 @@ html[data-theme="pasir"] {
   --t-taskbar-bg: rgba(253, 248, 236, .9); --t-taskbar-shadow: 0 8px 24px rgba(74, 50, 34, .12);
   --t-backdrop: rgba(74, 50, 34, .18);
   --t-tile-filter: sepia(.45) saturate(.85) brightness(1.03) contrast(.95);
+  /* scrollbar: tipis membulat ala Windows 11, jalur tak terlihat */
+  --t-sb-size: 10px; --t-sb-r: 999px; --t-sb-gap: 2px; --t-sb-ff-width: thin;
+  --t-sb-track: transparent; --t-sb-track-shadow: none;
+  --t-sb-thumb: #e0cfab; --t-sb-thumb-shadow: none;
+  --t-sb-thumb-hover: #c9b182; --t-sb-thumb-active: var(--p-mut);
 }
 html[data-theme="pasir"] body { background-attachment: fixed; }
 

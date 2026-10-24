@@ -1,67 +1,67 @@
-// js/data-home.js — Data › Ringkasan (#data/ringkasan, INTERFACE.md §2 halaman 6.1, M56).
-// GET /api/data/summary: jumlah scene/granule per satelit (aktif/nonaktif),
-// rentang tanggal, hari yang sudah punya angka per kecamatan, dan backfill
-// yang sedang/baru berjalan. Navigasi ke sub-halaman diambil dari ROUTES.
+// js/data-home.js — Data › Ringkasan (#data/ringkasan, INTERFACE.md §2 halaman 6.1, M56, M67, M74).
+// Baris status dan bagian "sedang berjalan" diisi js/process.js (dimuat di
+// sini dengan fragmen yang sama). Halaman ini sendiri mengisi tabel dataset
+// utama per satelit dari GET /api/data/summary + /api/data/activity.
+//
+// M74: tiga kartu satelit, dua kotak dataset utama, dan tabel "backfill
+// terakhir" diganti satu tabel tiga baris. Rincian per tanggal dan per item
+// tetap di Data › Satelit (tombol Kelola →).
 'use strict';
 Pages['data-home'] = (() => {
   const TAB = { s1: 'sentinel-1', modis: 'modis', gpm: 'gpm' };
-  const RUN_STATUS = { RUNNING: ['BERJALAN', 'v-cyan'], COMPLETED: ['SELESAI', ''], FAILED: ['GAGAL', 'v-alert'], SKIPPED: ['DILEWATI', 'v-amber'] };
+  const LIVE = { BACKFILLING: 'MENGISI RIWAYAT', RUNNING: 'MEMERIKSA SCENE BARU', WAITING: 'MENUNGGU GILIRAN', ACTIVE: 'SIAGA', ERROR: 'GALAT' };
   let st = null;
 
   async function init(root, ctx) {
-    st = { root, ctx, timer: null };
-    renderNav();
-    await load();
+    st = { root, ctx, timer: null, proc: false };
+    await Promise.all([load(), mountProcess()]);
     st.timer = setInterval(load, 15000);
   }
-  function destroy() { if (st && st.timer) clearInterval(st.timer); st = null; }
+  function destroy() {
+    if (st && st.timer) clearInterval(st.timer);
+    if (st && st.proc && Pages.process && Pages.process.destroy) { try { Pages.process.destroy(); } catch (e) { /* abaikan */ } }
+    st = null;
+  }
 
-  function renderNav() {
-    const route = Shell.ROUTES.find(r => r.hash === 'data');
-    UI.$('#dhNav', st.root).innerHTML = Shell.visibleTabs(route).filter(t => t.key !== 'ringkasan').map(t =>
-      '<a class="navcard" href="#data/' + t.key + '">' + UI.icon('folder') + '<span class="nc-body"><span class="nc-title">' +
-      UI.esc(t.title) + '</span><span class="nc-desc">' + UI.esc(t.lede) + '</span></span></a>').join('');
+  async function mountProcess() {
+    try { await Shell.loadScript('process'); } catch (e) { UI.$('#pcStatus', st.root).textContent = 'Status proses gagal dimuat.'; return; }
+    if (!st) return;
+    st.proc = true;
+    await Pages.process.init(st.root, st.ctx);
+  }
+
+  // Status proses tiap satelit: Sentinel-1 dari siklus Live, MODIS/GPM dari Job Hidromet.
+  function procOf(s, a) {
+    if (s.backfill_running) return ['BACKFILL BERJALAN', 'v-cyan'];
+    if (!a) return [UI.NA, ''];
+    if (s.key === 's1') {
+      const l = (a.live || [])[0];
+      if (!l) return ['BELUM ADA LIVE AREA', 'v-amber'];
+      return [(LIVE[l.status] || l.status) + (l.running ? '' : ' · 01, 07, 13, 19 WIB'), l.status === 'ERROR' ? 'v-alert' : l.running ? 'v-cyan' : ''];
+    }
+    const h = a.hydromet || {};
+    return h.locked ? ['JOB HIDROMET BERJALAN', 'v-cyan'] : ['SIAGA · HARIAN 02.00 WIB', ''];
   }
 
   async function load() {
     if (!st) return;
     const $ = s => UI.$(s, st.root);
-    let r;
-    try { r = await API.get('/api/data/summary'); }
-    catch (e) { if (st && !st.loaded) { $('#dhCards').innerHTML = UI.emptyHTML('GAGAL MEMUAT'); UI.showError('Data', e); } return; }
+    let r, a;
+    try { [r, a] = await Promise.all([API.get('/api/data/summary'), API.get('/api/data/activity').catch(() => null)]); }
+    catch (e) { if (st && !st.loaded) { $('#dhTable').innerHTML = UI.emptyHTML('GAGAL MEMUAT'); UI.showError('Data', e); } return; }
     if (!st) return;
     st.loaded = true;
-    const total = r.sources.reduce((s, x) => s + x.n_total, 0);
-    const invalid = r.sources.reduce((s, x) => s + x.n_invalid, 0);
-    const running = r.sources.filter(x => x.backfill_running).length;
-    $('#dhReadouts').innerHTML =
-      UI.readoutHTML('SCENE + GRANULE', UI.int(total), UI.int(invalid) + ' NONAKTIF', invalid ? 'v-amber' : '') +
-      UI.readoutHTML('DATASET', UI.int(r.datasets.n_datasets), UI.int(r.datasets.n_active) + ' SEDANG DIPROSES', r.datasets.n_active ? 'v-cyan' : '') +
-      UI.readoutHTML('BACKFILL', running ? 'BERJALAN' : 'DIAM', running ? UI.int(running) + ' SATELIT' : 'TIDAK ADA YANG BERJALAN', running ? 'v-cyan' : '');
-    // Backfill dataset utama (skrip, penjadwal, halaman Data): progres + perkiraan selesai.
-    $('#dhMain').innerHTML = UI.mainActivityHTML(r.main);
-    $('#dhCards').innerHTML = r.sources.map(s => '<section class="sat-card raised" aria-label="' + UI.esc(s.label) + '">' +
-      '<header><b>' + UI.esc(s.label) + '</b>' + (s.backfill_running ? '<span class="v-cyan">● BACKFILL</span>' : '') + '</header>' +
-      '<div class="screen"><div class="screen-inner"><dl class="kv">' +
-      '<dt>TOTAL</dt><dd>' + UI.int(s.n_total) + '</dd><dt>AKTIF</dt><dd>' + UI.int(s.n_valid) + '</dd>' +
-      '<dt>NONAKTIF</dt><dd class="' + (s.n_invalid ? 'v-amber' : '') + '">' + UI.int(s.n_invalid) + '</dd>' +
-      '<dt>RENTANG</dt><dd>' + UI.esc(s.first_date ? UI.date(s.first_date, 'short') + ' – ' + UI.date(s.last_date, 'short') : UI.NA) + '</dd>' +
-      '<dt>HARI DATA</dt><dd>' + UI.int(s.n_days) + '</dd>' +
-      (s.key !== 's1' ? '<dt>HARI ANGKA KEC.</dt><dd>' + UI.int(s.obs_days) + '</dd>' : '') +
-      '<dt>MASUK TERAKHIR</dt><dd>' + UI.esc(s.last_ingested_at ? UI.dateTime(s.last_ingested_at) : UI.NA) + '</dd></dl></div></div>' +
-      '<div class="btn-row end"><a class="btn default" href="#data/' + TAB[s.key] + '">Kelola ' + UI.esc(s.label) + ' →</a></div></section>').join('');
-    const h = r.hydromet || {};
-    const ext = h.external ? '<p class="scr-text v-cyan" style="margin:0 0 6px">● BACKFILL HIDROMET BERJALAN DI PROSES LAIN — sedang mengerjakan ' +
-      UI.esc(h.current_date ? UI.date(h.current_date) : 'tanggal berikutnya') + ', ' + UI.int(h.done_last_hour) + ' tanggal selesai dalam 1 jam terakhir. ' +
-      '<a href="#data/gpm">Lihat di Data › GPM</a></p>' : '';
-    $('#dhRuns').innerHTML = ext + UI.tableHTML([
-      { label: '#', key: 'run_id' }, { label: 'Satelit', get: x => x.source.toUpperCase() },
-      { label: 'Rentang', get: x => UI.date(x.date_from, 'short') + ' – ' + UI.date(x.date_to, 'short') },
-      { label: 'Progres', get: x => x.total ? x.done + '/' + x.total : UI.NA },
-      { label: 'Status', html: true, get: x => { const s = RUN_STATUS[x.status] || [x.status, '']; return '<span class="' + s[1] + '">' + s[0] + '</span>'; } },
-      { label: 'Mulai', get: x => UI.dateTime(x.started_at) },
-    ], r.recent_runs, { empty: h.external ? 'BELUM ADA BACKFILL DARI HALAMAN INI' : 'BELUM ADA BACKFILL SEJAK SERVER DIMULAI', caption: 'Backfill terakhir' });
-    st.ctx.setStatus('Siap · diperbarui tiap 15 detik');
+    $('#dhRec').textContent = UI.int(r.sources.length) + ' SATELIT';
+    $('#dhTable').innerHTML = UI.tableHTML([
+      { label: 'Satelit', html: true, get: s => '<b>' + UI.esc(s.label) + '</b>' },
+      { label: 'Rentang data', get: s => s.first_date ? UI.date(s.first_date, 'short') + ' – ' + UI.date(s.last_date, 'short') : UI.NA },
+      { label: 'Hari data', cls: 'r', get: s => UI.int(s.n_days) + (s.key !== 's1' ? ' (' + UI.int(s.obs_days) + ' berangka kec.)' : '') },
+      { label: 'Item aktif', cls: 'r', html: true, get: s => UI.int(s.n_valid) + ' / ' + UI.int(s.n_total) +
+        (s.n_invalid ? ' <span class="v-amber">(' + UI.int(s.n_invalid) + ' nonaktif)</span>' : '') },
+      { label: 'Masuk terakhir', get: s => s.last_ingested_at ? UI.dateTime(s.last_ingested_at) : UI.NA },
+      { label: 'Proses', html: true, get: s => { const p = procOf(s, a); return '<span class="' + p[1] + '">' + UI.esc(p[0]) + '</span>'; } },
+      { label: '', cls: 'r', html: true, get: s => '<a class="btn small" href="#data/satelit/' + TAB[s.key] + '">Kelola →</a>' },
+    ], r.sources, { caption: 'Dataset utama per satelit', empty: 'BELUM ADA DATA SATELIT' });
   }
 
   return { init, destroy };

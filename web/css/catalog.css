@@ -1,6 +1,3 @@
 /* css/catalog.css — Katalog Dataset */
-#ctList button .st { margin-left: auto; padding-left: 8px; font-size: 11px; }
-#ctList button { flex-wrap: nowrap; }
-#ctList button .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ct-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-bottom: 8px; }
 .ct-filters .field { margin: 0; }

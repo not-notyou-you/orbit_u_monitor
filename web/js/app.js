@@ -15,23 +15,23 @@
 'use strict';
 
 window.Pages = window.Pages || {};
-const ASSET_V = '6.24';
+const ASSET_V = '6.39';
 
 // `lede` = keterangan halaman; tidak lagi ditampilkan di jendela (dihapus atas
 // permintaan pemilik proyek), disimpan sebagai dokumentasi rute.
 const ROUTES = [
   {
     hash: 'beranda', file: 'home', title: 'Beranda', icon: 'globe', perm: ['home.view'],
-    lede: 'Pantau lokasi: kondisi kecamatan tempat Anda berada (pengguna yang masuk, dengan izin lokasi) atau yang Anda pilih — kalimat kondisi, citra satelit kecamatan itu, dan angkanya. Tema tampilan dipilih di bagian bawah.',
-    desc: 'Pantau lokasi: kondisi satu kecamatan, citra satelitnya, dan angka 30 hari terakhir; pilihan tema tampilan.',
+    lede: 'Pantau lokasi: kondisi kecamatan tempat Anda berada (pengguna yang masuk, dengan izin lokasi) atau yang Anda pilih — status, update terakhir, luas daerah, lalu citra dan angka satu satelit sekaligus. Tema tampilan dipilih di antara Informasi lokasi dan Pantau lokasi.',
+    desc: 'Pantau lokasi: kondisi satu kecamatan, citra satelitnya per satelit, dan angka 30 hari terakhir; pilihan tema tampilan.',
   },
   {
     // M63: isi Beranda lama (sambutan, penjelasan, kartu halaman, peta AOI)
     // digabung dengan Sistem › Tentang menjadi menu sendiri. Tema tampilan
     // kembali ke Beranda (M65).
     hash: 'tentang', file: 'about', title: 'Tentang', icon: 'help', perm: ['about.view'],
-    lede: 'Apa aplikasi ini, batasannya, halaman untuk peran Anda, peta AOI, sumber data, dan versi.',
-    desc: 'Apa aplikasi ini, batasannya, halaman per peran, peta AOI, dan sumber data.',
+    lede: 'Apa aplikasi ini, yang perlu diketahui lebih dulu, sumber data, dan versi.',
+    desc: 'Apa aplikasi ini, yang perlu diketahui, dan sumber data.',
   },
   {
     hash: 'aoi-3d', file: 'terrain3d', title: '3D AOI', icon: 'satellite', perm: ['aoi3d.view'], css: true,
@@ -66,67 +66,43 @@ const ROUTES = [
   },
   {
     hash: 'forecast', title: 'Forecast', icon: 'chart', perm: ['diagram.view'],
-    desc: 'Grafik semua band 30 hari terakhir dengan forecast 15 hari, dan analisa per kecamatan dengan laporan PDF.',
+    desc: 'Grafik semua band 30 hari terakhir dengan forecast 15 hari, dan analisa per kecamatan dengan evaluasi alert, PDF, dan CSV.',
     tabs: [
       {
         key: 'terbaru', file: 'diagram', mode: 'latest', title: 'Keadaan terbaru', perm: ['diagram.view'],
         lede: 'Semua band dalam satu grafik, 30 hari terakhir plus forecast 15 hari, diperbarui otomatis. Klik nama band untuk menyembunyikan atau membaca penjelasannya.',
       },
       {
+        // M67: termasuk evaluasi alert & kejadian (dulu tab "Tren & evaluasi alert").
         key: 'analisa-daerah', file: 'diagram', mode: 'regions', title: 'Analisa daerah', perm: ['diagram.view'],
-        lede: 'Pilih kecamatan (dan warnanya), rentang tanggal, dan band, lalu tekan Tampilkan. Forecast 15 hari dihitung dari data s.d. tanggal akhir. PDF memuat semua band.',
-      },
-      {
-        key: 'evaluasi', file: 'analytics', title: 'Tren & evaluasi alert', perm: ['analytics.view'],
-        lede: 'Tren per kecamatan dengan penanda kejadian dan forecast 15 hari (dari data s.d. tanggal akhir), dan evaluasi alert terhadap kejadian terverifikasi.',
+        lede: 'Pilih kecamatan (dan warnanya), rentang tanggal, dan band, lalu tekan Tampilkan. Forecast 15 hari dihitung dari data s.d. tanggal akhir. Evaluasi alert & kejadian terlipat di bawah grafik; PDF dan CSV di kotak Unduh.',
       },
     ],
   },
   {
-    hash: 'kejadian', title: 'Kejadian', icon: 'alarm', perm: ['disasters.view'],
-    desc: 'Kejadian bencana yang benar-benar terjadi di lapangan, di peta dan tabel.',
-    tabs: [
-      {
-        key: 'lihat', file: 'disasters-view', title: 'Lihat kejadian', perm: ['disasters.view'],
-        lede: 'Kejadian tercatat di wilayah AOI. Saring menurut tanggal, jenis, atau kecamatan; klik titik di peta untuk detailnya.',
-      },
-      {
-        key: 'kelola', file: 'disasters', title: 'Kelola kejadian', perm: ['disasters.manage'],
-        lede: 'Tambah, ubah, atau hapus catatan kejadian. Menghapus hanya menandai; data tidak hilang.',
-      },
-    ],
+    // M68: satu halaman untuk semua peran; catat/ubah/hapus tampil bila izin disasters.manage.
+    hash: 'kejadian', file: 'disasters', title: 'Kejadian', icon: 'alarm', perm: ['disasters.view'],
+    lede: 'Kejadian tercatat di wilayah AOI, di peta dan daftar yang berdampingan. Saring lewat baris di atas atau lencana; klik baris atau titik untuk detail. Analis dan Administrator juga bisa mencatat, mengubah, dan menghapus (hanya menandai).',
+    desc: 'Kejadian bencana yang benar-benar terjadi di lapangan, di peta dan daftar.',
   },
   {
     hash: 'data', title: 'Data', icon: 'folder', perm: ['datasets.manage'],
-    desc: 'Data per satelit, backfill dengan log, unduhan dengan mode fusion, dan EDA.',
+    desc: 'Proses yang berjalan, data per satelit dengan backfill, dataset (buat dan unduh), dan EDA.',
+    // M67: 8 tab → 4. Proses berjalan masuk Ringkasan; tiga tab satelit jadi
+    // satu (#data/satelit/<satelit>); Unduh data dan Dataset tersimpan jadi
+    // Dataset (#data/dataset/baru = wizard).
     tabs: [
       {
         key: 'ringkasan', file: 'data-home', title: 'Ringkasan', perm: ['datasets.manage'],
-        lede: 'Keadaan data ketiga satelit dan backfill yang sedang berjalan. Pilih satelit untuk mengelola datanya.',
+        lede: 'Yang sedang berjalan (dataset utama, proses dataset, tahap scene) dan keadaan data ketiga satelit.',
       },
       {
-        key: 'sentinel-1', file: 'data-source', source: 's1', title: 'Sentinel-1', perm: ['datasets.manage'],
-        lede: 'Scene Sentinel-1 yang tersimpan. Backfill membuat dataset S1 atas AOI; progres dan lognya tampil di bawah.',
+        key: 'satelit', file: 'data-source', title: 'Satelit', perm: ['datasets.manage'], sub: true,
+        lede: 'Pilih Sentinel-1, MODIS, atau GPM. Backfill dengan progres dan log, riwayat per tanggal, dan data tersimpan (proses ulang / nonaktifkan).',
       },
       {
-        key: 'gpm', file: 'data-source', source: 'gpm', title: 'GPM', perm: ['datasets.manage'],
-        lede: 'Granule GPM IMERG. Backfill menjalankan Job Hidromet per tanggal; lognya tampil langsung di bawah.',
-      },
-      {
-        key: 'modis', file: 'data-source', source: 'modis', title: 'MODIS', perm: ['datasets.manage'],
-        lede: 'Granule MODIS. Backfill mengisi tanggal yang belum punya angka MODIS; lognya tampil langsung di bawah.',
-      },
-      {
-        key: 'unduh', file: 'create-dataset', title: 'Unduh data', perm: ['datasets.manage'], css: true,
-        lede: 'Pilih satelit, tanggal, dan mode: tanpa fusion, atau fusion full coverage / co-occurrence / hybrid. Rentang maksimal 366 hari.',
-      },
-      {
-        key: 'tersimpan', file: 'catalog', title: 'Dataset tersimpan', perm: ['datasets.manage'], css: true,
-        lede: 'Dataset yang sudah dibuat. Pilih satu untuk melihat cakupan, produk, asal-usul, dan mengunduh ZIP-nya.',
-      },
-      {
-        key: 'proses', file: 'process', title: 'Proses berjalan', perm: ['datasets.manage'],
-        lede: 'Unduhan dan pengolahan yang sedang jalan di seluruh dataset, beserta tahap per scene dan antreannya.',
+        key: 'dataset', file: 'catalog', title: 'Dataset', perm: ['datasets.manage'], css: true, sub: true,
+        lede: 'Dataset yang sudah dibuat: cakupan, struktur, pratinjau, produk, dan unduhan ZIP. "Buat dataset baru" membuka wizard (satelit, tanggal, mode fusion; maks. 366 hari).',
       },
       {
         key: 'eda', file: 'eda', title: 'EDA', perm: ['eda.view'],
@@ -158,15 +134,15 @@ const ROUTES = [
       },
       {
         key: 'akun', file: 'account', title: 'Akun saya', perm: ['account.manage'],
-        lede: 'Ubah kata sandi dan kelola token API milik Anda sendiri.',
+        lede: 'Profil, email & kecamatan untuk peringatan, kata sandi, dan token API milik Anda sendiri.',
       },
       {
         key: 'pengguna', file: 'admin', group: 'akses', title: 'Manajemen akun', perm: ['admin.accounts'], sub: true,
-        lede: 'Akun, peran, dan token API milik seluruh pengguna. Akun Analis, Data Engineer, dan Administrator hanya dibuat di sini.',
+        lede: 'Akun dan peran seluruh pengguna; semua token API terlipat di bawahnya. Akun Analis, Data Engineer, dan Administrator hanya dibuat di sini.',
       },
       {
         key: 'pengaturan', file: 'admin', group: 'pengaturan', title: 'Pengaturan aplikasi', perm: ['admin.system'], sub: true,
-        lede: 'Keadaan sistem, pipeline, scene, Live Area, penyimpanan, wilayah, aturan, dan pengaturan aplikasi.',
+        lede: 'Live Area & penjadwal (dengan temuan yang perlu ditindak), penyimpanan, wilayah & aturan, dan pengaturan aplikasi. Progres data ada di Data, log di Sistem › Log.',
       },
     ],
   },
@@ -177,6 +153,23 @@ const ROUTES = [
 // Dicocokkan dari awalan terpanjang, jadi "pengaturan/operasi/live" ikut
 // pindah dengan sisa segmennya.
 const ALIASES = {
+  // M68: tab Lihat/Kelola kejadian jadi satu halaman
+  'kejadian/lihat': 'kejadian',
+  'kejadian/kelola': 'kejadian',
+  // M67: tab Forecast, Data, dan bagian Sistem digabung
+  'forecast/evaluasi': 'forecast/analisa-daerah',
+  'data/sentinel-1': 'data/satelit/sentinel-1',
+  'data/modis': 'data/satelit/modis',
+  'data/gpm': 'data/satelit/gpm',
+  'data/proses': 'data/ringkasan',
+  'data/tersimpan': 'data/dataset',
+  'data/unduh': 'data/dataset/baru',
+  'sistem/pengaturan/pipeline': 'sistem/pengaturan',
+  'sistem/pengaturan/ringkasan': 'sistem/pengaturan',
+  'sistem/pengaturan/scene': 'data/satelit',
+  'sistem/pengaturan/arsip': 'sistem/pengaturan/penyimpanan',
+  'sistem/pengaturan/aturan': 'sistem/pengaturan/wilayah',
+  'sistem/pengguna/token': 'sistem/pengguna',
   // M63: Tentang keluar dari Sistem menjadi menu sendiri
   'sistem/tentang': 'tentang',
   // M61: halaman Diagram berganti nama menjadi Forecast
@@ -187,12 +180,13 @@ const ALIASES = {
   'kondisi/kecamatan': 'citra/gpm',
   'kondisi/relief': 'aoi-3d',
   'riwayat': 'forecast',
-  'riwayat/grafik': 'forecast/evaluasi',
+  'riwayat/grafik': 'forecast/analisa-daerah',
   'riwayat/laporan': 'laporan',
-  'data/daftar': 'data/tersimpan',
-  'data/buat': 'data/unduh',
+  'data/daftar': 'data/dataset',
+  'data/buat': 'data/dataset/baru',
   'pengaturan': 'sistem/pengaturan',
   'pengaturan/ringkasan': 'sistem/pengaturan',
+  'pengaturan/operasi/scene': 'data/satelit',
   'pengaturan/operasi': 'sistem/pengaturan',
   'pengaturan/konfigurasi': 'sistem/pengaturan',
   'pengaturan/akses': 'sistem/pengguna',
@@ -202,9 +196,9 @@ const ALIASES = {
   'pantauan': 'citra/sentinel-1',
   'hari-ini': 'citra/gpm',
   'statistik': 'citra/gpm',
-  'analitik': 'forecast/evaluasi',
-  'katalog': 'data/tersimpan',
-  'buat-dataset': 'data/unduh',
+  'analitik': 'forecast/analisa-daerah',
+  'katalog': 'data/dataset',
+  'buat-dataset': 'data/dataset/baru',
   'admin': 'sistem/pengaturan',
 };
 
@@ -215,16 +209,39 @@ const Shell = (() => {
   const tasks = [];         // tujuan yang pernah dibuka sesi ini (tombol taskbar)
   let healthOk = null;
 
+  // M75: skrip yang gagal diunduh (jaringan tersendat) dicoba sekali lagi,
+  // dan bila tetap gagal TIDAK disimpan sebagai gagal — dulu promise yang
+  // ditolak tersimpan selamanya, jadi satu kali gagal membuat halaman itu
+  // terus gagal sampai peramban dimuat ulang.
+  function injectScript(file, attempt) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'js/' + file + '.js?v=' + ASSET_V + (attempt ? '&r=' + attempt : '');
+      s.onload = resolve;
+      s.onerror = () => { s.remove(); reject(new Error('Gagal memuat skrip ' + file)); };
+      document.body.appendChild(s);
+    });
+  }
   function loadScript(file) {
     if (!loadedScripts[file]) {
-      loadedScripts[file] = new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'js/' + file + '.js?v=' + ASSET_V;
-        s.onload = resolve; s.onerror = () => reject(new Error('Gagal memuat skrip ' + file));
-        document.body.appendChild(s);
-      });
+      loadedScripts[file] = injectScript(file, 0)
+        .catch(() => new Promise(r => setTimeout(r, 800)).then(() => injectScript(file, 1)))
+        .catch(e => { delete loadedScripts[file]; throw e; });
     }
     return loadedScripts[file];
+  }
+  // Fragmen halaman: satu kali coba ulang bila jaringan/server sesaat gagal.
+  async function fetchFragment(file) {
+    for (let i = 0; ; i++) {
+      try {
+        const r = await fetch('pages/' + file + '.html?v=' + ASSET_V, { cache: 'no-cache' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return await r.text();
+      } catch (e) {
+        if (i >= 1) throw e;
+        await new Promise(res => setTimeout(res, 800));
+      }
+    }
   }
   function loadCss(file) {
     if (loadedCss[file]) return;
@@ -271,9 +288,12 @@ const Shell = (() => {
       items.push({ href: '/masuk', label: 'Masuk…', icon: 'key' });
       items.push({ href: '/daftar', label: 'Daftar akun…', icon: 'user' });
     }
-    items.push({ sep: true });
-    items.push({ href: '/docs', label: 'Dokumentasi API', icon: 'help', ext: true });
-    if (me) items.push({ action: 'logout', label: 'Keluar', icon: 'door' });
+    // Dokumentasi API (Swagger) hanya ditautkan untuk pengguna yang masuk (M66).
+    if (me) {
+      items.push({ sep: true });
+      items.push({ href: '/docs', label: 'Dokumentasi API', icon: 'help', ext: true });
+      items.push({ action: 'logout', label: 'Keluar', icon: 'door' });
+    }
     return items;
   }
 
@@ -515,10 +535,7 @@ const Shell = (() => {
     if (!file) { setStatus('Tidak tersedia'); return; }
     if (useCss) loadCss(file);
     try {
-      const results = await Promise.all([
-        fetch('pages/' + file + '.html?v=' + ASSET_V, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }),
-        loadScript(file),
-      ]);
+      const results = await Promise.all([fetchFragment(file), loadScript(file)]);
       if (current.route !== route || current.tab !== tab) return; // pengguna sudah pindah
       const root = UI.$('#pageRoot');
       root.innerHTML = results[0];
@@ -529,7 +546,19 @@ const Shell = (() => {
       setStatus('Siap');
       if (page && page.init) await page.init(root, ctx);
     } catch (e) {
+      // Pengguna sudah pindah halaman: kegagalan halaman lama tidak dilaporkan.
+      if (current.route !== route || current.tab !== tab) return;
       setStatus('Gagal');
+      // Pesan + tombol coba lagi di tempat halaman, bukan hanya dialog yang
+      // meninggalkan jendela kosong.
+      const root = UI.$('#pageRoot');
+      if (root) {
+        root.removeAttribute('aria-busy');
+        root.innerHTML = '<div class="screen"><div class="screen-inner"><span class="scr-ch">SYS</span>' +
+          UI.emptyHTML('HALAMAN GAGAL DIMUAT. PERIKSA KONEKSI LALU COBA LAGI.') +
+          '<div class="btn-row" style="justify-content:center;margin-top:6px"><button type="button" class="default" id="pageRetry">Coba lagi</button></div></div></div>';
+        UI.$('#pageRetry').addEventListener('click', () => { current = null; navigate(); });
+      }
       UI.showError('Gagal memuat halaman', e instanceof API.ApiError ? e : String(e.message || e));
     }
   }

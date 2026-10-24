@@ -98,7 +98,8 @@ def lokasi_detail(region_id: int, sess: Session = Depends(get_session), etl=Depe
                              "url": f"{base}/{k}.png" if cropped else f"{full}/{k}.png"}
                          for k, v in items.items()},
         }
-    return {"region": region, **res, "stats": stats, "alerts": alerts, "imagery": imagery}
+    return {"region": region, **res, "stats": stats, "alerts": alerts, "imagery": imagery,
+            "updated_at": ld.updated_at(etl, region_id)}
 
 
 @router.get("/{region_id}/trend", summary="Daily series of one kecamatan for the trend charts (public)")

@@ -263,7 +263,6 @@ Pages['terrain3d'] = (() => {
       st.key = pick.key || null;
     }
     const $ = s => UI.$(s, root);
-    $('#t3DemNote').textContent = DEM_NOTE;
     if (pub) {
       // Tidak ada yang bisa dipilih: publik hanya melihat scene terbaru.
       // Pemilihnya disembunyikan, bukan dinonaktifkan -- select berisi satu
@@ -504,7 +503,7 @@ Pages['terrain3d'] = (() => {
     if (!cap) return;
     const sc = st.card.scene;
     const bits = [UI.esc(LiveTiles.LONG[st.key] || st.key) + ' · ' + UI.esc(UI.date(sc.date)),
-      'relief dari DEM (SRTM), bukan dari radar'];
+      '<span title="' + UI.esc(DEM_NOTE) + '">tinggi dari DEM AWS Terrain Tiles (SRTM, ~30 m), bukan dari citra</span>'];
     if (!st.geo.exact) bits.push('<b class="v-amber">POSISI PERKIRAAN: memakai bbox daerah, bukan extent scene — scene ini dirender sebelum georeferensi preview dicatat</b>');
     cap.innerHTML = bits.join(' · ');
   }

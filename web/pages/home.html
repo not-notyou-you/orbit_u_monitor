@@ -1,13 +1,12 @@
-<!-- pages/home.html — Beranda: Pantau Lokasi (INTERFACE.md §2 halaman 1, M63).
-     Untuk SEMUA peran. Urutan: landing singkat → Pantau lokasi.
+<!-- pages/home.html — Beranda: Pantau Lokasi (INTERFACE.md §2 halaman 1, M63, M66).
+     Untuk SEMUA peran. Urutan: landing singkat → [Lokasi saya] → Informasi
+     lokasi (pilih kecamatan → KPI Pantau lokasi → peta) → Tema tampilan →
+     Detail lokasi.
      * Lokasi saya (#hoMine): hanya pengguna yang sudah masuk, izin lokasi
-       diberikan, dan perangkat berada di kecamatan AOI. Panel pantau tampil
-       di dalamnya, lalu Informasi lokasi di bawahnya.
+       diberikan, dan perangkat berada di kecamatan AOI; KPI dan Detail lalu
+       menampilkan kecamatan itu.
      * Selain itu (pengunjung, di luar wilayah, izin ditolak/tidak didukung)
-       Informasi lokasi tampil lebih dulu dan panel pantau di bawahnya, untuk
-       kecamatan yang dipilih.
-     Panel pantau (#hoPantau) satu elemen yang dipindah js/home.js ke tempatnya.
-     Tema tampilan (#hoTheme) selalu paling bawah.
+       KPI dan Detail menampilkan kecamatan yang dipilih.
      Isi beranda sebelum M63 ada di Tentang (#tentang). -->
 
 <!-- landing -->
@@ -19,13 +18,12 @@
     <div class="hero-box">
     <p class="hero-lede" id="hoGreeting">
       Bagaimana kondisi kecamatan Anda sekarang? Orbit-U merangkum radar <b>Sentinel-1</b>, citra optik
-      <b>MODIS</b>, dan curah hujan <b>GPM</b> menjadi satu kalimat kondisi, citra satelit kecamatan itu,
+      <b>MODIS</b>, dan curah hujan <b>GPM</b> menjadi status kondisi, citra satelit kecamatan itu,
       dan angkanya.
     </p>
     <p class="hero-warn" role="note"><b>Ini bukan peringatan dini resmi.</b> Untuk keputusan evakuasi, ikuti BMKG dan BPBD.
       Satelit tidak melihat puncak banjir bandang; data kosong bukan berarti aman.</p>
     </div>
-    <div class="btn-row" id="hoHeroBtns"></div>
   </div>
 </div>
 
@@ -35,50 +33,56 @@
   <p class="pl-where" id="hoMineWhere" role="status"></p>
 </fieldset>
 
-<!-- Informasi lokasi -->
+<!-- Informasi lokasi: pilihan kecamatan, KPI kecamatan terpilih, lalu peta -->
 <fieldset class="pl-sec" id="hoInfo">
   <legend><span data-icon="globe" class="pl-ic"></span> Informasi lokasi</legend>
   <div class="pl-geo" id="hoGeo" role="status" aria-live="polite"></div>
-  <div class="layout wide-left">
-    <div class="control-panel">
-      <fieldset>
-        <legend>Pilih kecamatan</legend>
-        <p class="mut" style="font-size:11px;margin:0 0 6px">Pilih nama atau wilayah di peta untuk menampilkan kondisinya.</p>
-        <div class="listbox pl-list" id="hoList" role="listbox" aria-label="Kecamatan yang dipantau"></div>
-        <p class="mut" id="hoListSum" style="font-size:11px;margin:6px 0 0"></p>
-      </fieldset>
-    </div>
-    <div class="deck">
-      <div class="screen"><div class="screen-inner flush"><span class="scr-ch">CH-00 · KECAMATAN TERPANTAU</span><span class="scr-rec off" id="hoMapRec"></span>
-        <div class="map" id="hoMap" role="img" aria-label="Peta kecamatan terpantau, diwarnai menurut status; daftar yang sama ada di sebelahnya"></div></div></div>
-      <div class="legend pl-legend" aria-label="Arti warna peta">
-        <span><i style="background:#33ff99"></i>Normal</span><span><i style="background:#ffb000"></i>Waspada</span>
-        <span><i style="background:#ff3b3b"></i>Tinggi</span><span><i style="background:#808080"></i>Tidak tersedia</span>
-      </div>
-    </div>
+  <p class="mut pl-sub">Pilih kecamatan di bawah atau klik wilayahnya di peta untuk menampilkan kondisinya.</p>
+  <div class="listbox pl-list" id="hoList" role="listbox" aria-label="Kecamatan yang dipantau"></div>
+  <p class="mut pl-sub" id="hoListSum" style="margin-top:6px"></p>
+  <!-- Pantau lokasi: KPI satu kecamatan (M66) -->
+  <div class="pl-kpi" id="hoPantau" hidden>
+    <h2 class="pl-h" id="hoPantauTitle">Pantau lokasi</h2>
+    <div class="readouts" id="hoKpi" aria-live="polite"></div>
+    <!-- M64: langganan peringatan email kecamatan ini (pengguna yang masuk). -->
+    <p class="pl-sub-note" id="hoSub" hidden></p>
+  </div>
+  <div class="screen"><div class="screen-inner flush"><span class="scr-ch">CH-00 · KECAMATAN TERPANTAU</span><span class="scr-rec off" id="hoMapRec"></span>
+    <div class="map" id="hoMap" role="img" aria-label="Peta kecamatan terpantau, diwarnai menurut status; daftar yang sama ada di atasnya"></div></div></div>
+  <div class="legend pl-legend" aria-label="Arti warna peta">
+    <span><i style="background:#33ff99"></i>Normal</span><span><i style="background:#ffb000"></i>Waspada</span>
+    <span><i style="background:#ff3b3b"></i>Tinggi</span><span><i style="background:#808080"></i>Tidak tersedia</span>
   </div>
 </fieldset>
 
-<!-- Panel pantau: satu kecamatan -->
-<fieldset class="pl-sec" id="hoPantau" hidden>
-  <legend id="hoPantauTitle">Pantau lokasi</legend>
-  <div id="hoNarasi" aria-live="polite"></div>
-  <!-- M64: langganan peringatan email kecamatan ini (pengguna yang masuk). -->
-  <p class="pl-sub-note" id="hoSub" hidden></p>
-  <h2 class="pl-h">Citra satelit</h2>
-  <p class="mut pl-sub" id="hoCitraNote"></p>
-  <div class="deck" id="hoCitra"></div>
-  <h2 class="pl-h">Statistik</h2>
-  <p class="mut pl-sub">Angka terbaru tiap band untuk kecamatan ini, pengamatan sebelumnya, dan <b>rentang biasa</b>
-    (persentil 2–98 setahun terakhir). Tren 30 hari: pita = rentang biasa.</p>
-  <div class="readouts pl-stats" id="hoStats"></div>
-  <div class="deck" id="hoTrend" style="margin-top:8px"></div>
-</fieldset>
-
 <!-- tema tampilan (M57): empat pilihan, Kertas Mint bawaan -->
-<fieldset id="hoTheme">
+<fieldset class="pl-sec" id="hoTheme">
   <legend id="hoThemeLegend">Tema tampilan</legend>
   <div class="tema-pick" id="hoThemes" role="radiogroup" aria-labelledby="hoThemeLegend"></div>
   <p class="tema-pick-note">Hanya mengubah tampilan; isi, data, dan menu tetap sama.
     Pilihan disimpan di peramban ini dan berlaku di semua halaman.</p>
+</fieldset>
+
+<!-- Detail lokasi: citra + statistik satu satelit -->
+<fieldset class="pl-sec" id="hoDetail" hidden>
+  <legend id="hoDetailTitle">Detail lokasi</legend>
+  <div class="pl-detail">
+    <div class="control-panel">
+      <fieldset>
+        <legend id="hoSatLegend">Satelit</legend>
+        <div class="pl-radios" id="hoSats" role="radiogroup" aria-labelledby="hoSatLegend"></div>
+      </fieldset>
+      <fieldset>
+        <legend id="hoChLegend">Channel</legend>
+        <div class="pl-radios" id="hoChs" role="radiogroup" aria-labelledby="hoChLegend"></div>
+      </fieldset>
+      <p class="mut pl-sub" id="hoCitraNote"></p>
+    </div>
+    <div class="deck" id="hoView"></div>
+  </div>
+  <h2 class="pl-h" id="hoStatsTitle">Statistik</h2>
+  <p class="mut pl-sub">Angka terbaru tiap band satelit ini untuk kecamatan ini, pengamatan sebelumnya, dan <b>rentang biasa</b>
+    (persentil 2–98 setahun terakhir). Tren 30 hari: pita = rentang biasa.</p>
+  <div class="readouts pl-stats" id="hoStats"></div>
+  <div class="deck" id="hoTrend" style="margin-top:8px"></div>
 </fieldset>

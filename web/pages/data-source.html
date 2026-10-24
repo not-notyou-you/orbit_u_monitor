@@ -1,41 +1,41 @@
-<!-- pages/data-source.html — Data › Sentinel-1 / GPM / MODIS (INTERFACE.md §2
-     halaman 6.2–6.4). Satu fragmen untuk ketiganya; satelitnya dari tab router.
-     Isi: daftar data yang ada, backfill dengan progres + log yang terlihat,
-     dan ubah (proses ulang) / hapus (nonaktifkan, soft delete) per item. -->
-<div class="layout">
-  <div class="control-panel">
-    <form id="dsBackfill" novalidate>
-      <fieldset>
-        <legend>Backfill</legend>
-        <p class="mut" id="dsBfHelp" style="font-size:11px;margin:0 0 6px"></p>
-        <div class="field-row">
-          <div class="field"><label for="dsBfFrom">Dari</label><input type="date" id="dsBfFrom" required></div>
-          <div class="field"><label for="dsBfTo">Sampai</label><input type="date" id="dsBfTo" required></div>
-        </div>
-        <span class="err" id="dsBfErr" aria-live="polite"></span>
-        <div class="btn-row end"><button type="submit" class="default" id="dsBfGo">Jalankan backfill…</button></div>
-      </fieldset>
-    </form>
-    <form id="dsFilter" novalidate>
-      <fieldset>
-        <legend>Saring daftar</legend>
-        <div class="field-row">
-          <div class="field"><label for="dsFrom">Dari</label><input type="date" id="dsFrom"></div>
-          <div class="field"><label for="dsTo">Sampai</label><input type="date" id="dsTo"></div>
-        </div>
-        <div class="field"><label for="dsStatus">Status</label>
-          <select id="dsStatus"><option value="all">Semua</option><option value="valid">Aktif</option><option value="invalid">Nonaktif</option></select></div>
-        <div class="field"><label for="dsQ">Nama produk berisi</label><input type="search" id="dsQ" maxlength="100"></div>
-        <div class="btn-row end"><button type="submit" id="dsApply">Terapkan</button></div>
-      </fieldset>
-    </form>
+<!-- pages/data-source.html — Data › Satelit (INTERFACE.md §2 halaman 6.2, M67, M74).
+     Satu tab untuk ketiga satelit; pemilih #dsSats mengganti segmen hash.
+     M74: backfill jadi satu baris di atas (dulu panel kiri yang menyisakan
+     ruang kosong panjang); proses backfill hanya tampil bila ada; riwayat per
+     tanggal dan data tersimpan jadi dua tab. Aksi per item (proses ulang,
+     nonaktifkan/pulihkan) dibuka dengan mengklik barisnya. -->
+<div class="ds-top">
+  <nav class="seg" id="dsSats" aria-label="Pilih satelit"></nav>
+  <form id="dsBackfill" class="ds-bf" novalidate>
+    <b class="ds-bf-lbl">Backfill</b>
+    <div class="field"><label for="dsBfFrom">Dari</label><input type="date" id="dsBfFrom" required></div>
+    <div class="field"><label for="dsBfTo">Sampai</label><input type="date" id="dsBfTo" required></div>
+    <button type="submit" class="default" id="dsBfGo">Jalankan backfill…</button>
+    <span class="err" id="dsBfErr" aria-live="polite"></span>
+  </form>
+</div>
+<p class="mut ds-help" id="dsBfHelp"></p>
+<div class="screen" id="dsRunBox" hidden><div class="screen-inner"><span class="scr-ch" id="dsRunCh">CH-01 · PROSES BACKFILL</span><span class="scr-rec off" id="dsRunRec"></span>
+  <div id="dsRun"></div></div></div>
+<div class="tabs" role="tablist" aria-label="Isi data satelit" style="margin-top:8px">
+  <button type="button" role="tab" data-tab="hist" aria-selected="true">Riwayat per tanggal</button>
+  <button type="button" role="tab" data-tab="items" aria-selected="false" tabindex="-1">Data tersimpan <span id="dsCount"></span></button>
+</div>
+<div class="raised tabpanel" role="tabpanel">
+  <div id="dsHistPane">
+    <div class="screen"><div class="screen-inner"><span class="scr-ch" id="dsHistCh">RIWAYAT</span><div id="dsHist"></div></div></div>
   </div>
-  <div class="deck">
-    <div class="screen"><div class="screen-inner"><span class="scr-ch" id="dsRunCh">CH-01 · PROSES BACKFILL</span><span class="scr-rec off" id="dsRunRec"></span>
-      <div id="dsRun"></div></div></div>
-    <div class="screen"><div class="screen-inner"><span class="scr-ch" id="dsHistCh">CH-02 · RIWAYAT</span>
-      <div id="dsHist"></div></div></div>
-    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-03 · DATA TERSIMPAN</span><span class="scr-rec off" id="dsCount"></span>
+  <div id="dsItemsPane" hidden>
+    <form id="dsFilter" class="ds-filter" novalidate>
+      <div class="field"><label for="dsFrom">Dari</label><input type="date" id="dsFrom"></div>
+      <div class="field"><label for="dsTo">Sampai</label><input type="date" id="dsTo"></div>
+      <div class="field"><label for="dsStatus">Status</label>
+        <select id="dsStatus"><option value="all">Semua</option><option value="valid">Aktif</option><option value="invalid">Nonaktif</option></select></div>
+      <div class="field ds-q"><label for="dsQ">Nama produk berisi</label><input type="search" id="dsQ" maxlength="100"></div>
+      <button type="submit" id="dsApply">Terapkan</button>
+    </form>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">DATA TERSIMPAN</span><span class="scr-rec off" id="dsCountRec"></span>
       <div id="dsTable"></div></div></div>
+    <p class="mut" style="margin:6px 0 0;font-size:11px">Klik baris untuk rincian, proses ulang, atau nonaktifkan/pulihkan item.</p>
   </div>
 </div>

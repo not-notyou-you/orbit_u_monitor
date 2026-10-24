@@ -1,46 +1,23 @@
-// js/analytics.js — Analitik (INTERFACE.md §2.4). Data: /hydromet/observations (dipaginasi),
-// /disasters, /alerts/evaluation, /alerts, /alert-rules.
-// Forecast 15 hari (M61) di grafik garis CH-01 (per kecamatan) dan CH-03 (rerata
-// kecamatan terpilih), dihitung dari data s.d. tanggal akhir filter; sakelar di
-// bawah tiap grafik, menyala bawaannya.
+// js/analytics.js — "Evaluasi alert & kejadian" di Forecast › Analisa daerah (M67;
+// dulu tab Tren & evaluasi alert dengan formulirnya sendiri). Data:
+// /hydromet/observations (dipaginasi), /disasters, /alerts/evaluation,
+// /alerts, /alert-rules — untuk kecamatan dan rentang yang dipilih di
+// formulir Analisa daerah (js/diagram.js memanggil show()).
+// Grafik tren per kecamatan dihapus: Analisa daerah sudah menggambarnya per band.
+// Forecast 15 hari (M61) tetap di grafik hujan rerata vs kejadian.
 'use strict';
 Pages['analytics'] = (() => {
   const UNIT = { RAIN_24H: 'mm', RAIN_72H: 'mm', RAIN_7D: 'mm', RAIN_30D: 'mm', NDVI: '', NDWI: '', FLOOD: '%' };
-  const MAX_DAYS = 1100; // ±3 tahun arsip backfill
   let st = null;
 
-  async function init(root, ctx) {
-    st = { root, ctx, regions: [], alertPage: 1, fcOff: new Set() };
-    st.q = UI.forecastQueue(() => UI.$('#anFcProg', root));
-    const $ = s => UI.$(s, root);
-    Excel.mount($('#anExcel'), ['hujan_harian', 'observations', 'disaster_rain', 'alert_evaluation', 'alerts']);
-    try {
-      const [geo, latest] = await Promise.all([Maps.regions(), API.get('/api/hydromet/trend?band=RAIN_24H&days=1')]);
-      st.regions = geo.features.map(f => f.properties).sort((a, b) => a.name.localeCompare(b.name, 'id'));
-      const end = (latest.dates && latest.dates[0]) || UI.isoDate(new Date());
-      $('#anTo').value = end; $('#anFrom').value = UI.addDays(end, -29);
-    } catch (e) { UI.showError('Analitik', e); }
-    $('#anRegions').innerHTML = st.regions.length ? st.regions.map(r =>
-      '<label><input type="checkbox" value="' + r.region_id + '" checked> ' + UI.esc(r.name) + '</label>').join('') : '<p class="mut">Belum ada kecamatan AOI.</p>';
-    $('#anAll').addEventListener('click', () => UI.$$('#anRegions input', root).forEach(i => { i.checked = true; }));
-    $('#anNone').addEventListener('click', () => UI.$$('#anRegions input', root).forEach(i => { i.checked = false; }));
-    $('#anForm').addEventListener('submit', ev => { ev.preventDefault(); UI.busy($('#anApply'), apply); });
-    $('#anCsv').addEventListener('click', ev => UI.busy(ev.currentTarget, exportCsv));
-    await apply();
-  }
-
-  function filters() {
-    const $ = s => UI.$(s, st.root);
-    const f = { from: $('#anFrom').value, to: $('#anTo').value, band: $('#anBand').value,
-      ids: UI.$$('#anRegions input:checked', st.root).map(i => Number(i.value)) };
-    let err = '';
-    if (!f.from || !f.to) err = 'Isi kedua tanggal.';
-    else if (f.from > f.to) err = 'Tanggal akhir sebelum tanggal awal.';
-    else if ((UI.parseDate(f.to) - UI.parseDate(f.from)) / 864e5 > MAX_DAYS) err = 'Rentang maksimal ' + MAX_DAYS + ' hari.';
-    else if (!f.ids.length) err = 'Pilih minimal satu kecamatan.';
-    $('#anDateErr').textContent = err;
-    [$('#anFrom'), $('#anTo')].forEach(i => i.setAttribute('aria-invalid', err && !err.startsWith('Pilih') ? 'true' : 'false'));
-    return err ? null : f;
+  // f = { from, to, ids } dari formulir Analisa daerah.
+  async function show(root, ctx, f) {
+    if (!st || st.root !== root) {
+      if (st) st.q.stop();
+      st = { root, ctx, alertPage: 1, fcOff: new Set() };
+      st.q = UI.forecastQueue(() => st && UI.$('#anFcProg', root));
+    }
+    await apply(f);
   }
 
   async function fetchAll(band, from, to) {
@@ -53,64 +30,52 @@ Pages['analytics'] = (() => {
     return out;
   }
 
-  async function apply() {
-    const f = filters(); if (!f) return;
+  async function apply(f) {
     st.f = f; st.alertPage = 1;
-    st.ctx.setStatus('Memuat…');
     const $ = s => UI.$(s, st.root);
-    ['#anTrend', '#anHeat', '#anCorr', '#anEval', '#anAlerts'].forEach(s => { $(s).innerHTML = UI.loadingHTML(); });
+    ['#anHeat', '#anCorr', '#anEval', '#anAlerts'].forEach(s => { $(s).innerHTML = UI.loadingHTML(); });
     try {
-      const [obs, rain24, rain72, events, ev, rules] = await Promise.all([
-        fetchAll(f.band, f.from, f.to),
-        f.band === 'RAIN_24H' ? null : fetchAll('RAIN_24H', f.from, f.to),
+      const [rain24, rain72, events, ev, rules] = await Promise.all([
+        fetchAll('RAIN_24H', f.from, f.to),
         fetchAll('RAIN_72H', f.from, f.to),
         API.get('/api/disasters' + API.qs({ date_from: f.from, date_to: f.to, limit: 1000 })),
         API.get('/api/alerts/evaluation' + API.qs({ date_from: f.from, date_to: f.to })),
         API.get('/api/alert-rules'),
       ]);
+      if (!st || st.f !== f) return;
       const sel = new Set(f.ids);
       const pick = rows => rows.filter(r => sel.has(r.region_id));
-      st.obs = pick(obs); st.r24 = pick(rain24 || obs); st.r72 = pick(rain72);
+      st.r24 = pick(rain24); st.r72 = pick(rain72);
       st.events = (events.items || []).filter(e => sel.has(e.region_id));
       st.rules = (rules.items || []).filter(r => r.is_active && r.threshold_value !== null);
       st.q.reset();
-      renderReadouts(ev); renderTrend(); renderHeat(); renderCorr(); renderEval(ev);
+      renderReadouts(ev); renderHeat(); renderCorr(); renderEval(ev);
       runForecasts();
       await loadAlerts();
-      st.ctx.setStatus('Siap · ' + UI.date(f.from) + ' – ' + UI.date(f.to));
     } catch (e) {
-      ['#anTrend', '#anHeat', '#anCorr', '#anEval', '#anAlerts'].forEach(s => { $(s).innerHTML = UI.emptyHTML('GAGAL MEMUAT'); });
-      st.ctx.setStatus('Gagal'); UI.showError('Analitik', e);
+      if (!st) return;
+      ['#anHeat', '#anCorr', '#anEval', '#anAlerts'].forEach(s => { $(s).innerHTML = UI.emptyHTML('GAGAL MEMUAT'); });
+      UI.showError('Evaluasi alert & kejadian', e);
     }
   }
 
   function renderReadouts(ev) {
-    const vals = st.obs.map(o => o.value).filter(v => v !== null);
-    const unit = UNIT[st.f.band];
     UI.$('#anReadouts', st.root).innerHTML =
-      UI.readoutHTML('OBSERVASI', UI.int(st.obs.length), UI.esc(st.f.band)) +
-      UI.readoutHTML('MAKSIMUM', vals.length ? UI.num(Math.max(...vals), 1) : UI.NA, UI.esc(unit || 'INDEKS')) +
       UI.readoutHTML('KEJADIAN', UI.int(st.events.length), 'DALAM RENTANG', st.events.length ? 'v-amber' : '') +
       UI.readoutHTML('POD / FAR', (ev.pod === null ? UI.NA : UI.num(ev.pod, 2)) + ' / ' + (ev.far === null ? UI.NA : UI.num(ev.far, 2)), 'EVALUASI ALERT');
   }
 
   // ------------------------------------------------------------ forecast
-  const trendKey = rid => 't|' + st.f.band + '|' + rid + '|' + st.f.to;
   const corrKey = band => 'c|' + band + '|' + st.f.ids.join(',') + '|' + st.f.to;
   const fcPts = f => f && f.points && f.points.length ? f.points : null;
 
   function runForecasts() {
     const jobs = [];
-    if (!st.fcOff.has('trend')) {
-      const seen = new Set();
-      st.obs.forEach(o => { if (!seen.has(o.region_id)) { seen.add(o.region_id);
-        jobs.push({ kind: 'trend', key: trendKey(o.region_id), q: { band: st.f.band, region_id: o.region_id, end: st.f.to } }); } });
-    }
     if (!st.fcOff.has('corr') && st.r24.length) {
       ['RAIN_24H', 'RAIN_72H'].forEach(b => jobs.push({ kind: 'corr', key: corrKey(b),
         q: { band: b, region_ids: st.f.ids.join(','), end: st.f.to } }));
     }
-    if (jobs.length) st.q.run(jobs, j => { if (j.kind === 'trend') renderTrend(); else renderCorr(); });
+    if (jobs.length) st.q.run(jobs, () => { if (st) renderCorr(); });
     else st.q.stop();
   }
 
@@ -118,7 +83,7 @@ Pages['analytics'] = (() => {
     UI.$$('[data-an-fc]', box).forEach(inp => inp.addEventListener('change', () => {
       const k = inp.dataset.anFc;
       if (inp.checked) st.fcOff.delete(k); else st.fcOff.add(k);
-      if (k === 'trend') renderTrend(); else renderCorr();
+      renderCorr();
       runForecasts();
     }));
   }
@@ -130,33 +95,6 @@ Pages['analytics'] = (() => {
     st.rules.filter(r => r.band_code === band).sort((a, b) => a.threshold_value - b.threshold_value)
       .forEach(r => { t[UI.SEVERITY[r.severity] ? UI.SEVERITY[r.severity].label : r.severity] = r.threshold_value; });
     return t;
-  }
-
-  function renderTrend() {
-    const box = UI.$('#anTrend', st.root);
-    UI.$('#anTrendRec', st.root).textContent = st.f.band;
-    if (!st.obs.length) { box.innerHTML = UI.emptyHTML('BELUM ADA OBSERVASI UNTUK FILTER INI — ARSIP TERISI SETELAH BACKFILL'); return; }
-    const by = groupBy(st.obs, 'region_name');
-    const w = Math.max(280, Math.min(560, (box.clientWidth || 600) / (box.clientWidth > 700 ? 2 : 1) - 16));
-    // Ambang jauh di atas data membuat garis data tampak datar: tampilkan yang ≤ 1,5× maks.
-    const vmax = Math.max(...st.obs.map(o => o.value).filter(v => v !== null));
-    const all = thresholdsFor(st.f.band);
-    const thr = Object.fromEntries(Object.entries(all).filter(([, v]) => v <= vmax * 1.5));
-    const hidden = Object.entries(all).filter(([, v]) => v > vmax * 1.5);
-    const on = !st.fcOff.has('trend');
-    // Small multiples: satu grafik satu warna per kecamatan (≤ 3 warna sinyal per screen).
-    box.innerHTML = '<div class="cols-2">' + Object.keys(by).sort((a, b) => a.localeCompare(b, 'id')).map(name => {
-      const rows = by[name].sort((a, b) => a.obs_date < b.obs_date ? -1 : 1);
-      const pts = rows.map(o => ({ x: o.obs_date, y: o.value }));
-      const f = on ? st.q.cache[trendKey(rows[0].region_id)] : null;
-      return '<div><p class="lbl" style="margin:0 0 2px">' + UI.esc(name.toUpperCase()) + '</p>' +
-        UI.chartSVG([{ label: name, points: pts, forecast: fcPts(f) }], { unit: UNIT[st.f.band], thresholds: thr, width: w, height: 150,
-          zero: st.f.band.startsWith('RAIN'), label: 'Tren ' + st.f.band + ' ' + name + (on ? ', dengan forecast 15 hari' : '') }) +
-        (on ? '<p class="scr-text v-dim fc-models">Forecast: ' + UI.esc(UI.forecastDesc(f)) + '</p>' : '') + '</div>';
-    }).join('') + '</div>' + (hidden.length ? '<p class="v-dim" style="margin:6px 0 0;font-size:11px">AMBANG DI ATAS SKALA (TIDAK DIGAMBAR): ' +
-      hidden.map(([n, v]) => UI.esc(n.toUpperCase()) + ' ' + UI.num(v, 0)).join(' · ') + '</p>' : '') +
-      UI.forecastToggleHTML('data-an-fc="trend"', on);
-    bindFcToggle(box);
   }
 
   function renderHeat() {
@@ -269,15 +207,7 @@ Pages['analytics'] = (() => {
     UI.$$('[data-page]', box).forEach(b => b.addEventListener('click', () => { st.alertPage = Number(b.dataset.page); loadAlerts().catch(e => UI.showError('Riwayat alert', e)); }));
   }
 
-  async function exportCsv() {
-    const f = filters(); if (!f) return;
-    const q = { band: f.band, date_from: f.from, date_to: f.to };
-    if (f.ids.length === 1) q.region_id = f.ids[0];
-    try { await API.download('/api/hydromet/observations.csv' + API.qs(q), 'observasi_' + f.band + '.csv'); }
-    catch (e) { UI.showError('Ekspor CSV', e); }
-  }
+  function destroy() { if (st) st.q.stop(); st = null; }
 
-  function destroy() { if (st) st.q.stop(); }
-
-  return { init, destroy };
+  return { show, destroy, UNIT };
 })();

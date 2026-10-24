@@ -1,5 +1,13 @@
-// js/catalog.js — Katalog Dataset (INTERFACE.md §2.6, §4.7) [WARIS DataLab View 2].
+// js/catalog.js — Data › Dataset (#data/dataset, INTERFACE.md §2.6, §4.7, M67) [WARIS DataLab View 2].
 // Daftar + aksi di Control Panel; rincian dataset terpilih di tab property sheet (screen).
+// M67: Dataset tersimpan dan Unduh data jadi satu tab. #data/dataset/baru
+// memuat wizard js/create-dataset.js di tempat yang sama. Rincian 6 → 4 tab
+// (Detail sumber masuk Ringkasan, Log masuk Produk & log); tombol aksi yang
+// tidak berlaku untuk status dataset disembunyikan, bukan hanya dinonaktifkan.
+// M74: daftar + cari di panel kiri diganti satu pemilih (select) di baris atas
+// bersama tombol aksi; Ringkasan = konfigurasi (kiri) dan detail sumber
+// (kanan) berdampingan; "per satelit" di konfigurasi dihapus karena sama
+// dengan kotak detail sumber.
 'use strict';
 Pages['catalog'] = (() => {
   // Label status, himpunan status aktif, dan nama satelit dipakai bersama
@@ -13,10 +21,10 @@ Pages['catalog'] = (() => {
   let st = null;
 
   async function init(root, ctx) {
+    if (ctx.sub === 'baru') { await mountWizard(root, ctx); return; }
     st = { root, ctx, items: [], sel: null, tab: 'ringkasan', prog: {}, del: {}, timer: null, pv: {} };
     const $ = s => UI.$(s, root);
-    $('#ctSearch').addEventListener('input', renderList);
-    $('#ctList').addEventListener('keydown', listKeys);
+    $('#ctPick').addEventListener('change', e => select(Number(e.target.value)));
     $('#ctRefresh').addEventListener('click', ev => UI.busy(ev.currentTarget, load));
     UI.$$('#ctActions [data-act]', root).forEach(b => b.addEventListener('click', () => action(b, b.dataset.act)));
     UI.bindTabs(root, tab => { st.tab = tab; renderTab(); });
@@ -24,7 +32,25 @@ Pages['catalog'] = (() => {
     await load();
     st.timer = setInterval(() => { if (st && st.items.some(d => ACTIVE.has(d.status))) load(true); }, 10000);
   }
-  function destroy() { if (st && st.timer) clearInterval(st.timer); st = null; }
+  function destroy() {
+    if (st && st.timer) clearInterval(st.timer);
+    if (wizard && Pages['create-dataset'] && Pages['create-dataset'].destroy) { try { Pages['create-dataset'].destroy(); } catch (e) { /* abaikan */ } }
+    wizard = false; st = null;
+  }
+
+  // "Buat dataset baru" (dulu tab Unduh data): fragmen + skrip wizard dimuat
+  // ke panel tab ini, dengan tautan kembali ke daftar.
+  let wizard = false;
+  async function mountWizard(root, ctx) {
+    Shell.loadCss('create-dataset');
+    const [html] = await Promise.all([
+      fetch('pages/create-dataset.html', { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }),
+      Shell.loadScript('create-dataset'),
+    ]);
+    root.innerHTML = '<div class="btn-row" style="margin-bottom:8px"><a class="btn small" href="#data/dataset">‹ Kembali ke daftar dataset</a></div>' + html;
+    wizard = true;
+    await Pages['create-dataset'].init(root, ctx);
+  }
 
   const ds = () => st.items.find(d => d.dataset_id === st.sel);
   const mine = d => d.created_by === st.ctx.me.user_id || st.ctx.me.role_code === 'ADMIN';
@@ -38,23 +64,15 @@ Pages['catalog'] = (() => {
   }
 
   function renderList() {
-    const q = UI.$('#ctSearch', st.root).value.trim().toLowerCase();
-    const rows = st.items.filter(d => !q || d.name.toLowerCase().includes(q));
-    UI.$('#ctList', st.root).innerHTML = rows.length ? rows.map(d =>
-      '<button type="button" role="option" data-id="' + d.dataset_id + '" aria-selected="' + (d.dataset_id === st.sel) + '">' +
-        '<span class="nm">' + UI.esc(d.name) + '</span><span class="st">' + UI.esc(UI.datasetStatus(d.status)) + '</span></button>').join('')
-      : '<p class="mut" style="padding:4px">' + (st.items.length ? 'Tidak ada yang cocok.' : 'Belum ada dataset. Buat lewat "Buat dataset baru".') + '</p>';
-    UI.$$('#ctList [data-id]', st.root).forEach(b => b.addEventListener('click', () => select(Number(b.dataset.id))));
-  }
-  function listKeys(e) {
-    const opts = UI.$$('#ctList [data-id]', st.root), i = opts.indexOf(document.activeElement);
-    if (e.key === 'ArrowDown' && i < opts.length - 1) { e.preventDefault(); opts[i + 1].focus(); }
-    if (e.key === 'ArrowUp' && i > 0) { e.preventDefault(); opts[i - 1].focus(); }
+    const pick = UI.$('#ctPick', st.root);
+    pick.innerHTML = st.items.length ? st.items.map(d => '<option value="' + d.dataset_id + '"' + (d.dataset_id === st.sel ? ' selected' : '') + '>' +
+      UI.esc(d.name + ' · ' + UI.datasetStatus(d.status)) + '</option>').join('') : '<option value="">Belum ada dataset</option>';
+    pick.disabled = !st.items.length;
   }
 
   async function select(id, quiet) {
     st.sel = id;
-    UI.$$('#ctList [data-id]', st.root).forEach(b => b.setAttribute('aria-selected', Number(b.dataset.id) === id));
+    if (id) UI.$('#ctPick', st.root).value = String(id);
     const d = ds();
     syncActions();
     if (!d) {
@@ -93,7 +111,12 @@ Pages['catalog'] = (() => {
 
   function syncActions() {
     const d = ds();
-    const on = (act, ok) => { const b = UI.$('#ctActions [data-act="' + act + '"]', st.root); b.disabled = !ok; };
+    // Unduh/laporan selalu terlihat (nonaktif bila belum ada berkas); aksi
+    // proses hanya muncul bila berlaku untuk status dataset ini.
+    const on = (act, ok) => {
+      const b = UI.$('#ctActions [data-act="' + act + '"]', st.root);
+      if (act === 'download' || act === 'report') b.disabled = !ok; else b.hidden = !ok;
+    };
     on('download', d && d.total_size_bytes > 0); on('report', d && d.total_size_bytes > 0);
     on('pause', d && ['QUEUED', 'PREPARING', 'DOWNLOADING', 'PROCESSING'].includes(d.status));
     on('resume', d && d.status === 'PAUSED'); on('retry', d && d.status === 'FAILED');
@@ -140,18 +163,31 @@ Pages['catalog'] = (() => {
     const put = html => { if (st && st.tab === tab && ds() === d) panel.innerHTML = html; };
     if (tab !== 'ringkasan' && !panel.innerHTML.includes('data-keep')) put(UI.screenHTML({ channel: 'SYS', body: UI.loadingHTML() }));
     try {
-      if (tab === 'ringkasan') put(summaryHTML(d));
-      else if (tab === 'sumber') put(sourcesHTML(await API.get('/api/datasets/' + d.dataset_id + '/storage/by-source')));
-      else if (tab === 'struktur') {
+      if (tab === 'ringkasan') {
+        // Detail sumber terakhir ditampilkan dulu supaya refresh 10 detik tidak berkedip.
+        st.srcHTML = st.srcHTML || {};
+        const cached = st.srcHTML[d.dataset_id] || { sat: UI.screenHTML({ channel: 'DETAIL SUMBER', body: UI.loadingHTML() }), fus: '' };
+        put('<div class="ct-sum"><div class="deck">' + summaryHTML(d) + '<div id="ctFus">' + cached.fus + '</div></div>' +
+          '<div id="ctSrc" class="deck">' + cached.sat + '</div></div>');
+        const src = await API.get('/api/datasets/' + d.dataset_id + '/storage/by-source').catch(() => null);
+        const box = st && st.tab === tab && ds() === d && UI.$('#ctSrc', st.root);
+        if (src) st.srcHTML[d.dataset_id] = sourcesHTML(src);
+        if (box) {
+          const h = src ? st.srcHTML[d.dataset_id] : { sat: UI.screenHTML({ channel: 'DETAIL SUMBER', body: UI.emptyHTML('GAGAL MEMUAT') }), fus: '' };
+          box.innerHTML = h.sat; UI.$('#ctFus', st.root).innerHTML = h.fus;
+        }
+      } else if (tab === 'struktur') {
         const [s, q] = await Promise.all([API.get('/api/datasets/' + d.dataset_id + '/storage/summary'),
           API.get('/api/quality/dataset/' + d.dataset_id + '/by-source').catch(() => ({ sources: [] }))]);
         put(structureHTML(s, q)); bindTierFiles(d);
       } else if (tab === 'pratinjau') { st.pvData = await API.get('/api/datasets/' + d.dataset_id + '/preview'); drawPreview(d); }
-      else if (tab === 'produk') await drawProducts(d, 1);
-      else if (tab === 'log') {
+      else if (tab === 'produk') {
+        put('<div id="ctProd"></div><details class="ad-fold"><summary>Log pipeline dataset ini</summary><div id="ctLog">' + UI.loadingHTML() + '</div></details>');
+        await drawProducts(d, 1);
         const l = await API.get('/api/datasets/' + d.dataset_id + '/logs?limit=100');
         const prog = st.prog[d.dataset_id];
-        put(UI.screenHTML({ channel: 'CH-LOG · PIPELINE', body: '<div class="scr-log" style="max-height:420px">' + ((l.logs || []).length ? l.logs.map(x =>
+        const logBox = st && st.tab === tab && ds() === d && UI.$('#ctLog', st.root);
+        if (logBox) logBox.innerHTML = (UI.screenHTML({ channel: 'CH-LOG · PIPELINE', body: '<div class="scr-log" style="max-height:420px">' + ((l.logs || []).length ? l.logs.map(x =>
           '<div><span class="v-dim">' + UI.esc(UI.dateTime(x.timestamp)) + '</span> ' + UI.esc(x.stage || x.module || '') + ' <span class="' +
           (/FAIL|ERROR/.test(x.status) ? 'v-alert' : /RUN|START|WAIT/.test(x.status) ? 'v-amber' : '') + '">' + UI.esc(x.status || '') + '</span> ' + UI.esc(x.message || '') + '</div>').join('') : UI.emptyHTML()) + '</div>' }) +
           (prog && prog.scenes && prog.scenes.length ? '<div style="height:8px"></div>' + UI.screenHTML({ channel: 'STATUS PIPELINE SENTINEL-1 PER SCENE', body: UI.tableHTML([
@@ -171,24 +207,24 @@ Pages['catalog'] = (() => {
       ['PRATINJAU', (d.preview_options || []).join(', ') || 'tidak dibuat'], ['TIER', (d.required_tiers || []).join(', ')],
       ['PEMBUAT', d.created_by_name], ['DIBUAT', UI.dateTime(d.created_at)], ['DIPERBARUI', UI.dateTime(d.updated_at)],
       ['DISALIN DARI', d.last_config_source ? 'dataset #' + d.last_config_source : null]];
-    const per = Object.keys(d.scenes_by_source || {}).map(k => (SRC[k] || k) + ': ' + UI.int(d.scenes_by_source[k]) + ' scene · ' + UI.bytes((d.bytes_by_source || {})[k])).join('\n');
     return UI.screenHTML({ channel: 'CH-01 · KONFIGURASI DATASET #' + d.dataset_id, rec: UI.esc(UI.datasetStatus(d.status).toUpperCase()),
-      recCls: d.status === 'COMPLETED' ? 'off' : '', body: '<dl class="kv">' + kv.map(([k, v]) => '<dt>' + k + '</dt><dd class="scr-text">' + UI.esc(v || UI.NA) + '</dd>').join('') + '</dl>' +
-        (per ? '<p class="scr-text" style="margin:8px 0 0"><span class="lbl">PER SATELIT:</span>\n' + UI.esc(per) + '</p>' : '') });
+      recCls: d.status === 'COMPLETED' ? 'off' : '', body: '<dl class="kv">' + kv.map(([k, v]) => '<dt>' + k + '</dt><dd class="scr-text">' + UI.esc(v || UI.NA) + '</dd>').join('') + '</dl>' });
   }
 
   function sourcesHTML(data) {
     const keys = ['sentinel1', 'modis', 'gpm'].filter(k => (data.sources || {})[k]);
-    if (!keys.length && !data.fusion) return UI.screenHTML({ channel: 'DETAIL SUMBER', body: UI.emptyHTML('BELUM ADA DATA YANG DIUNDUH') });
-    return keys.map((k, i) => {
+    if (!keys.length && !data.fusion) return { sat: UI.screenHTML({ channel: 'DETAIL SUMBER', body: UI.emptyHTML('BELUM ADA DATA YANG DIUNDUH') }), fus: '' };
+    // Satelit ke kolom kanan, Fusion ke kolom kiri di bawah konfigurasi supaya kedua kolom seimbang.
+    const sat = keys.map((k, i) => {
       const s = data.sources[k];
       return UI.screenHTML({ channel: 'CH-0' + (i + 1) + ' · ' + SRC[k], rec: UI.bytes(s.size_bytes), recCls: 'off', body: s.stages.map(stg =>
         UI.barHTML((PHASE[stg.phase] || stg.phase) + ' · ' + stg.tier, stg.size_bytes, s.size_bytes, UI.bytes(stg.size_bytes)) +
         '<details><summary class="v-dim" style="cursor:pointer">' + UI.int(stg.scenes.length) + ' item · ' + UI.int(stg.file_count) + ' berkas</summary>' +
         UI.tableHTML([{ label: 'Item', key: 'scene' }, { label: 'Berkas', cls: 'r', key: 'file_count' }, { label: 'Ukuran', cls: 'r', get: x => UI.bytes(x.size_bytes) }], stg.scenes) + '</details>').join('') });
-    }).join('<div style="height:8px"></div>') +
-      (data.fusion ? '<div style="height:8px"></div>' + UI.screenHTML({ channel: 'FUSION (HDF5)', rec: UI.bytes(data.fusion.size_bytes), recCls: 'off',
-        body: UI.tableHTML([{ label: 'Tanggal', key: 'scene' }, { label: 'Berkas', cls: 'r', key: 'file_count' }, { label: 'Ukuran', cls: 'r', get: x => UI.bytes(x.size_bytes) }], data.fusion.scenes) }) : '');
+    }).join('');
+    const fus = data.fusion ? UI.screenHTML({ channel: 'FUSION (HDF5)', rec: UI.bytes(data.fusion.size_bytes), recCls: 'off',
+        body: UI.tableHTML([{ label: 'Tanggal', key: 'scene' }, { label: 'Berkas', cls: 'r', key: 'file_count' }, { label: 'Ukuran', cls: 'r', get: x => UI.bytes(x.size_bytes) }], data.fusion.scenes) }) : '';
+    return { sat: sat || UI.screenHTML({ channel: 'DETAIL SUMBER', body: UI.emptyHTML('BELUM ADA DATA SATELIT') }), fus };
   }
 
   function structureHTML(s, q) {
@@ -273,7 +309,7 @@ Pages['catalog'] = (() => {
 
   // ---------------------------------------------------------------- produk & lineage
   async function drawProducts(d, page) {
-    const panel = UI.$('#ctPanel', st.root), limit = 50;
+    const panel = UI.$('#ctProd', st.root) || UI.$('#ctPanel', st.root), limit = 50;
     const f = st.prodFilter = st.prodFilter || { source: '', tier: '' };
     const r = await API.get('/api/products' + API.qs({ dataset_id: d.dataset_id, source: f.source, tier: f.tier, limit, offset: (page - 1) * limit }));
     panel.innerHTML = '<div class="ct-filters">' +

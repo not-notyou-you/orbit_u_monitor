@@ -1,4 +1,5 @@
-// js/process.js — Proses berjalan (#data/proses).
+// js/process.js — bagian "sedang berjalan" Data › Ringkasan (M67; dulu tab #data/proses).
+// Dimuat js/data-home.js; elemen pc* ada di pages/data-home.html.
 //
 // Katalog menjawab "apa isi dataset ini"; halaman ini menjawab "apa yang
 // sedang jalan sekarang" tanpa harus memilih dataset satu per satu. Sumber
@@ -6,6 +7,11 @@
 // lintas dataset dan hanya untuk status yang masih bergerak. Di atasnya,
 // pekerjaan dataset utama (M58) dari GET /api/data/activity: Job Hidromet
 // dan siklus Live Sentinel-1, termasuk backfill yang dijalankan skrip.
+//
+// M74: empat angka besar (berjalan/antre/dijeda/gagal) diganti satu baris
+// status; kotak dataset utama dan daftar dataset hanya tampil selama ada yang
+// bergerak (saat diam, keadaannya terbaca di tabel per satelit dan di tab
+// Dataset). Tahap scene Sentinel-1 terakhir dilipat.
 //
 // Label status dan nama satelit diambil dari UI (UI.datasetStatus,
 // UI.DATASET_ACTIVE, UI.SOURCE_LABEL) supaya tidak jadi salinan kedua dari
@@ -19,9 +25,7 @@ Pages['process'] = (() => {
   let st = null;
 
   async function init(root, ctx) {
-    st = { root, ctx, items: [], prog: {}, rail: null, all: false, timer: null };
-    UI.$('#pcRefresh', root).addEventListener('click', ev => UI.busy(ev.currentTarget, () => load()));
-    UI.$('#pcAll', root).addEventListener('change', ev => { st.all = ev.target.checked; load(); });
+    st = { root, ctx, items: [], prog: {}, rail: null, timer: null };
     await load();
     // Timer dipasang sekali dan memeriksa sendiri apakah masih ada yang
     // bergerak, jadi halaman yang menganggur tidak menembaki API.
@@ -36,7 +40,7 @@ Pages['process'] = (() => {
     if (!st) return;
     st.items = list;
 
-    const shown = list.filter(d => st.all || ACTIVE.has(d.status));
+    const shown = list.filter(d => ACTIVE.has(d.status));
     // Progres per dataset diminta hanya untuk yang ditampilkan, dan
     // kegagalan satu dataset tidak boleh mengosongkan seluruh halaman.
     const progs = await Promise.all(shown.map(d =>
@@ -50,7 +54,7 @@ Pages['process'] = (() => {
     st.mainRunning = !!(main && main.running);
     renderMain(main);
 
-    renderReadouts(list);
+    renderStatus(list);
     renderList(shown);
     renderRail();
     const moving = list.filter(d => ACTIVE.has(d.status)).length;
@@ -67,6 +71,8 @@ Pages['process'] = (() => {
     const box = UI.$('#pcMain', st.root);
     if (!a) { box.innerHTML = ''; return; }
     const h = a.hydromet || {};
+    const lives = (a.live || []).filter(l => l.running);
+    if (!h.locked && !lives.length) { box.innerHTML = ''; return; }
     const run = (h.runs || [])[0];
     const hyd = UI.screenHTML({
       channel: 'DATASET UTAMA · JOB HIDROMET (GPM + MODIS)',
@@ -78,10 +84,9 @@ Pages['process'] = (() => {
           : 'Tidak berjalan. Job harian 02.00 WIB.\n') +
         '<span class="lbl">SELESAI 1 JAM TERAKHIR:</span> ' + UI.int(h.done_last_hour) + ' tanggal · ' +
         '<span class="lbl">TERAKHIR SELESAI:</span> ' + UI.esc(h.last_completed_date ? UI.date(h.last_completed_date) : UI.NA) + '</p>' +
-        '<p class="v-dim" style="margin:6px 0 0">Log rinci: Data › GPM atau Data › MODIS.</p>',
+        '<p class="v-dim" style="margin:6px 0 0">Log rinci: Data › Satelit (GPM atau MODIS).</p>',
     });
-    const live = (a.live || []).map(liveHTML).join('<div style="height:8px"></div>');
-    box.innerHTML = live + '<div style="height:8px"></div>' + hyd + '<div style="height:8px"></div>';
+    box.innerHTML = lives.map(liveHTML).concat(h.locked ? [hyd] : []).join('<div style="height:8px"></div>') + '<div style="height:8px"></div>';
   }
 
   // Sisa waktu yang dibaca manusia: "±2 hari 19 jam".
@@ -129,34 +134,31 @@ Pages['process'] = (() => {
       channel: 'DATASET UTAMA · BACKFILL SENTINEL-1 (' + (l.name || '').toUpperCase() + ')',
       rec: p.running ? 'BERJALAN' : s[0], recCls: p.running ? '' : 'off',
       body: UI.progressHTML(p.percent, 'Progres backfill Sentinel-1') + readouts + now + plan + log +
-        '<p class="v-dim" style="margin:6px 0 0">Perkiraan dihitung dari rata-rata waktu per frame yang sudah selesai dan diperbarui tiap 10 detik. Riwayat per tanggal: Data › Sentinel-1.</p>',
+        '<p class="v-dim" style="margin:6px 0 0">Perkiraan dihitung dari rata-rata waktu per frame yang sudah selesai dan diperbarui tiap 10 detik. Riwayat per tanggal: Data › Satelit › Sentinel-1.</p>',
     });
   }
 
-  function renderReadouts(list) {
-    const moving = list.filter(d => ACTIVE.has(d.status));
-    const queued = list.filter(d => d.status === 'QUEUED').length;
-    const paused = list.filter(d => d.status === 'PAUSED').length;
-    const failed = list.filter(d => d.status === 'FAILED').length;
-    // Pekerjaan dataset utama (backfill/job harian) ikut dihitung sebagai proses berjalan.
-    const main = st.main ? (st.main.hydromet && st.main.hydromet.locked ? 1 : 0) + (st.main.live || []).filter(l => l.running).length : 0;
-    UI.$('#pcReadouts', st.root).innerHTML =
-      UI.readoutHTML('SEDANG BERJALAN', UI.int(moving.length + main), main ? UI.int(main) + ' DATASET UTAMA · ' + UI.int(moving.length) + ' KATALOG'
-        : 'DARI ' + UI.int(list.length) + ' DATASET KATALOG', moving.length + main ? 'v-amber' : '') +
-      UI.readoutHTML('ANTRE', UI.int(queued), 'MENUNGGU GILIRAN') +
-      UI.readoutHTML('DIJEDA', UI.int(paused), 'PERLU DILANJUTKAN', paused ? 'v-amber' : '') +
-      UI.readoutHTML('GAGAL', UI.int(failed), 'PERLU DICOBA ULANG', failed ? 'v-alert' : '');
+  // Satu baris: yang berjalan dulu, lalu yang perlu tindakan (dengan tautan).
+  function renderStatus(list) {
+    const n = st2 => list.filter(d => d.status === st2).length;
+    const moving = list.filter(d => ACTIVE.has(d.status)).length;
+    const a = st.main || {};
+    const run = (a.live || []).filter(l => l.running).map(l => 'siklus Sentinel-1 (' + l.name + ')')
+      .concat(a.hydromet && a.hydromet.locked ? ['Job Hidromet'] : [], moving ? [moving + ' dataset Katalog'] : []);
+    const need = [[n('FAILED'), 'gagal', 'v-alert'], [n('PAUSED'), 'dijeda', 'v-amber'], [n('QUEUED'), 'antre', '']].filter(x => x[0]);
+    UI.$('#pcStatus', st.root).innerHTML =
+      '<span class="' + (run.length ? 'v-cyan' : '') + '"><b>' + (run.length ? '● Berjalan: ' : '✓ ') + '</b>' +
+        UI.esc(run.length ? run.join(' · ') : 'Tidak ada proses berjalan.') + '</span>' +
+      (need.length ? '<span><b>Perlu tindakan:</b> ' + need.map(([k, l, c]) => '<span class="' + c + '">' + UI.int(k) + ' dataset ' + l + '</span>').join(', ') +
+        ' · <a href="#data/dataset">buka Dataset →</a></span>' : '') +
+      '<span class="mut">Live 01, 07, 13, 19 WIB · Hidromet harian 02 WIB</span>' +
+      '<button type="button" class="small" id="pcRefresh">Muat ulang</button>';
+    UI.$('#pcRefresh', st.root).addEventListener('click', ev => UI.busy(ev.currentTarget, () => load()));
   }
 
   function renderList(shown) {
     const box = UI.$('#pcList', st.root);
-    if (!shown.length) {
-      box.innerHTML = UI.screenHTML({ channel: 'PROSES BERJALAN', body: UI.emptyHTML(
-        st.items.length
-          ? 'TIDAK ADA DATASET KATALOG YANG BERJALAN. SIKLUS LIVE JALAN 01, 07, 13, DAN 19 WIB; HIDROMET HARIAN 02 WIB.'
-          : 'BELUM ADA DATASET. BUAT LEWAT "BUAT DATASET BARU".') });
-      return;
-    }
+    if (!shown.length) { box.innerHTML = ''; return; }
     box.innerHTML = shown.map(cardHTML).join('<div style="height:8px"></div>');
     bindActions();
   }
@@ -231,7 +233,7 @@ Pages['process'] = (() => {
     const r = st.rail;
     const box = UI.$('#pcRail', st.root);
     if (!r || !r.scene_id) { box.innerHTML = ''; return; }
-    box.innerHTML = '<div style="height:8px"></div>' + UI.screenHTML({
+    box.innerHTML = '<details class="ad-fold"><summary>Tahap scene Sentinel-1 terakhir' + (r.active ? ' (sedang diproses)' : '') + '</summary>' + UI.screenHTML({
       channel: 'TAHAP SCENE SENTINEL-1 TERAKHIR' + (r.product_identifier ? ' · ' + UI.esc(r.product_identifier) : ''),
       rec: UI.esc(r.overall_status || ''), recCls: r.active ? '' : 'off',
       body: UI.tableHTML([
@@ -240,12 +242,12 @@ Pages['process'] = (() => {
         { label: 'Selesai', get: x => x.completed_at ? UI.dateTime(x.completed_at) : '' },
       ], r.stages || [], { empty: 'BELUM ADA TAHAP TERCATAT' }) +
         '<p class="v-dim" style="margin:6px 0 0;font-size:11px">Ini scene Sentinel-1 terakhir yang diproses pipeline, bukan ringkasan seluruh dataset.</p>',
-    });
+    }) + '</details>';
   }
 
   function bindActions() {
     const root = st.root;
-    UI.$$('#pcList [data-open]', root).forEach(b => b.addEventListener('click', () => st.ctx.go('#data/tersimpan')));
+    UI.$$('#pcList [data-open]', root).forEach(b => b.addEventListener('click', () => st.ctx.go('#data/dataset')));
     UI.$$('#pcList [data-act]', root).forEach(b => b.addEventListener('click', () => run(b, b.dataset.act, Number(b.dataset.id))));
   }
 

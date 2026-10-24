@@ -289,7 +289,7 @@ const UI = (() => {
       '<thead><tr>' + cols.map(c => '<th scope="col" class="' + (c.cls || '') + '">' + esc(c.label) + '</th>').join('') + '</tr></thead><tbody>' +
       rows.map((r, i) => '<tr' + (opts.rowAttr ? ' ' + opts.rowAttr(r, i) : '') + '>' + cols.map(c => {
         const v = c.get ? c.get(r, i) : r[c.key];
-        return '<td class="' + (c.cls || '') + '">' + (c.html ? (v === null || v === undefined ? NA : v) : esc(v === null || v === undefined || v === '' ? NA : v)) + '</td>';
+        return '<td class="' + (c.cls || '') + '" data-label="' + esc(c.label) + '">' + (c.html ? (v === null || v === undefined ? NA : v) : esc(v === null || v === undefined || v === '' ? NA : v)) + '</td>';
       }).join('') + '</tr>').join('') + '</tbody></table></div>';
   }
 
@@ -361,22 +361,41 @@ const UI = (() => {
   // supaya pemanggil tahu lapisan mana yang dimaksud -- indeks yang sedang
   // tampil hidup di closure ini, bukan di pemanggil, karena tombol
   // Sebelumnya/Berikutnya bisa menggesernya setelah dialog dibuka.
+  //
+  // opts.resolve(item) (opsional, async) melengkapi item saat ditampilkan —
+  // dipakai Citra per satelit, yang menelusuri tanggal × band dan baru memuat
+  // scene tanggal itu ketika dibutuhkan. Item tanpa url tampil "TIDAK ADA
+  // GAMBAR". item.side (HTML) menaruh panel di sepertiga kanan, mis. tabel angka.
   function lightbox(items, index, opts) {
     opts = opts || {};
-    let i = index || 0;
-    const render = win => {
-      const it = items[i];
-      $('.lb-body', win).innerHTML = screenHTML({ channel: it.channel || it.title, rec: it.rec || '', flush: false,
-        body: '<img ' + imgAttrs(it) + ' alt="' + esc(it.title) + '" style="display:block;margin:0 auto;max-height:60vh">' +
+    let i = index || 0, seq = 0;
+    const render = async win => {
+      const token = ++seq;
+      let it = items[i];
+      $('.lb-pos', win).textContent = (i + 1) + ' / ' + items.length + ' — ' + (it.title || '');
+      if (opts.resolve) {
+        $('.lb-body', win).innerHTML = screenHTML({ channel: it.channel || it.title, body: loadingHTML() });
+        try { it = Object.assign({}, it, await opts.resolve(it)); }
+        catch (e) { it = Object.assign({}, it, { url: null, note: esc('GAGAL MEMUAT: ' + (e.message || e)) }); }
+        if (token !== seq) return;
+      }
+      const main = screenHTML({ channel: it.channel || it.title, rec: it.rec || '', flush: false,
+        body: (it.url ? '<img ' + imgAttrs(it) + ' alt="' + esc(it.title) + '" style="display:block;margin:0 auto;max-height:60vh;max-width:100%">'
+          : emptyHTML('TIDAK ADA GAMBAR')) +
           (it.legend || '') + (it.note ? '<p class="scr-text" style="margin-top:8px">' + it.note + '</p>' : '') });
-      $('.lb-pos', win).textContent = (i + 1) + ' / ' + items.length + ' — ' + it.title;
+      $('.lb-body', win).innerHTML = it.side ? '<div class="lb-split"><div class="lb-main">' + main + '</div><div class="lb-side">' + it.side + '</div></div>' : main;
+      $('.lb-pos', win).textContent = (i + 1) + ' / ' + items.length + ' — ' + (it.title || '');
     };
     const actionBtn = opts.action ? [{ label: opts.action.label, value: 'action' }] : [];
     return dialog({ title: 'Pratinjau citra', wide: 'x',
-      body: '<div class="lb-body"></div><div class="btn-row" style="margin:8px 0"><button type="button" class="small lb-prev">‹ Sebelumnya</button><span class="lb-pos"></span><button type="button" class="small lb-next">Berikutnya ›</button></div>',
+      // Satu baris kaki: Sebelumnya · posisi · Berikutnya | aksi + Tutup.
+      body: '<div class="lb-body"></div><div class="lb-bar"><div class="lb-nav"><button type="button" class="lb-prev" aria-label="Sebelumnya">‹ Sebelumnya</button>' +
+        '<span class="lb-pos" aria-live="polite"></span><button type="button" class="lb-next" aria-label="Berikutnya">Berikutnya ›</button></div></div>',
       buttons: actionBtn.concat([{ label: 'Tutup', value: true, default: true, cancel: true }]),
       collect: (win, val) => val === 'action' ? items[i] : val,
       onOpen: win => {
+        const end = $('.window-body > .btn-row.end', win);
+        if (end) $('.lb-bar', win).appendChild(end);
         render(win);
         const go = d => { i = (i + d + items.length) % items.length; render(win); };
         $('.lb-prev', win).addEventListener('click', () => go(-1));
@@ -456,7 +475,8 @@ const UI = (() => {
         const fill = s.color ? ' style="fill:' + esc(s.color) + '"' : '';
         // Satu titik saja tetap digambar sebagai titik (polyline butuh dua).
         const flush = () => { if (seg.length > 1) g += '<polyline class="line ' + (s.cls || '') + '"' + stroke + ' points="' + seg.join(' ') + '"/>'; seg = []; };
-        s.points.forEach(p => { if (p.y === null || p.y === undefined) flush(); else seg.push(X(t(p.x)) + ',' + Y(p.y)); });
+        // opts.connect: hari kosong dilewati, garis tetap menyambung titik berdata.
+        s.points.forEach(p => { if (p.y === null || p.y === undefined) { if (!opts.connect) flush(); } else seg.push(X(t(p.x)) + ',' + Y(p.y)); });
         flush();
         // Satu titik per tanggal yang berdata; diperkecil bila rapat.
         const ds = pts.length > 120 ? 2 : pts.length > 60 ? 3 : 4;
@@ -604,7 +624,7 @@ const UI = (() => {
       ', ' + int(h.done_last_hour) + ' tanggal selesai dalam 1 jam terakhir.');
     return '<div class="banner raised" role="status">' + icon('info32') + '<div class="b-body">' +
       '<b class="v-cyan">● BACKFILL DATASET UTAMA SEDANG BERJALAN</b><br>' + rows.join('<br>') +
-      '<br><a href="#data/proses">Rincian di Data › Proses berjalan →</a></div></div>';
+      '<br><a href="#data/ringkasan">Rincian di Data › Ringkasan →</a></div></div>';
   }
 
   // Unduh berkas (Blob) dengan nama dari Content-Disposition.
@@ -614,6 +634,57 @@ const UI = (() => {
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
+
+  // M72: aturan tabel untuk seluruh aplikasi, dipasang sekali di sini supaya
+  // berlaku juga untuk tabel yang ditulis tangan (bukan lewat tableHTML).
+  //  - Paling banyak TABLE_ROWS baris terlihat; lebih dari itu .table-wrap
+  //    digulir ke bawah dengan header menempel. Tinggi diukur dari baris ke-9
+  //    (baris bisa dua tingkat), diukur ulang saat ukurannya berubah — termasuk
+  //    saat tab/lipatan yang tadinya tersembunyi dibuka.
+  //  - Di layar sempit tiap baris jadi kartu (css/main.css .tc): label kolom
+  //    diambil dari <th> dan ditulis ke data-label setiap sel.
+  // Matriks (.heat: heatmap, korelasi) dan tabel tanpa <thead> tidak diubah.
+  const TABLE_ROWS = 8;
+  function fitTable(wrap) {
+    const t = wrap.querySelector('table');
+    const rows = t && t.tBodies[0] ? t.tBodies[0].rows : [];
+    if (rows.length <= TABLE_ROWS) {
+      if (wrap.classList.contains('tw-scroll')) { wrap.classList.remove('tw-scroll'); wrap.style.maxHeight = ''; }
+      return;
+    }
+    const top = t.getBoundingClientRect().top, cut = rows[TABLE_ROWS].getBoundingClientRect().top;
+    if (!t.offsetHeight || cut <= top) return;   // belum terlihat; diukur lagi saat tampil
+    const h = Math.ceil(cut - top) + 'px';
+    wrap.classList.add('tw-scroll');
+    if (wrap.style.maxHeight !== h) wrap.style.maxHeight = h;
+  }
+  function labelTable(t) {
+    const head = t.tHead && t.tHead.rows[0];
+    if (!head) return;
+    t.classList.add('tc');
+    const labels = [...head.cells].map(c => c.textContent.trim());
+    [...t.tBodies].forEach(b => [...b.rows].forEach(r => [...r.cells].forEach((c, i) => {
+      if (!c.hasAttribute('data-label')) c.setAttribute('data-label', labels[i] || '');
+    })));
+  }
+  const tableRO = typeof ResizeObserver === 'function' ? new ResizeObserver(es => es.forEach(e => fitTable(e.target))) : null;
+  let tableQueued = false;
+  function enhanceTables() {
+    tableQueued = false;
+    $$('table.scr-table:not(.tc), table.roles:not(.tc)').forEach(labelTable);
+    $$('.table-wrap').forEach(w => {
+      if (!w.querySelector('table.tc')) return;
+      if (!w.dataset.tw) { w.dataset.tw = '1'; if (tableRO) tableRO.observe(w); }
+      fitTable(w);
+    });
+  }
+  const queueTables = () => { if (!tableQueued) { tableQueued = true; requestAnimationFrame(enhanceTables); } };
+  function startTables() {
+    new MutationObserver(queueTables).observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('resize', () => $$('.table-wrap.tw-scroll, .table-wrap[data-tw]').forEach(fitTable));
+    queueTables();
+  }
+  if (document.body) startTables(); else document.addEventListener('DOMContentLoaded', startTables);
 
   return { icon, ICONS, NA, num, int, pct, bytes, date, dateTime, isoDate, addDays, parseDate, esc, $, $$,
     ERROR_TEXT, errorText, windowHTML, dialog, info, warn, showError, confirm, busy, screenHTML, readoutHTML,

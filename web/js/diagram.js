@@ -11,11 +11,21 @@
 // 4.2 Analisa daerah (mode = 'regions'): kecamatan (+ warna) × tanggal ×
 //     band → satu grafik per band (GET /api/diagram/regions). PDF memuat
 //     SEMUA band untuk kecamatan & tanggal yang sama (GET /report.pdf).
+//     M67: tab Tren & evaluasi alert digabung ke sini. Bagian terlipat
+//     "Evaluasi alert & kejadian" (js/analytics.js, dimuat saat pertama
+//     dibuka) memakai kecamatan dan rentang formulir yang sama; PDF dan CSV
+//     berada dalam satu kotak Unduh.
 //
 // Forecast 15 hari (M61): grafik data tampil lebih dulu; forecast menyusul
 // lewat GET /api/diagram/forecast, satu request per deret (band × AOI atau
 // band × kecamatan) supaya palang progres jujur. Setiap grafik punya
 // sakelar forecast di bawahnya, menyala bawaannya.
+//
+// M70: garis data selalu menyambung titik berdata (tidak diputus di hari
+// kosong); chip band di atas grafik; dua tabel berdampingan — forecast di
+// kiri, rincian band di kanan — keduanya hanya band yang dipilih, dengan
+// model/keyakinan dan penjelasan terlipat per baris. Analisa daerah: kartu
+// 2×2 di atas grafik; kecamatan di luar beberapa baris pertama lewat dialog.
 //
 // Penjelasan dan ambang tiap band dari GET /api/diagram/bands (sumbernya
 // etl/band_catalog.py — ambang yang sama dengan kalimat kondisi dan alert).
@@ -45,7 +55,11 @@ Pages['diagram'] = (() => {
     }
   }
 
-  function destroy() { if (st) { if (st.timer) clearInterval(st.timer); st.q.stop(); } st = null; }
+  function destroy() {
+    if (st) { if (st.timer) clearInterval(st.timer); st.q.stop(); }
+    if (st && st.evalLoaded && Pages.analytics) { try { Pages.analytics.destroy(); } catch (e) { /* abaikan */ } }
+    st = null;
+  }
 
   // ===================================================== 4.1 keadaan terbaru
   const latestKey = code => 'aoi|' + code + '|' + st.latest.date_to;
@@ -152,19 +166,26 @@ Pages['diagram'] = (() => {
       if (st.hidden.has(c)) st.hidden.delete(c); else st.hidden.add(c);
       drawLatest();
     }));
+    const unitOf = b => b.unit ? ' ' + b.unit : '';
+    const sub = t => '<br><span class="v-dim" style="font-size:11px">' + UI.esc(t) + '</span>';
+    const more = (title, text) => '<details class="dg-more"><summary>' + UI.esc(title) + '</summary><p>' + UI.esc(text) + '</p></details>';
+    const bandCell = b => '<span class="swatch" style="background:' + b.color + '"></span> ' + UI.esc(b.band_name);
+    const empty = 'SEMUA BAND DISEMBUNYIKAN';
     UI.$('#dgExplain', st.root).innerHTML = UI.tableHTML([
-      { label: 'Band', html: true, get: b => '<span class="swatch" style="background:' + b.color + '"></span> ' + UI.esc(b.band_name) },
-      { label: 'Terakhir', cls: 'r', get: b => { const p = lastPoint(b); return p ? UI.num(p.y, 2) + (b.unit ? ' ' + b.unit : '') : UI.NA; } },
-      { label: 'Tanggal', get: b => { const p = lastPoint(b); return p ? UI.date(p.x, 'short') + (p.source === 'scene' ? ' (scene)' : '') : ''; } },
-      { label: 'Titik', cls: 'r', get: b => UI.int(b.n_points) + (b.per_region ? ' (' + UI.int(b.n_daily) + ' harian)' : '') },
-      { label: 'Rentang biasa (365 hr)', get: b => b.range ? UI.num(b.range[0], 2) + ' – ' + UI.num(b.range[1], 2) + (b.unit ? ' ' + b.unit : '') : UI.NA },
+      { label: 'Band', html: true, get: b => bandCell(b) + (st.fcOn ? more('Model & keyakinan', UI.forecastDesc(fcOf(b))) : '') },
+      { label: 'Terakhir', html: true, get: b => { const p = lastPoint(b);
+        return p ? UI.esc(UI.num(p.y, 2) + unitOf(b)) + sub(UI.date(p.x, 'short') + (p.source === 'scene' ? ' · scene' : '')) : UI.NA; } },
+      { label: 'Forecast H+15', html: true, get: b => { const f = fcOf(b), p = f && f.points && f.points[f.points.length - 1];
+        return !st.fcOn ? 'mati' : !p ? (f ? UI.NA : '…')
+          : UI.esc(UI.num(p.mean, 2) + unitOf(b)) + sub(UI.num(p.lo, 2) + ' – ' + UI.num(p.hi, 2) + ' · ' + UI.date(p.x, 'short')); } },
+    ], visible, { empty, caption: 'Nilai terakhir dan forecast tiap band' });
+    UI.$('#dgBands', st.root).innerHTML = UI.tableHTML([
+      { label: 'Band', html: true, get: b => bandCell(b) + more('Penjelasan', b.about) },
+      { label: 'Rentang biasa (365 hr)', get: b => b.range ? UI.num(b.range[0], 2) + ' – ' + UI.num(b.range[1], 2) + unitOf(b) : UI.NA },
       { label: 'Ambang', get: b => b.thresholds.length ? b.thresholds.map(t => t.label + ' ' + UI.num(t.value, 2)).join(' · ')
         : (b.band_code === 'VV' || b.band_code === 'NDVI') ? 'perubahan antar scene' : UI.NA },
-      { label: 'Forecast H+15', get: b => { const f = fcOf(b), p = f && f.points && f.points[f.points.length - 1];
-        return !st.fcOn ? 'mati' : !p ? (f ? UI.NA : '…') : UI.num(p.mean, 2) + (b.unit ? ' ' + b.unit : '') + ' (' + UI.num(p.lo, 2) + ' – ' + UI.num(p.hi, 2) + ') · ' + UI.date(p.x, 'short'); } },
-      { label: 'Model forecast', get: b => st.fcOn ? UI.forecastDesc(fcOf(b)) : 'mati' },
-      { label: 'Penjelasan', get: b => b.about },
-    ], visible, { empty: 'SEMUA BAND DISEMBUNYIKAN', caption: 'Nilai terakhir, forecast, dan penjelasan band' });
+      { label: 'Titik', cls: 'r', get: b => UI.int(b.n_points) + (b.per_region ? ' (' + UI.int(b.n_daily) + ' harian)' : '') },
+    ], visible, { empty, caption: 'Rincian band' });
   }
 
   // Tooltip titik: tampil saat kursor di atas titik, saat titik difokus
@@ -212,8 +233,7 @@ Pages['diagram'] = (() => {
   // "rentang biasa" band itu (persentil 2–98 dalam 365 hari, dari API):
   // 0 = rendah biasa, 1 = tinggi biasa; nilai di luar rentang dijepit ke tepi.
   // Skala tetap ini membuat garis yang datar tetap tampak datar.
-  // Satu titik per tanggal yang berdata. Band harian diputus di hari kosong;
-  // Sentinel-1 (`sparse`) memang hanya ada per lintasan sehingga disambung.
+  // Satu titik per tanggal yang berdata; garis menyambung semua titik itu.
   // `fcMap` {band_code: forecast}: sumbu waktu diperpanjang sampai hari
   // forecast terakhir; forecast = garis putus + pita 80% berwarna band,
   // dijepit ke 0–1 supaya pita lebar tidak memipihkan garis data.
@@ -259,14 +279,11 @@ Pages['diagram'] = (() => {
           ';stroke-dasharray:4 3;stroke-width:1;opacity:.7"/>';
         hits.push({ x: W - R - 30, y: Y(y), color: b.color, tip: b.band_name + ' · ambang ' + th.label + ' ' + UI.num(th.value, 2) + (b.unit ? ' ' + b.unit : '') });
       });
-      // Garis: angka harian bersebelahan disambung (diputus di hari kosong);
-      // titik scene Live (±6–12 hari sekali) disambung antar scene. Band
-      // Sentinel-1 (VV, VH, …) hanya ada per lintasan, jadi semua titiknya
-      // disambung apa pun sumbernya (scene Live atau angka per kecamatan).
+      // Garis menyambung setiap titik berdata berurutan (M70: tidak lagi
+      // diputus di hari kosong). Ruas menuju titik scene Live tetap putus-putus.
       let prev = null;
       have.forEach(p => {
-        if (prev && (b.sparse || p.source === 'scene' && prev.source === 'scene' ||
-                     (t(p.x) - t(prev.x)) <= 864e5 * 1.5)) {
+        if (prev) {
           g += '<line class="line" style="stroke:' + b.color + (p.source === 'scene' && !b.sparse ? ';stroke-dasharray:3 2' : '') +
             '" x1="' + X(t(prev.x)) + '" y1="' + Y(n(prev.y)) + '" x2="' + X(t(p.x)) + '" y2="' + Y(n(p.y)) + '"/>';
         }
@@ -307,10 +324,11 @@ Pages['diagram'] = (() => {
     let geo;
     try { geo = await Maps.regions(); } catch (e) { UI.showError('Forecast', e); return; }
     const regions = geo.features.map(f => f.properties).sort((a, b) => a.name.localeCompare(b.name, 'id'));
-    $('#dgRegionList').innerHTML = regions.map((r, i) =>
-      '<div class="region-row"><label class="check"><input type="checkbox" name="rg" value="' + r.region_id + '"' + (i < 2 ? ' checked' : '') + '> ' +
-      UI.esc(r.name) + '</label><input type="color" aria-label="Warna ' + UI.esc(r.name) + '" data-color="' + r.region_id + '" value="' +
-      REGION_COLORS[i % REGION_COLORS.length] + '"></div>').join('') || UI.emptyHTML('AOI BELUM DIATUR');
+    st.regions = regions;
+    st.rsel = new Set(regions.slice(0, 2).map(r => r.region_id));
+    st.rcolor = {}; regions.forEach((r, i) => { st.rcolor[r.region_id] = REGION_COLORS[i % REGION_COLORS.length]; });
+    renderRegionList();
+    $('#dgRegionMore').addEventListener('click', allRegions);
     const regionBands = st.bands.filter(b => b.per_region);
     $('#dgBandList').innerHTML = regionBands.map(b => '<label class="check"><input type="checkbox" name="bd" value="' + b.band_code + '"' +
       (b.band_code === 'RAIN_24H' || b.band_code === 'NDVI' ? ' checked' : '') + '> <span class="swatch" style="background:' + b.color + '"></span> ' +
@@ -326,13 +344,62 @@ Pages['diagram'] = (() => {
     }));
     $('#dgForm').addEventListener('submit', ev => { ev.preventDefault(); UI.busy($('#dgGo'), showRegions); });
     $('#dgPdf').addEventListener('click', () => UI.busy($('#dgPdf'), pdf));
-    UI.$$('[data-color]', st.root).forEach(inp => inp.addEventListener('change', () => { if (st.last) drawRegions(st.last); }));
+    $('#dgCsvBand').innerHTML = regionBands.map(b => '<option value="' + b.band_code + '"' + (b.band_code === 'RAIN_24H' ? ' selected' : '') + '>' + UI.esc(b.band_name) + '</option>').join('');
+    $('#dgCsv').addEventListener('click', () => UI.busy($('#dgCsv'), csv));
+    Excel.mount($('#anExcel'), ['hujan_harian', 'observations', 'disaster_rain', 'alert_evaluation', 'alerts']);
+    $('#dgEval').addEventListener('toggle', () => { if ($('#dgEval').open) evaluate(); });
     await showRegions();
+  }
+
+  // Kartu Kecamatan menampilkan paling banyak REGION_ROWS baris (yang
+  // tercentang lebih dulu); bila AOI lebih banyak, sisanya lewat dialog.
+  const REGION_ROWS = 8;
+  const regionRow = (r, attr) => '<div class="region-row"><label class="check"><input type="checkbox" ' + attr + '="' + r.region_id + '"' +
+    (st.rsel.has(r.region_id) ? ' checked' : '') + '> ' + UI.esc(r.name) + '</label><input type="color" aria-label="Warna ' + UI.esc(r.name) +
+    '" data-color="' + r.region_id + '" value="' + st.rcolor[r.region_id] + '"></div>';
+
+  function renderRegionList() {
+    const box = UI.$('#dgRegionList', st.root), all = st.regions;
+    const shown = all.filter(r => st.rsel.has(r.region_id)).concat(all.filter(r => !st.rsel.has(r.region_id)))
+      .slice(0, Math.max(REGION_ROWS, st.rsel.size));
+    box.innerHTML = shown.map(r => regionRow(r, 'data-rg')).join('') || UI.emptyHTML('AOI BELUM DIATUR');
+    const btn = UI.$('#dgRegionMore', st.root);
+    btn.hidden = all.length <= shown.length;
+    btn.textContent = 'Semua kecamatan (' + all.length + ')…';
+    UI.$$('[data-rg]', box).forEach(c => c.addEventListener('change', () => {
+      const id = Number(c.dataset.rg);
+      if (c.checked) st.rsel.add(id); else st.rsel.delete(id);
+    }));
+    UI.$$('[data-color]', box).forEach(inp => inp.addEventListener('change', () => {
+      st.rcolor[inp.dataset.color] = inp.value;
+      if (st.last) drawRegions(st.last);
+    }));
+  }
+
+  async function allRegions() {
+    const v = await UI.dialog({ title: 'Semua kecamatan', wide: true,
+      body: '<p class="mut" style="margin:0 0 6px;font-size:11px">Centang kecamatan (maksimal 12) dan pilih warnanya.</p>' +
+        '<div class="dg-all">' + st.regions.map(r => regionRow(r, 'data-all')).join('') + '</div><span class="err" id="dgAllErr"></span>',
+      buttons: [{ label: 'Pakai', value: 'ok', default: true }, { label: 'Batal', value: null, cancel: true }],
+      validate: (win, val) => {
+        if (val !== 'ok') return true;
+        const n = UI.$$('[data-all]:checked', win).length;
+        const msg = !n ? 'Pilih minimal satu kecamatan.' : n > 12 ? 'Maksimal 12 kecamatan.' : '';
+        UI.$('#dgAllErr', win).textContent = msg;
+        return !msg;
+      },
+      collect: win => ({ ids: UI.$$('[data-all]:checked', win).map(c => Number(c.dataset.all)),
+        colors: UI.$$('[data-color]', win).map(c => [c.dataset.color, c.value]) }) });
+    if (!v || v === 'cancel' || !st) return;
+    st.rsel = new Set(v.ids);
+    v.colors.forEach(([id, c]) => { st.rcolor[id] = c; });
+    renderRegionList();
+    await UI.busy(UI.$('#dgGo', st.root), showRegions);
   }
 
   function selection() {
     const $ = s => UI.$(s, st.root);
-    const ids = UI.$$('input[name=rg]:checked', st.root).map(x => Number(x.value));
+    const ids = st.regions.filter(r => st.rsel.has(r.region_id)).map(r => r.region_id);
     const bands = UI.$$('input[name=bd]:checked', st.root).map(x => x.value);
     const from = $('#dgFrom').value, to = $('#dgTo').value;
     $('#dgRegionErr').textContent = !ids.length ? 'Pilih minimal satu kecamatan.' : ids.length > 12 ? 'Maksimal 12 kecamatan.' : '';
@@ -340,7 +407,7 @@ Pages['diagram'] = (() => {
     if (!from || !to || from > to) { UI.showError('Analisa daerah', { code: 'INVALID_DATE_RANGE' }); return null; }
     return { ids, bands, from, to };
   }
-  const colorOf = id => { const el = UI.$('[data-color="' + id + '"]', st.root); return el ? el.value : '#cccccc'; };
+  const colorOf = id => st.rcolor[id] || '#cccccc';
 
   async function showRegions() {
     const sel = selection();
@@ -352,7 +419,33 @@ Pages['diagram'] = (() => {
     } catch (e) { UI.showError('Analisa daerah', e); st.ctx.setStatus('Gagal'); return; }
     drawRegions(st.last);
     st.ctx.setStatus('Siap · ' + st.last.regions.length + ' kecamatan · ' + UI.date(sel.from) + ' – ' + UI.date(sel.to));
+    st.sel = sel;
     regionForecasts();
+    if (UI.$('#dgEval', st.root).open) evaluate();
+  }
+
+  // Evaluasi alert & kejadian: hanya dimuat bila bagiannya dibuka (data hujan
+  // harian seluruh rentang cukup berat), dan hanya sekali per pilihan.
+  async function evaluate() {
+    const sel = st.sel;
+    if (!sel) return;
+    const key = sel.ids.join(',') + '|' + sel.from + '|' + sel.to;
+    if (st.evalKey === key) return;
+    st.evalKey = key;
+    try { await Shell.loadScript('analytics'); } catch (e) { UI.showError('Evaluasi alert & kejadian', e); st.evalKey = null; return; }
+    if (!st) return;
+    st.evalLoaded = true;
+    await Pages.analytics.show(st.root, st.ctx, { from: sel.from, to: sel.to, ids: sel.ids });
+  }
+
+  async function csv() {
+    const sel = selection();
+    if (!sel) return;
+    const band = UI.$('#dgCsvBand', st.root).value;
+    const q = { band, date_from: sel.from, date_to: sel.to };
+    if (sel.ids.length === 1) q.region_id = sel.ids[0];
+    try { await API.download('/api/hydromet/observations.csv' + API.qs(q), 'observasi_' + band + '.csv'); }
+    catch (e) { UI.showError('Ekspor CSV', e); }
   }
 
   // Forecast dihitung dari data s.d. tanggal akhir rentang terpilih, jadi
@@ -380,7 +473,7 @@ Pages['diagram'] = (() => {
       const models = on ? '<p class="scr-text v-dim fc-models">' + series.map((s, k) =>
         '<span><span class="swatch" style="background:' + s.color + '"></span> ' + UI.esc(s.label) + ': ' + UI.esc(UI.forecastDesc(fcs[k])) + '</span>').join('') + '</p>' : '';
       return UI.screenHTML({ channel: 'CH-0' + (i + 1) + ' · ' + b.band_name.toUpperCase(), rec: b.unit ? b.unit.toUpperCase() : '', body:
-        UI.chartSVG(series, { unit: b.unit, thresholds: thr, zero: b.band_code.startsWith('RAIN'), width: 640, height: 200,
+        UI.chartSVG(series, { connect: true, unit: b.unit, thresholds: thr, zero: b.band_code.startsWith('RAIN'), width: 640, height: 200,
           label: b.band_name + ' per kecamatan' + (on ? ', dengan forecast 15 hari' : '') }) +
         legend + UI.forecastToggleHTML('data-fc-band="' + UI.esc(b.band_code) + '"', on) + models +
         '<p class="scr-text v-dim" style="margin:6px 0 0">' + UI.esc(b.about) +

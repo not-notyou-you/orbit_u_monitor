@@ -1,7 +1,9 @@
 <!-- pages/account.html — Akun Saya (INTERFACE.md §2.9): profil, email & peringatan (M64),
-     ubah sandi, token API, panduan. -->
-<div class="layout">
-  <div class="control-panel">
+     ubah sandi, token API.
+     M74: kisi dua kolom — Profil · Email & peringatan / Kecamatan · Kata sandi —
+     lalu token API selebar halaman (dulu satu kolom kiri yang panjang dengan
+     ruang kosong besar di kanan). Contoh curl/Python dihapus: /docs memuatnya. -->
+<div class="ac-grid">
     <fieldset>
       <legend>Profil</legend>
       <div class="screen"><div class="screen-inner"><span class="scr-ch">PROFIL</span><dl class="kv" id="profile"></dl></div></div>
@@ -31,7 +33,7 @@
       <p class="mut" style="margin:0 0 6px;font-size:11px">Pilih satu (mis. tempat tinggal Anda), beberapa, atau semua.
         Tanpa pilihan, Anda tidak menerima peringatan.</p>
       <label class="check"><input type="checkbox" id="regAll"> Semua kecamatan (termasuk yang ditambahkan nanti)</label>
-      <div class="listbox pl-checks" id="regList" role="group" aria-label="Kecamatan untuk peringatan email"></div>
+      <div class="listbox pl-checks ac-regs" id="regList" role="group" aria-label="Kecamatan untuk peringatan email"></div>
       <p class="mut" id="regState" role="status" style="margin:6px 0 0;font-size:11px"></p>
       <div class="btn-row end"><button type="button" class="default" id="regBtn">Simpan pilihan</button></div>
     </fieldset>
@@ -48,12 +50,13 @@
         <div class="btn-row end"><button type="submit" class="default" id="pwBtn">Simpan</button></div>
       </fieldset>
     </form>
-  </div>
-  <div class="deck">
+</div>
+<div class="deck" style="margin-top:8px">
     <form id="tokenForm" novalidate>
       <fieldset>
         <legend>Buat token API</legend>
-        <p>Token untuk skrip atau sistem lain (header <code>Authorization: Bearer</code>). Token hanya bisa <b>membaca</b> data; aksi tulis tetap lewat sesi web.</p>
+        <p style="margin:0 0 6px">Token untuk skrip atau sistem lain (header <code>Authorization: Bearer</code>). Token hanya bisa <b>membaca</b> data; aksi tulis tetap lewat sesi web.
+          Contoh pemakaian dan daftar endpoint: <a href="/docs" target="_blank" rel="noopener">/docs</a>.</p>
         <div class="cols-3">
           <div class="field"><label for="tkName">Nama token</label><input type="text" id="tkName" maxlength="60" required placeholder="mis. skrip analisis" aria-describedby="tkNameErr"><span class="err" id="tkNameErr"></span></div>
           <div class="field"><label for="tkScope">Cakupan</label>
@@ -64,11 +67,4 @@
       </fieldset>
     </form>
     <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-01 · TOKEN API MILIK SAYA</span><span class="scr-rec off" id="tkCount"></span><div id="tokenList"></div></div></div>
-    <fieldset>
-      <legend>Panduan singkat</legend>
-      <div class="screen"><div class="screen-inner"><span class="scr-ch">CONTOH · CURL</span><pre class="scr-text" style="margin:0;overflow-x:auto" id="curlEx"></pre></div></div>
-      <div class="screen" style="margin-top:8px"><div class="screen-inner"><span class="scr-ch">CONTOH · PYTHON</span><pre class="scr-text" style="margin:0;overflow-x:auto" id="pyEx"></pre></div></div>
-      <p style="margin:8px 0 0">Dokumentasi lengkap setiap endpoint: <a href="/docs" target="_blank" rel="noopener">/docs</a> (Swagger).</p>
-    </fieldset>
-  </div>
 </div>

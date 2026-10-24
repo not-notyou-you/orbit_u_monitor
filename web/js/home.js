@@ -12,11 +12,17 @@
 // otomatis bila sudah 'granted', selain itu lewat tombol (js/geo.js).
 // Koordinat hanya dipakai di browser untuk mencari kecamatannya.
 //
-// Panel pantau satu kecamatan: kalimat kondisi (normal/tidak + apa yang tidak
-// normal) → citra scene terbaru dipotong ke kecamatan → angka terbaru + tren
-// 30 hari terhadap rentang biasa. Sumber: GET /api/public/lokasi[/{id}[/trend]].
+// Satu kecamatan tampil dalam dua bagian (M66):
+// * Pantau lokasi: tiga KPI — status, update terakhir (waktu angka kecamatan
+//   terakhir dihitung), dan luas daerah — di dalam Informasi lokasi, di bawah
+//   pilihan kecamatan dan di atas peta.
+// * Detail lokasi: SATU satelit sekaligus. Kiri pilihan satelit dan channel,
+//   kanan citra scene terbaru dipotong ke kecamatan dengan panah ‹ › untuk
+//   berganti channel (menyeberang ke satelit lain di ujungnya); angka terbaru + tren 30 hari di bawahnya hanya untuk
+//   satelit itu. Sumber: GET /api/public/lokasi[/{id}[/trend]].
 //
-// Paling bawah: pemilih tema tampilan (js/theme.js; M65, sebelumnya di Tentang).
+// Tema tampilan (js/theme.js; M65) berada di antara Informasi lokasi dan
+// Detail lokasi.
 'use strict';
 Pages['home'] = (() => {
   const PICK_KEY = 'orbit-u.lokasi';
@@ -26,10 +32,14 @@ Pages['home'] = (() => {
   const DIGITS = { VV: 1, VH: 1, WATER_PCT: 1, FLOOD: 1, NDVI: 3, NDWI: 3, RAIN_24H: 1, RAIN_72H: 1, RAIN_7D: 1 };
   // Band per lintasan (Sentinel-1): titiknya jarang, garisnya disambung.
   const SPARSE = new Set(['VV', 'VH', 'WATER_PCT']);
+  // Urutan = LiveTiles.ROWS dan kelompok stats/tren API (etl/lokasi_data.GROUPS).
+  const SATS = ['s1', 'modis', 'gpm'];
+  const SAT_NAME = { s1: 'Sentinel-1', modis: 'MODIS', gpm: 'GPM' };
   let st = null;
 
   async function init(root, ctx) {
-    st = { root, ctx, map: null, layers: {}, me: null, token: 0, items: [], geo: null, current: null, stopWatch: null };
+    st = { root, ctx, map: null, layers: {}, me: null, token: 0, items: [], geo: null, current: null, stopWatch: null,
+           sat: 's1', ch: null, d: null, tr: null };
     UI.$$('[data-icon]', root).forEach(el => { el.innerHTML = UI.icon(el.dataset.icon); });
     renderHero(root, ctx.me);
     renderThemes(root);
@@ -55,35 +65,25 @@ Pages['home'] = (() => {
       visitorBar();
     }
     if (!detected) {
-      placePanel('after');
       const last = remembered();
-      if (last) show(last, 'pick', false);
+      if (last) show(last, 'pick');
     }
     ctx.setStatus(ctx.me ? 'Siap · masuk sebagai ' + (ctx.me.full_name || ctx.me.username) : 'Siap · pengunjung');
   }
 
   function destroy() {
-    if (st && st.map) st.map.remove();
+    // stop(): animasi peta yang masih berjalan saat halaman ditutup melempar galat Leaflet (_leaflet_pos).
+    if (st && st.map) { st.map.stop(); st.map.remove(); }
     if (st && st.stopWatch) st.stopWatch();
     if (st && st.onTheme) document.removeEventListener('orbit-u:tema', st.onTheme);
     st = null;
   }
 
   // ---------------------------------------------------------------- landing
+  // Tanpa tombol navigasi (M66): Informasi lokasi langsung di bawahnya, dan
+  // Masuk/Daftar untuk pengunjung ada di bar lokasi serta taskbar.
   function renderHero(root, me) {
-    const btns = ['<button type="button" class="default" id="hoGo">Pantau lokasi ↓</button>',
-      '<a class="btn" href="#tentang">Tentang aplikasi</a>'];
-    if (me) {
-      UI.$('#hoGreeting', root).insertAdjacentHTML('afterbegin', '<b>Halo, ' + UI.esc(me.full_name || me.username) + '.</b> ');
-    } else {
-      btns.push('<a class="btn" href="/masuk?next=' + encodeURIComponent('/app#beranda') + '">Masuk…</a>');
-      btns.push('<a class="btn" href="/daftar">Daftar akun</a>');
-    }
-    UI.$('#hoHeroBtns', root).innerHTML = btns.join('');
-    UI.$('#hoGo', root).addEventListener('click', () => {
-      const first = UI.$$('.pl-sec', root).find(el => !el.hidden);
-      if (first) scrollTo(first);
-    });
+    if (me) UI.$('#hoGreeting', root).insertAdjacentHTML('afterbegin', '<b>Halo, ' + UI.esc(me.full_name || me.username) + '.</b> ');
   }
 
   // ---------------------------------------------------------- tema tampilan
@@ -144,7 +144,6 @@ Pages['home'] = (() => {
       bar.innerHTML = '<p class="pl-geo-line">Batas kecamatan gagal dimuat, jadi lokasi Anda belum bisa dicocokkan. ' +
         'Pilih kecamatan dari daftar. <button type="button" class="small" id="hoRetry">Coba lagi</button></p>';
       bindRetry();
-      placePanel('after');
       return false;
     }
     const feat = Geo.regionAt(pos.lon, pos.lat, st.geo);
@@ -158,7 +157,6 @@ Pages['home'] = (() => {
         (rough ? ' Lokasinya perkiraan kasar — bila Anda sebenarnya di Lebak Selatan, pilih kecamatan secara manual.' : '') +
         ' <button type="button" class="small" id="hoRetry">Coba lagi</button></p>';
       bindRetry();
-      placePanel('after');
       return false;
     }
     const p = feat.properties;
@@ -169,8 +167,7 @@ Pages['home'] = (() => {
       '<span class="pl-priv">Koordinat hanya dipakai di peramban ini untuk mencari kecamatan; tidak dikirim ke server.</span>';
     bindRetry();
     bar.innerHTML = '<p class="pl-geo-line">Ingin melihat kecamatan lain? Pilih dari daftar atau peta.</p>';
-    placePanel('mine');
-    show(p.region_id, 'mine', false);
+    show(p.region_id, 'mine');
     return true;
   }
 
@@ -213,7 +210,7 @@ Pages['home'] = (() => {
     if (!st) return;
     if (state === 'granted') { detect(); return; }
     geoBar(state);
-    if (st.current && st.current.source === 'mine') { placePanel('after'); st.current.source = 'pick'; }
+    if (st.current && st.current.source === 'mine') st.current.source = 'pick';
   }
 
   // ------------------------------------------------------- daftar + peta
@@ -228,7 +225,7 @@ Pages['home'] = (() => {
     if (!st.items.length) { box.innerHTML = UI.emptyHTML('BELUM ADA KECAMATAN TERPANTAU'); return; }
     box.innerHTML = st.items.map(it => '<button type="button" role="option" aria-selected="false" data-rid="' + it.region_id + '">' +
       '<span class="pl-name">' + UI.esc(it.name) + '</span>' + badge(it) + '</button>').join('');
-    UI.$$('button[data-rid]', box).forEach(b => b.addEventListener('click', () => show(+b.dataset.rid, 'pick', true)));
+    UI.$$('button[data-rid]', box).forEach(b => b.addEventListener('click', () => show(+b.dataset.rid, 'pick')));
     const counts = [0, 0, 0];
     st.items.forEach(it => { const l = it.status && it.status.level; if (l >= 0) counts[l]++; });
     UI.$('#hoListSum', st.root).textContent = UI.int(st.items.length) + ' kecamatan · ' + UI.int(counts[0]) + ' normal, ' +
@@ -253,11 +250,11 @@ Pages['home'] = (() => {
         st.layers[f.properties.region_id] = l;
         const it = st.items.find(x => x.region_id === f.properties.region_id);
         l.bindTooltip(UI.esc(f.properties.name) + (it && it.status ? ' · ' + UI.esc(it.status.label) : ''), { sticky: true });
-        l.on('click', () => show(f.properties.region_id, 'pick', true));
+        l.on('click', () => show(f.properties.region_id, 'pick'));
       },
     }).addTo(st.map);
     st.aoiBounds = layer.getBounds();
-    setTimeout(() => { if (st && st.map) { st.map.invalidateSize(); st.map.fitBounds(st.aoiBounds); } }, 100);
+    setTimeout(() => { if (st && st.map) { st.map.invalidateSize(); st.map.fitBounds(st.aoiBounds, { animate: false }); } }, 100);
   }
 
   // Titik perangkat + lingkaran akurasi, hanya di peta lokal ini.
@@ -279,110 +276,69 @@ Pages['home'] = (() => {
     if (l && st.map) { l.bringToFront(); st.map.fitBounds(l.getBounds(), { maxZoom: 11, padding: [20, 20] }); }
   }
 
-  // 'mine' = panel di dalam Lokasi saya (sebelum Informasi lokasi);
-  // 'after' = panel sesudah Informasi lokasi.
-  function placePanel(where) {
-    const panel = UI.$('#hoPantau', st.root);
-    if (where === 'mine') UI.$('#hoMine', st.root).insertAdjacentElement('afterend', panel);
-    else UI.$('#hoInfo', st.root).insertAdjacentElement('afterend', panel);
-  }
-
   function remembered() {
     let v = null;
     try { v = +localStorage.getItem(PICK_KEY); } catch (e) { /* mode privat */ }
     return v && st.items.some(it => it.region_id === v) ? v : null;
   }
 
-  function scrollTo(el) {
-    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
-  }
-
   // ------------------------------------------------------------ panel pantau
-  async function show(rid, source, scroll) {
+  async function show(rid, source) {
     if (!st) return;
     const token = ++st.token;
     st.current = { rid, source };
     if (source === 'pick') { try { localStorage.setItem(PICK_KEY, String(rid)); } catch (e) { /* mode privat */ } }
     highlight(rid);
     const it = st.items.find(x => x.region_id === rid);
-    const panel = UI.$('#hoPantau', st.root);
+    const panel = UI.$('#hoPantau', st.root), detail = UI.$('#hoDetail', st.root);
+    const name = 'Kecamatan ' + (it ? it.name : '');
     panel.hidden = false;
-    UI.$('#hoPantauTitle', st.root).textContent = (source === 'mine' ? 'Lokasi saya · ' : 'Pantau lokasi · ') +
-      'Kecamatan ' + (it ? it.name : '');
-    UI.$('#hoNarasi', st.root).innerHTML = UI.screenHTML({ channel: 'CH-01 · KONDISI', body: UI.loadingHTML() });
-    UI.$('#hoCitra', st.root).innerHTML = '';
-    UI.$('#hoStats', st.root).innerHTML = '';
-    UI.$('#hoTrend', st.root).innerHTML = '';
-    UI.$('#hoCitraNote', st.root).textContent = '';
-    if (scroll) scrollTo(panel);
+    detail.hidden = true;
+    UI.$('#hoPantauTitle', st.root).textContent = (source === 'mine' ? 'Lokasi saya · ' : 'Pantau lokasi · ') + name;
+    UI.$('#hoDetailTitle', st.root).textContent = 'Detail lokasi · ' + name;
+    UI.$('#hoKpi', st.root).innerHTML = UI.loadingHTML();
+    st.d = null; st.tr = null;
 
     let d;
     try { d = await API.get('/api/public/lokasi/' + rid); }
     catch (e) {
       if (!st || token !== st.token) return;
-      UI.$('#hoNarasi', st.root).innerHTML = UI.screenHTML({ channel: 'CH-01 · KONDISI', rec: '● NO SIGNAL', recCls: 'live',
+      UI.$('#hoKpi', st.root).innerHTML = UI.screenHTML({ channel: 'KONDISI', rec: '● NO SIGNAL', recCls: 'live',
         body: UI.emptyHTML('KONDISI KECAMATAN TIDAK DAPAT DIMUAT') });
       st.ctx.setStatus('Gagal memuat kondisi');
       return;
     }
     if (!st || token !== st.token) return;
-    renderNarasi(d);
+    st.d = d;
+    renderKpi(d);
     renderSubscribe(d.region);
-    renderCitra(d);
-    renderStats(d);
+    detail.hidden = false;
+    renderDetail();
     st.ctx.setStatus('Siap · Kecamatan ' + d.region.name);
     try {
       const tr = await API.get('/api/public/lokasi/' + rid + '/trend');
-      if (st && token === st.token) renderTrend(tr, d);
+      if (st && token === st.token) { st.tr = tr; renderTrend(); }
     } catch (e) {
       if (st && token === st.token) UI.$('#hoTrend', st.root).innerHTML = UI.screenHTML({ channel: 'TREN 30 HARI', body: UI.emptyHTML('TREN TIDAK DAPAT DIMUAT') });
     }
   }
 
-  function daysAgo(iso) {
+  // Waktu WIB apa pun zona waktu perangkatnya: semua kecamatan ada di Lebak Selatan.
+  function wib(iso) {
     const d = UI.parseDate(iso);
-    if (!d) return null;
-    return Math.round((Date.now() - d.getTime()) / 864e5);
+    if (!d) return '—';
+    return d.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit' }) + ' WIB';
   }
 
-  function dateLine(dates) {
-    const part = (label, iso) => {
-      if (!iso) return label + ' <span class="v-dim">belum ada</span>';
-      const n = daysAgo(iso);
-      return label + ' ' + UI.esc(UI.date(iso)) + (n !== null && n > 1 ? ' <span class="' + (n > 14 ? 'v-amber' : 'v-dim') + '">(' + n + ' hari lalu)</span>' : '');
-    };
-    return part('SENTINEL-1', dates.s1) + ' · ' + part('MODIS', dates.modis) + ' · ' + part('GPM', dates.gpm);
-  }
-
-  function renderNarasi(d) {
+  function renderKpi(d) {
     const s = d.status || {};
     const lv = LiveTiles.levelInfo(s.level);
     const reason = (s.text || '').split(' — ').slice(1).join(' — ');
-    let body = '<p class="pl-status"><span class="lbl">STATUS:</span> <b class="' + lv.cls + '">' +
-      UI.esc((s.label || lv.label).toUpperCase()) + '</b>' + (reason ? ' — ' + UI.esc(reason) : '') + '</p>';
-    if ((d.abnormal || []).length) {
-      body += '<p class="lbl" style="margin:8px 0 2px">YANG TIDAK NORMAL:</p><ul class="pl-abn">' + d.abnormal.map(a =>
-        '<li><b class="' + (a.level >= 2 ? 'v-alert' : 'v-amber') + '">' + UI.esc(a.what.charAt(0).toUpperCase() + a.what.slice(1)) +
-        '</b> — ' + UI.esc(a.because) + '.</li>').join('') + '</ul>';
-    } else if (s.level === 0) {
-      body += '<p class="scr-text v-dim" style="margin:6px 0 0">Semua indikator yang tersedia berada di bawah ambang waspada. ' +
-        'Tidak adanya tanda bukan jaminan aman: satelit bisa melewatkan kejadian singkat.</p>';
-    }
-    const all = Object.values(d.items || {});
-    if (all.length) {
-      body += '<details class="pl-all"><summary class="lbl">SEMUA KALIMAT KONDISI (' + all.length + ')</summary><ul class="pl-abn">' +
-        all.map(it => '<li>' + LiveTiles.sentenceHTML(it) + '</li>').join('') + '</ul></details>';
-    }
-    body += '<p class="lbl" style="margin:8px 0 0">DATA: ' + dateLine(d.dates || {}) + '</p>';
-    UI.$('#hoNarasi', st.root).innerHTML =
-      '<div class="readouts">' +
-        UI.readoutHTML('STATUS', UI.esc((s.label || lv.label).toUpperCase()), 'Kecamatan ' + UI.esc(d.region.name), lv.cls) +
-        UI.readoutHTML('TIDAK NORMAL', UI.int((d.abnormal || []).length), (d.abnormal || []).length ? 'indikator di atas ambang' : 'semua dalam batas',
-          (d.abnormal || []).length ? 'v-amber' : '') +
-        UI.readoutHTML('LUAS', UI.num(d.region.area_km2, 0) + ' km²', 'COD-AB BPS', 'v-cyan') +
-      '</div>' +
-      UI.screenHTML({ channel: 'CH-01 · KONDISI KEC. ' + d.region.name.toUpperCase(), rec: '● LIVE', recCls: 'live', body });
+    UI.$('#hoKpi', st.root).innerHTML =
+      UI.readoutHTML('STATUS', UI.esc((s.label || lv.label).toUpperCase()), reason ? UI.esc(reason) : '', lv.cls) +
+      UI.readoutHTML('UPDATE TERAKHIR', UI.esc(wib(d.updated_at)), 'angka satelit terakhir dihitung') +
+      UI.readoutHTML('LUAS DAERAH', UI.num(d.region.area_km2, 0) + ' km²', 'Sumber data: BPS (COD-AB)', 'v-cyan');
   }
 
   // Peringatan email untuk kecamatan ini (M64). Hanya pengguna yang masuk;
@@ -413,27 +369,106 @@ Pages['home'] = (() => {
     }));
   }
 
-  function renderCitra(d) {
-    const box = UI.$('#hoCitra', st.root);
-    const im = d.imagery;
-    if (!im || !Object.keys(im.previews || {}).length) {
-      UI.$('#hoCitraNote', st.root).textContent = '';
-      box.innerHTML = UI.screenHTML({ channel: 'CITRA', rec: '● NO DATA', recCls: 'off', body: UI.emptyHTML('BELUM ADA SCENE YANG MENUTUPI KECAMATAN INI') });
-      return;
-    }
-    UI.$('#hoCitraNote', st.root).innerHTML = 'Scene terbaru ' + UI.esc(UI.date(im.scene_date)) + ' (Live Area ' + UI.esc(im.area_name) + '). ' +
-      (im.cropped ? 'Gambar dipotong ke batas Kecamatan ' + UI.esc(d.region.name) + '; di luar batas transparan.'
+  // ---------------------------------------------------------- detail lokasi
+  // Tingkat terburuk tiap satelit dari daftar "tidak normal" API (kunci
+  // kalimat berawalan s1_/modis_/gpm_), untuk lencana di pilihan satelit.
+  function satLevel(sat) {
+    return ((st.d && st.d.abnormal) || []).filter(a => (a.key || '').indexOf(sat + '_') === 0)
+      .reduce((m, a) => Math.max(m, a.level || 0), 0);
+  }
+
+  const interpOf = d => Object.assign({}, (d.imagery && d.imagery.interpretations) || {}, d.items || {});
+
+  function renderDetail() {
+    const d = st.d, im = d.imagery || {}, previews = im.previews || {};
+    const row = LiveTiles.ROWS[SATS.indexOf(st.sat)];
+    if (row.keys.indexOf(st.ch) < 0) st.ch = row.keys.find(k => previews[k]) || row.keys[0];
+    const interp = interpOf(d);
+
+    UI.$('#hoSats', st.root).innerHTML = SATS.map((k, i) => {
+      const lvl = satLevel(k), lv = LiveTiles.levelInfo(lvl);
+      return '<label class="check"><input type="radio" name="hoSat" value="' + k + '"' + (k === st.sat ? ' checked' : '') + '>' +
+        '<span class="pl-name">' + UI.esc(LiveTiles.ROWS[i].title) + '</span>' +
+        (lvl > 0 ? '<span class="pl-badge ' + lv.cls + '">' + UI.esc(lv.label.toUpperCase()) + '</span>' : '') + '</label>';
+    }).join('');
+    UI.$('#hoChs', st.root).innerHTML = row.keys.map(k => {
+      const cat = interp[k] && LiveTiles.CAT[interp[k].category];
+      return '<label class="check"><input type="radio" name="hoCh" value="' + k + '"' + (k === st.ch ? ' checked' : '') +
+        (previews[k] ? '' : ' disabled') + '>' +
+        '<span class="pl-name">' + UI.esc(LiveTiles.LABEL[k]) + '</span>' +
+        (cat && cat[1] ? '<span class="pl-badge ' + cat[1] + '">' + UI.esc(cat[0]) + '</span>' : '') +
+        (previews[k] ? '' : '<span class="v-dim">tidak ada</span>') + '</label>';
+    }).join('');
+    UI.$$('input[name=hoSat]', st.root).forEach(r => r.addEventListener('change', () => pickSat(r.value)));
+    UI.$$('input[name=hoCh]', st.root).forEach(r => r.addEventListener('change', () => { st.ch = r.value; renderView(); }));
+
+    const date = d.dates && d.dates[st.sat];
+    UI.$('#hoCitraNote', st.root).innerHTML = !im.scene_date ? '' :
+      'Scene terbaru ' + UI.esc(UI.date(im.scene_date)) +
+      (st.sat !== 's1' ? ' (' + UI.esc(SAT_NAME[st.sat]) + ' memakai data terdekat dengan tanggal itu)' : '') + '. ' +
+      (im.cropped ? 'Gambar dipotong ke batas kecamatan.'
         : '<span class="v-amber">Scene ini belum punya georeferensi, jadi yang tampil citra seluruh area.</span>') +
-      ' MODIS/GPM memakai data terdekat dengan tanggal scene. Klik gambar untuk legenda dan penjelasan.';
-    // Kalimat per tile = kalimat KECAMATAN ini (kuncinya sama dengan tile);
-    // tile tanpa padanan per kecamatan (perubahan air) memakai kalimat area.
-    const interp = Object.assign({}, im.interpretations || {}, d.items || {});
-    box.innerHTML = LiveTiles.rowsHTML(im.previews, interp, { sceneDate: im.scene_date });
+      (date ? ' Angka ' + UI.esc(SAT_NAME[st.sat]) + ' terakhir: ' + UI.esc(UI.date(date)) + '.' : '');
+    UI.$('#hoStatsTitle', st.root).textContent = 'Statistik ' + SAT_NAME[st.sat];
+    renderView();
+    renderStats();
+    renderTrend();
+  }
+
+  // Pilihan satelit di kiri dan panah di citra memakai jalan yang sama; ch =
+  // null berarti channel pertama yang bergambar. Fokus kembali ke panah yang
+  // ditekan, karena isi layar digambar ulang.
+  function pickSat(sat, step, ch) {
+    st.sat = sat;
+    st.ch = ch || null;
+    renderDetail();
+    if (step) { const b = UI.$('#hoView .pl-nav[data-step="' + step + '"]', st.root); if (b) b.focus(); }
+  }
+
+  function renderView() {
+    const d = st.d, im = d.imagery || {}, previews = im.previews || {};
+    const box = UI.$('#hoView', st.root);
+    const i = SATS.indexOf(st.sat), row = LiveTiles.ROWS[i];
+    // Panah menelusuri semua channel bergambar berurutan, menyeberang ke
+    // satelit berikutnya/sebelumnya di ujung channel satelit ini.
+    let seq = [];
+    LiveTiles.ROWS.forEach((r, ri) => r.keys.forEach(k => { if (previews[k]) seq.push({ sat: SATS[ri], ch: k }); }));
+    if (!seq.some(x => x.ch === st.ch)) seq = seq.concat([{ sat: st.sat, ch: st.ch }]);
+    const pos = seq.findIndex(x => x.ch === st.ch);
+    const prev = seq[(pos + seq.length - 1) % seq.length], next = seq[(pos + 1) % seq.length];
+    const interp = interpOf(d);
+    const p = previews[st.ch];
+    const img = p
+      ? '<button type="button" class="thumb" data-key="' + st.ch + '" aria-label="' + UI.esc(LiveTiles.LONG[st.ch]) +
+          ': perbesar, legenda, dan penjelasan"><img ' + UI.imgAttrs(p) + ' alt=""></button>'
+      : '<div class="noimg">' + (Object.keys(previews).length ? 'NO DATA' : 'BELUM ADA SCENE YANG MENUTUPI KECAMATAN INI') + '</div>';
+    const sentence = LiveTiles.sentenceHTML(interp[st.ch]);
+    const nav = (step, to) => {
+      const name = SAT_NAME[to.sat] + ' ' + LiveTiles.LABEL[to.ch];
+      return '<button type="button" class="pl-nav" data-step="' + step + '" title="' + UI.esc(name) + '"' +
+        ' aria-label="Channel ' + (step > 0 ? 'berikutnya' : 'sebelumnya') + ': ' + UI.esc(name) + '">' +
+        '<svg viewBox="0 0 24 48" aria-hidden="true"><path d="' + (step > 0 ? 'M6 6 L18 24 L6 42' : 'M18 6 L6 24 L18 42') + '"/></svg></button>';
+    };
+    box.innerHTML = UI.screenHTML({
+      channel: 'CH-01 · ' + row.ch + ' · ' + LiveTiles.LABEL[st.ch].toUpperCase(),
+      rec: im.scene_date ? UI.date(im.scene_date) : '● NO DATA', recCls: im.scene_date ? '' : 'off',
+      body: '<div class="pl-viewer">' + nav(-1, prev) + '<div class="pl-img">' + img + '</div>' + nav(1, next) + '</div>' +
+        (p && p.legend ? LiveTiles.legendHTML(p.legend) : '') +
+        (sentence ? '<p class="scr-text" style="margin:6px 0 0">' + sentence + '</p>' : ''),
+    });
+    UI.$$('.pl-nav', box).forEach(b => b.addEventListener('click', () => {
+      const to = b.dataset.step === '1' ? next : prev;
+      pickSat(to.sat, b.dataset.step, to.ch);
+    }));
+    if (!p) return;
+    // Lightbox hanya berisi channel satelit ini, sama dengan yang tampil.
+    const own = {};
+    row.keys.forEach(k => { if (previews[k]) own[k] = previews[k]; });
     const opts = Auth.can('aoi3d.view') ? { action: { label: 'Lihat 3D', onPick: item => {
       Terrain3DHandoff.set({ area_id: im.area_id, date: im.scene_date, key: item.key });
       location.hash = '#aoi-3d';
     } } } : {};
-    LiveTiles.bindLightbox(box, im.previews, interp, im.scene_date, opts);
+    LiveTiles.bindLightbox(box, own, interp, im.scene_date, opts);
   }
 
   function fmtVal(s, v) {
@@ -442,9 +477,9 @@ Pages['home'] = (() => {
     return UI.num(v, DIGITS[s.band_code] === undefined ? 1 : DIGITS[s.band_code]) + unit;
   }
 
-  function renderStats(d) {
+  function renderStats() {
     const box = UI.$('#hoStats', st.root);
-    box.innerHTML = (d.stats || []).map(s => {
+    box.innerHTML = (st.d.stats || []).filter(s => s.group === st.sat).map(s => {
       const r = s.range || {};
       const out = s.value !== null && s.value !== undefined && r.p98 !== null && r.p98 !== undefined &&
         (s.value > r.p98 || s.value < r.p02);
@@ -458,12 +493,14 @@ Pages['home'] = (() => {
     }).join('') || UI.emptyHTML('BELUM ADA ANGKA');
   }
 
-  function renderTrend(tr, d) {
-    const box = UI.$('#hoTrend', st.root);
-    if (!tr.dates || !tr.dates.length) { box.innerHTML = UI.screenHTML({ channel: 'TREN 30 HARI', body: UI.emptyHTML('BELUM ADA DERET WAKTU') }); return; }
+  function renderTrend() {
+    const box = UI.$('#hoTrend', st.root), tr = st.tr, d = st.d;
+    if (!tr) { box.innerHTML = UI.screenHTML({ channel: 'TREN 30 HARI', body: UI.loadingHTML() }); return; }
+    const g = (tr.groups || []).find(x => x.key === st.sat);
+    if (!tr.dates || !tr.dates.length || !g) { box.innerHTML = UI.screenHTML({ channel: 'TREN 30 HARI', body: UI.emptyHTML('BELUM ADA DERET WAKTU') }); return; }
     const statOf = code => (d.stats || []).find(s => s.band_code === code) || {};
-    box.innerHTML = tr.groups.map((g, gi) => UI.screenHTML({
-      channel: 'CH-0' + (gi + 2) + ' · TREN ' + tr.dates.length + ' HARI · ' + g.title.toUpperCase(),
+    box.innerHTML = UI.screenHTML({
+      channel: 'CH-02 · TREN ' + tr.dates.length + ' HARI · ' + g.title.toUpperCase(),
       body: '<div class="pl-charts">' + g.bands.map(b => {
         const s = statOf(b.band_code);
         let pts = tr.dates.map((x, i) => ({ x, y: b.values[i] }));
@@ -484,7 +521,7 @@ Pages['home'] = (() => {
               zero: /^RAIN|FLOOD|WATER_PCT/.test(b.band_code), range: b.range ? { lo: b.range.p02, hi: b.range.p98 } : null }) +
           '</div>';
       }).join('') + '</div>',
-    })).join('');
+    });
   }
 
   return { init, destroy };

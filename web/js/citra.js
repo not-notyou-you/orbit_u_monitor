@@ -2,6 +2,10 @@
 // Sumber: GET /api/citra/summary. Batas waktu (pengunjung 30 hari, Relawan
 // 1 tahun, peran lain semua) dihitung VIEW v_citra_scenes; di sini hanya
 // dijelaskan supaya pengguna tahu kenapa daftar tanggalnya sependek itu.
+//
+// M66: tiga kartu satelit berjajar tanpa panel "Lanjut ke" dan tanpa layar
+// status area; pilihan Live Area hanya untuk Administrator (peran lain
+// memakai area bawaan dari API).
 'use strict';
 Pages['citra'] = (() => {
   const TAB = { s1: 'sentinel-1', modis: 'modis', gpm: 'gpm' };
@@ -9,6 +13,7 @@ Pages['citra'] = (() => {
 
   async function init(root, ctx) {
     st = { root, ctx };
+    UI.$('#ciAreaBox', root).hidden = Auth.role() !== 'ADMIN';
     UI.$('#ciArea', root).addEventListener('change', e => load(Number(e.target.value)));
     await load(CitraState.area());
   }
@@ -29,11 +34,6 @@ Pages['citra'] = (() => {
     CitraState.setArea(r.area.area_id);
     $('#ciArea').innerHTML = r.areas.map(a => '<option value="' + a.area_id + '"' + (a.area_id === r.area.area_id ? ' selected' : '') + '>' +
       UI.esc(a.area_name) + '</option>').join('');
-    const s = r.area_status || {}, lv = LiveTiles.levelInfo(s.level);
-    $('#ciStatus').innerHTML = UI.screenHTML({ channel: 'CH-00 · ' + r.area.area_name.toUpperCase(), rec: '● ' + UI.int(r.area.n_scenes) + ' SCENE', recCls: 'live',
-      body: '<p class="scr-text" style="margin:0"><span class="lbl">STATUS:</span> <b class="' + lv.cls + '">' +
-        UI.esc((s.label || lv.label).toUpperCase()) + '</b> — ' + UI.esc(s.text || 'Belum ada kalimat kondisi.') + '</p>' +
-        '<p class="lbl" style="margin:6px 0 0">SCENE TERBARU ' + UI.esc(UI.date(r.area.latest_date)) + '</p>' });
     $('#ciCards').innerHTML = r.sources.map(card).join('');
     UI.applyBoundaries(st.root);
     st.ctx.setStatus('Siap · ' + r.area.area_name);

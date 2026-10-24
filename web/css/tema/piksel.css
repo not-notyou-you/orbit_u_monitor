@@ -43,6 +43,11 @@ html[data-theme="piksel"] {
   --t-taskbar-bg: var(--x-card); --t-taskbar-shadow: inset 0 4px 0 #fafafa;
   --t-backdrop: rgba(43, 43, 43, .35);
   --t-tile-filter: grayscale(1) contrast(1.08) brightness(1.06);
+  /* scrollbar: tipis dan bersiku, pegangan abu-abu, jalur tak terlihat */
+  --t-sb-size: 10px; --t-sb-r: 0; --t-sb-gap: 2px; --t-sb-ff-width: thin;
+  --t-sb-track: transparent; --t-sb-track-shadow: none;
+  --t-sb-thumb: #b4b4b4; --t-sb-thumb-shadow: none;
+  --t-sb-thumb-hover: #8a8a8a; --t-sb-thumb-active: var(--x-mut);
 }
 html[data-theme="piksel"] body { background-attachment: fixed; image-rendering: pixelated; }
 /* Siluet gunung marun di garis cakrawala (body::before konsep). */
@@ -98,4 +103,3 @@ html[data-theme="piksel"] .progress > i { background: repeating-linear-gradient(
 @media (prefers-reduced-motion: reduce) {
   html[data-theme="piksel"] #linkLamp .lamp { animation: none; }
 }
-

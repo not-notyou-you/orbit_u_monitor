@@ -1,61 +1,83 @@
-<!-- pages/diagram.html — Forecast (dulu Diagram; INTERFACE.md §2 halaman 4, M61).
+<!-- pages/diagram.html — Forecast (dulu Diagram; INTERFACE.md §2 halaman 4, M61, M67).
      Satu fragmen untuk dua tab: "Keadaan terbaru" (semua band, 30 hari +
      forecast 15 hari, satu grafik) dan "Analisa daerah" (kecamatan × tanggal ×
-     band + forecast + PDF). Bagian yang tidak dipakai tab aktif disembunyikan
-     oleh js/diagram.js. ANALYST & ADMIN. -->
+     band + forecast; evaluasi alert & kejadian terlipat — dulu tab sendiri;
+     PDF + CSV dalam satu kotak Unduh). Bagian yang tidak dipakai tab aktif
+     disembunyikan oleh js/diagram.js. ANALYST & ADMIN. -->
 
 <!-- 4.1 keadaan terbaru -->
 <section id="dgLatest" hidden>
   <div class="screen"><div class="screen-inner">
     <span class="scr-ch">CH-01 · SEMUA BAND · 30 HARI + FORECAST 15 HARI</span><span class="scr-rec live" id="dgRec">● AUTO</span>
+    <div class="band-chips" id="dgChips" role="group" aria-label="Band yang ditampilkan"></div>
     <div id="dgChart"></div>
     <label class="check fc-toggle"><input type="checkbox" id="dgFcOn" checked> Tampilkan forecast 15 hari</label>
     <div id="dgFcProg" class="fc-prog" aria-live="polite" hidden></div>
-    <div class="band-chips" id="dgChips" role="group" aria-label="Band yang ditampilkan"></div>
-    <p class="scr-text v-dim" style="margin:6px 0 0">Satuan tiap band berbeda (dB, %, mm, indeks), jadi setiap garis diskalakan ke rentang biasanya dalam setahun (0 = rendah biasa, 1 = tinggi biasa). Satu titik per tanggal; garis terputus di hari tanpa data. Arahkan kursor ke titik untuk nilai aslinya. Garis putus tipis berwarna = ambang band itu.</p>
-    <p class="scr-text v-dim" style="margin:6px 0 0">Forecast = garis putus tebal dan pita (rentang 80%) sesudah data terakhir tiap band, dihitung dari seluruh riwayat band itu di database. Modelnya dipilih otomatis per band dari lima kandidat (naive, exponential smoothing, Holt, musiman, musiman + anomali) lewat uji mundur 12 kali sepanjang setahun terakhir. "Keyakinan" menunjukkan seberapa jauh model itu mengalahkan tebakan "nilai terakhir berlanjut". Prakiraan statistik, bukan peringatan.</p>
     <p class="scr-text v-amber" id="dgStale" style="margin:6px 0 0" hidden></p>
+    <details class="ad-fold dg-help"><summary>Cara membaca grafik &amp; forecast</summary>
+      <p class="scr-text v-dim" style="margin:6px 0 0">Satuan tiap band berbeda (dB, %, mm, indeks), jadi setiap garis diskalakan ke rentang biasanya dalam setahun (0 = rendah biasa, 1 = tinggi biasa). Satu titik per tanggal; garis menyambung titik-titik berdata. Arahkan kursor ke titik untuk nilai aslinya. Garis putus tipis berwarna = ambang band itu.</p>
+      <p class="scr-text v-dim" style="margin:6px 0 0">Forecast = garis putus tebal dan pita (rentang 80%) sesudah data terakhir tiap band, dihitung dari seluruh riwayat band itu. Model dipilih otomatis per band dari lima kandidat lewat uji mundur 12 kali sepanjang setahun terakhir; "keyakinan" = seberapa jauh model itu mengalahkan tebakan "nilai terakhir berlanjut". Prakiraan statistik, bukan peringatan.</p>
+    </details>
   </div></div>
-  <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-02 · NILAI TERAKHIR, FORECAST & PENJELASAN</span>
-    <div id="dgExplain"></div></div></div>
+  <div class="dg-tables">
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-02 · NILAI TERAKHIR & FORECAST</span>
+      <div id="dgExplain"></div></div></div>
+    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-03 · RINCIAN BAND</span>
+      <div id="dgBands"></div></div></div>
+  </div>
 </section>
 
-<!-- 4.2 analisa daerah -->
+<!-- 4.2 analisa daerah (M70): empat kartu 2×2 di atas — Kecamatan · Band /
+     Tanggal · Unduh — lalu grafik selebar halaman. Kecamatan menampilkan
+     beberapa baris; sisanya lewat dialog "Semua kecamatan". -->
 <section id="dgRegions" hidden>
-  <div class="layout">
-    <div class="control-panel">
-      <form id="dgForm" novalidate>
-        <fieldset>
-          <legend>Kecamatan</legend>
-          <p class="mut" style="font-size:11px;margin:0 0 4px">Centang kecamatan, lalu pilih warnanya.</p>
-          <div class="region-pick" id="dgRegionList"></div>
-          <span class="err" id="dgRegionErr" aria-live="polite"></span>
-        </fieldset>
-        <fieldset>
-          <legend>Tanggal</legend>
-          <div class="field-row">
-            <div class="field"><label for="dgFrom">Dari</label><input type="date" id="dgFrom" required></div>
-            <div class="field"><label for="dgTo">Sampai</label><input type="date" id="dgTo" required></div>
-          </div>
-          <div class="btn-row">
-            <button type="button" class="small" data-range="30">30 hari</button>
-            <button type="button" class="small" data-range="90">90 hari</button>
-            <button type="button" class="small" data-range="365">1 tahun</button>
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend>Band</legend>
-          <div id="dgBandList"></div>
-        </fieldset>
-        <div class="btn-row end">
-          <button type="button" id="dgPdf">Buat PDF (semua band)…</button>
-          <button type="submit" class="default" id="dgGo">Tampilkan</button>
+  <form id="dgForm" class="dg-cards" novalidate>
+    <fieldset>
+      <legend>Kecamatan</legend>
+      <div class="region-pick" id="dgRegionList"></div>
+      <div class="btn-row"><button type="button" class="small" id="dgRegionMore" hidden>Semua kecamatan…</button></div>
+      <span class="err" id="dgRegionErr" aria-live="polite"></span>
+    </fieldset>
+    <fieldset>
+      <legend>Band</legend>
+      <div id="dgBandList" class="dg-bandlist"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Tanggal</legend>
+      <div class="field-row">
+        <div class="field"><label for="dgFrom">Dari</label><input type="date" id="dgFrom" required></div>
+        <div class="field"><label for="dgTo">Sampai</label><input type="date" id="dgTo" required></div>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="small" data-range="30">30 hari</button>
+        <button type="button" class="small" data-range="90">90 hari</button>
+        <button type="button" class="small" data-range="365">1 tahun</button>
+        <span class="spacer"></span>
+        <button type="submit" class="default" id="dgGo">Tampilkan</button>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Unduh</legend>
+      <p class="mut" style="font-size:11px;margin:0 0 6px">Untuk kecamatan dan rentang terpilih.</p>
+      <div class="btn-row" style="margin-bottom:6px"><button type="button" id="dgPdf">PDF semua band…</button></div>
+      <div class="dg-csv"><div class="field"><label for="dgCsvBand">CSV observasi</label><select id="dgCsvBand"></select></div>
+        <button type="button" id="dgCsv">Unduh CSV</button></div>
+      <details class="ad-fold"><summary>Ekspor / impor Excel</summary><div id="anExcel"></div></details>
+    </fieldset>
+  </form>
+  <div class="deck">
+    <div id="dgRegFcProg" class="fc-prog" aria-live="polite" hidden></div>
+    <div class="deck" id="dgRegionCharts"></div>
+      <details class="ad-fold" id="dgEval">
+        <summary>Evaluasi alert &amp; kejadian (heatmap hujan, korelasi kejadian, POD/FAR, riwayat alert)</summary>
+        <div class="deck" style="margin-top:8px">
+          <div class="readouts" id="anReadouts"></div>
+          <div id="anFcProg" class="fc-prog" aria-live="polite" hidden></div>
+          <div class="screen"><div class="screen-inner"><span class="scr-ch">HEATMAP HUJAN HARIAN (RERATA KECAMATAN TERPILIH, MM)</span><div id="anHeat" class="table-wrap"></div></div></div>
+          <div class="screen"><div class="screen-inner"><span class="scr-ch">KEJADIAN × HUJAN 24 JAM / 72 JAM + FORECAST 15 HARI</span><div id="anCorr"></div></div></div>
+          <div class="screen"><div class="screen-inner"><span class="scr-ch">EVALUASI ALERT (WARNING+ VS KEJADIAN TERVERIFIKASI)</span><div id="anEval"></div></div></div>
+          <div class="screen"><div class="screen-inner"><span class="scr-ch">RIWAYAT ALERT</span><span class="scr-rec off" id="anAlertRec"></span><div id="anAlerts"></div></div></div>
         </div>
-      </form>
-    </div>
-    <div class="deck">
-      <div id="dgRegFcProg" class="fc-prog" aria-live="polite" hidden></div>
-      <div class="deck" id="dgRegionCharts"></div>
-    </div>
+      </details>
   </div>
 </section>

@@ -77,7 +77,8 @@ DOCS: dict[tuple[str, str], dict] = {
                        "7 days), latest value per band with the previous one and the usual range (2nd–98th "
                        "percentile, 365 days), and the latest Live scene previews cropped to the kecamatan. "
                        "Numbers come from `v_public_lokasi_obs`: visitors see 30 days, but the two latest "
-                       "observations per band are always visible.",
+                       "observations per band are always visible. `updated_at` = when this kecamatan's numbers were "
+                       "last computed.",
         "response": {"region": {"region_id": 6, "name": "Cibeber", "area_km2": 401.2},
                      "status": {"label": "Waspada", "level": 1, "text": "Waspada — curah hujan 7 hari melewati ambang"},
                      "abnormal": [{"key": "gpm_rain_7d", "what": "curah hujan 7 hari", "category": "alert", "level": 1,
@@ -85,7 +86,8 @@ DOCS: dict[tuple[str, str], dict] = {
                      "stats": [{"band_code": "RAIN_7D", "unit": "mm", "value": 81.5, "obs_date": "2026-10-07",
                                 "prev_value": 76.2, "range": {"p02": 0.0, "p98": 226.2}}],
                      "imagery": {"area_id": 1, "scene_date": "2026-10-12", "cropped": True,
-                                 "previews": {"s1_vh": {"url": "/api/public/lokasi/6/preview/s1_vh.png"}}}},
+                                 "previews": {"s1_vh": {"url": "/api/public/lokasi/6/preview/s1_vh.png"}}},
+                     "updated_at": "2026-10-12T23:41:05+07:00"},
     },
     ("GET", "/api/live/areas/{area_id}/card"): {
         "description": "Everything the Live card shows for one area: selected scene (default latest) with metrics, "

@@ -1,33 +1,36 @@
 <!-- pages/citra-sat.html — Citra Satelit › Sentinel-1 / MODIS / GPM (INTERFACE.md §2
-     halaman 3.2–3.4). Satu fragmen untuk ketiganya; satelitnya dari tab router
-     (ctx.tab.source). Isi: penjelasan satelit, daftar tanggal, gambar PNG,
-     informasi yang bisa diambil, dan perbandingan dua tanggal. -->
-<div class="layout">
-  <div class="control-panel">
-    <fieldset>
-      <legend id="csAboutLegend">Tentang satelit</legend>
-      <p id="csAbout" style="margin:0 0 6px"></p>
-      <dl class="kv kv-light" id="csSpec"></dl>
-    </fieldset>
-    <fieldset>
-      <legend>Tanggal</legend>
-      <div class="field"><label for="csArea">Live Area</label><select id="csArea"></select></div>
-      <p id="csWindow" class="mut" style="font-size:11px;margin:0 0 6px"></p>
-      <div class="listbox tall" id="csDates" role="listbox" aria-label="Tanggal scene"></div>
-      <label class="check" style="margin-top:6px"><input type="checkbox" id="csCmpOn"> Bandingkan dengan tanggal lain</label>
-      <div class="field" id="csCmpBox" hidden><label for="csCmp">Tanggal pembanding</label><select id="csCmp"></select></div>
-    </fieldset>
-    <fieldset>
-      <legend>Informasi yang bisa diambil</legend>
-      <ul class="facts" id="csExtract"></ul>
-      <p class="mut" id="csLimits" style="font-size:11px;margin:6px 0 0"></p>
-    </fieldset>
-  </div>
-  <div class="deck">
-    <div id="csTiles"></div>
-    <div id="csSentences"></div>
-    <div id="csMetrics"></div>
-    <div id="csBands"></div>
-    <div id="csExtra"></div>
-  </div>
+     halaman 3.2–3.4, M66). Satu fragmen untuk ketiganya; satelitnya dari tab
+     router (ctx.tab.source). Susunan:
+     * atas: 2/3 penjelasan satelit (termasuk keterbatasannya) · 1/3 pilihan tanggal;
+     * CH-01: gambar satelit tanggal terpilih, selebar jendela;
+     * CH-02 kondisi & band selebar jendela (kalimat kondisi dipasangkan dengan
+       band-nya, menggantikan blok "Informasi yang bisa diambil");
+     * angka per kecamatan; di GPM berupa "Hujan per kecamatan" (peta + tabel,
+       tanggal yang sama dengan gambar, M73) dan satu baris pemberitahuan alert
+       aktif yang menaut ke Kejadian.
+     Angka per band (dulu CH-03) tampil di modal saat gambar dibuka: ⅔ gambar +
+     penjelasan, ⅓ tabel tanggal dan band itu (M66). -->
+<div class="cs-split">
+  <fieldset class="cs-about">
+    <legend id="csAboutLegend">Tentang satelit</legend>
+    <p id="csAbout" style="margin:0 0 8px;line-height:1.5"></p>
+    <dl class="kv kv-light" id="csSpec"></dl>
+  </fieldset>
+  <fieldset>
+    <legend>Tanggal</legend>
+    <div class="field" id="csAreaBox" hidden><label for="csArea">Live Area</label><select id="csArea"></select></div>
+    <p id="csWindow" class="mut" style="font-size:11px;margin:0 0 6px"></p>
+    <div class="dd" id="csDateDd">
+      <button type="button" class="dd-btn" id="csDateBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="csDates">Memuat…</button>
+      <div class="listbox dd-list" id="csDates" role="listbox" aria-label="Tanggal scene" hidden></div>
+    </div>
+    <label class="check" style="margin-top:6px"><input type="checkbox" id="csCmpOn"> Bandingkan dengan tanggal lain</label>
+    <div class="field" id="csCmpBox" hidden><label for="csCmp">Tanggal pembanding</label><select id="csCmp"></select></div>
+  </fieldset>
+</div>
+<div class="deck">
+  <div id="csAlert"></div>
+  <div id="csTiles"></div>
+  <div id="csInfo"></div>
+  <div id="csPerRegion"></div>
 </div>

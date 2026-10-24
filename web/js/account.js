@@ -8,14 +8,6 @@ Pages['account'] = {
       ['NAMA', me.full_name], ['PENGGUNA', me.username], ['ORGANISASI', me.organization], ['PERAN', UI.ROLE_LABEL[me.role_code] || me.role_code],
     ].map(([k, v]) => '<dt>' + k + '</dt><dd>' + UI.esc(v || UI.NA) + '</dd>').join('');
 
-    const origin = location.origin;
-    UI.$('#curlEx', root).textContent =
-      'curl -H "Authorization: Bearer $ORBIT_U_TOKEN" \\\n  "' + origin + '/api/hydromet/observations?band=RAIN_24H&limit=50"';
-    UI.$('#pyEx', root).textContent =
-      'import os, requests\nH = {"Authorization": "Bearer " + os.environ["ORBIT_U_TOKEN"]}\n' +
-      'r = requests.get("' + origin + '/api/hydromet/today", headers=H, timeout=30)\nr.raise_for_status()\n' +
-      'for k in r.json()["regions"]:\n    print(k["name"], k["rain_24h_mm"])';
-
     const setErr = (id, msg) => {
       const i = UI.$('#' + id, root);
       i.setAttribute('aria-invalid', msg ? 'true' : 'false');

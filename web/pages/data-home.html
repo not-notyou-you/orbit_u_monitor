@@ -1,14 +1,18 @@
-<!-- pages/data-home.html — Data › Ringkasan (INTERFACE.md §2 halaman 6.1).
-     Keadaan data ketiga satelit, backfill yang berjalan, dan navigasi ke
-     sub-halaman Data. DATA_ENGINEER & ADMIN. -->
-<div class="readouts" id="dhReadouts"></div>
-<div id="dhMain" style="margin-bottom:8px"></div>
-<div class="sat-cards" id="dhCards"></div>
-<div class="cols-2">
-  <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-02 · BACKFILL TERAKHIR</span>
-    <div id="dhRuns"></div></div></div>
-  <fieldset>
-    <legend>Sub-halaman Data</legend>
-    <div class="navcards" id="dhNav"></div>
-  </fieldset>
+<!-- pages/data-home.html — Data › Ringkasan (INTERFACE.md §2 halaman 6.1, M67, M74).
+     Susunan dari atas (M74):
+     * satu baris status: apa yang berjalan dan apa yang perlu tindakan
+       (menggantikan empat angka besar yang hampir selalu 0);
+     * tabel dataset utama per satelit (rentang, jumlah, masuk terakhir,
+       status proses, Kelola →) — menggantikan dua kotak dataset utama dan tiga
+       kartu satelit yang mengulang isi tab Satelit;
+     * "Sedang berjalan": hanya tampil bila ada yang bergerak (backfill
+       dataset utama, dataset Katalog). Elemen pc* diisi js/process.js.
+     DATA_ENGINEER & ADMIN. -->
+<div class="dh-status" id="pcStatus" role="status" aria-live="polite"></div>
+<div class="screen"><div class="screen-inner"><span class="scr-ch">CH-01 · DATASET UTAMA PER SATELIT</span><span class="scr-rec off" id="dhRec"></span>
+  <div id="dhTable"></div></div></div>
+<div class="deck" id="pcRunning" style="margin-top:8px">
+  <div id="pcMain" aria-live="polite"></div>
+  <div id="pcList" aria-live="polite"></div>
 </div>
+<div id="pcRail"></div>

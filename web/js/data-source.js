@@ -1,5 +1,7 @@
-// js/data-source.js — Data › Sentinel-1 | GPM | MODIS (#data/<satelit>, INTERFACE.md §2
-// halaman 6.2–6.4, M56). Satelitnya dari ctx.tab.source.
+// js/data-source.js — Data › Satelit (#data/satelit/<sentinel-1|modis|gpm>, INTERFACE.md §2
+// halaman 6.2, M56, M67). Satu tab untuk ketiga satelit: pemilih di atas
+// mengganti segmen ketiga hash, router memanggil onSub, dan isi dimuat ulang
+// tanpa membuang fragmen. Dulu tiga tab terpisah (#data/sentinel-1, …).
 //
 // * Daftar: GET /api/data/{src}/items (termasuk yang dinonaktifkan).
 // * Ubah/hapus: PATCH .../items/{id} {is_valid, reason} (soft delete, alasan
@@ -9,6 +11,11 @@
 //   GPM/MODIS = Job Hidromet, Sentinel-1 = siklus Live dibatasi rentang (M58);
 //   keduanya di thread latar, progres + log dibaca dari
 //   GET /api/data/backfill/runs/{id}?since=n tiap 2 detik selama berjalan.
+//
+// M74: backfill satu baris di atas, kotak proses backfill hanya tampil bila
+// ada run atau backfill dari proses lain; riwayat dan data tersimpan jadi dua
+// tab. Kolom Aksi (dua tombol per baris × 50 baris) diganti klik baris →
+// dialog rincian dengan Proses ulang dan Nonaktifkan/Pulihkan.
 'use strict';
 Pages['data-source'] = (() => {
   const LABEL = { s1: 'Sentinel-1', gpm: 'GPM', modis: 'MODIS' };
@@ -19,17 +26,38 @@ Pages['data-source'] = (() => {
   };
   const RUN_STATUS = { RUNNING: ['BERJALAN', 'v-cyan'], COMPLETED: ['SELESAI', ''], FAILED: ['GAGAL', 'v-alert'], SKIPPED: ['DILEWATI', 'v-amber'] };
   const LIMIT = 50;
+  // Segmen hash → kunci API. Urutan = urutan pemilih.
+  const SUB = { 'sentinel-1': 's1', modis: 'modis', gpm: 'gpm' };
   let st = null;
 
   async function init(root, ctx) {
-    const src = (ctx.tab && ctx.tab.source) || 'gpm';
-    st = { root, ctx, src, page: 1, run: null, lines: [], poll: null };
+    st = { root, ctx, src: SUB[ctx.sub] || 's1', page: 1, run: null, lines: [], poll: null };
     const $ = s => UI.$(s, root);
-    $('#dsBfHelp').textContent = HELP[src];
+    $('#dsSats').innerHTML = Object.entries(SUB).map(([sub, k]) =>
+      '<a href="#data/satelit/' + sub + '" data-src="' + k + '">' + UI.esc(LABEL[k]) + '</a>').join('');
     const today = UI.isoDate(new Date());
     $('#dsBfTo').value = UI.addDays(today, -1); $('#dsBfFrom').value = UI.addDays(today, -7);
     $('#dsBackfill').addEventListener('submit', ev => { ev.preventDefault(); startBackfill(); });
     $('#dsFilter').addEventListener('submit', ev => { ev.preventDefault(); st.page = 1; UI.busy($('#dsApply'), loadItems); });
+    UI.bindTabs(root, tab => { $('#dsHistPane').hidden = tab !== 'hist'; $('#dsItemsPane').hidden = tab !== 'items'; });
+    await refresh();
+  }
+
+  // Satelit lain dipilih: hanya isi yang dimuat ulang.
+  async function onSub(sub) {
+    if (!st) return;
+    const src = SUB[sub] || 's1';
+    if (src === st.src) return;
+    if (st.poll) { clearTimeout(st.poll); st.poll = null; }
+    Object.assign(st, { src, page: 1, run: null, lines: [], hydromet: null, wasRunning: false });
+    await refresh();
+  }
+
+  async function refresh() {
+    const $ = s => UI.$(s, st.root);
+    UI.$$('#dsSats a', st.root).forEach(a => a.toggleAttribute('aria-current', a.dataset.src === st.src));
+    $('#dsBfHelp').textContent = HELP[st.src];
+    $('#dsRun').innerHTML = ''; $('#dsHist').innerHTML = UI.loadingHTML(); $('#dsTable').innerHTML = UI.loadingHTML();
     await Promise.all([loadItems(), loadBackfill()]);
   }
 
@@ -40,13 +68,16 @@ Pages['data-source'] = (() => {
     const $ = s => UI.$(s, st.root);
     const from = $('#dsFrom').value, to = $('#dsTo').value;
     if (from && to && from > to) { UI.showError('Saring daftar', { code: 'INVALID_DATE_RANGE' }); return; }
+    const src = st.src;
     let r;
     try {
       r = await API.get('/api/data/' + st.src + '/items' + API.qs({ date_from: from, date_to: to, status: $('#dsStatus').value,
         q: $('#dsQ').value.trim(), limit: LIMIT, offset: (st.page - 1) * LIMIT }));
-    } catch (e) { $('#dsTable').innerHTML = UI.emptyHTML('GAGAL MEMUAT'); UI.showError('Data ' + LABEL[st.src], e); return; }
-    if (!st) return;
-    $('#dsCount').textContent = UI.int(r.total) + ' ITEM';
+    } catch (e) { if (st && st.src === src) { $('#dsTable').innerHTML = UI.emptyHTML('GAGAL MEMUAT'); UI.showError('Data ' + LABEL[src], e); } return; }
+    if (!st || st.src !== src) return;
+    $('#dsCount').textContent = '(' + UI.int(r.total) + ')';
+    $('#dsCountRec').textContent = UI.int(r.total) + ' ITEM';
+    st.items = r.items;
     const cols = st.src === 's1'
       ? [{ label: 'ID', key: 'id' }, { label: 'Produk', get: x => x.name.length > 42 ? x.name.slice(0, 42) + '…' : x.name },
          { label: 'Akuisisi', get: x => UI.dateTime(x.acquisition_datetime) }, { label: 'Orbit', get: x => (x.orbit_direction || '') + ' ' + (x.relative_orbit || '') },
@@ -55,17 +86,35 @@ Pages['data-source'] = (() => {
          { label: 'Tanggal', get: x => UI.date(x.acquisition_date) }, { label: 'Run', key: 'run_type' }];
     cols.push({ label: 'Produk turunan', cls: 'r', get: x => UI.int(x.n_products) });
     cols.push({ label: 'Status', html: true, get: x => x.is_valid ? 'AKTIF' : '<span class="v-amber" title="' + UI.esc(x.invalid_reason || '') + '">NONAKTIF</span>' });
-    cols.push({ label: 'Aksi', html: true, get: x =>
-      '<button type="button" class="small" data-reproc="' + x.id + '">Proses ulang…</button> ' +
-      (x.is_valid ? '<button type="button" class="small" data-off="' + x.id + '">Nonaktifkan…</button>'
-                  : '<button type="button" class="small" data-on="' + x.id + '">Pulihkan</button>') });
-    $('#dsTable').innerHTML = UI.tableHTML(cols, r.items, { empty: 'BELUM ADA DATA. JALANKAN BACKFILL UNTUK MENGISI.', caption: 'Data ' + LABEL[st.src] }) +
+    $('#dsTable').innerHTML = UI.tableHTML(cols, r.items, { empty: 'BELUM ADA DATA. JALANKAN BACKFILL UNTUK MENGISI.', caption: 'Data ' + LABEL[st.src],
+      rowAttr: x => 'class="ds-row" tabindex="0" data-id="' + x.id + '" aria-label="Item #' + x.id + ': buka rincian dan aksi"' }) +
       UI.pagerHTML(r.total, LIMIT, (st.page - 1) * LIMIT);
     UI.$$('#dsTable [data-page]', st.root).forEach(b => b.addEventListener('click', () => { st.page = Number(b.dataset.page); loadItems(); }));
-    UI.$$('[data-off]', st.root).forEach(b => b.addEventListener('click', () => deactivate(Number(b.dataset.off))));
-    UI.$$('[data-on]', st.root).forEach(b => b.addEventListener('click', () => setValid(Number(b.dataset.on), true, null)));
-    UI.$$('[data-reproc]', st.root).forEach(b => b.addEventListener('click', () => reprocess(Number(b.dataset.reproc))));
+    UI.$$('#dsTable .ds-row', st.root).forEach(tr => {
+      const open = () => openItem(Number(tr.dataset.id));
+      tr.addEventListener('click', open);
+      tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    });
     st.ctx.setStatus('Siap · ' + UI.int(r.total) + ' item');
+  }
+
+  // Rincian satu item + aksinya (dulu dua tombol di setiap baris tabel).
+  async function openItem(id) {
+    const x = (st.items || []).find(i => i.id === id);
+    if (!x) return;
+    const kv = st.src === 's1'
+      ? [['PRODUK', x.name], ['AKUISISI', UI.dateTime(x.acquisition_datetime)], ['ORBIT', (x.orbit_direction || '') + ' ' + (x.relative_orbit || '')],
+         ['UKURAN', UI.num(x.raw_file_size_mb, 0) + ' MB']]
+      : [['PRODUK', x.name], ['TILE', x.tile_id], ['TANGGAL', UI.date(x.acquisition_date)], ['RUN', x.run_type]];
+    kv.push(['PRODUK TURUNAN', UI.int(x.n_products)], ['STATUS', x.is_valid ? 'AKTIF' : 'NONAKTIF' + (x.invalid_reason ? ' — ' + x.invalid_reason : '')]);
+    const v = await UI.dialog({ title: LABEL[st.src] + ' · item #' + id, wide: true,
+      body: '<div class="screen"><div class="screen-inner"><span class="scr-ch">RINCIAN</span><dl class="kv">' +
+        kv.map(([k, val]) => '<dt>' + k + '</dt><dd style="overflow-wrap:anywhere">' + UI.esc(val || UI.NA) + '</dd>').join('') + '</dl></div></div>',
+      buttons: [{ label: 'Proses ulang…', value: 'reproc' }, x.is_valid ? { label: 'Nonaktifkan…', value: 'off' } : { label: 'Pulihkan', value: 'on' },
+        { label: 'Tutup', value: null, default: true, cancel: true }] });
+    if (v === 'reproc') reprocess(id);
+    else if (v === 'off') deactivate(id);
+    else if (v === 'on') setValid(id, true, null);
   }
 
   async function deactivate(id) {
@@ -114,17 +163,18 @@ Pages['data-source'] = (() => {
 
   async function loadBackfill() {
     if (!st) return;
+    const src = st.src;
     let r;
-    try { r = await API.get('/api/data/' + st.src + '/backfill'); }
-    catch (e) { UI.$('#dsHist', st.root).innerHTML = UI.emptyHTML('GAGAL MEMUAT'); return; }
-    if (!st) return;
+    try { r = await API.get('/api/data/' + src + '/backfill'); }
+    catch (e) { if (st && st.src === src) UI.$('#dsHist', st.root).innerHTML = UI.emptyHTML('GAGAL MEMUAT'); return; }
+    if (!st || st.src !== src) return;
     if (!st.run && r.runs.length) st.run = r.runs[0];
     st.hydromet = r.hydromet || null;
     if (st.src === 's1') {
       // Siklus Live/backfill S1 dari proses lain (skrip, penjadwal): progresnya
       // dibaca dari live_areas lewat /api/data/activity, sama seperti hidromet.
       const a = await API.get('/api/data/activity').catch(() => null);
-      if (!st) return;
+      if (!st || st.src !== src) return;
       const live = a && (a.live || []).find(l => l.running);
       st.hydromet = live ? { external: true, live } : null;
     }
@@ -143,8 +193,9 @@ Pages['data-source'] = (() => {
     if (st.poll) { clearTimeout(st.poll); st.poll = null; }
     if (!st.run) { renderRun(null); return; }
     try {
-      const r = await API.get('/api/data/backfill/runs/' + st.run.run_id + API.qs({ since: st.lines.length }));
-      if (!st) return;
+      const id = st.run.run_id;
+      const r = await API.get('/api/data/backfill/runs/' + id + API.qs({ since: st.lines.length }));
+      if (!st || !st.run || st.run.run_id !== id) return;
       st.lines = st.lines.concat(r.lines || []);
       st.run = r;
       renderRun(r);
@@ -163,7 +214,7 @@ Pages['data-source'] = (() => {
       $('#dsRunRec').textContent = '● BERJALAN';
       $('#dsRunRec').className = 'scr-rec live';
       $('#dsRun').innerHTML = '<p class="scr-text" style="margin:0">BACKFILL SENTINEL-1 DATASET UTAMA SEDANG BERJALAN ' +
-        '(scripts/backfill_s1.py atau penjadwal). Progres dibaca dari basis data; rincian di Data › Proses berjalan.</p>' +
+        '(scripts/backfill_s1.py atau penjadwal). Progres dibaca dari basis data; rincian di Data › Ringkasan.</p>' +
         (p && p.dates_total ? UI.progressHTML(p.percent, 'Progres backfill Sentinel-1') : '') +
         '<dl class="kv" style="margin-top:6px"><dt>STATUS</dt><dd>' + UI.esc(l.status_message || UI.NA) + '</dd>' +
         (p && p.dates_total ? '<dt>PROGRES</dt><dd>' + UI.int(p.dates_done) + '/' + UI.int(p.dates_total) + ' tanggal · ' +
@@ -188,13 +239,10 @@ Pages['data-source'] = (() => {
 
   function renderRun(r) {
     const $ = s => UI.$(s, st.root);
+    $('#dsRunBox').hidden = !r && !(st.hydromet && st.hydromet.external);
     if (!r && st.hydromet && st.hydromet.external) { renderExternal(st.hydromet); return; }
     if (r && r.status !== 'RUNNING' && st.hydromet && st.hydromet.external) { renderExternal(st.hydromet); return; }
-    if (!r) {
-      $('#dsRunRec').textContent = '';
-      $('#dsRun').innerHTML = UI.emptyHTML('BELUM ADA BACKFILL SEJAK SERVER DIMULAI. RIWAYAT PER TANGGAL ADA DI BAWAH.');
-      return;
-    }
+    if (!r) { $('#dsRunRec').textContent = ''; $('#dsRun').innerHTML = ''; return; }
     const s = RUN_STATUS[r.status] || [r.status, ''];
     $('#dsRunRec').textContent = '● ' + s[0];
     $('#dsRunRec').className = 'scr-rec ' + (r.status === 'RUNNING' ? 'live' : 'off');
@@ -212,19 +260,19 @@ Pages['data-source'] = (() => {
     INCOMPLETE: ['TIDAK MENUTUP AOI', 'v-dim'], DELETED: ['BERKAS DIHAPUS', 'v-dim'] };
 
   function renderHydrometHistory(days, stale) {
-    UI.$('#dsHistCh', st.root).textContent = st.src === 's1' ? 'CH-02 · RIWAYAT LINTASAN SENTINEL-1 PER TANGGAL' : 'CH-02 · RIWAYAT JOB HIDROMET PER TANGGAL';
+    UI.$('#dsHistCh', st.root).textContent = st.src === 's1' ? 'RIWAYAT LINTASAN SENTINEL-1 PER TANGGAL' : 'RIWAYAT JOB HIDROMET PER TANGGAL';
     const note = stale.length ? '<p class="scr-text v-amber" style="margin:0 0 6px">' + UI.int(stale.length) +
       ' TANGGAL TERPUTUS (proses berhenti sebelum selesai): ' + UI.esc(stale.slice(0, 5).map(d => UI.date(d)).join(', ')) +
       (stale.length > 5 ? ', …' : '') + '. Tanggal ini dikerjakan ulang otomatis oleh backfill berikutnya yang mencakupnya.</p>' : '';
-    UI.$('#dsHist', st.root).innerHTML = note + '<div class="scroll-box">' + UI.tableHTML([
+    UI.$('#dsHist', st.root).innerHTML = note + UI.tableHTML([
       { label: 'Tanggal', get: d => UI.date(d.date) },
       { label: 'Status', html: true, get: d => { const x = d.stale ? ['TERPUTUS', 'v-amber'] : (DAY_STATUS[d.status] || [d.status, '']);
         return '<span class="' + x[1] + '">' + UI.esc(x[0]) + '</span>'; } },
       { label: 'Angka ' + LABEL[st.src], cls: 'r', get: d => UI.int(d.n_observations) },
       { label: 'Gagal', cls: 'r', get: d => UI.int(d.failed_count) },
       { label: 'Selesai', get: d => d.completed_at ? UI.dateTime(d.completed_at) : '' },
-    ], days, { empty: st.src === 's1' ? 'BELUM ADA LINTASAN SENTINEL-1' : 'BELUM ADA JOB HIDROMET', caption: 'Riwayat per tanggal' }) + '</div>';
+    ], days, { empty: st.src === 's1' ? 'BELUM ADA LINTASAN SENTINEL-1' : 'BELUM ADA JOB HIDROMET', caption: 'Riwayat per tanggal' });
   }
 
-  return { init, destroy };
+  return { init, destroy, onSub };
 })();

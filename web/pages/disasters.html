@@ -1,31 +1,30 @@
-<!-- pages/disasters.html — Kejadian Bencana (INTERFACE.md §2.5): tabel + peta titik + formulir.
-     Hapus = soft delete dengan konfirmasi. ANALYST & ADMIN. -->
-<div class="layout">
-  <div class="control-panel">
-    <fieldset>
-      <legend>Kejadian</legend>
-      <button type="button" class="default" id="dzNew">Catat kejadian baru…</button>
-    </fieldset>
-    <form id="dzFilter" novalidate>
-      <fieldset>
-        <legend>Saring daftar kejadian</legend>
-        <div class="field-row">
-          <div class="field"><label for="dzFrom">Dari tanggal</label><input type="date" id="dzFrom"></div>
-          <div class="field"><label for="dzTo">Sampai</label><input type="date" id="dzTo"></div>
-        </div>
-        <div class="field"><label for="dzType">Jenis bencana</label><select id="dzType"><option value="">Semua jenis</option></select></div>
-        <div class="field"><label for="dzRegion">Kecamatan</label><select id="dzRegion"><option value="">Semua kecamatan</option></select></div>
-        <div class="field"><label for="dzVer">Verifikasi</label>
-          <select id="dzVer"><option value="">Semua</option><option value="true">Terverifikasi</option><option value="false">Belum diverifikasi</option></select></div>
-        <div class="btn-row end"><button type="submit" id="dzApply">Terapkan</button></div>
-      </fieldset>
-    </form>
-    <div id="dzExcel"></div>
-  </div>
-  <div class="deck">
-    <div class="screen"><div class="screen-inner flush"><span class="scr-ch">CH-01 · PETA TITIK KEJADIAN</span><span class="scr-rec off" id="dzMapRec"></span>
-      <div class="map" id="dzMap" role="img" aria-label="Peta titik kejadian bencana; daftar lengkap ada di tabel"></div></div></div>
-    <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-02 · DAFTAR KEJADIAN</span><span class="scr-rec off" id="dzCount"></span>
-      <div id="dzTable"></div></div></div>
-  </div>
+<!-- pages/disasters.html — Kejadian (INTERFACE.md §2 halaman 5, M68). Satu halaman
+     untuk semua peran (dulu dua tab: Lihat kejadian dan Kelola kejadian).
+     Pengunjung melihat 365 hari terakhir (VIEW v_public_kejadian), peran lain
+     seluruh riwayat. Tombol catat/ubah/hapus dan Excel hanya tampil untuk
+     izin disasters.manage (ANALYST & ADMIN); hapus = soft delete.
+     Susunan: baris aksi + saringan → lencana ringkasan (filter cepat) →
+     peta dan daftar berdampingan. -->
+<div class="dz-bar">
+  <button type="button" class="default" id="dzNew" hidden>Catat kejadian baru…</button>
+  <form id="dzFilter" class="dz-filter" novalidate>
+    <div class="field"><label for="dzFrom">Dari</label><input type="date" id="dzFrom"></div>
+    <div class="field"><label for="dzTo">Sampai</label><input type="date" id="dzTo"></div>
+    <div class="field"><label for="dzType">Jenis</label><select id="dzType"><option value="">Semua jenis</option></select></div>
+    <div class="field"><label for="dzRegion">Kecamatan</label><select id="dzRegion"><option value="">Semua kecamatan</option></select></div>
+    <div class="field"><label for="dzVer">Verifikasi</label>
+      <select id="dzVer"><option value="">Semua</option><option value="true">Terverifikasi</option><option value="false">Belum diverifikasi</option></select></div>
+    <button type="submit" id="dzApply">Terapkan</button>
+    <button type="button" id="dzReset">Reset</button>
+  </form>
 </div>
+<p class="dz-note" id="dzWindow" hidden></p>
+<div class="dz-chips" id="dzChips" role="group" aria-label="Ringkasan dan saring cepat"></div>
+<div class="dz-split">
+  <div class="screen"><div class="screen-inner flush"><span class="scr-ch">PETA TITIK KEJADIAN</span><span class="scr-rec off" id="dzMapRec"></span>
+    <div class="map" id="dzMap" role="img" aria-label="Peta titik kejadian bencana; daftar yang sama ada di sebelahnya"></div></div></div>
+  <div class="screen"><div class="screen-inner"><span class="scr-ch">DAFTAR KEJADIAN</span><span class="scr-rec off" id="dzCount"></span>
+    <div class="dz-list" id="dzTable"></div></div></div>
+</div>
+<p class="dz-note">Titik oranye = terverifikasi, biru = belum. Arahkan kursor ke baris untuk menyorot titiknya; klik baris atau titik untuk detail.</p>
+<details class="ad-fold" id="dzExcelBox" hidden><summary>Ekspor / impor Excel</summary><div id="dzExcel"></div></details>
