@@ -25,7 +25,7 @@ Status:
 | C.1 Legalitas objek studi ≥ 2 tahun | Tidak diperlukan (22 Okt 2026): GMLS mitra resmi UMN (MoU melalui LPPM) dan objek studi sudah disetujui program studi. GMLS berdiri 13 Okt 2020 (`lampiran/profil.jpeg`, notulensi) |
 | A. Tahap DBSDLC: implementasi, loading, keamanan | Terjawab |
 | A. Tahap DBSDLC: perencanaan, analisis, desain konseptual dan logikal, UML | Sebagian (8 Okt 2026): DATABASE.md, PIPELINE.md, DESIGN.md ditulis ulang dari kode (M60). UML di INTERFACE.md §9. Fact-finding GMLS: wawancara 16 Okt 2026 (`lampiran/notulensiGMLS.txt`, DATABASE.md §2.4). Belum: hasil isian lembar tinjauan kebutuhan dari GMLS (requirement/user review, disiapkan 23 Okt 2026) |
-| A. Testing: evaluasi minimum Tabel 4 | Sebagian: integrity, functional, security, query, dan backup/recovery punya bukti (pytest 1.187/1.187 pada 19 Okt 2026, INTERFACE.md §7, `DOCS/hasil_uji/`, `benchmark/`). Requirement/user review belum |
+| A. Testing: evaluasi minimum Tabel 4 | Sebagian: integrity, functional, security, query, dan backup/recovery punya bukti (pytest 1.183 lulus, 0 gagal pada 24 Okt 2026, INTERFACE.md §7, `DOCS/hasil_uji/`, `benchmark/`). Requirement/user review belum |
 
 ---
 
@@ -78,7 +78,7 @@ Angka di bawah dihitung langsung dari database:
 
 - Ada 1.142 test pytest (berhasil dikumpulkan; seluruh suite tidak dijalankan pada audit ini).
 - Ada uji keamanan GRANT (`tests/security/`).
-- **Backup/recovery** diuji lewat [backup_restore.sh](../tests/recovery/backup_restore.sh), [kill_and_resume.sh](../tests/recovery/kill_and_resume.sh), dan `recovery_backfill.py`. Dijalankan 23 Okt 2026, lulus: restore salinan produksi identik isi, dan backfill pulih setelah `kill -9`. Ini memenuhi evaluasi minimum backup/recovery jalur Design and Implementation (pedoman 1.3, Tabel 4). Rincian di INTERFACE.md §7.2 dan `DOCS/hasil_uji/`. Backup harian terjadwal (M66, PIPELINE.md §13): tugas didaftarkan pemilik 23 Okt 2026, run uji 11:11 berhasil (`LastTaskResult` 0, dump 5 MB), jadwal berikutnya 24 Okt 01:30.
+- **Backup/recovery** diuji lewat [backup_restore.sh](../tests/recovery/backup_restore.sh), [kill_and_resume.sh](../tests/recovery/kill_and_resume.sh), dan `recovery_backfill.py`. Dijalankan 23 Okt 2026, lulus: restore salinan produksi identik isi, dan backfill pulih setelah `kill -9`. Ini memenuhi evaluasi minimum backup/recovery jalur Design and Implementation (pedoman 1.3, Tabel 4). Rincian di INTERFACE.md §7.2 dan `DOCS/hasil_uji/`. Backup harian terjadwal (M76, PIPELINE.md §13): tugas didaftarkan pemilik 23 Okt 2026, run uji 11:11 berhasil (`LastTaskResult` 0, dump 5 MB), jadwal berikutnya 24 Okt 01:30.
 - **Integrity**: PK/FK, CHECK, UNIQUE, dan trigger di skema; diuji `test_database`, `test_schema_comments`, `test_audit`.
 - **Functional**: skenario black-box per fitur (`test_*_api`, `test_alert_engine`, `test_notify`, dan lainnya).
 - **Security**: matriks GRANT/VIEW/RLS (`tests/security/grant_matrix.sql`), `test_rbac_api`, `test_auth`, `test_credentials`.
@@ -129,7 +129,7 @@ Semua baris MySQL di `timing.csv` dan `features.csv` berstatus "belum dijalankan
 
 - **`disaster_events` berisi 0 baris.** Halaman Kejadian, evaluasi alert (hit/miss/false alarm), dan RM4 bergantung pada tabel ini. Saat ini evaluasi alert pada data produksi tidak punya pembanding.
 - ~~`fusion_products` 0, `api_tokens` 0~~ Terbukti 22 Okt 2026: dataset #3 "Fusion AOI GMLS Okt 2026" (S1 + MODIS + GPM PROCESSED, CO_OCCURRENCE, 1–16 Okt 2026, AOI GMLS) selesai `COMPLETED`: 6/6 scene S1, **4 HDF5** (4, 9, 12, 16 Okt), masing-masing berisi grup `sentinel1` (VV, VH), `modis` (FLOOD, NDVI, NDWI + umur data), `gpm` (24h/72h/7d). Tercatat di `fusion_products`, `data_products` (tier FUSED) dan 12 baris `data_lineage` ke produk FUSED. `api_tokens` 1. `cleanup_operations` 0 masih wajar.
-- README menyebut `region_observations` "±79.000 baris". Isi sebenarnya 68.120. Angka ini perlu diselaraskan.
+- ~~README menyebut `region_observations` "±79.000 baris".~~ Diselaraskan 24 Okt 2026: 72.850 baris.
 
 ### f. Requirement/user review
 
@@ -184,5 +184,5 @@ Urutan disusun dari yang paling berdampak dan paling murah.
    - Untuk requirement/user review: minta GMLS meninjau kebutuhan dan batasan sistem (lembar tinjauan atau konfirmasi singkat), lalu simpan buktinya di `DOCS/lampiran/`.
 8. **Lengkapi bukti dan rapikan dokumen:**
    - Simpan bukti legalitas dan lama operasi GMLS, serta bukti review model bersama GMLS (notulen), di `DOCS/lampiran/`.
-   - Selaraskan angka di README (79.000 → angka aktual).
+   - ~~Selaraskan angka di README (79.000 → angka aktual).~~ Selesai 24 Okt 2026 (M79).
    - Perbaiki Peta Dokumen di README §10 supaya hanya mencantumkan berkas yang memang ada.

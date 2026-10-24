@@ -112,7 +112,9 @@ def test_fragments_follow_design_rules():
     emoji = re.compile("[\U0001F300-\U0001FAFF☀-⛿✀-➿]")
     for p in list((WEB / "pages").glob("*.html")) + list((WEB / "css").glob("*.css")):
         t = p.read_text(encoding="utf-8")
-        if re.search(r"border-radius:\s*(?!0\b|0;|0px)[\d.]+", t):
+        # Pengecualian DESIGN.md §2 "Bentuk": logo Nusantara bulat; aturan selektor yang memuat "logo" dilewati.
+        checked = re.sub(r"[^{}]*logo[^{}]*\{[^}]*\}", "", t) if p.suffix == ".css" else t
+        if re.search(r"border-radius:\s*(?!0\b|0;|0px)[\d.]+", checked):
             bad.append(f"{p.name}: border-radius")
         if re.search(r"blur\(", t) or re.search(r"box-shadow:[^;]*\d+px\s+\d+px\s+[1-9]\d*px", t):
             bad.append(f"{p.name}: blur")

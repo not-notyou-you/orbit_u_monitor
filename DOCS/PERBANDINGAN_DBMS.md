@@ -19,7 +19,7 @@ DBMS dinilai dari apa yang benar-benar dikerjakan sistem ini. Kebutuhan itu diam
 
 | Kode | Kebutuhan | Asal |
 |---|---|---|
-| K1 | Model relasional dengan FK dan constraint yang ditegakkan DBMS: 38 tabel, 12 master | RM1, prasyarat prodi "database terstruktur" |
+| K1 | Model relasional dengan FK dan constraint yang ditegakkan DBMS: 43 tabel, 12 master | RM1, prasyarat prodi "database terstruktur" |
 | K2 | Kueri spasial: irisan poligon kecamatan dan luas geodesik | AOI = gabungan kecamatan COD-AB |
 | K3 | Agregasi deret waktu per kecamatan per band (pivot, tren, rekap bulanan) | Dashboard, Diagram, laporan, alert hujan |
 | K4 | Kueri rekursif untuk lineage produk | RM2 |

@@ -64,8 +64,9 @@ Didefinisikan di `:root` dalam `main.css`.
 
 Judul (`h1`–`h4`) tetap 12px tebal. Hierarki dibentuk oleh jendela dan title bar, bukan oleh ukuran huruf.
 
-**Bentuk.** `border-radius: 0` berlaku untuk semua elemen. Tidak ada `blur` atau `backdrop-filter`. Aturan ini
-diuji `tests/test_web_ui.py`.
+**Bentuk.** `border-radius: 0` berlaku untuk semua elemen. Satu-satunya pengecualian adalah logo Nusantara yang
+memang bulat (`.hero-logo`, `.start-logo`, `border-radius: 50%`); aturan CSS yang selektornya memuat `logo` tidak
+diperiksa. Tidak ada `blur` atau `backdrop-filter`. Aturan ini diuji `tests/test_web_ui.py`.
 
 ---
 
@@ -183,7 +184,7 @@ Kertas Mint: dipakai bila peramban belum menyimpan pilihan. Tiga tema lain diamb
 - Larangan radius/blur (§2) **tidak** berlaku untuk CSS tema tambahan, tetapi setiap aturannya wajib tercakup
   selektor temanya sendiri. Larangan emoji (§6) tetap berlaku karena menyangkut fragmen halaman, bukan tema.
   Keduanya diuji `tests/test_web_ui.py`.
-- Scrollbar ikut tema dan sengaja tidak mencolok (M75). Orbital 95 (`main.css`, tercakup `html:not(.tema-alt)`):
+- Scrollbar ikut tema dan sengaja tidak mencolok (M78). Orbital 95 (`main.css`, tercakup `html:not(.tema-alt)`):
   scrollbar Windows 95 ramping 14px, jalur abu-abu muda, pegangan dan tombol panah berbevel; di layar CRT pegangan
   hijau gelap 8px tanpa tombol. Tema lain (`umum.css`) membaca `--t-sb-*`: tipis 10px, jalur tak terlihat, pegangan
   warna pudar dari palet tema (abu-navy, pasir, abu-abu), membulat kecuali Piksel Marun. Firefox hanya mendapat

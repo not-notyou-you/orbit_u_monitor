@@ -18,13 +18,12 @@
   (5W1H), dan alur yang diusulkan (To-Be).</p>
 </header>
 
-<p class="note"><b>Diisi penulis:</b> alur As-Is di bawah adalah <b>draf</b> yang disusun dari README §2 (SIGAP DESA
-dipakai untuk data warga, sedangkan data hidrometeorologi belum punya tempat). Langkah persisnya, siapa pelakunya,
-dan alat yang dipakai (grup WhatsApp, situs BMKG, catatan kertas, spreadsheet) harus dikonfirmasi lewat wawancara
-atau observasi di GMLS, lalu diagram ini disesuaikan.</p>
+<p class="note"><b>Sumber:</b> wawancara dengan Ketua GMLS, Anis Faisal Reza, 16 Oktober 2026 (daring)
+(<code>DOCS/lampiran/notulensiGMLS.txt</code>, bagian B dan C), serta profil resmi GMLS. Diagram sebab-akibat dan
+pemetaan ke RM adalah analisis penulis atas temuan tersebut.</p>
 
 <h2>Sistem yang sedang berjalan (As-Is)</h2>
-<div class="fig" data-cap="Activity diagram sistem berjalan (As-Is) pemantauan hujan dan pencatatan kejadian di GMLS" data-from="Draf dari README §2, perlu konfirmasi GMLS">
+<div class="fig" data-cap="Activity diagram sistem berjalan (As-Is) pemantauan hujan dan pencatatan kejadian di GMLS" data-from="Notulen wawancara GMLS 16 Okt 2026, bagian B–C">
 <div class="body white" id="asis"></div>
 </div>
 
@@ -32,12 +31,12 @@ atau observasi di GMLS, lalu diagram ini disesuaikan.</p>
 <div class="fig" data-kind="Tabel" data-cap="Identifikasi masalah sistem berjalan dengan 5W1H">
 <div class="body"><table class="t">
 <tr><th style="width:110px">Unsur</th><th>Kondisi sistem berjalan</th><th>Kebutuhan sistem usulan</th></tr>
-<tr><td><b>What</b></td><td>Data hujan, citra satelit, dan catatan kejadian bencana tersebar dan tidak tersimpan terstruktur</td><td>Basis data monitoring hidrometeorologi dan arsip kejadian bencana</td></tr>
-<tr><td><b>Who</b></td><td>Relawan dan koordinator GMLS memantau secara manual</td><td>Relawan (USER), Analis, Data Engineer, Administrator, dan masyarakat umum (PUBLIC)</td></tr>
-<tr><td><b>When</b></td><td>Pemantauan dilakukan saat ada hujan lebat atau kabar kejadian, tidak terjadwal</td><td>Job Hidromet harian 02:00 WIB; siklus Live 01/07/13/19 WIB; laporan Senin 03:00 dan tanggal 1 03:30 WIB</td></tr>
-<tr><td><b>Where</b></td><td>Kecamatan cakupan GMLS di Lebak Selatan</td><td>10 kecamatan AOI GMLS, Kabupaten Lebak, Banten</td></tr>
-<tr><td><b>Why</b></td><td>Banjir bandang di Bayah surut dalam hitungan jam; tanpa arsip, peringatan tidak bisa dievaluasi terhadap kejadian nyata</td><td>Hujan harian sebagai indikator utama; data satu tempat, terlacak asal-usulnya, dan bisa dievaluasi (hit/miss/false alarm)</td></tr>
-<tr><td><b>How</b></td><td>Membuka sumber luar satu per satu dan meneruskan informasi lewat pesan</td><td>ETL otomatis dari API resmi ke PostgreSQL/PostGIS, agregasi per kecamatan, peringatan berbasis aturan, akses per peran</td></tr>
+<tr><td><b>What</b></td><td>Informasi cuaca diterima dari BMKG (termasuk radar) lewat aplikasi Are You In Sys. Tidak ada data hujan per kecamatan yang tersimpan. GMLS tidak mencatat kejadian sendiri; data dampak bergantung pada data pemerintah (BNPB) yang menurut narasumber tidak rapi</td><td>Basis data monitoring hidrometeorologi per kecamatan dan arsip kejadian bencana dari sumber resmi</td></tr>
+<tr><td><b>Who</b></td><td>BMKG dan BNPB sebagai sumber; GMLS meneruskan peringatan kepada masyarakat; masyarakat melapor kejadian lewat Are You In Sys. Belum ada penanggung jawab (PIC) informasi potensi bencana di GMLS</td><td>Relawan (USER), Analis, Data Engineer, Administrator, dan masyarakat umum (PUBLIC)</td></tr>
+<tr><td><b>When</b></td><td>Saat BMKG menerbitkan informasi atau peringatan; tidak ada rekap berkala per kecamatan</td><td>Job Hidromet harian 02:00 WIB; siklus Live 01/07/13/19 WIB; laporan Senin 03:00 dan tanggal 1 03:30 WIB</td></tr>
+<tr><td><b>Where</b></td><td>Lebak Selatan; radar BMKG hanya menunjukkan area berpotensi hujan dan banjir, belum spesifik ke lokasi warga</td><td>10 kecamatan AOI GMLS, Kabupaten Lebak, Banten; kecamatan lokasi pengguna (Pantau Lokasi)</td></tr>
+<tr><td><b>Why</b></td><td>Hujan lebat memicu banjir bandang ke hilir dan longsor. Tanpa informasi spesifik lokasi dan arsip kejadian, peringatan tidak bisa dievaluasi; situs rujukan yang ada sulit dipahami orang awam</td><td>Hujan harian sebagai indikator utama; data satu tempat, terlacak asal-usulnya, dan bisa dievaluasi (hit/miss/false alarm); tampilan sederhana</td></tr>
+<tr><td><b>How</b></td><td>GMLS mengikuti informasi pemerintah dan hanya memberi peringatan, bukan penetapan status bencana</td><td>ETL otomatis dari API resmi ke PostgreSQL/PostGIS, agregasi per kecamatan, peringatan berbasis ambang BMKG lewat web dan email, akses per peran</td></tr>
 </table></div>
 </div>
 
@@ -45,18 +44,18 @@ atau observasi di GMLS, lalu diagram ini disesuaikan.</p>
 <div class="body white"><pre class="mermaid">
 flowchart LR
     subgraph D [Data]
-        d1[Data hujan tersebar<br/>di banyak sumber]
+        d1[Informasi cuaca BMKG berupa<br/>area, belum spesifik lokasi]
         d2[Citra satelit tidak<br/>diolah per kecamatan]
-        d3[Asal-usul dan mutu<br/>data tidak tercatat]
+        d3[Data kejadian BNPB tidak rapi;<br/>GMLS tidak mencatat sendiri]
     end
     subgraph P [Proses]
-        p1[Pemantauan manual,<br/>tidak terjadwal]
-        p2[Peringatan tidak<br/>berbasis ambang]
-        p3[Kejadian tidak diarsipkan<br/>secara terstruktur]
+        p1[Belum ada PIC informasi<br/>potensi bencana]
+        p2[Peringatan tidak berbasis<br/>ambang per kecamatan]
+        p3[Peringatan tidak bisa<br/>dinilai terhadap kejadian]
     end
-    subgraph A [Akses]
-        a1[Tidak ada pembagian<br/>hak akses per peran]
-        a2[Tidak ada jejak siapa<br/>mengubah/mengunduh apa]
+    subgraph A [Pengguna dan akses]
+        a1[Tampilan situs rujukan<br/>sulit dipahami orang awam]
+        a2[Belum ada wadah data bersama<br/>dengan hak akses dan jejak]
     end
     D --> M
     P --> M
@@ -70,8 +69,8 @@ flowchart LR
 <tr><th>Masalah</th><th class=c>RM</th><th>Solusi di sistem</th><th>Objek basis data</th></tr>
 <tr><td>Data tiga satelit tidak terintegrasi</td><td class=c>RM1</td><td>Ingestion otomatis Sentinel-1, MODIS, GPM; nilai harian per kecamatan</td><td><code>satellite_scenes</code>, <code>nasa_scenes</code>, <code>region_observations</code></td></tr>
 <tr><td>Asal-usul dan mutu data tidak bisa ditelusuri</td><td class=c>RM2</td><td>Lineage SHA-256 dan metrik mutu per scene</td><td><code>data_products</code>, <code>data_lineage</code>, <code>quality_metrics</code></td></tr>
-<tr><td>Informasi sulit diakses relawan dan publik</td><td class=c>RM3</td><td>Dashboard web, peringatan hujan, laporan PDF, REST API</td><td>VIEW per peran, <code>alert_events</code>, <code>generated_reports</code></td></tr>
-<tr><td>Tidak ada kontrol akses dan jejak audit</td><td class=c>RM4</td><td>5 peran ↔ 5 role PostgreSQL, GRANT, RLS, trigger audit</td><td><code>roles</code>, <code>users</code>, <code>audit_log</code>, <code>user_activity_logs</code></td></tr>
+<tr><td>Informasi belum spesifik lokasi dan sulit dipahami orang awam; kejadian tidak diarsipkan</td><td class=c>RM3</td><td>Pantau Lokasi, peringatan hujan lewat web dan email, arsip kejadian, laporan PDF, REST API</td><td>VIEW per peran, <code>alert_events</code>, <code>user_notify_regions</code>, <code>disaster_events</code>, <code>generated_reports</code></td></tr>
+<tr><td>Belum ada wadah data bersama dengan kontrol akses dan jejak audit</td><td class=c>RM4</td><td>5 peran ↔ 5 role PostgreSQL, GRANT, RLS, trigger audit</td><td><code>roles</code>, <code>users</code>, <code>audit_log</code>, <code>user_activity_logs</code></td></tr>
 </table></div>
 </div>
 
@@ -83,28 +82,29 @@ flowchart LR
 <script>
 window.pageInit = function () {
   UML.activity(document.getElementById("asis"), {
-    lanes: ["Relawan GMLS", "Koordinator GMLS", "Sumber luar (BMKG, media, warga)"],
-    laneW: 270,
+    lanes: ["BMKG / BNPB", "Are You In Sys", "GMLS", "Masyarakat"],
+    laneW: 220,
     nodes: [
       { id: "s", type: "start", lane: 0, row: 0 },
-      { id: "a1", type: "action", lane: 0, row: 1, text: "Memantau cuaca dan kabar hujan" },
-      { id: "x1", type: "action", lane: 2, row: 1, text: "Informasi prakiraan cuaca dan laporan warga" },
-      { id: "d1", type: "decision", lane: 0, row: 2, text: "Hujan lebat / ada kejadian?" },
-      { id: "a2", type: "action", lane: 0, row: 3, text: "Meneruskan informasi lewat pesan grup" },
-      { id: "a3", type: "action", lane: 1, row: 4, text: "Menilai situasi berdasarkan pengalaman" },
-      { id: "d2", type: "decision", lane: 1, row: 5, text: "Terjadi bencana?" },
-      { id: "a4", type: "action", lane: 1, row: 6, text: "Mencatat kejadian secara manual (kertas / spreadsheet)" },
-      { id: "a5", type: "action", lane: 1, row: 7, text: "Menyusun laporan kegiatan secara manual" },
-      { id: "e", type: "end", lane: 1, row: 8 },
+      { id: "x1", type: "action", lane: 0, row: 1, text: "Menerbitkan informasi cuaca dan radar (area potensi hujan)" },
+      { id: "y1", type: "action", lane: 1, row: 2, text: "Menampilkan informasi BMKG dan peta BNPB" },
+      { id: "g1", type: "action", lane: 2, row: 3, text: "Membaca informasi area, belum spesifik lokasi warga" },
+      { id: "d1", type: "decision", lane: 2, row: 4, text: "Berpotensi bahaya?" },
+      { id: "g2", type: "action", lane: 2, row: 5, text: "Menyampaikan peringatan (bukan penetapan status)" },
+      { id: "m1", type: "action", lane: 3, row: 6, text: "Menerima peringatan" },
+      { id: "d2", type: "decision", lane: 3, row: 7, text: "Terjadi kejadian?" },
+      { id: "m2", type: "action", lane: 3, row: 8, text: "Melapor lewat Are You In Sys" },
+      { id: "x2", type: "action", lane: 2, row: 9, text: "Tidak mencatat kejadian; data dampak merujuk BNPB (dinilai tidak rapi)" },
+      { id: "e", type: "end", lane: 2, row: 10 },
     ],
     edges: [
-      { f: "s", t: "a1" }, { f: "x1", t: "a1" }, { f: "a1", t: "d1" },
-      { f: "d1", t: "a2", label: "ya", down: true },
-      { f: "d1", t: "a1", label: "tidak", loop: "l", loopX: 0.04 },
-      { f: "a2", t: "a3" }, { f: "a3", t: "d2" },
-      { f: "d2", t: "a4", label: "ya", down: true },
-      { f: "d2", t: "e", label: "tidak", loop: "r", loopX: 1.9 },
-      { f: "a4", t: "a5" }, { f: "a5", t: "e" },
+      { f: "s", t: "x1" }, { f: "x1", t: "y1" }, { f: "y1", t: "g1" }, { f: "g1", t: "d1" },
+      { f: "d1", t: "g2", label: "ya", down: true },
+      { f: "d1", t: "e", label: "tidak", loop: "r", loopX: 1.9 },
+      { f: "g2", t: "m1" }, { f: "m1", t: "d2" },
+      { f: "d2", t: "m2", label: "ya", down: true },
+      { f: "d2", t: "e", label: "tidak", loop: "r", loopX: 3.95 },
+      { f: "m2", t: "x2" }, { f: "x2", t: "e" },
     ],
   });
   UML.activity(document.getElementById("tobe"), {

@@ -456,7 +456,7 @@ python database/apply_schema.py --migrate m64_peringatan_email.sql
 
 ### 7.1 Hasil uji terakhir
 
-Dijalankan 19 Oktober 2026 (setelah M63 dan M64) pada database uji `themonitor_test` (PostgreSQL 18), di luar `tests/ui/` yang butuh browser:
+Dijalankan 24 Oktober 2026 (setelah M75 dan M79) pada database uji `themonitor_test` (PostgreSQL 18), di luar `tests/ui/` yang butuh browser:
 
 ```
 venv\Scripts\python -m pytest --ignore=tests/ui --ignore=tests/recovery --junitxml=DOCS/hasil_uji/pytest.xml
@@ -464,7 +464,7 @@ venv\Scripts\python -m pytest --ignore=tests/ui --ignore=tests/recovery --junitx
 
 | Lulus | Gagal | Dilewati | Waktu |
 |---|---|---|---|
-| 1.187 | 0 | 2 | 2 menit 13 detik |
+| 1.183 | 0 | 2 | 2 menit 30 detik |
 
 - Dua tes yang dilewati butuh shapefile COD-AB di `data/external/cod-ab-idn/` (`test_hydromet_aggregate::TestRegionsFromShapefile`).
 - Matriks GRANT (`tests/security/grant_matrix.sql`) ikut dijalankan lewat `tests/security/test_grant_matrix.py`.

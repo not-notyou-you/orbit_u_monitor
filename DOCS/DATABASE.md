@@ -22,7 +22,7 @@ Nomor bagian dokumen ini dirujuk langsung oleh kode, misalnya `DATABASE.md §8.3
 | Database Planning: mission statement & objective | §2.1, §2.2 |
 | System Definition: batas sistem & user views | §2.3 |
 | Requirement Collection and Analysis | §2.4 |
-| Conceptual Database Design | §2.5–§2.7 |
+| Conceptual Database Design | §2.5–§2.8 |
 | Logical Database Design | §5 |
 | Physical Database Design: translasi, berkas & indeks | §3, §4, §6 |
 | Physical: pandangan pengguna | §7 |
@@ -113,6 +113,11 @@ Bukti wawancara: `DOCS/lampiran/notulensiGMLS.txt`.
 email peneliti). Model data konseptual dan logikal ditinjau dalam bahasa awam karena pengisi bukan orang
 teknis: konseptual sebagai daftar "informasi yang dicatat", logikal sebagai "aturan pencatatan". Kolom
 *Jawaban GMLS* diisi dari Sheet setelah tinjauan selesai; ekspor CSV-nya disimpan di `DOCS/lampiran/`.
+Selama jawaban asli belum masuk, Bab IV disusun dengan
+`DOCS/lampiran/user_review_webapp/CONTOH_DUMMY_jawaban_tinjauan_kebutuhan.csv` (kolom sama dengan Sheet, setiap
+baris bertanda "DATA CONTOH - BUKAN JAWABAN ASLI"). Atas arahan pembimbing (24 Okt 2026), berkas ini boleh dipakai
+di draf naskah seperti jawaban asli; begitu ekspor Sheet asli masuk, berkas ini dan angka turunannya di naskah diganti.
+Kolom *Jawaban GMLS* di bawah tetap kosong sampai jawaban asli tersedia.
 
 | Butir tinjauan | Dasar (notulen) | Fitur / objek basis data | Jawaban GMLS |
 |---|---|---|---|
@@ -144,7 +149,7 @@ teknis: konseptual sebagai daftar "informasi yang dicatat", logikal sebagai "atu
 
 ### 2.5 Entitas
 
-38 tabel, dikelompokkan menurut perannya:
+43 tabel, dikelompokkan menurut perannya:
 
 | Kelompok | Entitas |
 |---|---|
@@ -158,13 +163,14 @@ teknis: konseptual sebagai daftar "informasi yang dicatat", logikal sebagai "atu
 | Forecast | `band_forecasts`, `band_forecast_points`, `band_forecast_scores` |
 | Kejadian & laporan | `disaster_events`, `generated_reports` |
 | Akses & jejak | `api_tokens`, `user_activity_logs`, `audit_log` |
+| Peringatan email (M64) | `user_notify_regions`, `notify_sent` |
 
 Syarat prodi "master ≥ 10, transaksi ≥ 100 baris" dipenuhi oleh 12 tabel master. Jumlah baris transaksi
 diambil dari `database/db_manifest.sql` (§10).
 
 ### 2.6 ERD konseptual (inti)
 
-Hanya entitas yang menjawab RM1–RM4 yang digambar. ERD fisik lengkap (38 tabel) dibangkitkan sebagai
+Hanya entitas yang menjawab RM1–RM4 yang digambar. ERD fisik lengkap (43 tabel) dibangkitkan sebagai
 `DOCS/generated/erd_physical.mmd`.
 
 ```mermaid
@@ -217,6 +223,33 @@ Semua tabel memakai **PK surrogate** (`SERIAL`/`BIGSERIAL`/`SMALLSERIAL`). Kunci
 
 Domain atribut ditegakkan dengan `CHECK` dan tipe ENUM (§5.3, §6.2). Rentang nilai fisik per band
 (`spectral_bands.valid_min/max`) ditegakkan trigger `trg_obs_range`.
+
+### 2.8 Enhanced modeling, redundansi, dan validasi terhadap transaksi
+
+**Enhanced modeling (opsional) dipertimbangkan pada dua tempat:**
+
+| Kandidat | Bentuk EER | Keputusan |
+|---|---|---|
+| Pengguna per peran (Relawan, Analis, Data Engineer, Administrator) | Spesialisasi disjoint, total dari `USERS` | Tidak dipecah. Peran hanya membedakan hak akses, tidak ada atribut khusus per peran, jadi cukup FK `users.role_id → roles` |
+| Scene Sentinel-1 dan granule NASA (MODIS, GPM) | Generalisasi "sumber produk" | Dua tabel terpisah (`satellite_scenes`, `nasa_scenes`) karena atributnya berbeda. Supertipe diwujudkan di `data_products` dengan CHECK `chk_dprods_single_origin`: Sentinel-1 → `scene_id`, MODIS/GPM → `nasa_scene_id`, FUSION tanpa keduanya (M30, M38) |
+
+**Pemeriksaan redundansi.** Tidak ada relasi yang dapat diturunkan dari jalur lain kecuali salinan historis
+yang disengaja di `alert_events` (§5.2) dan redundansi terkendali di §9. Penggabungan ke model global tidak
+diperlukan karena hanya ada satu model data untuk seluruh user views.
+
+**Validasi terhadap transaksi pengguna.** Setiap transaksi dari user views §2.3 dapat dijalankan melalui
+jalur relasi di ERD:
+
+| # | Transaksi | Peran | Jalur entitas |
+|---|---|---|---|
+| T1 | Melihat hujan dan kondisi kecamatan 30 hari terakhir | PUBLIC+ | `administrative_regions` → `region_observations` ← `spectral_bands` → `satellite_sources` |
+| T2 | Membangkitkan peringatan saat hujan melewati ambang | sistem (ETL) | `region_observations` → `alert_events` ← `alert_rules` ← `disaster_types` |
+| T3 | Menerima email peringatan untuk kecamatan pilihan | USER+ | `users` → `user_notify_regions` → `administrative_regions`; jejak di `notify_sent` |
+| T4 | Menindaklanjuti (acknowledge) peringatan | ANALYST, ADMIN | `users` → `alert_events.acknowledged_by` |
+| T5 | Mencatat dan memverifikasi kejadian bencana | ANALYST, ADMIN | `users` → `disaster_events` ← `disaster_types`, `administrative_regions` |
+| T6 | Menilai peringatan terhadap kejadian (hit, miss, false alarm) | ANALYST+ | `alert_events` ⋈ `disaster_events` (kecamatan + jenis bencana, jendela 0–3 hari, hanya `is_verified`) lewat `v_evaluasi_alert` |
+| T7 | Menelusuri asal-usul dan mutu sebuah produk | DATA_ENGINEER+ | `data_products` → `data_lineage` → `processing_jobs` → `processing_stages`; `quality_metrics` |
+| T8 | Mengelola akun dan melihat jejak perubahan | ADMIN | `roles` → `users`; `audit_log`, `user_activity_logs` |
 
 ---
 

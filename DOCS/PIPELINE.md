@@ -399,7 +399,7 @@ dengan seed).
   ke database kosong, lalu membandingkan jumlah baris per tabel, jumlah objek, dan GRANT. Skrip ini menolak
   berjalan pada database produksi `themonitor`. Hasil 23 Okt 2026 (lulus, restore 4 s): INTERFACE.md §7.2.
 - **Membandingkan dua mesin:** `database/db_manifest.sql` (baca saja, aman untuk produksi).
-- **Backup produksi (M66):** tugas Windows Task Scheduler **"Orbit-U backup harian"**, di luar APScheduler,
+- **Backup produksi (M76):** tugas Windows Task Scheduler **"Orbit-U backup harian"**, di luar APScheduler,
   sesuai `etl/scheduler.py`.
 
   | Butir | Nilai |
