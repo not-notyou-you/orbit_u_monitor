@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tinjauan Kebutuhan – Orbit-U: The Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Warna mengikuti tema bawaan Orbit-U "Kertas Mint" (web/css/tema/mint.css). */
+  :root {
+    --bg:#eef7f0; --grid:#dbeee0; --card:#fafdfb; --line:#1f2a5a; --mut:#4a5388;
+    --acc:#7fe0ea; --acc-soft:#d3f2f6; --ok:#17784a; --ok-soft:#dff3e8;
+    --warn:#904a00; --warn-soft:#fdf0dc; --bad:#c62839; --bad-soft:#fde8ea; --soft-line:#9fb0c9;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body {
+    margin:0; color:var(--line); font:17px/1.55 "Nunito","Segoe UI",system-ui,sans-serif;
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 32px 32px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, var(--bg);
+    min-height:100vh;
+  }
+  main { max-width:720px; margin:0 auto; padding:20px 16px 56px; }
+
+  /* Kepala + kemajuan */
+  .top { display:flex; align-items:center; gap:10px; margin:0 0 14px; }
+  .logo { width:38px; height:38px; flex:none; border:2px solid var(--line); border-radius:10px; background:var(--acc);
+          display:grid; place-items:center; box-shadow:3px 3px 0 var(--line); }
+  .brand { font-weight:800; line-height:1.2; }
+  .brand small { display:block; font-weight:600; color:var(--mut); font-size:.85rem; }
+  .progress { margin:0 0 18px; }
+  .progress .bar { height:12px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; }
+  .progress .fill { height:100%; width:0; background:var(--acc); border-right:2px solid var(--line); transition:width .3s; }
+  .progress .lbl { display:flex; justify-content:space-between; font-size:.85rem; color:var(--mut); font-weight:700; margin-top:6px; }
+
+  /* Kartu */
+  .card { background:var(--card); border:2px solid var(--line); border-radius:14px; padding:20px 18px;
+          box-shadow:6px 6px 0 var(--acc), 6px 6px 0 2px var(--line); margin:0 0 22px; }
+  h1 { font-size:1.6rem; line-height:1.25; margin:0 0 8px; font-weight:800; }
+  h2 { font-size:1.3rem; line-height:1.3; margin:0 0 6px; font-weight:800; }
+  h3 { font-size:1.08rem; margin:0 0 4px; font-weight:800; }
+  p { margin:0 0 12px; }
+  .mut { color:var(--mut); }
+  .step { display:none; }
+  .step.on { display:block; animation:muncul .25s ease-out; }
+  @keyframes muncul { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+  /* Daftar langkah di layar pembuka */
+  .peta { list-style:none; padding:0; margin:14px 0 18px; display:grid; gap:8px; }
+  .peta li { display:flex; gap:10px; align-items:center; padding:4px 0; font-weight:700; }
+  .peta li span { width:28px; height:28px; flex:none; border-radius:50%; background:var(--acc-soft);
+                  display:grid; place-items:center; font-size:.9rem; }
+
+  /* Kartu fitur */
+  .fitur { border-top:2px dashed var(--soft-line); padding:18px 0 4px; margin:0 0 8px; }
+  .fitur.missing { background:var(--bad-soft); border-radius:10px; padding-left:10px; padding-right:10px; }
+  .fitur .head { display:flex; gap:12px; align-items:flex-start; margin:0 0 6px; }
+  .ikon { width:44px; height:44px; flex:none; border-radius:12px; background:var(--acc-soft);
+          display:grid; place-items:center; }
+  .ikon svg { width:24px; height:24px; }
+  .kode { font-size:.8rem; font-weight:800; color:var(--mut); letter-spacing:.04em; }
+  .fitur p { margin:6px 0 10px; }
+  .video { display:inline-flex; align-items:center; gap:6px; font-weight:700; color:#1f5fa8; text-decoration:none; margin:0 0 10px; }
+  .tanya { font-weight:800; margin:4px 0 8px; }
+
+  /* Pilihan jawaban */
+  .opsi { display:grid; gap:8px; }
+  .opsi.tiga { grid-template-columns:repeat(3,1fr); }
+  .opsi label { position:relative; display:flex; flex-direction:column; justify-content:center; gap:2px; min-height:52px;
+                border:2px solid var(--line); border-radius:10px; padding:8px 12px; background:#fff; cursor:pointer;
+                font-weight:800; box-shadow:3px 3px 0 var(--line); transition:transform .08s, box-shadow .08s, background .15s; }
+  .opsi label small { font-weight:600; color:var(--mut); font-size:.85rem; line-height:1.35; }
+  .opsi label:hover { background:var(--acc-soft); }
+  .opsi input { position:absolute; opacity:0; pointer-events:none; }
+  .opsi label:has(input:focus-visible) { outline:3px solid #1f5fa8; outline-offset:2px; }
+  .opsi label:has(input:checked) { transform:translate(3px,3px); box-shadow:0 0 0 var(--line); }
+  .opsi label.ya:has(input:checked) { background:var(--ok-soft); border-color:var(--ok); color:var(--ok); }
+  .opsi label.ubah:has(input:checked) { background:var(--warn-soft); border-color:var(--warn); color:var(--warn); }
+  .opsi label.tidak:has(input:checked) { background:var(--bad-soft); border-color:var(--bad); color:var(--bad); }
+  .opsi label:has(input:checked) small { color:inherit; }
+  .opsi .missing, .opsi.missing { border-radius:12px; outline:3px solid var(--bad); outline-offset:3px; }
+
+  /* Isian */
+  label.f { display:block; font-weight:800; margin:14px 0 6px; }
+  label.f small { display:block; font-weight:600; color:var(--mut); font-size:.88rem; }
+  input[type=text], textarea { width:100%; border:2px solid var(--line); border-radius:10px; padding:11px 12px;
+    font:inherit; background:#fff; color:var(--line); }
+  input[type=text]:focus, textarea:focus { outline:3px solid var(--acc); outline-offset:1px; }
+  textarea { min-height:90px; resize:vertical; }
+  .missing-f { border-color:var(--bad) !important; background:var(--bad-soft) !important; }
+  .catatan { display:none; }
+  .catatan.on { display:block; }
+
+  /* Daftar fakta */
+  .fakta { list-style:none; padding:0; margin:10px 0 16px; display:grid; gap:8px; }
+  .fakta li { display:flex; gap:10px; align-items:flex-start; padding:2px 0; }
+  .fakta li svg { width:22px; height:22px; flex:none; margin-top:1px; }
+  .fakta b { display:block; }
+
+
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 12px; }
+  .chips span { border-radius:999px; padding:3px 10px; background:var(--acc-soft); font-weight:700; font-size:.9rem; }
+
+  .peran { display:grid; gap:8px; margin:8px 0 6px; }
+  .peran div { border-left:4px solid var(--acc); padding:2px 0 2px 12px; }
+  .peran b { display:block; }
+
+  .ringkas { background:var(--acc-soft); border-radius:10px; padding:12px 14px; margin:0 0 14px; font-weight:700; }
+
+  /* Tombol */
+  .nav { display:flex; gap:10px; margin-top:6px; }
+  button { font:800 1rem "Nunito","Segoe UI",system-ui,sans-serif; border:2px solid var(--line); border-radius:12px;
+           padding:14px 18px; cursor:pointer; box-shadow:3px 3px 0 var(--line); transition:transform .08s, box-shadow .08s; }
+  button:active { transform:translate(3px,3px); box-shadow:0 0 0 var(--line); }
+  .utama { flex:1; background:var(--line); color:#fafdfb; box-shadow:3px 3px 0 var(--acc), 3px 3px 0 2px var(--line); }
+  .kedua { background:#fff; color:var(--line); }
+  button:disabled { opacity:.6; cursor:default; }
+  .pesan { margin:12px 0 0; font-weight:800; color:var(--bad); min-height:1.4em; }
+  .selesai { text-align:center; padding:36px 20px; }
+  .selesai .ikon { width:72px; height:72px; margin:0 auto 14px; border-radius:50%; background:var(--ok-soft); }
+  .selesai .ikon svg { width:38px; height:38px; }
+
+  @media (max-width:560px) {
+    body { font-size:16px; }
+    .opsi.tiga { grid-template-columns:1fr; }
+    h1 { font-size:1.4rem; }
+  }
+</style>
+</head>
+<body>
+<main id="app">
+  <div class="top">
+    <div class="logo" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1f2a5a" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(-25 12 12)"/></svg>
+    </div>
+    <div class="brand">Orbit-U: The Monitor<small>Tinjauan kebutuhan oleh GMLS</small></div>
+  </div>
+
+  <div class="progress" id="progress" hidden>
+    <div class="bar"><div class="fill" id="fill"></div></div>
+    <div class="lbl"><span id="stepName"></span><span id="stepNo"></span></div>
+  </div>
+
+  <form id="f" novalidate>
+
+    <!-- 0. Pembuka -->
+    <section class="step card on" data-name="Pembuka">
+      <h1>Apakah sistem ini sudah sesuai kebutuhan GMLS?</h1>
+      <p>Pada wawancara 16 Oktober 2026, GMLS menyampaikan apa yang dibutuhkan. Sistem Orbit-U: The Monitor
+      dibuat berdasarkan masukan itu. Sekarang kami ingin memastikan hasilnya sudah sesuai.</p>
+      <p class="mut">Tidak ada jawaban benar atau salah. Pendapat jujur GMLS sangat membantu. Waktu mengisi sekitar 10 menit.</p>
+      <ul class="peta">
+        <li><span>1</span>Fitur yang disediakan sistem</li>
+        <li><span>2</span>Informasi yang dicatat sistem</li>
+        <li><span>3</span>Hal yang tidak dilakukan sistem</li>
+        <li><span>4</span>Siapa yang memakai dan wilayahnya</li>
+        <li><span>5</span>Persetujuan</li>
+      </ul>
+      <p class="mut" id="links"></p>
+      <label class="f" for="nama">Nama Anda</label>
+      <input type="text" id="nama" name="nama" autocomplete="name" placeholder="Contoh: Hakim Hakim">
+      <label class="f" for="jabatan">Jabatan atau tugas di GMLS</label>
+      <input type="text" id="jabatan" name="jabatan" placeholder="Contoh: Ketua, relawan, koordinator lapangan">
+    </section>
+
+    <!-- 1. Fitur -->
+    <section class="step card" data-name="Fitur sistem">
+      <h2>1. Fitur yang disediakan sistem</h2>
+      <p class="mut">Baca setiap fitur, lalu pilih apakah fitur itu sesuai dengan yang GMLS butuhkan.</p>
+      <div id="fiturList"></div>
+      <div class="catatan" id="catatanFitur">
+        <label class="f" for="catatan_kebutuhan">Apa yang perlu diperbaiki?
+          <small>Sebutkan nama fiturnya dan apa yang GMLS harapkan.</small></label>
+        <textarea id="catatan_kebutuhan" name="catatan_kebutuhan" placeholder="Contoh: Pemberitahuan sebaiknya juga lewat WhatsApp"></textarea>
+      </div>
+    </section>
+
+    <!-- 2. Informasi yang dicatat -->
+    <section class="step card" data-name="Informasi yang dicatat">
+      <h2>2. Informasi yang dicatat sistem</h2>
+      <p class="mut">Untuk setiap kecamatan, sistem mencatat:</p>
+      <ul class="fakta">
+        <li>__CEK__<div>Curah hujan setiap hari</div></li>
+        <li>__CEK__<div>Genangan air yang terlihat dari satelit</div></li>
+        <li>__CEK__<div>Peringatan yang muncul dan siapa yang menanganinya</div></li>
+        <li>__CEK__<div>Kejadian bencana: jenis, tanggal, lokasi, dan dampaknya</div></li>
+      </ul>
+      <p class="mut">Nama dan data pribadi warga tidak dicatat.</p>
+      <p class="tanya">Apakah informasi ini sudah cukup untuk GMLS?</p>
+      <div id="dataOpsi"></div>
+      <label class="f" for="catatan_data">Informasi apa lagi yang GMLS butuhkan? <small>Boleh dikosongkan.</small></label>
+      <textarea id="catatan_data" name="catatan_data" placeholder="Contoh: jumlah rumah terdampak per desa"></textarea>
+
+      <h3 style="margin-top:22px">Aturan pencatatan</h3>
+      <p class="mut">Sistem mencatat informasi di atas dengan aturan berikut.</p>
+      <ul class="fakta">
+        <li>__CEK__<div>Peringatan untuk satu kecamatan hanya dicatat sekali per hari, tidak dobel.</div></li>
+        <li>__CEK__<div>Kejadian bencana wajib berisi jenis, tanggal, kecamatan, uraian, dan sumber informasinya.</div></li>
+        <li>__CEK__<div>Kejadian baru dihitung untuk menilai ketepatan peringatan setelah dipastikan benar.</div></li>
+        <li>__CEK__<div>Angka hujan dan genangan disimpan selamanya; gambar satelit disimpan 1 tahun.</div></li>
+        <li>__CEK__<div>Akun pengguna tidak dihapus, hanya dinonaktifkan, agar riwayatnya tetap ada.</div></li>
+      </ul>
+      <p class="tanya">Apakah aturan ini sesuai dengan cara kerja GMLS?</p>
+      <div id="aturanOpsi"></div>
+      <div class="catatan" id="catatanAturan">
+        <label class="f" for="catatan_aturan">Aturan mana yang perlu diubah, dan bagaimana seharusnya?</label>
+        <textarea id="catatan_aturan" name="catatan_aturan"></textarea>
+      </div>
+    </section>
+
+    <!-- 3. Batasan -->
+    <section class="step card" data-name="Batasan">
+      <h2>3. Hal yang tidak dilakukan sistem</h2>
+      <p class="mut">Sistem ini sengaja tidak melakukan hal berikut.</p>
+      <ul class="fakta">
+        <li>__SILANG__<div><b>Tidak memantau gempa, tsunami, dan banjir rob</b>Satelit yang dipakai hanya mengamati hujan dan genangan air.</div></li>
+        <li>__SILANG__<div><b>Bukan peringatan resmi</b>Sistem hanya memberi saran. Keputusan evakuasi tetap mengikuti BMKG dan BPBD.</div></li>
+        <li>__SILANG__<div><b>Tidak sampai tingkat rumah dan tidak seketika</b>Informasi per kecamatan dan diperbarui setiap hari.</div></li>
+        <li>__SILANG__<div><b>Belum ada notifikasi di ponsel</b>Pemberitahuan dikirim lewat email.</div></li>
+        <li>__SILANG__<div><b>Tidak menerima laporan langsung dari warga</b>Kejadian dicatat oleh pengurus GMLS yang bertugas.</div></li>
+      </ul>
+      <p class="tanya">Apakah GMLS dapat menerima batasan di atas?</p>
+      <div id="batasanOpsi"></div>
+      <label class="f" for="catatan_batasan">Catatan <small>Boleh dikosongkan.</small></label>
+      <textarea id="catatan_batasan" name="catatan_batasan"></textarea>
+    </section>
+
+    <!-- 4. Peran dan wilayah -->
+    <section class="step card" data-name="Pengguna dan wilayah">
+      <h2>4. Siapa yang memakai dan wilayahnya</h2>
+      <p class="mut">Setiap orang hanya bisa melihat dan mengubah data sesuai tugasnya.</p>
+      <div class="peran">
+        <div><b>Masyarakat umum</b>Melihat keadaan kecamatan dan kejadian 30 hari terakhir, tanpa akun.</div>
+        <div><b>Relawan</b>Melihat keadaan di lokasinya, riwayat setahun, dan menerima email peringatan.</div>
+      </div>
+      <p class="tanya" style="margin-top:14px">Siapa di GMLS yang cocok untuk tugas berikut?</p>
+      <p class="mut" style="margin-top:-4px">Tulis nama atau jabatan. Tulis "tidak ada" bila belum ada orangnya. Boleh dikosongkan.</p>
+      <label class="f" for="peran_analis">Pencatat kejadian <small>Mencatat kejadian bencana dan menindaklanjuti peringatan (peran Analis)</small></label>
+      <input type="text" id="peran_analis" name="peran_analis">
+      <label class="f" for="peran_data_engineer">Pengurus data satelit <small>Memastikan data satelit masuk dan mutunya baik (peran Data Engineer)</small></label>
+      <input type="text" id="peran_data_engineer" name="peran_data_engineer">
+      <label class="f" for="peran_admin">Pengelola sistem <small>Membuat akun dan mengatur batas peringatan (peran Administrator)</small></label>
+      <input type="text" id="peran_admin" name="peran_admin">
+
+      <p class="tanya" style="margin-top:20px">Sistem memantau 10 kecamatan ini. Apakah sudah sesuai wilayah kerja GMLS?</p>
+      <div class="chips" id="kecamatan"></div>
+      <div id="wilayahOpsi"></div>
+      <div class="catatan" id="catatanWilayah">
+        <label class="f" for="catatan_wilayah">Kecamatan mana yang perlu ditambah atau dihapus?</label>
+        <input type="text" id="catatan_wilayah" name="catatan_wilayah">
+      </div>
+    </section>
+
+    <!-- 5. Persetujuan -->
+    <section class="step card" data-name="Persetujuan">
+      <h2>5. Persetujuan</h2>
+      <div class="ringkas" id="ringkas"></div>
+      <p class="tanya">Setelah melihat semuanya, apakah GMLS menyetujui rancangan sistem ini?</p>
+      <div id="setujuOpsi"></div>
+      <label class="f" for="saran">Saran untuk pengembangan berikutnya <small>Boleh dikosongkan.</small></label>
+      <textarea id="saran" name="saran"></textarea>
+    </section>
+
+    <p class="pesan" id="pesan" role="alert"></p>
+    <div class="nav">
+      <button type="button" class="kedua" id="kembali" hidden>Kembali</button>
+      <button type="button" class="utama" id="lanjut">Mulai</button>
+    </div>
+  </form>
+</main>
+
+<script>
+  // Isi bila ingin menampilkan tautan (boleh dikosongkan).
+  var LINK_WEB = "";
+  var LINK_VIDEO = "";
+  // Tautan video per fitur, misalnya file di Google Drive (boleh dikosongkan).
+  var VIDEO = { k1: "", k2: "", k3: "", k4: "", k5: "", k6: "" };
+
+  var IKON = {
+    lokasi: '<path d="M12 21s-7-6.1-7-11.5A7 7 0 0 1 19 9.5C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+    surat: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+    bicara: '<path d="M4 5h16v10H9l-5 4z"/><path d="M8 9h8M8 12h5"/>',
+    satelit: '<path d="M4 20l5-5"/><rect x="8" y="5" width="6" height="6" rx="1" transform="rotate(45 11 8)"/><path d="M14 14a4 4 0 0 0 4-4M14 18a8 8 0 0 0 8-8"/>',
+    buku: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M8 7h7M8 11h7"/>',
+    kunci: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'
+  };
+  var CEK = '<svg viewBox="0 0 24 24" fill="none" stroke="#17784a" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" fill="#dff3e8"/><path d="M7.5 12.5l3 3 6-6.5"/></svg>';
+  var SILANG = '<svg viewBox="0 0 24 24" fill="none" stroke="#904a00" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="10" fill="#fdf0dc"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/></svg>';
+
+  var FITUR = [
+    ["k1", "lokasi", "Melihat keadaan di tempat Anda berada",
+     "Saat web dibuka di ponsel, sistem mengenali kecamatan tempat Anda berada. Lalu tampil keadaannya (Normal, Waspada, atau Tinggi), gambar satelit wilayah itu, dan grafik 30 hari terakhir."],
+    ["k2", "surat", "Pemberitahuan hujan lebat lewat email",
+     "Bila hujan dalam sehari sangat deras menurut ukuran BMKG, sistem mengirim email ke orang yang memilih kecamatan tersebut."],
+    ["k3", "bicara", "Bahasa yang mudah dan tidak memerintah",
+     "Pesan berupa saran, misalnya “Waspadai genangan di daerah rendah”. Sistem tidak menetapkan status bencana. Tampilan bisa dibuka di ponsel maupun komputer."],
+    ["k4", "satelit", "Memantau genangan dan memperkirakan ke depan",
+     "Satelit memotret Lebak Selatan untuk melihat genangan air. Sistem juga memperkirakan keadaan 15 hari ke depan dari pola data sebelumnya."],
+    ["k5", "buku", "Catatan kejadian bencana",
+     "Banjir, banjir bandang, longsor, dan kekeringan dicatat beserta sumbernya (BNPB, BPBD, atau berita). Hanya kejadian yang sudah dipastikan benar yang dipakai untuk menilai ketepatan peringatan."],
+    ["k6", "kunci", "Akses sesuai tugas",
+     "Masyarakat umum bisa melihat tanpa akun. Pengurus GMLS memakai akun, dan setiap orang hanya bisa mengubah data sesuai tugasnya."]
+  ];
+  var KECAMATAN = ["Banjarsari", "Bayah", "Cibeber", "Cigemblong", "Cihara", "Cijaku", "Cilograng", "Malingping", "Panggarangan", "Wanasalam"];
+
+  // [nilai yang disimpan, teks tombol, keterangan, kelas warna]
+  var OPSI_FITUR = [["Sesuai", "Ya, sesuai", "", "ya"], ["Perlu diubah", "Perlu diperbaiki", "", "ubah"], ["Tidak sesuai", "Tidak sesuai", "", "tidak"]];
+
+  function opsi(name, items, tiga) {
+    return '<div class="opsi' + (tiga ? " tiga" : "") + '" data-group="' + name + '">' + items.map(function (o) {
+      return '<label class="' + o[3] + '"><input type="radio" name="' + name + '" value="' + o[0] + '">' + o[1] +
+        (o[2] ? "<small>" + o[2] + "</small>" : "") + "</label>";
+    }).join("") + "</div>";
+  }
+  function ikon(nama) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="#1f2a5a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + IKON[nama] + "</svg>";
+  }
+
+  // Bangun isi halaman
+  document.getElementById("fiturList").innerHTML = FITUR.map(function (k, i) {
+    return '<div class="fitur" data-card="' + k[0] + '"><div class="head"><div class="ikon">' + ikon(k[1]) + '</div><div>' +
+      '<div class="kode">FITUR ' + (i + 1) + " DARI " + FITUR.length + "</div><h3>" + k[2] + "</h3></div></div>" +
+      "<p>" + k[3] + "</p>" +
+      (VIDEO[k[0]] ? '<a class="video" href="' + VIDEO[k[0]] + '" target="_blank" rel="noopener">▶ Lihat contoh video</a>' : "") +
+      '<p class="tanya">Apakah fitur ini sesuai dengan yang GMLS butuhkan?</p>' + opsi(k[0], OPSI_FITUR, true) + "</div>";
+  }).join("");
+  document.getElementById("dataOpsi").innerHTML = opsi("data", [["Cukup", "Sudah cukup", "", "ya"], ["Kurang", "Masih kurang", "Tulis di bawah apa yang kurang", "ubah"]]);
+  document.getElementById("aturanOpsi").innerHTML = opsi("aturan", [["Sesuai", "Ya, sesuai", "", "ya"], ["Perlu diubah", "Perlu diubah", "", "ubah"]]);
+  document.getElementById("batasanOpsi").innerHTML = opsi("batasan", [["Dapat diterima", "Dapat diterima", "", "ya"], ["Tidak dapat diterima", "Tidak dapat diterima", "Tulis alasannya di bawah", "tidak"]]);
+  document.getElementById("wilayahOpsi").innerHTML = opsi("wilayah", [["Ya", "Ya, sudah sesuai", "", "ya"], ["Perlu diubah", "Perlu diubah", "", "ubah"]]);
+  document.getElementById("setujuOpsi").innerHTML = opsi("persetujuan", [
+    ["Disetujui", "Setuju", "Rancangan sistem sudah sesuai kebutuhan GMLS", "ya"],
+    ["Disetujui dengan perbaikan", "Setuju, dengan perbaikan", "Sudah sesuai, tetapi ada yang perlu diperbaiki", "ubah"],
+    ["Tidak disetujui", "Tidak setuju", "Rancangan belum sesuai kebutuhan GMLS", "tidak"]]);
+  document.getElementById("kecamatan").innerHTML = KECAMATAN.map(function (k) { return "<span>" + k + "</span>"; }).join("");
+  document.querySelectorAll(".fakta li").forEach(function (li) {
+    li.innerHTML = li.innerHTML.replace("__CEK__", CEK).replace("__SILANG__", SILANG);
+  });
+  var links = [];
+  if (LINK_WEB) links.push('<a href="' + LINK_WEB + '" target="_blank" rel="noopener">Buka sistem Orbit-U</a>');
+  if (LINK_VIDEO) links.push('<a href="' + LINK_VIDEO + '" target="_blank" rel="noopener">Semua video demo</a>');
+  document.getElementById("links").innerHTML = links.join(" · ");
+
+  // Navigasi langkah
+  var form = document.getElementById("f"), steps = [].slice.call(document.querySelectorAll(".step"));
+  var lanjut = document.getElementById("lanjut"), kembali = document.getElementById("kembali"), pesan = document.getElementById("pesan");
+  var cur = 0;
+  var WAJIB = [["nama", "jabatan"], ["k1", "k2", "k3", "k4", "k5", "k6"], ["data", "aturan"], ["batasan"], ["wilayah"], ["persetujuan"]];
+
+  function nilai() {
+    var d = {};
+    new FormData(form).forEach(function (v, k) { d[k] = String(v).trim(); });
+    return d;
+  }
+  function perluCatatanFitur(d) {
+    return FITUR.some(function (k) { return d[k[0]] && d[k[0]] !== "Sesuai"; });
+  }
+  function segarkan() {
+    var d = nilai();
+    document.getElementById("catatanFitur").classList.toggle("on", perluCatatanFitur(d));
+    document.getElementById("catatanWilayah").classList.toggle("on", d.wilayah === "Perlu diubah");
+    document.getElementById("catatanAturan").classList.toggle("on", d.aturan === "Perlu diubah");
+    simpanDraf(d);
+  }
+  function tampil(i) {
+    steps[cur].classList.remove("on");
+    cur = i;
+    steps[cur].classList.add("on");
+    var bar = document.getElementById("progress");
+    bar.hidden = cur === 0;
+    document.getElementById("fill").style.width = (cur / (steps.length - 1)) * 100 + "%";
+    document.getElementById("stepName").textContent = steps[cur].dataset.name;
+    document.getElementById("stepNo").textContent = "Langkah " + cur + " dari " + (steps.length - 1);
+    kembali.hidden = cur === 0;
+    lanjut.textContent = cur === 0 ? "Mulai" : cur === steps.length - 1 ? "Kirim jawaban" : "Lanjut";
+    pesan.textContent = "";
+    if (cur === steps.length - 1) ringkasan();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function periksa(i) {
+    var d = nilai(), pertama = null;
+    document.querySelectorAll(".missing").forEach(function (el) { el.classList.remove("missing"); });
+    document.querySelectorAll(".missing-f").forEach(function (el) { el.classList.remove("missing-f"); });
+    var wajib = WAJIB[i].slice();
+    if (i === 1 && perluCatatanFitur(d)) wajib.push("catatan_kebutuhan");
+    if (i === 2 && d.aturan === "Perlu diubah") wajib.push("catatan_aturan");
+    wajib.forEach(function (k) {
+      if (d[k]) return;
+      var grup = document.querySelector('[data-group="' + k + '"]');
+      var el = grup ? (document.querySelector('[data-card="' + k + '"]') || grup) : document.getElementById(k);
+      el.classList.add(grup ? "missing" : "missing-f");
+      if (!pertama) pertama = el;
+    });
+    if (pertama) {
+      pesan.textContent = i === 1 && d.k1 && d.k2 && d.k3 && d.k4 && d.k5 && d.k6
+        ? "Mohon tuliskan apa yang perlu diperbaiki."
+        : "Masih ada yang belum dijawab. Bagian yang bertanda merah perlu diisi.";
+      pertama.scrollIntoView({ behavior: "smooth", block: "center" });
+      return false;
+    }
+    return true;
+  }
+  function ringkasan() {
+    var d = nilai(), n = { "Sesuai": 0, "Perlu diubah": 0, "Tidak sesuai": 0 };
+    FITUR.forEach(function (k) { n[d[k[0]]] = (n[d[k[0]]] || 0) + 1; });
+    document.getElementById("ringkas").innerHTML = "Ringkasan jawaban Anda: dari 6 fitur, " + n["Sesuai"] + " sesuai, " +
+      n["Perlu diubah"] + " perlu diperbaiki, " + n["Tidak sesuai"] + " tidak sesuai. Informasi yang dicatat: " + (d.data || "-").toLowerCase() +
+      ". Aturan pencatatan: " + (d.aturan || "-").toLowerCase() + ". Batasan: " + (d.batasan || "-").toLowerCase() + ".";
+  }
+
+  lanjut.addEventListener("click", function () {
+    if (!periksa(cur)) return;
+    if (cur < steps.length - 1) return tampil(cur + 1);
+    kirim();
+  });
+  kembali.addEventListener("click", function () { if (cur > 0) tampil(cur - 1); });
+  function bersihkan(e) {
+    var t = e.target;
+    if (!t.value || !String(t.value).trim()) return;
+    t.classList.remove("missing-f");
+    [".fitur", ".opsi"].forEach(function (s) { var el = t.closest(s); if (el) el.classList.remove("missing"); });
+    if (!document.querySelector(".missing, .missing-f")) pesan.textContent = "";
+  }
+  form.addEventListener("change", function (e) { bersihkan(e); segarkan(); });
+  form.addEventListener("input", function (e) { bersihkan(e); segarkan(); });
+  form.addEventListener("submit", function (e) { e.preventDefault(); });
+
+  function kirim() {
+    var d = nilai();
+    if (!(window.google && google.script && google.script.run)) {
+      pesan.textContent = "Pratinjau lokal: jawaban hanya terkirim bila halaman dibuka dari URL Apps Script.";
+      return;
+    }
+    lanjut.disabled = kembali.disabled = true;
+    lanjut.textContent = "Mengirim…";
+    google.script.run
+      .withSuccessHandler(function () {
+        hapusDraf();
+        document.getElementById("app").innerHTML =
+          '<div class="card selesai"><div class="ikon">' + CEK.replace('fill="#dff3e8"', 'fill="none"') + "</div>" +
+          "<h1>Terima kasih</h1><p>Jawaban GMLS sudah terkirim. Masukan ini akan dipakai untuk memperbaiki sistem Orbit-U: The Monitor.</p></div>";
+        window.scrollTo(0, 0);
+      })
+      .withFailureHandler(function (err) {
+        lanjut.disabled = kembali.disabled = false;
+        lanjut.textContent = "Kirim jawaban";
+        pesan.textContent = "Gagal mengirim: " + (err && err.message ? err.message : err) + ". Periksa sambungan internet lalu coba lagi.";
+      })
+      .submit(d);
+  }
+
+  // Draf disimpan di perangkat agar jawaban tidak hilang bila halaman tertutup.
+  var KUNCI = "orbitu-tinjauan-draf";
+  function simpanDraf(d) { try { localStorage.setItem(KUNCI, JSON.stringify(d)); } catch (e) {} }
+  function hapusDraf() { try { localStorage.removeItem(KUNCI); } catch (e) {} }
+  (function pulihkan() {
+    var d = null;
+    try { d = JSON.parse(localStorage.getItem(KUNCI) || "null"); } catch (e) {}
+    if (!d) return;
+    Object.keys(d).forEach(function (k) {
+      var r = form.querySelector('input[type=radio][name="' + k + '"][value="' + d[k] + '"]');
+      if (r) { r.checked = true; return; }
+      var el = document.getElementById(k);
+      if (el && "value" in el) el.value = d[k];
+    });
+    segarkan();
+  })();
+</script>
+</body>
+</html>

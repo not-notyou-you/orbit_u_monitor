@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uji Coba – Orbit-U: The Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Warna mengikuti tema bawaan Orbit-U "Kertas Mint" (web/css/tema/mint.css). */
+  :root {
+    --bg:#eef7f0; --grid:#dbeee0; --card:#fafdfb; --line:#1f2a5a; --mut:#4a5388;
+    --acc:#7fe0ea; --acc-soft:#d3f2f6; --ok:#17784a; --ok-soft:#dff3e8;
+    --warn:#904a00; --warn-soft:#fdf0dc; --bad:#c62839; --bad-soft:#fde8ea; --soft-line:#9fb0c9;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body {
+    margin:0; color:var(--line); font:17px/1.55 "Nunito","Segoe UI",system-ui,sans-serif;
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 32px 32px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 32px 32px, var(--bg);
+    min-height:100vh;
+  }
+  main { max-width:760px; margin:0 auto; padding:20px 16px 56px; }
+
+  .top { display:flex; align-items:center; gap:10px; margin:0 0 14px; }
+  .logo { width:38px; height:38px; flex:none; border:2px solid var(--line); border-radius:10px; background:var(--acc);
+          display:grid; place-items:center; box-shadow:3px 3px 0 var(--line); }
+  .brand { font-weight:800; line-height:1.2; }
+  .brand small { display:block; font-weight:600; color:var(--mut); font-size:.85rem; }
+  .progress { margin:0 0 18px; }
+  .progress .bar { height:12px; border:2px solid var(--line); border-radius:999px; background:#fff; overflow:hidden; }
+  .progress .fill { height:100%; width:0; background:var(--acc); border-right:2px solid var(--line); transition:width .3s; }
+  .progress .lbl { display:flex; justify-content:space-between; font-size:.85rem; color:var(--mut); font-weight:700; margin-top:6px; }
+
+  .card { background:var(--card); border:2px solid var(--line); border-radius:14px; padding:20px 18px;
+          box-shadow:6px 6px 0 var(--acc), 6px 6px 0 2px var(--line); margin:0 0 22px; }
+  h1 { font-size:1.6rem; line-height:1.25; margin:0 0 8px; font-weight:800; }
+  h2 { font-size:1.3rem; line-height:1.3; margin:0 0 6px; font-weight:800; }
+  p { margin:0 0 12px; }
+  .mut { color:var(--mut); }
+  .kode { font-size:.8rem; font-weight:800; color:var(--mut); letter-spacing:.04em; }
+  .step { display:none; }
+  .step.on { display:block; animation:muncul .25s ease-out; }
+  @keyframes muncul { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+  /* Informasi (bukan isian): tanpa kotak berborder */
+  .langkah { margin:4px 0 14px; padding-left:0; list-style:none; counter-reset:n; }
+  .langkah li { counter-increment:n; position:relative; padding:3px 0 3px 36px; }
+  .langkah li::before { content:counter(n); position:absolute; left:0; top:4px; width:26px; height:26px; border-radius:50%;
+                        background:var(--acc-soft); display:grid; place-items:center; font-weight:800; font-size:.85rem; }
+  .info { background:var(--acc-soft); border-radius:10px; padding:10px 14px; margin:0 0 14px; }
+  .info b { display:block; }
+
+  .video { position:relative; width:100%; aspect-ratio:16/9; background:#dfe8e3; border-radius:12px; overflow:hidden; margin:6px 0 6px; }
+  .video iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  .video .kosong { position:absolute; inset:0; display:grid; place-items:center; color:var(--mut); font-weight:700; text-align:center; padding:12px; }
+  .ket { font-size:.85rem; color:var(--mut); margin:0 0 14px; }
+  .ket a { color:#1f5fa8; font-weight:700; }
+
+  a.buka { display:inline-flex; align-items:center; gap:8px; font-weight:800; color:var(--line); text-decoration:none;
+           border:2px solid var(--line); border-radius:12px; padding:10px 14px; background:#fff; box-shadow:3px 3px 0 var(--line); margin:0 0 6px; }
+  a.buka:active { transform:translate(3px,3px); box-shadow:0 0 0 var(--line); }
+
+  .tanya { font-weight:800; margin:16px 0 8px; }
+  .sub { font-weight:600; color:var(--mut); font-size:.88rem; margin:-4px 0 8px; }
+
+  .opsi { display:grid; gap:8px; }
+  .opsi label { position:relative; display:flex; flex-direction:column; justify-content:center; gap:2px; min-height:52px;
+                border:2px solid var(--line); border-radius:10px; padding:8px 12px; background:#fff; cursor:pointer;
+                font-weight:800; box-shadow:3px 3px 0 var(--line); transition:transform .08s, box-shadow .08s, background .15s; }
+  .opsi label small { font-weight:600; color:var(--mut); font-size:.85rem; line-height:1.35; }
+  .opsi label:hover { background:var(--acc-soft); }
+  .opsi input { position:absolute; opacity:0; pointer-events:none; }
+  .opsi label:has(input:focus-visible) { outline:3px solid #1f5fa8; outline-offset:2px; }
+  .opsi label:has(input:checked) { transform:translate(3px,3px); box-shadow:0 0 0 var(--line); }
+  .opsi label.ya:has(input:checked) { background:var(--ok-soft); border-color:var(--ok); color:var(--ok); }
+  .opsi label.ubah:has(input:checked) { background:var(--warn-soft); border-color:var(--warn); color:var(--warn); }
+  .opsi label.tidak:has(input:checked) { background:var(--bad-soft); border-color:var(--bad); color:var(--bad); }
+  .opsi label.netral:has(input:checked) { background:var(--acc-soft); }
+  .opsi label:has(input:checked) small { color:inherit; }
+  .opsi.missing { border-radius:12px; outline:3px solid var(--bad); outline-offset:3px; }
+
+  .skala { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+  .skala label { align-items:center; text-align:center; min-height:48px; font-size:1.1rem; }
+  .skala-ujung { display:flex; justify-content:space-between; font-size:.82rem; color:var(--mut); font-weight:700; margin-top:6px; }
+
+  label.f { display:block; font-weight:800; margin:16px 0 6px; }
+  label.f small { display:block; font-weight:600; color:var(--mut); font-size:.88rem; }
+  input[type=text], textarea { width:100%; border:2px solid var(--line); border-radius:10px; padding:11px 12px;
+    font:inherit; background:#fff; color:var(--line); }
+  input[type=text]:focus, textarea:focus { outline:3px solid var(--acc); outline-offset:1px; }
+  textarea { min-height:80px; resize:vertical; }
+  .missing-f { border-color:var(--bad) !important; background:var(--bad-soft) !important; }
+  .tersembunyi { display:none; }
+
+  .nav { display:flex; gap:10px; margin-top:6px; }
+  button { font:800 1rem "Nunito","Segoe UI",system-ui,sans-serif; border:2px solid var(--line); border-radius:12px;
+           padding:14px 18px; cursor:pointer; box-shadow:3px 3px 0 var(--line); transition:transform .08s, box-shadow .08s; }
+  button:active { transform:translate(3px,3px); box-shadow:0 0 0 var(--line); }
+  .utama { flex:1; background:var(--line); color:#fafdfb; box-shadow:3px 3px 0 var(--acc), 3px 3px 0 2px var(--line); }
+  .kedua { background:#fff; color:var(--line); }
+  button:disabled { opacity:.6; cursor:default; }
+  .pesan { margin:12px 0 0; font-weight:800; color:var(--bad); min-height:1.4em; }
+  .selesai { text-align:center; padding:36px 20px; }
+  .selesai .bulat { width:72px; height:72px; margin:0 auto 14px; border-radius:50%; background:var(--ok-soft); display:grid; place-items:center; }
+
+  @media (max-width:560px) {
+    body { font-size:16px; }
+    h1 { font-size:1.4rem; }
+    .skala { gap:6px; }
+  }
+</style>
+</head>
+<body>
+<main id="app">
+  <div class="top">
+    <div class="logo" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1f2a5a" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><ellipse cx="12" cy="12" rx="10" ry="4.5" transform="rotate(-25 12 12)"/></svg>
+    </div>
+    <div class="brand">Orbit-U: The Monitor<small>Uji coba sistem</small></div>
+  </div>
+
+  <div class="progress" id="progress" hidden>
+    <div class="bar"><div class="fill" id="fill"></div></div>
+    <div class="lbl"><span id="stepName"></span><span id="stepNo"></span></div>
+  </div>
+
+  <form id="f" novalidate>
+    <section class="step card on" data-name="Pembuka">
+      <h1>Uji coba sistem Orbit-U: The Monitor</h1>
+      <p>Anda akan mencoba 6 kegiatan di sistem. Setiap kegiatan punya video contoh singkat. Tonton videonya,
+      coba lakukan sendiri di sistem, lalu ceritakan pengalaman Anda.</p>
+      <p class="mut">Yang diuji adalah sistemnya, bukan Anda. Bila ada yang sulit, itu masukan yang berharga. Waktu sekitar 20 menit.</p>
+      <div class="info"><b>Sebelum mulai</b>Siapkan akun yang sudah dikirim lewat WhatsApp. Buka sistem di tab lain agar halaman ini tetap terbuka.</div>
+      <a class="buka" id="bukaUtama" target="_blank" rel="noopener">Buka sistem Orbit-U ↗</a>
+
+      <label class="f" for="nama">Nama Anda</label>
+      <input type="text" id="nama" name="nama" autocomplete="name" placeholder="Contoh: Hakim Hakim">
+      <p class="tanya">Anda dari mana?</p>
+      <div id="asalOpsi"></div>
+      <p class="tanya">Anda mencoba sistem memakai apa?</p>
+      <div id="perangkatOpsi"></div>
+    </section>
+
+    <div id="skenarioList"></div>
+
+    <section class="step card" data-name="Penilaian akhir">
+      <h2>Penilaian akhir</h2>
+      <p class="tanya">Menurut Anda, apakah sistem ini layak dipakai GMLS?</p>
+      <div id="layakOpsi"></div>
+      <label class="f" for="saran">Saran untuk perbaikan <small>Boleh dikosongkan.</small></label>
+      <textarea id="saran" name="saran"></textarea>
+    </section>
+
+    <p class="pesan" id="pesan" role="alert"></p>
+    <div class="nav">
+      <button type="button" class="kedua" id="kembali" hidden>Kembali</button>
+      <button type="button" class="utama" id="lanjut">Mulai</button>
+    </div>
+  </form>
+</main>
+
+<script>
+  var LINK_WEB = "https://solely-coffee-jon-emerald.trycloudflare.com";
+  var LINK_VIDEO = "https://drive.google.com/drive/folders/1I40g4FzrF8jePyCYZM1fxOtTNdh_q8kR?usp=sharing";
+
+  // [judul, link video Drive, khusus akun Analis?, langkah-langkah]
+  var SKENARIO = [
+    ["Melihat keadaan di tempat Anda berada",
+     "https://drive.google.com/file/d/1cnhxEdsJJEGlOrZ0xuKePcqjK468Pmi7/view?usp=sharing", false,
+     ["Masuk dengan akun Anda.", "Di Beranda, tekan <b>Gunakan lokasi saya</b> lalu izinkan lokasi.",
+      "Baca keadaan kecamatan Anda: Normal, Waspada, atau Tinggi.",
+      "Bila Anda sedang di luar Lebak Selatan, pilih salah satu kecamatan dari daftar di bawahnya."]],
+    ["Mengatur pemberitahuan lewat email",
+     "https://drive.google.com/file/d/19Q5Kwj0VR9o1Tn65P3W_s1trWfzLPP-M/view?usp=sharing", false,
+     ["Buka menu <b>Akun saya</b>.", "Isi alamat email Anda.", "Pilih kecamatan yang ingin dipantau.", "Tekan <b>Simpan</b>."]],
+    ["Melihat gambar satelit",
+     "https://drive.google.com/file/d/1_wMa5_fpN3RSffpCh2QtWSMcuknyXhCQ/view?usp=sharing", false,
+     ["Buka menu <b>Citra Satelit</b>, lalu pilih <b>Sentinel-1</b>.", "Pilih salah satu tanggal dan baca keterangannya.",
+      "Bandingkan dengan tanggal lain.", "Unduh laporannya dalam bentuk PDF."]],
+    ["Melihat riwayat kejadian bencana",
+     "https://drive.google.com/file/d/1LCeNQ2y3JgsVZHJ45s6kFLEMK15nZ9XN/view?usp=sharing", false,
+     ["Buka menu <b>Kejadian</b>.", "Saring daftar menurut kecamatan atau jenis bencana.", "Buka salah satu kejadian untuk melihat rinciannya."]],
+    ["Mencatat kejadian bencana baru",
+     "https://drive.google.com/file/d/1MfAXjaWb3vjr7-df1LdeYH-9ArFYZyzs/view?usp=sharing", true,
+     ["Buka menu <b>Kejadian</b>, lalu tekan <b>Tambah</b>.", "Isi jenis, kecamatan, tanggal, uraian, dan sumber. Awali uraian dengan kata <b>UJI</b>.",
+      "Tekan <b>Simpan</b> dan pastikan kejadian muncul di daftar."]],
+    ["Menindaklanjuti peringatan hujan",
+     "https://drive.google.com/file/d/1T3pbbyXuLDWK1xVBc8_qfks68KL1sVOG/view?usp=sharing", true,
+     ["Buka <b>Citra Satelit</b>, lalu pilih <b>GPM</b>.", "Lihat bagian <b>Hujan per kecamatan hari ini</b>.",
+      "Pilih satu peringatan, tulis catatan singkat, lalu tandai sudah ditindaklanjuti."]]
+  ];
+
+  // Ambil ID file dari link Drive biasa → alamat pemutar.
+  function driveEmbed(url) {
+    var m = String(url || "").match(/\/d\/([\w-]+)/) || String(url || "").match(/[?&]id=([\w-]+)/);
+    return m ? "https://drive.google.com/file/d/" + m[1] + "/preview" : "";
+  }
+  function opsi(name, items, kelas) {
+    return '<div class="opsi' + (kelas ? " " + kelas : "") + '" data-group="' + name + '">' + items.map(function (o) {
+      return '<label class="' + (o[3] || "") + '"><input type="radio" name="' + name + '" value="' + o[0] + '">' + o[1] +
+        (o[2] ? "<small>" + o[2] + "</small>" : "") + "</label>";
+    }).join("") + "</div>";
+  }
+
+  document.getElementById("bukaUtama").href = LINK_WEB;
+  document.getElementById("asalOpsi").innerHTML = opsi("asal", [["GMLS", "Pengurus atau relawan GMLS", "", "netral"],
+    ["Mahasiswa Humanity Project", "Mahasiswa Humanity Project", "", "netral"], ["Lainnya", "Lainnya", "", "netral"]]);
+  document.getElementById("perangkatOpsi").innerHTML = opsi("perangkat", [["Ponsel", "Ponsel", "", "netral"],
+    ["Komputer/laptop", "Komputer atau laptop", "", "netral"], ["Keduanya", "Keduanya", "", "netral"]]);
+  document.getElementById("layakOpsi").innerHTML = opsi("layak", [
+    ["Layak", "Layak", "Sistem bisa langsung dipakai", "ya"],
+    ["Layak dengan perbaikan", "Layak, dengan perbaikan", "Bisa dipakai setelah beberapa hal diperbaiki", "ubah"],
+    ["Belum layak", "Belum layak", "Masih perlu banyak perbaikan", "tidak"]]);
+
+  document.getElementById("skenarioList").innerHTML = SKENARIO.map(function (s, i) {
+    var n = i + 1, src = driveEmbed(s[1]);
+    return '<section class="step card" data-name="Kegiatan ' + n + '">' +
+      '<div class="kode">KEGIATAN ' + n + " DARI " + SKENARIO.length + "</div><h2>" + s[0] + "</h2>" +
+      (s[2] ? '<div class="info"><b>Khusus akun pencatat kejadian (Analis)</b>Bila akun Anda bukan akun Analis, pilih "Tidak saya coba" di bawah.</div>' : "") +
+      '<div class="video" data-src="' + src + '">' + (src ? "" : '<div class="kosong">Video belum tersedia</div>') + "</div>" +
+      '<p class="ket">Video tidak muncul? <a href="' + s[1] + '" target="_blank" rel="noopener">Buka video di Google Drive</a>.</p>' +
+      '<p class="tanya" style="margin-top:6px">Sekarang coba sendiri:</p><ol class="langkah">' +
+      s[3].map(function (l) { return "<li>" + l + "</li>"; }).join("") + "</ol>" +
+      '<a class="buka" href="' + LINK_WEB + '" target="_blank" rel="noopener">Buka sistem ↗</a>' +
+      '<p class="tanya">Apakah Anda berhasil melakukannya?</p>' +
+      opsi("s" + n + "_hasil", [["Berhasil", "Berhasil", "", "ya"], ["Berhasil dengan kesulitan", "Berhasil, tetapi ada kesulitan", "", "ubah"],
+        ["Tidak berhasil", "Tidak berhasil", "", "tidak"], ["Tidak dicoba", "Tidak saya coba", "", "netral"]]) +
+      '<div class="tersembunyi" data-mudah="' + n + '"><p class="tanya">Seberapa mudah kegiatan ini?</p>' +
+      opsi("s" + n + "_mudah", [["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"]], "skala") +
+      '<div class="skala-ujung"><span>Sangat sulit</span><span>Sangat mudah</span></div></div>' +
+      '<div class="tersembunyi" data-kendala="' + n + '"><label class="f" for="s' + n + '_kendala">Apa yang membuat sulit?' +
+      '<small>Ceritakan bagian mana yang membingungkan atau tidak berjalan.</small></label>' +
+      '<textarea id="s' + n + '_kendala" name="s' + n + '_kendala"></textarea></div>' +
+      "</section>";
+  }).join("");
+
+  // Navigasi
+  var form = document.getElementById("f"), steps = [].slice.call(document.querySelectorAll(".step"));
+  var lanjut = document.getElementById("lanjut"), kembali = document.getElementById("kembali"), pesan = document.getElementById("pesan");
+  var cur = 0;
+
+  function nilai() {
+    var d = {};
+    new FormData(form).forEach(function (v, k) { d[k] = String(v).trim(); });
+    return d;
+  }
+  function wajibLangkah(i, d) {
+    if (i === 0) return ["nama", "asal", "perangkat"];
+    if (i === steps.length - 1) return ["layak"];
+    var w = ["s" + i + "_hasil"], h = d["s" + i + "_hasil"];
+    if (h && h !== "Tidak dicoba") w.push("s" + i + "_mudah");
+    if (h === "Berhasil dengan kesulitan" || h === "Tidak berhasil") w.push("s" + i + "_kendala");
+    return w;
+  }
+  function segarkan() {
+    var d = nilai();
+    for (var n = 1; n <= SKENARIO.length; n++) {
+      var h = d["s" + n + "_hasil"];
+      document.querySelector('[data-mudah="' + n + '"]').classList.toggle("tersembunyi", !h || h === "Tidak dicoba");
+      document.querySelector('[data-kendala="' + n + '"]').classList.toggle("tersembunyi", !(h === "Berhasil dengan kesulitan" || h === "Tidak berhasil"));
+    }
+    simpanDraf(d);
+  }
+  function muatVideo(sec) {
+    var v = sec.querySelector(".video[data-src]");
+    if (v && v.dataset.src && !v.querySelector("iframe")) {
+      v.innerHTML = '<iframe src="' + v.dataset.src + '" allow="autoplay; fullscreen" allowfullscreen loading="lazy" title="Video contoh"></iframe>';
+    }
+  }
+  function tampil(i) {
+    steps[cur].classList.remove("on");
+    cur = i;
+    steps[cur].classList.add("on");
+    muatVideo(steps[cur]);
+    document.getElementById("progress").hidden = cur === 0;
+    document.getElementById("fill").style.width = (cur / (steps.length - 1)) * 100 + "%";
+    document.getElementById("stepName").textContent = steps[cur].dataset.name;
+    document.getElementById("stepNo").textContent = "Langkah " + cur + " dari " + (steps.length - 1);
+    kembali.hidden = cur === 0;
+    lanjut.textContent = cur === 0 ? "Mulai" : cur === steps.length - 1 ? "Kirim jawaban" : "Lanjut";
+    pesan.textContent = "";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function periksa(i) {
+    var d = nilai(), pertama = null;
+    document.querySelectorAll(".missing").forEach(function (el) { el.classList.remove("missing"); });
+    document.querySelectorAll(".missing-f").forEach(function (el) { el.classList.remove("missing-f"); });
+    wajibLangkah(i, d).forEach(function (k) {
+      if (d[k]) return;
+      var grup = document.querySelector('[data-group="' + k + '"]');
+      var el = grup || document.getElementById(k);
+      el.classList.add(grup ? "missing" : "missing-f");
+      if (!pertama) pertama = el;
+    });
+    if (pertama) {
+      pesan.textContent = "Masih ada yang belum dijawab. Bagian yang bertanda merah perlu diisi.";
+      pertama.scrollIntoView({ behavior: "smooth", block: "center" });
+      return false;
+    }
+    return true;
+  }
+  function bersihkan(e) {
+    var t = e.target;
+    if (!t.value || !String(t.value).trim()) return;
+    t.classList.remove("missing-f");
+    var g = t.closest(".opsi");
+    if (g) g.classList.remove("missing");
+    if (!document.querySelector(".missing, .missing-f")) pesan.textContent = "";
+  }
+
+  lanjut.addEventListener("click", function () {
+    if (!periksa(cur)) return;
+    if (cur < steps.length - 1) return tampil(cur + 1);
+    kirim();
+  });
+  kembali.addEventListener("click", function () { if (cur > 0) tampil(cur - 1); });
+  form.addEventListener("change", function (e) { bersihkan(e); segarkan(); });
+  form.addEventListener("input", function (e) { bersihkan(e); segarkan(); });
+  form.addEventListener("submit", function (e) { e.preventDefault(); });
+
+  function kirim() {
+    var d = nilai();
+    if (!(window.google && google.script && google.script.run)) {
+      pesan.textContent = "Pratinjau lokal: jawaban hanya terkirim bila halaman dibuka dari URL Apps Script.";
+      return;
+    }
+    lanjut.disabled = kembali.disabled = true;
+    lanjut.textContent = "Mengirim…";
+    google.script.run
+      .withSuccessHandler(function () {
+        hapusDraf();
+        document.getElementById("app").innerHTML =
+          '<div class="card selesai"><div class="bulat"><svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#17784a" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.5l4 4 8-9"/></svg></div>' +
+          "<h1>Terima kasih</h1><p>Jawaban Anda sudah terkirim dan akan dipakai untuk memperbaiki sistem Orbit-U: The Monitor.</p></div>";
+        window.scrollTo(0, 0);
+      })
+      .withFailureHandler(function (err) {
+        lanjut.disabled = kembali.disabled = false;
+        lanjut.textContent = "Kirim jawaban";
+        pesan.textContent = "Gagal mengirim: " + (err && err.message ? err.message : err) + ". Periksa sambungan internet lalu coba lagi.";
+      })
+      .submit(d);
+  }
+
+  // Draf disimpan di perangkat agar jawaban tidak hilang bila halaman tertutup.
+  var KUNCI = "orbitu-uat-draf";
+  function simpanDraf(d) { try { localStorage.setItem(KUNCI, JSON.stringify(d)); } catch (e) {} }
+  function hapusDraf() { try { localStorage.removeItem(KUNCI); } catch (e) {} }
+  (function pulihkan() {
+    var d = null;
+    try { d = JSON.parse(localStorage.getItem(KUNCI) || "null"); } catch (e) {}
+    if (!d) return;
+    Object.keys(d).forEach(function (k) {
+      var r = form.querySelector('input[type=radio][name="' + k + '"][value="' + d[k] + '"]');
+      if (r) { r.checked = true; return; }
+      var el = document.getElementById(k);
+      if (el && "value" in el) el.value = d[k];
+    });
+    segarkan();
+  })();
+</script>
+</body>
+</html>

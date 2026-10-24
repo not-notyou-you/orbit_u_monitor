@@ -106,9 +106,30 @@ Teknik pencarian fakta yang dipakai sesuai metode di SKRIPSI.txt bagian B:
 | Penelitian | Kode dan skema Orbit-U: The DataLab (README §5) | Tabel warisan §4.1 |
 | Wawancara | 16 Okt 2026, daring (Zoom), Anis Faisal Reza ("Abah Lala"), Ketua GMLS. GMLS memperhatikan semua bencana; info cuaca dari BMKG lewat Are You In Sys belum spesifik ke lokasi warga; GMLS hanya memberi peringatan, bukan penetapan; GMLS tidak mencatat kejadian sendiri dan menilai data BNPB tidak rapi; tampilan harus mudah bagi orang awam; informasi paling berguna bila spesifik ke lokasi dan dikirim sebagai notifikasi | Lokasi saya di Beranda dan `user_notify_regions`/`notify_sent` (lokasi + notifikasi); kalimat "bukan peringatan dini resmi" dan status Waspada/Tinggi (peringatan, bukan penetapan); `disaster_events.info_source` + `is_verified` (kejadian dari sumber resmi); `band_forecasts` (prediksi); batasan: gempa, tsunami, rob, Himawari |
 
-Bukti wawancara: `DOCS/lampiran/notulensiGMLS.txt`. Tinjauan kebutuhan oleh GMLS (requirement/user review)
-memakai lembar tinjauan yang menelusuri tiap kebutuhan ke pokok wawancara; hasil isiannya disimpan di
-`DOCS/lampiran/` setelah dikembalikan GMLS.
+Bukti wawancara: `DOCS/lampiran/notulensiGMLS.txt`.
+
+**Tinjauan kebutuhan oleh GMLS (requirement/user review).** Dilakukan lewat halaman web
+`DOCS/lampiran/user_review_webapp/` (Google Apps Script; jawaban tersimpan di Google Sheet dan terkirim ke
+email peneliti). Model data konseptual dan logikal ditinjau dalam bahasa awam karena pengisi bukan orang
+teknis: konseptual sebagai daftar "informasi yang dicatat", logikal sebagai "aturan pencatatan". Kolom
+*Jawaban GMLS* diisi dari Sheet setelah tinjauan selesai; ekspor CSV-nya disimpan di `DOCS/lampiran/`.
+
+| Butir tinjauan | Dasar (notulen) | Fitur / objek basis data | Jawaban GMLS |
+|---|---|---|---|
+| K1 Keadaan di lokasi sendiri | D.6 | Beranda "Lokasi saya"; `administrative_regions`, `region_observations` | |
+| K2 Pemberitahuan hujan lebat lewat email | B (sumber BMKG), D.6 | `alert_rules` (50/100/150 mm), `alert_events`, `user_notify_regions`, `notify_sent` | |
+| K3 Bahasa saran, bukan penetapan; mudah bagi awam | B (GMLS hanya memberi peringatan), C (situs sulit dipahami), D.7 | Kalimat kondisi (`etl/lokasi_interpret.py`), email berlapis (`etl/notify_email.py`) | |
+| K4 Genangan dari satelit dan perkiraan 15 hari | D.2, D.5 | `satellite_scenes`, `live_scene_metrics` (WATER_CHANGE), `band_forecasts` | |
+| K5 Catatan kejadian dari sumber resmi | B (tidak mencatat sendiri), C (data BNPB tidak rapi) | `disaster_events.info_source`, `is_verified`; `v_evaluasi_alert` | |
+| K6 Akses sesuai tugas | Profil GMLS; user views §2.3 | `roles`, `users`; GRANT/VIEW/RLS §8 | |
+| Informasi yang dicatat (model konseptual) | B, C | Entitas inti §2.5–2.6: `region_observations`, `alert_events`, `disaster_events`, `users` | |
+| Aturan: peringatan sekali per kecamatan per hari (model logikal) | — | `uq_alert_rule_region_date` | |
+| Aturan: kejadian wajib berisi jenis, tanggal, kecamatan, uraian, sumber | B | NOT NULL + CHECK `description` 10–4000, `info_source` di `disaster_events` | |
+| Aturan: kejadian dihitung setelah dipastikan benar | C | Filter `is_verified` di `v_evaluasi_alert` | |
+| Aturan: angka disimpan selamanya, gambar 1 tahun | — | Retensi M58: `region_observations` tidak dihapus, raster 365 hari | |
+| Aturan: akun dinonaktifkan, tidak dihapus | — | `users.is_active`; tanpa GRANT DELETE pada `users` | |
+| Batasan (gempa, tsunami, rob; bukan peringatan resmi; per kecamatan; email; tanpa laporan warga) | B (semua jenis bencana), D.4 (Himawari) | Batas sistem §2.3 | |
+| Wilayah 10 kecamatan | Profil GMLS | `administrative_regions.in_aoi` | |
 
 **5W1H sistem yang diusulkan:**
 

@@ -133,7 +133,7 @@ Semua baris MySQL di `timing.csv` dan `features.csv` berstatus "belum dijalankan
 
 ### f. Requirement/user review
 
-Evaluasi minimum pertama di Tabel 4. Kebutuhan sudah dikumpulkan lewat wawancara GMLS 16 Okt 2026 (`lampiran/notulensiGMLS.txt`), tetapi belum ada bukti GMLS meninjau kebutuhan dan rancangan yang dihasilkan. Bahan tinjauan: `lampiran/Lembar_Tinjauan_Kebutuhan_GMLS.docx`/`.pdf`.
+Evaluasi minimum pertama di Tabel 4. Kebutuhan sudah dikumpulkan lewat wawancara GMLS 16 Okt 2026 (`lampiran/notulensiGMLS.txt`), tetapi belum ada bukti GMLS meninjau kebutuhan dan rancangan yang dihasilkan. Sarana tinjauan: halaman web `lampiran/user_review_webapp/` (kebutuhan, model data konseptual dan logikal dalam bahasa awam, batasan, peran, persetujuan); traceability butir → notulen → objek basis data di DATABASE.md §2.4.
 
 ### g. Prasyarat objek studi (C.1)
 

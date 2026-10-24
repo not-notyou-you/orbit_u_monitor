@@ -1,0 +1,34 @@
+link deployment :
+https://solely-coffee-jon-emerald.trycloudflare.com
+
+jawaban user requirement:
+https://docs.google.com/spreadsheets/d/1fl6hGGOarRuI0rJOQ17TKY_Wym5CRRHyR36gPhfR6kQ/edit
+
+jawaban UAT:
+https://docs.google.com/spreadsheets/d/11sMYPC9vv3Yy71rDGBArgiHYMzxwGNHvJ3y5HGDXZYQ/edit
+
+seluruh video demo :
+https://drive.google.com/drive/folders/1I40g4FzrF8jePyCYZM1fxOtTNdh_q8kR?usp=sharing
+
+form user requirement :
+https://script.google.com/macros/s/AKfycbxeHP6-wvx9pLsDw5h6SrifKtxCLJi7TWx6UdjzZUL7c8S97ScCkGT6JdBLwECoDo-Gfg/exec
+
+form UAT :
+https://script.google.com/macros/s/AKfycbwT82yCCjSeIensZFFieEXWuglLMzv8G9nhg6A9OQHU983u42h1idiPWRjDx8wQ2S4Q/exec
+
+01_lokasi_saya_desktop.mp4: https://drive.google.com/file/d/1cnhxEdsJJEGlOrZ0xuKePcqjK468Pmi7/view?usp=sharing
+
+02_email_peringatan_desktop.mp4:
+https://drive.google.com/file/d/19Q5Kwj0VR9o1Tn65P3W_s1trWfzLPP-M/view?usp=sharing
+
+03_citra_satelit_desktop.mp4:
+https://drive.google.com/file/d/1_wMa5_fpN3RSffpCh2QtWSMcuknyXhCQ/view?usp=sharing
+
+04_riwayat_kejadian_desktop.mp4:
+https://drive.google.com/file/d/1LCeNQ2y3JgsVZHJ45s6kFLEMK15nZ9XN/view?usp=sharing
+
+05_catat_kejadian_desktop.mp4:
+https://drive.google.com/file/d/1MfAXjaWb3vjr7-df1LdeYH-9ArFYZyzs/view?usp=sharing
+
+06_tindak_lanjut_peringatan_desktop.mp4:
+https://drive.google.com/file/d/1T3pbbyXuLDWK1xVBc8_qfks68KL1sVOG/view?usp=sharing
