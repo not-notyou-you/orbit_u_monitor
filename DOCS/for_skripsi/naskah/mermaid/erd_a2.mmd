@@ -1,0 +1,13 @@
+erDiagram
+    SUMBER_SATELIT ||--|{ VARIABEL : "mengukur"
+    WILAYAH ||--o{ WILAYAH : "induk dari"
+    WILAYAH ||--o{ OBSERVASI : "diamati di"
+    VARIABEL ||--o{ OBSERVASI : "nilai dari"
+    VARIABEL ||--o{ ATURAN_PERINGATAN : "diuji pada"
+    JENIS_BENCANA ||--o{ ATURAN_PERINGATAN : "dipicu oleh"
+    ATURAN_PERINGATAN ||--o{ PERINGATAN : "menghasilkan"
+    OBSERVASI ||--o{ PERINGATAN : "memicu"
+    PENGGUNA |o--o{ PERINGATAN : "menindaklanjuti"
+    JENIS_BENCANA ||--o{ KEJADIAN : "jenis"
+    WILAYAH ||--o{ KEJADIAN : "lokasi"
+    PENGGUNA ||--o{ KEJADIAN : "mencatat"

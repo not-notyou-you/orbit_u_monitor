@@ -62,6 +62,12 @@ erDiagram
     SCENE_S1 ||--o{ METRIK_MUTU : "dinilai"
     PENGGUNA ||--o{ TOKEN_API : "memiliki"
     PENGGUNA |o--o{ LOG_AKTIVITAS : "melakukan"
+    PENGGUNA ||--o{ LANGGANAN_PERINGATAN : "berlangganan"
+    WILAYAH ||--o{ LANGGANAN_PERINGATAN : "dipantau"
+    PENGGUNA ||--o{ PERINGATAN_TERKIRIM : "menerima"
+    WILAYAH ||--o{ PERINGATAN_TERKIRIM : "untuk"
+    VARIABEL ||--o{ FORECAST : "diprakirakan"
+    WILAYAH ||--o{ FORECAST : "lokasi"
 </pre></div>
 </div>
 

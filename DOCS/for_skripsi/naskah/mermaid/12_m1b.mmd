@@ -1,0 +1,19 @@
+sequenceDiagram
+    autonumber
+    actor P as Relawan
+    participant W as Web
+    participant A as API FastAPI
+    participant DB as PostgreSQL
+    P->>W: buka Citra › Sentinel-1
+    W->>A: GET /api/citra/areas/1/scenes?source=s1 (cookie)
+    A->>A: decode JWT → user_id
+    A->>DB: auth_session_user(user_id)
+    DB-->>A: role USER, aktif
+    A->>A: require_role("PUBLIC") ✓
+    A->>DB: BEGIN#59; SET LOCAL ROLE monitor_user#59; set_config('app.user_id', id)
+    A->>DB: SELECT … FROM v_citra_scenes
+    Note over A,DB: VIEW membatasi 365 hari untuk monitor_user
+    DB-->>A: daftar tanggal
+    A->>DB: COMMIT (role kembali otomatis)
+    A-->>W: 200 JSON
+    W-->>P: daftar tanggal dan gambar

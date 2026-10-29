@@ -77,6 +77,8 @@ flowchart LR
         end
         pg[(PostgreSQL 18<br/>+ PostGIS)]
         disk[(Disk data/)]
+        bak[Task Scheduler Windows<br/>pg_dump -Fc 01:30 → backups/harian/]
+        bak -- "backup harian, retensi 14 hari" --> pg
         api --- pg
         sch --- pg
         api --- disk
@@ -158,6 +160,7 @@ flowchart LR
 <tr><td>Laporan mingguan</td><td>Senin 03:00 / 03:15</td><td><code>report</code></td><td><code>generated_reports</code></td></tr>
 <tr><td>Laporan bulanan</td><td>Tanggal 1, 03:30 / 03:45</td><td><code>report</code></td><td><code>generated_reports</code></td></tr>
 <tr><td>Forecast tersimpan</td><td>00:30, 06:30, 12:30, 18:30</td><td><code>forecast</code></td><td><code>band_forecasts</code>, <code>band_forecast_points</code>, <code>band_forecast_scores</code></td></tr>
+<tr><td>Backup harian (M76, di luar APScheduler)</td><td>01:30 setiap hari, Windows Task Scheduler</td><td>—</td><td>Berkas <code>pg_dump -Fc</code> di <code>backups\harian\</code> (diverifikasi <code>pg_restore -l</code>, retensi 14 hari)</td></tr>
 </table></div>
 </div>
 <div class="fig" data-cap="Linimasa job terjadwal dalam satu hari (WIB)" data-from="PIPELINE.md §7">

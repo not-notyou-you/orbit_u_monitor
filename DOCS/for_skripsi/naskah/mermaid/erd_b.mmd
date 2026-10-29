@@ -1,0 +1,11 @@
+erDiagram
+    SUMBER_SATELIT ||--o{ GRANULE_NASA : "menerbitkan"
+    SCENE_S1 |o--o{ PRODUK_DATA : "menghasilkan"
+    GRANULE_NASA |o--o{ PRODUK_DATA : "menghasilkan"
+    TAHAP_PROSES ||--o{ JOB_PROSES : "tahap"
+    JOB_PROSES ||--o{ PRODUK_DATA : "menulis"
+    PRODUK_DATA ||--o{ LINEAGE : "induk / anak"
+    SCENE_S1 ||--o{ METRIK_MUTU : "dinilai"
+    PRODUK_DATA |o--o{ OBSERVASI : "sumber"
+    VARIABEL ||--o{ OBSERVASI : "nilai dari"
+    VARIABEL ||--o{ FORECAST : "diprakirakan"

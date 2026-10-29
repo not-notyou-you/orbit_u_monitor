@@ -1,0 +1,180 @@
+## khan
+OURS: S. M. Khan *et al.*, “A systematic review of disaster management systems: Approaches, challenges, and future directions,” *Land*, vol. 12, no. 8, Art. no. 1514, 2023, doi: 10.3390/land12081514.
+CR  : Saad Mazhar Khan; Imran Shafi; Wasi Haider Butt; Isabel de la Torre Diez; Miguel Angel López Flores; Juan Castanedo Galán; Imran Ashraf | A Systematic Review of Disaster Management Systems: Approaches, Challenges, and Future Directions | Land | vol=12 no=8 page=1514 art=None | year=2023 | type=journal-article
+
+## deng
+OURS: T. Deng, “The application of database systems in information management,” *Applied and Computational Engineering*, vol. 40, no. 1, 2024, doi: 10.54254/2755-2721/40/20230625.
+CR  : Tianle Deng | The application of database systems in information management | Applied and Computational Engineering | vol=40 no=1 page=33-42 art=None | year=2024 | type=journal-article
+
+## wang
+OURS: J. Wang *et al.*, “Digital platform empowering China–Pakistan Economic Corridor disaster management: Enhancing data integration, resilience, and policy innovation,” *International Journal of Disaster Risk Science*, 2025, doi: 10.1007/s13753-025-00644-3.
+CR  : Juanle Wang; Kun Bu; Congrong Li; Yuelei Yuan; Xinrong Yan; Chen Xu; Meer Muhammad Sajjad; Lina Hao; Jiazhuo Liu; Xiaodong Min | Digital Platform Empowering China-Pakistan Economic Corridor Disaster Management: Enhancing Data Integration, Resilience, and Policy Innovation | International Journal of Disaster Risk Science | vol=16 no=3 page=376-391 art=None | year=2025 | type=journal-article
+
+## shafiya
+OURS: A. Shafiya, A. A. Kuntoro, F. I. W. Rohmat, and W. Wijayasari, “Development of Java Island-scale flood model using CaMa-Flood,” *IOP Conference Series: Earth and Environmental Science*, vol. 1472, no. 1, Art. no. 012031, 2025, doi: 10.1088/1755-1315/1472/1/012031.
+CR  : Adristi Shafiya; Arno Adi Kuntoro; Faizal Immaddudin Wira Rohmat; Winda Wijayasari | Development of Java Island-scale Flood Model using CaMa-Flood | IOP Conference Series: Earth and Environmental Science | vol=1472 no=1 page=012031 art=None | year=2025 | type=journal-article
+
+## hidayah
+OURS: E. Hidayah *et al.*, “Performance of GPM-IMERG satellite precipitation for rainfall-runoff modeling in Indonesia,” *Water Practice and Technology*, vol. 19, no. 10, 2024, doi: 10.2166/wpt.2024.240.
+CR  : Entin Hidayah; Saifurridzal Saifurridzal; Retno Utami Agung Wiyono; Wiwik Yunarni Widiarti; Resa Martini | Performance of GPM-IMERG satellite precipitation for rainfall-runoff modeling in Indonesia | Water Practice &amp; Technology | vol=19 no=10 page=3909-3928 art=None | year=2024 | type=journal-article
+
+## kovacs
+OURS: D. D. Kovács, J. Musial, J. Bojanowski, D. Clarijs, J. de la Mar, and A. Zlinszky, “Copernicus Data Space Ecosystem establishes public cloud processing for Earth observation data,” *Scientific Data*, vol. 13, no. 1, 2026, doi: 10.1038/s41597-026-06765-8.
+CR  : Dávid D.Kovács; Jan Musial; Jędrzej Bojanowski; Dennis Clarijs; Jurry de la Mar; András Zlinszky | Copernicus Data Space Ecosystem establishes public cloud processing for earth observation data | Scientific Data | vol=13 no=1 page=None art=537 | year=2026 | type=journal-article
+
+## tarpanelli
+OURS: A. Tarpanelli, A. C. Mondini, and S. Camici, “Effectiveness of Sentinel-1 and Sentinel-2 for flood detection assessment in Europe,” *Natural Hazards and Earth System Sciences*, vol. 22, no. 8, pp. 2473–2489, 2022, doi: 10.5194/nhess-22-2473-2022.
+CR  : Angelica Tarpanelli; Alessandro C. Mondini; Stefania Camici | Effectiveness of Sentinel-1 and Sentinel-2  for flood detection assessment in Europe | Natural Hazards and Earth System Sciences | vol=22 no=8 page=2473-2489 art=None | year=2022 | type=journal-article
+
+## roman
+OURS: M. O. Román *et al.*, “Continuity between NASA MODIS Collection 6.1 and VIIRS Collection 2 land products,” *Remote Sensing of Environment*, vol. 302, Art. no. 113963, 2024, doi: 10.1016/j.rse.2023.113963.
+CR  : Miguel O. Román; Chris Justice; Ian Paynter; Peter B. Boucher; Sadashiva Devadiga; Arthur Endsley; Angela Erb; Mark Friedl; Huilin Gao; Louis Giglio; Josh M. Gray; Dorothy Hall; Glynn Hulley; John Kimball; Yuri Knyazikhin; Alexei Lyapustin; Ranga B. Myneni; Praveen Noojipady; Jiabin Pu; George Riggs; Sudipta Sarkar; Crystal Schaaf; Deep Shah; Khuong H. Tran; Eric Vermote; Dongdong Wang; Zhuosen Wang; Aisheng Wu; Yongchang Ye; Yu Shen; Shuai Zhang; Shuai Zhang; Xiaoyang Zhang; Maosheng Zhao; Carol Davidson; Robert Wolfe | Continuity between NASA MODIS Collection 6.1 and VIIRS Collection 2 land products | Remote Sensing of Environment | vol=302 no=None page=113963 art=113963 | year=2024 | type=journal-article
+
+## zhu
+OURS: S. Zhu *et al.*, “Evaluation of IMERG climate trends over land in the TRMM and GPM eras,” *Environmental Research Letters*, vol. 20, no. 1, 2025, doi: 10.1088/1748-9326/ad984e.
+CR  : Siyu Zhu; Zhi Li; Mengye Chen; Yixin Wen; Zhong Liu; George J Huffman; Theresa E Tsoodle; Sebastian C Ferraro; Yuzhou Wang; Yang Hong | Evaluation of IMERG climate trends over land in the TRMM and GPM eras | Environmental Research Letters | vol=20 no=1 page=014064 art=None | year=2024 | type=journal-article
+
+## ansori
+OURS: M. B. Ansori and I. D. B. JBS, “A comprehensive evaluation of GPM IMERG satellite rainfall data across multiple temporal and spatial scales for sustainable flood risk management in East Java, Indonesia,” *Sustainability*, vol. 18, no. 9, Art. no. 4550, 2026, doi: 10.3390/su18094550.
+CR  : Mohamad Bagus Ansori; I.D. Bagus JBS | A Comprehensive Evaluation of GPM IMERG Satellite Rainfall Data Across Multiple Temporal and Spatial Scales for Sustainable Flood Risk Management in East Java, Indonesia | Sustainability | vol=18 no=9 page=4550 art=None | year=2026 | type=journal-article
+
+## liu
+OURS: S. Liu, Y. Wu, G. Xu, S. Cheng, Y. Zhong, and Y. Zhang, “Characterizing the 2022 extreme drought event over the Poyang Lake Basin using multiple satellite remote sensing observations and in situ data,” *Remote Sensing*, vol. 15, no. 21, Art. no. 5125, 2023, doi: 10.3390/rs15215125.
+CR  : Sulan Liu; Yunlong Wu; Guodong Xu; Siyu Cheng; Yulong Zhong; Yi Zhang | Characterizing the 2022 Extreme Drought Event over the Poyang Lake Basin Using Multiple Satellite Remote Sensing Observations and In Situ Data | Remote Sensing | vol=15 no=21 page=5125 art=None | year=2023 | type=journal-article
+
+## castro
+OURS: I. Castro-Melgar, T. Falaras, E. Basiou, and I. Parcharidis, “Assessment of the October 2024 cut-off low event floods impact in Valencia (Spain) with satellite and geospatial data,” *Remote Sensing*, vol. 17, no. 13, Art. no. 2145, 2025, doi: 10.3390/rs17132145.
+CR  : Ignacio Castro-Melgar; Triantafyllos Falaras; Eleftheria Basiou; Issaak Parcharidis | Assessment of the October 2024 Cut-Off Low Event Floods Impact in Valencia (Spain) with Satellite and Geospatial Data | Remote Sensing | vol=17 no=13 page=2145 art=None | year=2025 | type=journal-article
+
+## weiss
+OURS: T. Weiß and T. Fincke, “SenSARP: A pipeline to pre-process Sentinel-1 SLC data by using ESA SNAP Sentinel-1 Toolbox,” *Journal of Open Source Software*, vol. 7, no. 69, Art. no. 3337, 2022, doi: 10.21105/joss.03337.
+CR  : Thomas Weiß; Tonio Fincke | SenSARP: A pipeline to pre-process Sentinel-1 SLC data by using ESA SNAP Sentinel-1 Toolbox | Journal of Open Source Software | vol=7 no=69 page=3337 art=None | year=2022 | type=journal-article
+
+## upadhyay
+OURS: P. Upadhyay *et al.*, “A flexible multi-temporal and multi-modal framework for Sentinel-1 and Sentinel-2 analysis ready data,” *Remote Sensing*, vol. 14, no. 5, Art. no. 1120, 2022, doi: 10.3390/rs14051120.
+CR  : Priti Upadhyay; Mikolaj Czerkawski; Christopher Davison; Javier Cardona; Malcolm Macdonald; Ivan Andonovic; Craig Michie; Robert Atkinson; Nikela Papadopoulou; Konstantinos Nikas; Christos Tachtatzis | A Flexible Multi-Temporal and Multi-Modal Framework for Sentinel-1 and Sentinel-2 Analysis Ready Data | Remote Sensing | vol=14 no=5 page=1120 art=None | year=2022 | type=journal-article
+
+## dev
+OURS: M. Dev, V. V. S. Krishna, D. Kumar, and M. K. Jha, “Integrated geospatial database design for land use pattern analysis and its impact on local governance: A case study of Manesar Urban Complex, Gurugram, India,” *Journal of Applied and Natural Science*, vol. 15, no. 4, 2023, doi: 10.31018/jans.v15i4.5084.
+CR  : Manuj Dev; Vanama Venkata Sai Krishna; Deepak Kumar; Manas Kumar Jha | Integrated geospatial database design for land use pattern analysis and its impact on local governance: A case study of Manesar Urban Complex, Gurugram, India | Journal of Applied and Natural Science | vol=15 no=4 page=1541-1556 art=None | year=2023 | type=journal-article
+
+## vattumilli
+OURS: P. K. Vattumilli, “Metadata-driven ETL pipelines: A framework for scalable data integration architecture,” *International Journal of Scientific Research in Computer Science, Engineering and Information Technology*, vol. 10, no. 6, 2024, doi: 10.32628/CSEIT241061224.
+CR  : Pradeep Kumar Vattumilli | Metadata-Driven ETL Pipelines: A Framework for Scalable Data Integration Architecture | International Journal of Scientific Research in Computer Science, Engineering and Information Technology | vol=10 no=6 page=1799-1807 art=None | year=2024 | type=journal-article
+
+## gopaluni
+OURS: J. Gopaluni, “Metadata driven optimization of distributed ETL pipelines in cloud native data warehouses,” *International Journal of Computational and Experimental Science and Engineering*, vol. 11, no. 4, 2025, doi: 10.22399/ijcesen.4742.
+CR  : Jitendra Gopaluni | Metadata Driven Optimization of Distributed ETL Pipelines in Cloud Native Data Warehouses | International Journal of Computational and Experimental Science and Engineering | vol=11 no=4 page=None art=None | year=2025 | type=journal-article
+
+## ananth
+OURS: V. Ananthakrishnan, “Governance frameworks for large-scale ETL ecosystems in complex data environments,” *Journal of Computer Science and Technology Studies*, vol. 8, no. 5, 2026, doi: 10.32996/jcsts.2026.8.5.5.
+CR  : Vasudevan Ananthakrishnan | Governance Frameworks for Large-Scale ETL Ecosystems in Complex Data Environments | Journal of Computer Science and Technology Studies | vol=8 no=5 page=82-87 art=None | year=2026 | type=journal-article
+
+## male
+OURS: V. R. Male, “Decoding role-based access control (RBAC),” *International Journal of Scientific Research in Computer Science, Engineering and Information Technology*, vol. 11, no. 1, 2025, doi: 10.32628/CSEIT251112211.
+CR  : Vinay Reddy Male | Decoding Role-Based Access Control (RBAC) | International Journal of Scientific Research in Computer Science, Engineering and Information Technology | vol=11 no=1 page=2082-2090 art=None | year=2025 | type=journal-article
+
+## purwitasari
+OURS: A. Purwitasari, R. Permatasari, and A. B. Putra, “Implementasi role-based access control (RBAC) untuk keamanan sistem informasi penjualan perhiasan pada PostgreSQL di pgAdmin4 dan DBeaver,” *Jurnal SCRIPT*, vol. 13, no. 2, 2025, doi: 10.34151/script.v13i2.5464.
+CR  : Astri Purwitasari; Reisa Permatasari; Agung Brastama Putra | Implementasi Role-Based Access Control (RBAC) untuk Keamanan Sistem Informasi Penjualan Perhiasan pada Postgresql di Pgadmin4 dan Dbeaver | Jurnal SCRIPT | vol=13 no=2 page=134-143 art=None | year=2025 | type=journal-article
+
+## tilung
+OURS: G. E. Tilung, N. Prastomo, and A. F. Reza, “Analysis and visualization of earthquake patterns (2021–2025) in the South Lebak region based on the dataset from Gugus Mitigasi Lebak Selatan,” in *International Conference on New Media Studies (CONMEDIA)*, 2025, doi: 10.1109/CONMEDIA67140.2025.11290328.
+CR  : Gilbert Evan Tilung; Niki Prastomo; Anis Faisal Reza | Analysis and Visualization of Earthquake Patterns (2021-2025) in the South Lebak Region Based on the Dataset from Gugus Mitigasi Lebak Selatan | 2025 8th International Conference on New Media Studies (CONMEDIA) | vol=None no=None page=163-170 art=None | year=2025 | type=proceedings-article
+
+## wong
+OURS: R. F. Wong, S. A. Sanjaya, C. Darren, H. Yahya, and M. F. Riyadi, “Perancangan dasbor pra-bencana tsunami di Gugus Mitigasi Lebak Selatan: Visualisasi dan mitigasi di Panggarangan,” *G-Tech: Jurnal Teknologi Terapan*, vol. 8, no. 4, 2024, doi: 10.70609/gtech.v8i4.4763.
+CR  : Richard Faustine Wong; Samuel Ady Sanjaya; Christopher Darren; Howard Yahya; Muhammad Fikri Riyadi | Perancangan Dasbor Pra-Bencana Tsunami di Gugus Mitigasi Lebak Selatan: Visualisasi dan Mitigasi di Panggarangan | G-Tech: Jurnal Teknologi Terapan | vol=8 no=4 page=2241-2252 art=None | year=2024 | type=journal-article
+
+## pradipta
+OURS: R. A. Pradipta, P. B. Wintoro, and D. Budiyanto, “Perancangan pemodelan basis data sistem informasi secara konseptual dan logikal,” *Jurnal Informatika dan Teknik Elektro Terapan*, vol. 10, no. 2, 2022, doi: 10.23960/jitet.v10i2.2541.
+CR  : Rio Ariestia Pradipta; Puput Budi Wintoro; Deny Budiyanto | PERANCANGAN PEMODELAN BASIS DATA SISTEM INFORMASI SECARA KONSEPTUAL DAN LOGIKAL | Jurnal Informatika dan Teknik Elektro Terapan | vol=10 no=2 page=None art=None | year=2022 | type=journal-article
+
+## rahmawati
+OURS: T. Rahmawati, E. Y. Sari, A. T. Shakti, and A. N. Yomura, “Analisis perancangan database manajemen sistem untuk sistem penunjang proses bisnis wedang uwuh instan,” *TEKNIMEDIA: Teknologi Informasi dan Multimedia*, vol. 4, no. 1, 2023, doi: 10.46764/teknimedia.v4i1.104.
+CR  : Titik Rahmawati; Eka Yulia Sari; Anjasmara Tanjung Shakti; Atthaya Nanda Yomura | ANALISIS PERANCANGAN DATABASE MANAGEMEN SISTEM UNTUK SISTEM PENUNJANG PROSES BISNIS WEDANG UWUH INSTAN | TEKNIMEDIA: Teknologi Informasi dan Multimedia | vol=4 no=1 page=61-69 art=None | year=2023 | type=journal-article
+
+## siregar
+OURS: M. F. Siregar, R. A. Adithia, R. Azizzah, and I. Ernawati, “Sistem informasi pemesanan makanan online,” *Jurnal Riset Sistem Informasi*, vol. 2, no. 4, 2025, doi: 10.69714/4t9nht72.
+CR  : Moniqah Febbyanti Siregar; Ryanalea Ananda Adithia; Ratu Azizzah; Iin Ernawati | SISTEM INFORMASI PEMESANAN MAKANAN ONLINE | Jurnal Riset Sistem Informasi | vol=2 no=4 page=13-19 art=None | year=2025 | type=journal-article
+
+## kaptsov
+OURS: L. Kaptosv, “Applying PostGIS for storage and processing of geospatial data in logistics system,” *The American Journal of Engineering and Technology*, vol. 7, no. 8, 2025, doi: 10.37547/tajet/volume07issue08-28.
+CR  : Bechalor Degree in Computer Science, Odesa National University of Technology, smartbarrel.io - Senior Software Engineer; Liubomyr Kaptosv | Applying Postgis for Storage and Processing of Geospatial Data in Logistics System | The American Journal of Engineering and Technology | vol=07 no=08 page=318-327 art=None | year=2025 | type=journal-article
+
+## kaptsov_api
+OURS: L. Kaptosv, “RESTful API design for geospatial logistics platforms using TypeScript and Laravel,” *Journal of Information, Technology and Policy*, 2025, doi: 10.62836/jitp.2025.515.
+CR  : Liubomyr Kaptosv | RESTful API Design for Geospatial Logistics Platforms Using Type Script and Laravel | Journal of Information, Technology and Policy | vol=None no=None page=1-13 art=None | year=2025 | type=journal-article
+
+## papasani
+OURS: P. K. Papasani and R. T. Papasani, “PostGIS-powered proximity queries: Implementation and Google Maps visualization,” *PeerJ Computer Science*, vol. 11, 2025, doi: 10.7717/peerj-cs.3220.
+CR  : Pavan Kumar Papasani; Ravi Teja Papasani | PostGIS-powered proximity queries: implementation and Google Maps visualization | PeerJ Computer Science | vol=11 no=None page=e3220 art=e3220 | year=2025 | type=journal-article
+
+## tran
+OURS: K. H. Tran, M. Menenti, and L. Jia, “Surface water mapping and flood monitoring in the Mekong Delta using Sentinel-1 SAR time series and Otsu threshold,” *Remote Sensing*, vol. 14, no. 22, Art. no. 5721, 2022, doi: 10.3390/rs14225721.
+CR  : Khuong H. Tran; Massimo Menenti; Li Jia | Surface Water Mapping and Flood Monitoring in the Mekong Delta Using Sentinel-1 SAR Time Series and Otsu Threshold | Remote Sensing | vol=14 no=22 page=5721 art=None | year=2022 | type=journal-article
+
+## halder
+OURS: B. Halder *et al.*, “Large-scale flood hazard monitoring and impact assessment on landscape: Representative case study in India,” *Sustainability*, vol. 15, no. 14, Art. no. 11413, 2023, doi: 10.3390/su151411413.
+CR  : Bijay Halder; Subhadip Barman; Papiya Banik; Puja Das; Jatisankar Bandyopadhyay; Fredolin Tangang; Shamsuddin Shahid; Chaitanya B. Pande; Baqer Al-Ramadan; Zaher Mundher Yaseen | Large-Scale Flood Hazard Monitoring and Impact Assessment on Landscape: Representative Case Study in India | Sustainability | vol=15 no=14 page=11413 art=None | year=2023 | type=journal-article
+
+## alonso
+OURS: F. Alonso-Sarria, C. Valdivieso-Ros, and G. Molina-Pérez, “Detecting flooded areas using Sentinel-1 SAR imagery,” *Remote Sensing*, vol. 17, no. 8, Art. no. 1368, 2025, doi: 10.3390/rs17081368.
+CR  : Francisco Alonso-Sarria; Carmen Valdivieso-Ros; Gabriel Molina-Pérez | Detecting Flooded Areas Using Sentinel-1 SAR Imagery | Remote Sensing | vol=17 no=8 page=1368 art=None | year=2025 | type=journal-article
+
+## misra
+OURS: A. Misra, K. White, S. F. Nsutezo, W. Straka, and J. Lavista, “Mapping global floods with 10 years of satellite radar data,” *Nature Communications*, 2025, doi: 10.1038/s41467-025-60973-1.
+CR  : Amit Misra; Kevin White; Simone Fobi Nsutezo; William Straka; Juan Lavista | Mapping global floods with 10 years of satellite radar data | Nature Communications | vol=16 no=1 page=None art=5762 | year=2025 | type=journal-article
+
+## klein
+OURS: I. Klein, S. Uereyen, P. Sogno, A. Twele, A. Hirner, and C. Kuenzer, “Global WaterPack: The development of global surface water over the past 20 years at daily temporal resolution,” *Scientific Data*, 2024, doi: 10.1038/s41597-024-03328-7.
+CR  : Igor Klein; Soner Uereyen; Patrick Sogno; André Twele; Andreas Hirner; Claudia Kuenzer | Global WaterPack - The development of global surface water over the past 20 years at daily temporal resolution | Scientific Data | vol=11 no=1 page=None art=472 | year=2024 | type=journal-article
+
+## tang
+OURS: W. Tang *et al.*, “TRIMS LST: A daily 1 km all-weather land surface temperature dataset for China's landmass and surrounding areas (2000–2022),” *Earth System Science Data*, vol. 16, Art. no. 387, 2024, doi: 10.5194/essd-16-387-2024.
+CR  : Wenbin Tang; Ji Zhou; Jin Ma; Ziwei Wang; Lirong Ding; Xiaodong Zhang; Xu Zhang | TRIMS LST: a daily 1 km all-weather land surface temperature dataset for China's landmass and surrounding areas (2000–2022) | Earth System Science Data | vol=16 no=1 page=387-419 art=None | year=2024 | type=journal-article
+
+## seyf
+OURS: K. Seyfullazadə, “Database systems,” *Scientific Work*, vol. 19, Special Issue, 2025, doi: 10.36719/2663-4619/117/119-121.
+CR  : AEM ( Azerbaijan Science Center ); Kənan Seyfullazadə | Verilənlər bazası sistemləri | SCIENTIFIC WORK | vol=Special no=Issue 3 page=119-121 art=None | year=2025 | type=journal-article
+
+## sholah
+OURS: M. N. A. Sholah, I. Sutrisno, A. Z. Arfianto, D. P. Riananda, M. K. Hasin, and B. Rahmat, “Implementasi checksum untuk keandalan data dalam pesan AIS untuk pengembangan sistem prediksi daerah penangkapan ikan,” *Jurnal 7 Samudra*, vol. 9, no. 2, 2024, doi: 10.54992/7samudra.v9i2.186.
+CR  : MUHAMMAD NIAL ALANUS SHOLAH; Imam Sutrisno; Afif Zuhri Arfianto; Dimas Pristovani Riananda; Muhammad Khoirul Hasin; Basuki Rahmat | IMPLEMENTASI CHECKSUM UNTUK KEANDALAN DATA DALAM PESAN AIS UNTUK PENGEMBANGAN SISTEM PREDIKSI DAERAH PENANGKAPAN IKAN | Jurnal 7 Samudra | vol=9 no=2 page=61-68 art=None | year=2024 | type=journal-article
+
+## ramli
+OURS: A. Ramli and M. Y. Darus, “AI-ready ICT security for education: A holistic framework to strengthen data integrity at Malaysia's data centre,” *International Journal on e-Learning and Higher Education*, vol. 21, no. 1, 2026, doi: 10.24191/ijelhe.v21n1.2117.
+CR  : Azlin Ramli; Mohamad Yusof Darus | AI-Ready ICT Security for Education: A Holistic Framework to Strengthen Data Integrity at Malaysia’s Data Centre | International Journal on e-Learning and Higher Education | vol=21 no=1 page=121-139 art=None | year=2026 | type=journal-article
+
+## chanda
+OURS: D. Chanda, “Automated ETL pipelines for modern data warehousing: Architectures, challenges, and emerging solutions,” *The Eastasouth Journal of Information System and Computer Science*, vol. 1, no. 3, 2024, doi: 10.58812/esiscs.v1i03.523.
+CR  : Deepak Chanda | Automated ETL Pipelines for Modern Data Warehousing: Architectures, Challenges, and Emerging Solutions | The Eastasouth Journal of Information System and Computer Science | vol=1 no=03 page=209-212 art=None | year=2024 | type=journal-article
+
+## gujjala
+OURS: P. K. R. Gujjala, “Optimizing ETL pipelines with Delta Lake and medallion architecture: A scalable approach for large-scale data,” *International Journal for Multidisciplinary Research*, vol. 6, no. 6, 2024, doi: 10.36948/ijfmr.2024.v06i06.55445.
+CR  : Praveen Kumar Reddy Gujjala | Optimizing ETL Pipelines with Delta Lake and Medallion Architecture: A Scalable Approach for Large-Scale Data | International Journal For Multidisciplinary Research | vol=6 no=6 page=None art=55445 | year=2024 | type=journal-article
+
+## maryani
+OURS: N. Maryani, M. Muchlish, R. Mulyadi, and N. Solehah, “Blockchain-based audit trails: Improving transparency and fraud detection in digital accounting systems,” *International Journal of Advanced Computer Science and Applications*, vol. 17, no. 1, 2026, doi: 10.14569/IJACSA.2026.0170162.
+CR  : Neni Maryani; Munawar Muchlish; Roza Mulyadi; Nurhayati Solehah | Blockchain-Based Audit Trails: Improving Transparency and Fraud Detection in Digital Accounting Systems | International Journal of Advanced Computer Science and Applications | vol=17 no=1 page=None art=None | year=2026 | type=journal-article
+
+## alshamaa
+OURS: Z. M. Alshamaa and N. N. Saleem, “Black box software testing techniques: A literature review,” *Passer Journal of Basic and Applied Sciences*, vol. 7, no. 2, 2025, doi: 10.24271/psr.2025.508216.1963.
+CR  :  | Black box software testing techniques :a literature review | passer journal of basic and applied sciences | vol=7 no=2 page=None art=None | year=2025 | type=journal-article
+
+## maspupah
+OURS: A. Maspupah, “Literature review: Advantages and disadvantages of black box and white box testing methods,” *Jurnal Techno Nusa Mandiri*, vol. 21, no. 2, 2024, doi: 10.33480/techno.v21i2.5776.
+CR  : Asri Maspupah | LITERATURE REVIEW: ADVANTAGES AND DISADVANTAGES OF BLACK BOX AND WHITE BOX TESTING METHODS | Jurnal Techno Nusa Mandiri | vol=21 no=2 page=151-162 art=None | year=2024 | type=journal-article
+
+## maric
+OURS: V. Marić, “Difference and application of white-box, black-box, and grey-box testing,” *International Journal of Innovative Solutions in Engineering*, vol. 2, no. 1, 2026, doi: 10.47960/3029-3200.2026.2.1.39.
+CR  : Vedran Marić | Difference and Application of White-Box, Black-Box, and Grey-Box Testing | International Journal of Innovative Solutions in Engineering | vol=2 no=1 page=39 art=None | year=2026 | type=journal-article
+
+## salih
+OURS: Y. Salih and R. Saefullah, “Black box testing on website-based guestbook registration applications,” *International Journal of Mathematics, Statistics, and Computing*, vol. 2, no. 2, 2024, doi: 10.46336/ijmsc.v2i2.96.
+CR  : Yasir Salih; Rifki Saefullah | Black Box Testing on Website-Based Guestbook Registration Applications | International Journal of Mathematics, Statistics, and Computing | vol=2 no=2 page=44-49 art=None | year=2024 | type=journal-article
+
+## balsam
+OURS: S. Balsam and D. Mishra, “Web application testing—Challenges and opportunities,” *Journal of Systems and Software*, vol. 219, 2025, doi: 10.1016/j.jss.2024.112186.
+CR  : Sebastian Balsam; Deepti Mishra | Web application testing—Challenges and opportunities | Journal of Systems and Software | vol=219 no=None page=112186 art=112186 | year=2025 | type=journal-article
+

@@ -1,0 +1,472 @@
+TY  - JOUR
+AU  - Philipp Skavantzos
+AU  - Sebastian Link
+TI  - Third and Boyce–Codd normal form for property graphs
+T2  - The VLDB Journal
+PY  - 2025
+VL  - 34
+IS  - 2
+SP  - 
+DO  - 10.1007/s00778-025-00902-2
+UR  - https://link.springer.com/content/pdf/10.1007/s00778-025-00902-2.pdf
+KW  - 1 Normalisasi
+AB  - Abstract Normalization minimizes sources of potential data inconsistency and costs of update maintenance incurred by data redundancy. For relational databases, different classes of dependencies cause data redundancy and have resulted in proposals such as Third, Boyce–Codd, Fourth and Fifth Normal Form. Features of more advanced data models make it challenging to extend achievements from the relational model to missing, non-atomic, or uncertain data. We initiate research on the normalization of graph data, starting with a class of functional dependencies tailored to property graphs. We show that this class captures important semantics of applications, constitutes a rich source of data redundancy, its implication problem can be decided in linear time, and facilitates the normalization of property graphs flexibly tailored to their labels and properties that are targeted by applications. We normalize property graphs into Boyce–Codd Normal Form without loss of data and dependencies whenever possible, but guarantee Third Normal Form in general. Experiments on real-world property graphs quantify and qualify various benefits of graph normalization: (1) removing redundant property values as sources of inconsistent data, (2) detecting inconsistency as violation of functional dependencies, (3) reducing overheads for updates by orders of magnitude, and (4) significant speed ups of queries.
+ER  - 
+
+TY  - JOUR
+AU  - Zhuoxing Zhang
+AU  - Sebastian Link
+TI  - Synthesizing Third Normal Form Schemata that Minimize Integrity Maintenance and Update Overheads: Parameterizing 3NF by the Numbers of Minimal Keys and Functional Dependencies
+T2  - Proceedings of the ACM on Management of Data
+PY  - 2025
+VL  - 3
+IS  - 3
+SP  - 1-25
+DO  - 10.1145/3725362
+UR  - https://dl.acm.org/doi/pdf/10.1145/3725362
+KW  - 1 Normalisasi
+AB  - State-of-the-art relational schema design generates a lossless, dependency-preserving decomposition into Third Normal Form (3NF), that is in Boyce-Codd Normal Form (BCNF) whenever possible. In particular, dependency-preservation ensures that data integrity can be maintained on individual relation schemata without having to join them, but may need to tolerate a priori unbounded levels of data redundancy and integrity faults. As our main contribution we parameterize 3NF schemata by the numbers of minimal keys and functional dependencies they exhibit. Conceptually, these parameters quantify, already at schema design time, the effort necessary to maintain data integrity, and allow us to break ties between 3NF schemata. Computationally, the parameters enable us to optimize normalization into 3NF according to different strategies. Operationally, we show through experiments that our optimizations translate from the logical level into significantly smaller update overheads during integrity maintenance. Hence, our framework provides access to parameters that guide the computation of logical schema designs which reduce operational overheads.
+ER  - 
+
+TY  - JOUR
+AU  - Raji Ramachandran
+AU  - G Veena
+AU  - Anu Prasad
+AU  - Aparna Sujitha
+AU  - Bhamini Ravikumar
+TI  - NormaScore: Intelligent Database Normalization Assessment Framework for DBMS Education
+T2  - Big Data and Cognitive Computing
+PY  - 2026
+VL  - 10
+IS  - 10
+SP  - 343-343
+DO  - 10.3390/bdcc10100343
+UR  - https://doi.org/10.3390/bdcc10100343
+KW  - 1 Normalisasi
+AB  - Normalization is a core concept in Relational Database Management Systems (RDBMS) education, but assessing student’s normalization solutions is tedious and hard to scale. Current automated methods produce schemas out of structured inputs which cannot be used to do a mathematically precise and staged evaluation. This work introduces an end-to-end intelligent framework NormaScore that automatically evaluates database normalization solutions from First Normal Form (1NF) to Third Normal Form (3NF). The framework integrates a domain-specific Qwen2.5-7B-Instruct model trained with Supervised Fine-Tuning (SFT) and Group Relative Policy Optimization (GRPO) techniques, as well as deterministic algorithms for computing attribute closure, verifying joins without losing all data elements, and preserving functional dependencies. NormaBench is a first formally validated dataset of 113 problems from various real-world domains for normalization reasoning, which is a significant contribution. Reinforcement learning is guided by a mathematically sound reward function and correct normalization reasoning is enforced by stage-specific rewards. Experimental results show that the reward is improved by 0.26–0.53 compared with the REINFORCE baseline, and BERTScore F1 is 0.87–0.92 for reference schema generation, while the Pearson correlation is 0.91 with expert assessment of students. The results illustrate the effectiveness of the proposed solution, NormaScore, in automated assessment of normalization degree in databases, with respect to accuracy and scalability.
+ER  - 
+
+TY  - JOUR
+AU  - Ziheng Wei
+AU  - Sebastian Link
+TI  - The Bounded Cardinality Normal Form for the Logical Design of Relational Database Schemata
+T2  - ACM Transactions on Database Systems
+PY  - 2025
+VL  - 50
+IS  - 4
+SP  - 1-45
+DO  - 10.1145/3744897
+UR  - https://dl.acm.org/doi/pdf/10.1145/3744897
+KW  - 1 Normalisasi
+AB  - The goal of classical normalization is to maintain data consistency under updates, with a minimum level of effort. Given functional dependencies (FDs) alone, this goal is only achievable in the special case an FD-preserving Boyce–Codd Normal Form (BCNF) decomposition exists. As we show, in all other cases the level of effort can be neither controlled nor quantified. In response, we establish the ℓ-Bounded Cardinality Normal Form, parameterized by a positive integer ℓ. For every ℓ, the normal form condition requires from every instance that every value combination over the left-hand side of every non-trivial FD does not occur in more than ℓ tuples. BCNF is captured when ℓ =1. We show that schemata in ℓ-Bounded Cardinality Normal Form characterize instances in which updates to at most ℓ occurrences of any redundant data value are sufficient to maintain data consistency. In fact, for the smallest ℓ in which a schema is in ℓ-Bounded Cardinality Normal Form we capture an equilibrium between worst-case update inefficiency and best-case join efficiency, where some redundant data value can be joined with up to ℓ other data values. We then establish algorithms that compute schemata in ℓ-Bounded Cardinality Normal Form for the smallest level ℓ attainable across all lossless, FD-preserving decompositions. Additional algorithms (i) attain even smaller levels of effort based on the loss of some FDs, and (ii) decompose schemata based on prioritized FDs that cause high levels of effort. Our framework informs de-normalization already during logical design. In particular, every materialized view exhibits an equilibrium level ℓ that quantifies its worst-case incremental maintenance cost and its best-case support for join queries. Experiments with synthetic and real-world data illustrate which properties the schemata have that result from our algorithms, and how these properties predict the performance of update and query operations on instances over the schemata, without and with materialized views. We further demonstrate how our framework can automate the design of data warehouses by mining data for dimensions that exhibit high levels of data redundancy. In an effort to align data and the business rules that govern them, we use lattice theory to characterize ℓ-Bounded Cardinality Normal Form on database instances and schemata. As a consequence, any difference in constraints observed at instance and schema levels provides an opportunity to improve data quality, insight derived from analytics, and database performance.
+ER  - 
+
+TY  - JOUR
+AU  - Hao‐Chen Huang
+AU  - Bingyu Shen
+AU  - Li Zhong
+AU  - Yuanyuan Zhou
+TI  - Protecting Data Integrity of Web Applications with Database Constraints Inferred from Application Code
+T2  - ACM International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)
+PY  - 2023
+VL  - 
+IS  - 
+SP  - 632-645
+DO  - 10.1145/3575693.3575699
+UR  - https://dl.acm.org/doi/pdf/10.1145/3575693.3575699
+KW  - 2 Constraint
+AB  - Database-backed web applications persist a large amount of production data and have high requirements for integrity. To protect data integrity against application code bugs and operator mistakes, most RDBMSes allow application developers to specify various types of integrity constraints. Unfortunately, applications (e.g., e-commerce web apps) often do not take full advantage of this capability and miss specifying many database constraints, resulting in many severe consequences, such as crashing the order placement page and corrupting the store inventory data.
+ER  - 
+
+TY  - JOUR
+TI  - AVOIDANCE OF CYCLICAL REFERENCE OF FOREIGN KEYS IN DATA MODELING USING THE ENTITY-RELATIONSHIP MODEL
+T2  - Issues in Information Systems
+PY  - 2022
+VL  - 
+IS  - 
+SP  - 
+DO  - 10.48009/2_iis_2006_263-268
+UR  - https://doi.org/10.48009/2_iis_2006_263-268
+KW  - 2 Constraint
+AB  - The entity-relationship (ER) model is clearly established as a conceptual model of choice when building relational database systems.Once the ER model is built, it can be mapped algorithmically to the relational model and consequently to the data definition language (DDL) of SQL.Algorithmic mapping of the ER model to the relational model can produce foreign keys referencing each other's tables cyclically.This cyclical reference of foreign keys generates irresolvable deadlocks when enforcing the referential integrity rule using the cascading option.However, it is not obvious for database designers while building an ER model.In this article, we provide a set of rules of ER modeling for avoiding cyclical references of foreign keys.
+ER  - 
+
+TY  - JOUR
+AU  - Batya Kenig
+AU  - Dan Mircea Suciu
+TI  - Integrity Constraints Revisited: From Exact to Approximate Implication
+T2  - Logical Methods in Computer Science
+PY  - 2022
+VL  - Volume 18, Issue 1
+IS  - 
+SP  - 
+DO  - 10.46298/lmcs-18(1:5)2022
+UR  - https://lmcs.episciences.org/8943/pdf
+KW  - 2 Constraint
+AB  - Integrity constraints such as functional dependencies (FD) and multi-valued dependencies (MVD) are fundamental in database schema design. Likewise, probabilistic conditional independences (CI) are crucial for reasoning about multivariate probability distributions. The implication problem studies whether a set of constraints (antecedents) implies another constraint (consequent), and has been investigated in both the database and the AI literature, under the assumption that all constraints hold exactly. However, many applications today consider constraints that hold only approximately. In this paper we define an approximate implication as a linear inequality between the degree of satisfaction of the antecedents and consequent, and we study the relaxation problem: when does an exact implication relax to an approximate implication? We use information theory to define the degree of satisfaction, and prove several results. First, we show that any implication from a set of data dependencies (MVDs+FDs) can be relaxed to a simple linear inequality with a factor at most quadratic in the number of variables; when the consequent is an FD, the factor can be reduced to 1. Second, we prove that there exists an implication between CIs that does not admit any relaxation; however, we prove that every implication between CIs relaxes "in the limit". Then, we show that the implication problem for differential constraints in market basket analysis also admits a relaxation with a factor equal to 1. Finally, we show how some of the results in the paper can be derived using the I-measure theory, which relates between information theoretic measures and set theory. Our results recover, and sometimes extend, previously known results about the implication problem: the implication of MVDs and FDs can be checked by considering only 2-tuple relations.
+ER  - 
+
+TY  - JOUR
+AU  - Shamsa Kanwal
+AU  - Nauman Riaz Chaudhry
+AU  - Reema Choudhary
+AU  - Younus Ahamad Shaik
+AU  - Pankaj Yadav
+AU  - Ayesha Rashid
+TI  - Foreign Key Constraints to Maintain Referential Integrity in Distributed Database in Microservices Architecture
+T2  - International Journal of Advanced Computer Science and Applications
+PY  - 2025
+VL  - 16
+IS  - 6
+SP  - 
+DO  - 10.14569/ijacsa.2025.0160696
+UR  - http://thesai.org/Downloads/Volume16No6/Paper_96-Foreign_Key_Constraints_to_Maintain_Referential_Integrity.pdf
+KW  - 2 Constraint
+AB  - In the world of modern software development, microservices architecture has become increasingly popular due to its ability to help developers to build large and complex applications that are more agile, faster and more scalable. In large scale applications (such as e-commerce, healthcare, finance, social media, inventory management, travel booking, content management, and customer relationship management systems etc.) with many interconnected services, it is tough to keep the data accurate and consistent. The concept of referential integrity is applied to validate the data. Referential integrity refers to the preservation of relationships between tables. In a monolithic architecture, where the application and database are closely linked and co-located on the same server, referential integrity via foreign key constraints makes it feasible to preserve consistent and accurate data. But in the microservices architecture, maintaining referential integrity across distributed databases poses significant challenges due to its decentralized nature of data management. This study utilizes a hybrid research methodology, combining empirical research and design science research to discover and address the challenges of maintaining referential integrity in distributed databases in microservice architecture and calculate the response time by comparing and analyzing with existing models. The results of the evolution in term of response time are presented in this work.
+ER  - 
+
+TY  - JOUR
+AU  - Mariha Siddika Ahmad
+AU  - Brajendra Panda
+TI  - ClusteredLog: Optimizing Log Structures for Efficient Data Recovery and Integrity Management in Database Systems
+T2  - Electronics
+PY  - 2024
+VL  - 13
+IS  - 23
+SP  - 4723-4723
+DO  - 10.3390/electronics13234723
+UR  - https://www.mdpi.com/2079-9292/13/23/4723/pdf?version=1732870880
+KW  - 3 Backup/recovery
+AB  - In modern database systems, efficient log management is crucial for ensuring data integrity and facilitating swift recovery from potential data corruption or system failures. Traditional log structures, which store operations sequentially as they occur, often lead to significant delays in accessing and recovering specific data objects due to their scattered nature across the log. ClusteredLog addresses the limitations of traditional logging methods by implementing a novel logical organization of log entries. Instead of simply storing operations sequentially, it groups related operations for each data item into clusters. As a result, ClusteredLog enables faster identification and recovery of damaged data items and thus reduces the need for extensive log scanning, improving overall efficiency in database recovery processes. We introduce data structures and algorithms that facilitate the creation of these clustered logs, which also track dependencies and update operations on data items. Simulation studies demonstrate that our clustered log method significantly accelerates damage assessment and recovery times compared to traditional sequential logs, particularly as the number of transactions and data items increases. This optimization is pivotal for maintaining data integrity and operational efficiency in databases, especially in scenarios involving potential malicious modifications.
+ER  - 
+
+TY  - JOUR
+AU  - V K Dileep
+TI  - Approaches to Disaster Recovery in Cloud Databases: A Comparative Analysis of Current Mechanisms
+T2  - International Journal Of Engineering And Computer Science
+PY  - 2024
+VL  - 11
+IS  - 12
+SP  - 25634-25646
+DO  - 10.18535/ijecs/v11i12.4709
+UR  - https://ijecs.in/index.php/ijecs/article/view/4709/4210
+KW  - 3 Backup/recovery
+AB  - Disaster recovery (DR) is a critical aspect of maintaining the availability, integrity, and continuity of cloud databases, which store and manage vast amounts of mission-critical data. With the increasing reliance on cloud platforms for business operations, organizations must implement effective disaster recovery mechanisms to safeguard against data loss, downtime, and system failures. This paper presents a comparative analysis of current disaster recovery approaches in cloud databases, examining the strengths and weaknesses of various strategies, including backup and restore, data replication, and automated failover systems. We evaluate how these mechanisms are applied in different cloud models (public, private, and hybrid), considering factors such as recovery time objectives (RTO), recovery point objectives (RPO), cost, and scalability. The paper also discusses emerging technologies and trends in cloud DR, such as real-time data synchronization, machine learning-based predictive recovery, and multi-cloud disaster recovery solutions. Additionally, the role of cloud service providers’ Service Level Agreements (SLAs) in defining DR expectations is analyzed. By comparing the advantages and limitations of these mechanisms, this paper provides insights into how organizations can select the most appropriate DR strategy based on their specific business needs and risk tolerance. The study concludes by offering recommendations for optimizing disaster recovery plans in cloud environments to ensure business continuity and data protection in the face of unexpected disruptions.
+ER  - 
+
+TY  - JOUR
+AU  - Gayatri Shitanshu Kapadia
+AU  - Rustom D. Morena
+TI  - Expeditious data recovery in Not Only SQL (NoSQL) databases using a log-based approach
+T2  - PeerJ Computer Science
+PY  - 2026
+VL  - 12
+IS  - 
+SP  - e3507-e3507
+DO  - 10.7717/peerj-cs.3507
+UR  - https://peerj.com/articles/cs-3507.pdf
+KW  - 3 Backup/recovery
+AB  - Not Only SQL (NoSQL) databases lack standardized backup and recovery procedures, making fault tolerance and rapid restoration more challenging than in traditional relational systems. Achieving efficient recovery in distributed NoSQL environments requires mechanisms that can manage operational failures while preserving availability, consistency, and performance. This study investigates existing recovery strategies for NoSQL databases and introduces a novel log-based expeditious recovery mechanism tailored for distributed architectures. Our primary contribution is a transaction evaluator and cleaner system that performs real-time inspection of operational logs, identifies failed or inconsistent transactions, and prevents their propagation from the primary node to secondary replica nodes. Unlike conventional log-shipping and replication approaches, the proposed method integrates selective log forwarding with automated transaction sanitization, thereby reducing replica divergence, data loss, and overall recovery time. We implemented the system using Node.js and MongoDB Atlas, incorporating modules for log management, collection operations, and a lightweight journaling process for secondary nodes. Experimental evaluation shows that our approach improves recovery speed and reliability compared to standard replication-based techniques. These findings demonstrate a practical and robust solution for accelerating recovery in NoSQL databases, contributing meaningful advancement to failure-recovery research in distributed data systems.
+ER  - 
+
+TY  - JOUR
+AU  - Raghu Gollapudi
+TI  - Backup Integrity and Recovery Readiness Assessment for High-Availability Databases
+T2  - Computer Fraud & Security
+PY  - 2024
+VL  - 
+IS  - 
+SP  - 35-48
+DO  - 10.52710/cfs.1031
+UR  - https://computerfraudsecurity.com/index.php/journal/article/download/1031/739
+KW  - 3 Backup/recovery
+AB  - High-availability databases that support payment, settlement, and other always-on transactional workloads require more than status-based backup monitoring; they require explicit evidence that protected data can be restored within recovery-point and recovery-time constraints. In many operational estates, protection posture is still summarized through a small set of signals such as validation success, warning counts, or dashboard status. Those signals remain useful, but they do not reliably surface latent recovery blockers such as incomplete change-history chains, stale recovery metadata, unresolved replication gaps, restore-target dependency failures, or policy breaches that make a nominally protected database operationally unrecoverable. This study proposes a dual-score assessment framework consisting of a Backup Integrity Score (BIS) and a Restore Readiness Score (RRS) for continuous post-backup evaluation in high-availability database environments. BIS measures artifact trustworthiness through validation state, corruption-free status, continuity of recoverable history, freshness, and metadata completeness. RRS extends BIS by incorporating restore-target compatibility, dependency availability, prior restore evidence, and policy penalties linked to safety-critical constraints. Hard-gate rules override favorable weighted scores whenever a single critical blocker exists. The paper presents an implementation-oriented control loop driven by scripts, SQL-based health checks, and scheduler chains, together with a controlled synthetic study of twenty scenarios used to illustrate method behavior. Within that controlled set, the framework shows stronger safety behavior than status-oriented baselines, especially for the Not-Ready class. The paper closes with a practical evidence-collection checklist to support future laboratory or field-scale validation.
+ER  - 
+
+TY  - JOUR
+AU  - Yasin Efendi
+AU  - Sodikin Sodikin
+AU  - Rahmat Haryanto
+TI  - Perancangan Dan Implementasi System Incremental Backup Database Postgresql Menggunakan Aplikasi Barman Di PT. ROF
+T2  - Jurnal Minfo Polgan
+PY  - 2023
+VL  - 12
+IS  - 1
+SP  - 958-965
+DO  - 10.33395/jmp.v12i1.12539
+UR  - https://jurnal.polgan.ac.id/index.php/jmp/article/download/12539/1702
+KW  - 3 Backup/recovery
+AB  - Perkembangan teknologi berkembang sangat cepat, tidak hanya dari segi hardware, namun software juga mengalami perkembangan yang sama. Salah satu dari sekian banyak hal yang perlu diperhatikan adalah backup. Backup adalah proses membuat data cadangan dengan cara menyalin atau membuat arsip data sehingga data tersebut dapat digunakan kembali apabila data tersebut hilang, rusak, terhapus atau yang di sebabkan oleh kesalahan kita sendiri atau factor lain diluar kemampuan kita. Database postgresql memiliki stabilitas yang lebih tinggi, sebab satu proses yang mati tidak akan menyebabkan seluruh daemon mati, selain itu database postgresql mendukung hampir semua konsep SQL. Proses backup server database postgresql dengan teknik incremental backup bekerja untuk menyalin semua data yang berubah sejak terakhir kali melakukan full backup dan waktu yang dibutuhkan untuk membackup lebih singkat, dimana server database utama dapat terkoneksi dengan server backup database secara realtime, ketika server utama dalam keadaan down, server database backup akan menggantikan kinerjanya.
+ER  - 
+
+TY  - JOUR
+AU  - Yosef Jeffri Silvanus Nahak
+AU  - Hindriyanto Dwi Purnomo
+TI  - Perancangan Sistem Replikasi Dan Sistem Backup Database Postgresql Menggunakan Repmgr Dan Barman
+T2  - Progresif Jurnal Ilmiah Komputer
+PY  - 2023
+VL  - 19
+IS  - 2
+SP  - 867-867
+DO  - 10.35889/progresif.v19i2.1319
+UR  - https://repository.uksw.edu//bitstream/123456789/31043/1/T1_672019055_Judul.pdf
+KW  - 3 Backup/recovery
+AB  - A database is an object consisting of a set of data that is important in terms of management. If there is a disturbance to the database that makes the data from a database lost or damaged, a way is needed to recover the data and a way is needed to prevent the absence of data. The purpose of this research is to test data availability using repmgr and barman. The research begins with installing a virtual machine, installing a replication and backup system followed by testing. The result of this research is that the repmgr and barman functions on the postgresql database provide a comprehensive solution for replication and backup management in the postgresql environment. Where repmgr can simplify replication administration tasks with failover and switchover functions and ensure high availability in the postgresql database while barman performs an efficient backup system as stated in the PITR barman function. Keywords : Replication; Backup Recovery; Postgresql Abstract Database merupakan objek yang terdiri dari sekumpulan data yang dalam hal pengelolaanya menjadi penting. Jika terjadi gangguan terhadap database yang membuat data dari suatu databasehilang ataupun rusak maka diperlukan cara untuk memulihkan data serta diperlukan cara untuk mencegah dengan ketersiadaan data. Tujuan penelitian ini adalah menguji avaibilitas data dengan menggunakan repmgr dan barman. Penelitian diawali dengan menginstall virtual machine, instalasi sistem replikasi dan backup dilanjutkan dengan pengujian. Hasil dari penelitian ini adalah fungsi repmgr dan barman pada database postgresql memberikan solusi yang komprehensif untuk manajemen replikasi dan backup dalam environtment postgresql. Dimana repmgr dapat menyederhanakan tugas administrasi replikasi dengan fungsi failover dan switchover serta memastikan high availability dalam database postgresql sedangkan barman melakukan sistem backup dengan efisien seperti tercantum dalam fungsi barman PITR. Kata kunci : Replikasi; pemulihan cadangan Postgresql
+ER  - 
+
+TY  - JOUR
+AU  - Abdulrahman Alyami
+AU  - Salvatore F. Pileggi
+AU  - Osama Sohaib
+AU  - Igor Titus Hawryszkiewycz
+TI  - Seamless transformation from use case to sequence diagrams
+T2  - PeerJ Computer Science
+PY  - 2023
+VL  - 9
+IS  - 
+SP  - e1444-e1444
+DO  - 10.7717/peerj-cs.1444
+UR  - https://doi.org/10.7717/peerj-cs.1444
+KW  - 4 UML
+AB  - System design is an essential subject taught in information systems and has become a core course in its curriculum. Unified modelling language (UML) has been broadly adopted, and it is common to support the system design process using different diagrams. Each diagram serves a purpose by focusing on a specific part of a particular system. Design consistency ensures a seamless process, as the diagrams are generally interrelated. However, creating a well-designed system takes a lot of work, especially for university students with work experience. To overcome this challenge, aligning the concepts across diagrams is essential, which can help achieve better consistency and management of the design system, especially in an educational setting. This article is an extension of our previous work, as we have discussed a simple scenario of Automated teller machines to demonstrate the alignment concepts between UML diagrams. From a more technical perspective, the current contribution provides a Java program that aligns concepts by converting text-based use cases to text-based sequence diagrams. Then, the text is transformed in PlantUML to generate its graphical representation. The developed alignment tool is expected to contribute to helping students and instructors during the system design phases to be more consistent and practical. Limitations and future work are presented.
+ER  - 
+
+TY  - JOUR
+AU  - Bukohwo Michael Esiefarienrhe
+AU  - Thusoyaone Joseph Moemi
+TI  - UML Design of Business Intelligence System for Small-Scale Enterprises
+T2  - Journal of Information Systems and Informatics
+PY  - 2024
+VL  - 6
+IS  - 1
+SP  - 495-513
+DO  - 10.51519/journalisi.v6i1.672
+UR  - http://dx.doi.org/10.51519/journalisi.v6i1.672
+KW  - 4 UML
+AB  - Small scale enterprises (SSEs) face numerous challenges in managing and processing their business data, which often leads to inefficiencies, errors, and suboptimal decision-making. To address these challenges, the design of a Business Intelligence (BI) system for SSEs using Unified Modeling Language (UML) diagrams is proposed. UML diagrams provide a visual modeling language that facilitates the design, analysis, and implementation of complex systems. The proposed BI system is designed to enable SSEs to gather, integrate, analyze, and present data from various sources, including sales, finance, operations, and customer relations. The agile methodology was used in the design of the mobile intelligence system (MoIS) utilizing the Scrum method because of its time-boxed iterations (sprints), cross-functional team collaboration, and regular feedback loops. The UML diagrams used in this design are use case diagrams, activity diagrams, class diagrams, and sequence diagrams. The use case diagrams identify the system's users and their interactions with the system, while the activity diagrams describe the system's processes and workflows. The class diagrams depict the system's data structures and relationships, and the sequence diagrams specify the interactions between system components. The proposed BI system provides SSEs with the necessary tools to make informed decisions, improve operational efficiency, and gain a competitive advantage. The UML-based design approach ensures that the BI system is well-structured, easy to maintain, and scalable. The effectiveness of the proposed BI system is demonstrated through a case study of an SSE in the retail industry. The results indicate that the BI system improves the SSE's decision-making processes and enables it to respond more quickly to changing market conditions. The proposed BI system using UML diagrams is a valuable contribution to the field of BI systems design and is expected to benefit SSEs in various industries.
+ER  - 
+
+TY  - JOUR
+AU  - Mantas Ražinskas
+AU  - Benas Miliūnas
+AU  - Mantas Jurgelaitis
+AU  - Lina Čeponienė
+AU  - Lina Bisikirskienė
+TI  - Transforming Sketches of UML Use Case Diagrams to Models
+T2  - IEEE Access
+PY  - 2024
+VL  - 
+IS  - 
+SP  - 1-1
+DO  - 10.1109/access.2024.3514455
+UR  - https://doi.org/10.1109/access.2024.3514455
+KW  - 4 UML
+AB  - Considering that use case specification often plays the most important role in requirements engineering, transitioning from a design on paper to an editable, standard-compliant model is a fitting candidate for automation. This paper presents a methodology for transforming Use Case diagram sketches into standardized UML Use Case models. The methodology utilizes a tailored Faster R-CNN network for detecting objects in the sketch, combined with the Google Cloud Vision API for text recognition. It also includes techniques for detecting and identifying diagram relations, their direction, start, and end points, and integrating these elements into a structured UML diagram. The final output is transformed into an XML Metadata Interchange (XMI) format file, ensuring compatibility with various UML Computer-Aided Software Engineering (CASE) tools. The methodology was implemented in a tool and empirically validated through experiments using a dataset of 32 Use Case diagram sketches, made up of 765 instances of Use Case diagram elements. The tool’s performance demonstrates 94% accuracy in symbol recognition and overall diagram digitization accuracy of 95%.
+ER  - 
+
+TY  - JOUR
+AU  - Pragya Jha
+AU  - Madhusmita Sahu
+AU  - Takanori Isobe
+TI  - A UML Activity Flow Graph-Based Regression Testing Approach
+T2  - Applied Sciences
+PY  - 2023
+VL  - 13
+IS  - 9
+SP  - 5379-5379
+DO  - 10.3390/app13095379
+UR  - https://www.mdpi.com/2076-3417/13/9/5379/pdf?version=1682438255
+KW  - 4 UML
+AB  - Regression testing is a crucial process that ensures that changes made to a system do not affect existing functionalities. However, there is currently no adequate technique for selecting test cases that consider changes in Unified Modeling Language (UML) activity flow graphs. This paper proposes a novel approach to regression testing of UML diagrams, focusing on healthcare management systems. We provide a formal definition of sequence and activity diagrams and their relationship and construct corresponding activity flow graphs, which are used to develop a regression testing algorithm. The proposed algorithm categorizes test cases into reusable, retestable, obsolete, and newly generated categories by comparing old and new versions of UML activity flow graphs. The methodology is evaluated using a custom-designed hospital management system website as the test case, and the results demonstrate a significant reduction in time and resources required for regression testing. Our study provides valuable insights into the application of UML diagrams and activity flow graphs in regression testing, making it an important contribution to software testing research.
+ER  - 
+
+TY  - JOUR
+AU  - Abdulrahman Alyami
+AU  - Hisham Allahem
+AU  - Ayman Mohamed Mostafa
+AU  - Mahmood A. Mahmood
+TI  - Automated project scheduling from UML sequence diagrams using OCR and critical path analysis
+T2  - Scientific Reports
+PY  - 2025
+VL  - 16
+IS  - 1
+SP  - 2558-2558
+DO  - 10.1038/s41598-025-32431-x
+UR  - https://www.nature.com/articles/s41598-025-32431-x_reference.pdf
+KW  - 4 UML
+AB  - This paper introduces a novel automated framework aimed at bridging the gap between software design documentation and practical project management schedules. The primary objective is to address the longstanding challenge of manually translating UML sequence diagrams, fundamental design artifacts in software engineering, into executable and accurate project management plans such as Gantt charts and precedence graphs. Current manual approaches to schedule generation are notably error-prone, time-consuming, and inadequately integrated with the dynamic requirements of Agile and iterative project environments. To tackle this critical research gap, the paper proposes an integrated methodological pipeline combining advanced Optical Character Recognition (OCR), dependency graph generation, and machine learning optimization techniques. Specifically, OCR is employed to automatically extract tasks, interactions, and temporal details directly from visual representations of UML sequence diagrams, significantly reducing transcription errors and saving valuable planning time. Following extraction, tasks are structured into a validated Directed Acyclic Graph (DAG), accurately modeling inter-task dependencies and constraints. Further enhancing scheduling accuracy, the study applies gradient descent methods to iteratively predict and optimize task durations, moving beyond static estimates to dynamically refined predictions based on real-world project constraints. A forward pass analysis then calculates the earliest feasible start times, while Critical Path Method (CPM) analysis identifies the tasks crucial for project completion timelines. Comprehensive experimental validation across diverse scenarios clearly demonstrates the effectiveness and reliability of the proposed framework. Results show notable improvements in scheduling precision, visualization clarity through8/ generated Gantt charts and precedence graphs, and offering practical benefits to project managers and software development teams.
+ER  - 
+
+TY  - JOUR
+AU  - Syaddam Syaddam
+AU  - Muhammad Yusril
+AU  - Agustinus Jimi Jon Kawuta
+AU  - Sehlmi Duwiputri Banni
+AU  - Yakobus Silfianus Ratu
+TI  - Desain Model Relational Database Perpustakaan SMP Negeri 13 Tarakan menggunakan Metode Database Life Cycle
+T2  - Jurnal Terapan Teknologi Informasi
+PY  - 2025
+VL  - 9
+IS  - 1
+SP  - 1-10
+DO  - 10.21460/jutei.2025.91.398
+UR  - https://jutei.ukdw.ac.id/index.php/jurnal/article/download/398/101
+KW  - 5 DBSDLC
+AB  - Perpustakaan merupakan salah satu unit layanan pendidikan yang memiliki peran esensial dalam mendukung proses belajar dan mengajar di sekolah. Sebagai sumber informasi dan pengetahuan, perpustakaan menyediakan berbagai macam sumber daya, sperti buku, jurnal, dan media pembelajaran lainnya, yang dapat dimanfaatkan oleh siswa, guru, dan staf sekolah untuk memperkaya wawasan dan meningkatkan kualitas pendidikan. Penelitian ini bertujuan untuk merancang model basis data relasional yang efektif dan terintegrasi untuk sistem perpustakaan sekolah, dengan menggunakan metode Database Life Cycle. Metode ini mencakup tahapan analisis kebutuhan, desain konseptual, desain logis, desain fisik, serta implementasi dan pengujian. Melalui proses perancangan dan implementasi, dihasilkan sebuah model basis data perpustakaan yang terdiri dari 8 tabel utama, yaitu tabel t. Tabel-tabel tersebut saling berelasi satu sama lain untuk menjaga integritas data dan memudahkan proses pengolahan informasi terkait perpustakaan. Hasil akhir menunjukkan bahwa basis data perpustakaan yang dirancang dapat mendukung seluruh aktivitas dan layanan perpustakaan secara efektif, mulai dari pengelolaan data anggota, katalog buku, peminjaman, hingga pelaporan. Melalui pengujian yang dilakukan, basis data ini terbukti dapat menerima data dengan baik dan siap untuk diimplementasikan dalam sistem informasi perpustakaan yang lebih komprehensif.
+ER  - 
+
+TY  - JOUR
+AU  - Denisha Trihapningsari
+AU  - Mayang Anglingsari Putri
+TI  - Perancangan Basis Data Sistem Reservasi Wisma Universitas Terbuka dengan Metode Database Life Cycle
+T2  - Jurnal Teknologi Sistem Informasi dan Aplikasi
+PY  - 2024
+VL  - 7
+IS  - 4
+SP  - 1638-1646
+DO  - 10.32493/jtsi.v7i4.45421
+UR  - https://openjournal.unpam.ac.id/index.php/JTSI/article/download/45421/21799
+KW  - 5 DBSDLC
+AB  - The current of wisma’s Universita Terbuka reservation system still faces various obstacles, especially related to data consistency and integrity anomalies. This problem causes errors in recording and confusion in the transaction process, such as duplication of invoice numbers, which in turn can reduce reporting accuracy. This research aims to design a basis data for the Open University guesthouse reservation system using the Basis data Life Cycle (DBLC) method. This method includes several stages, starting from needs analysis, conceptual, logical, and physical basis data design. The results show a well-structured and optimized basis data design, which supports the management of reservation data, check-in, check-out, and room reservation management. The normalization process to achieve Third Normal (3NF) ensures that the data is free from redundancy and remains consistent. The physical model of the basis data is implemented using SQL queries, which are ready to be applied to a Basis data Management System (DBMS). The designed basis data is expected to improve operational efficiency, record accuracy, and maintain data integrity in the Open University guesthouse reservation system. This research is also expected to contribute to the development of literature on systematic life cycle-based basis data design.
+ER  - 
+
+TY  - JOUR
+AU  - Samidi Samidi
+AU  - Ramdhani Hidayat
+TI  - Desain Model Database Mutasi Siswa Dengan Menerapkan Metode Database Life Cycle
+T2  - Technomedia Journal
+PY  - 2023
+VL  - 8
+IS  - 2SP
+SP  - 221-235
+DO  - 10.33050/tmj.v8i2sp.2063
+UR  - https://ijc.ilearning.co/index.php/TMJ/article/download/2063/722
+KW  - 5 DBSDLC
+AB  - Peserta didik pada beberapa kondisi dan alasan dapat mengajukan mutasi keluar dan masuk E perubahan data, sehingga untuk efisiensi penyesuaian data diperlukan implementasi metode database life cycle. Penelitian ini bertujuan untuk merancang desain model database mutasi siswa dengan menerapkan metode database life cycle. Penelitian ini menggunakan metode penelitian studi kasus dengan metode pengumpulan data melalui studi kepustakaan yakni mengeksplorasi jurnal, buku dan informasi lain yang relevan dengan kajian. Analisis dan desain model database menggunakan Metode Database Life Cycle (DBLC) yang berfokus pada desain database konseptual, desain database logis, dan desain basis data fisik. Hasil dari perancangan ini adalah sebuah model rancangan basis data dengan menerapkan metode DBLC yang memiliki relasi antar tabel atau relasional serta memiliki fungsi utama untuk menyimpan serta memelihara data serta mampu menjawab keperluan pengelolaan informasi yang diharapkan mampu mempermudah proses mutasi siswa.
+ER  - 
+
+TY  - JOUR
+AU  - Muhammad Rehan Anwar
+AU  - Suryari Purnama
+TI  - Boarding House Search Information System Database Design
+T2  - International Journal of Cyber and IT Service Management
+PY  - 2022
+VL  - 2
+IS  - 1
+SP  - 70-81
+DO  - 10.34306/ijcitsm.v2i1.89
+UR  - https://doi.org/10.34306/ijcitsm.v2i1.89
+KW  - 5 DBSDLC
+AB  - Technological advancements are causing humans to produce several inventions and developments to accomplish anything. Which one utilizes internet technology to obtain information as quickly and simply as possible? For example, if someone moves to a new area for work or school, they will need boarding houses. However, this information is difficult to obtain because it is traditionally passed down from person to person, and the boarding house owner finds it difficult to promote his boarding house. As a result, individuals require a computerized system to resolve this issue. This study aims to create a database design for a boarding home information system. This study employs the DBLC (Database Life Cycle) technique, which illustrates the life cycle of a database that may be developed at any time. Database design is separated into three parts: conceptual, logical, and physical database design.
+ER  - 
+
+TY  - JOUR
+AU  - Retno Kartika Ningrum
+AU  - Perdinan Perdinan
+AU  - Supari Supari
+AU  - Muh Taufik
+TI  - Atmospheric Stability Index Threshold for Very Heavy Rainfall Events in Indonesia
+T2  - Agromet
+PY  - 2026
+VL  - 
+IS  - 
+SP  - 61-61
+DO  - 10.29244/j.agromet.40.1.61-69
+UR  - https://journal.ipb.ac.id/agromet/article/download/69655/33724
+KW  - 6 Hujan BMKG (parsial)
+AB  - Indonesia's maritime tropical climate exhibits high atmospheric variability often triggering extreme rainfall that disrupts flight and increases hydrometeorological disaster risks. This study investigates threshold values of atmospheric stability indices —Lifted Index (LI), K-Index (KI), and Precipitable Water (PW)— as predictors of very heavy rainfall events (>100 mm/day). Daily rainfall data from six meteorological stations (Medan, Padang, Tangerang, Surabaya, Merauke, Kupang) across Indonesia for 1993-2024 was analysed for very high rainfall events. We used the receiver operating characteristic area under the curve (ROC AUC) method to quantify the indices’ ability to characterize and distinguish very heavy and non-very heavy rainfall, objectively identifying the optimal threshold. The results show spatially varying thresholds reflecting dominant local atmospheric factors, with KI dominant in Kupang, while LI and PW in Merauke. This suggests that the optimal threshold value is a region specific, emphasizing a local calibration. further, the findings are crucial for enhancing prediction accuracy and extreme weather warnings at airports.
+ER  - 
+
+TY  - JOUR
+AU  - Andi Sadri Agung
+AU  - A. Arfan Fauzi
+AU  - Andi Akram Nur Risal
+AU  - Fhatiah Adiba
+TI  - Implementasi Teknik Data Mining terhadap Klasifikasi Data Prediksi Curah Hujan BMKG Di Sulawesi Selatan
+T2  - Jurnal Tekno Insentif
+PY  - 2023
+VL  - 17
+IS  - 1
+SP  - 22-23
+DO  - 10.36787/jti.v17i1.955
+UR  - https://jurnal.lldikti4.or.id/index.php/jurnaltekno/article/download/955/228
+KW  - 6 Hujan BMKG (parsial)
+AB  - Abstrak Cuaca cenderung tidak stabil dan susah diprediksi mempengaruhi beberapa sektor kehidupan manusia. Pemanfaatan teknologi dibidang data sains dalam memprediksi cuaca mendatang sangat dibutuhkan. Badan Meteorologi Klimatologi dan Geofisika (BMKG) merupakan organisasi pemerintahan, bertugas memprediksi cuaca di Indonesia. Namun dalam menentukan akurasi data, diperlukan metode yang memprediksi cuaca dengan akurat. Penelitian ini bertujuan menghasilkan informasi dari klasifikasi data prediksi curah hujan BMKG di Sulawesi Selatan. Klasifikasi dibagi menjadi 5 kategori dengan 1036 data dan 11 atribut. Pengumpulan data dimulai dari 1 Januari 2020 hingga 31 Oktober 2022. K = 3 menjadi nilai K terbaik dengan akurasi mencapai 82,21%. Sehingga disimpulkan bahwa data prediksi curah hujan BMKG memiliki tingkat akurasi data yang baik dan hasil penelitian ini dapat dijadikan acuan dalam menginformasikan curah hujan di Sulawesi Selatan. Abstract The weather tends to be unstable and difficult to predict, affecting several sectors of human life. The utilization of technology in the field of scientific data in predicting future weather is urgently needed. The Meteorology, Climatology, and Geophysics Agency (BMKG) is a government organization, tasked with predicting weather in Indonesia. But in determining the accuracy of data, we require a method that predicts the weather accurately. This study aims to produce information from the classification of BMKG rainfall prediction data in South Sulawesi. Classification is divided into 5 categories with 1036 data and 11 attributes. Data collection starts from 1 January 2020 to 31 October 2022. K = 3 is the best K value with an accuracy of 82.21%. So it was concluded that BMKG rainfall prediction data has a good data accuracy level, and this study's results can be used as a reference in informing rainfall in South Sulawesi.
+ER  - 
+
+TY  - JOUR
+AU  - Ragil Andika Yuniawan
+AU  - Ahmad Rifa’i
+AU  - Fikri Faris
+AU  - Andy Subiyantoro
+AU  - Ratna Satyaningsih
+AU  - Alidina Nurul Hidayah
+AU  - Rokhmat Hidayat
+AU  - Akhyar Mushthofa
+AU  - Banata Wachid Ridwan
+AU  - Eka Priangga
+AU  - Agus Setyo Muntohar
+AU  - Victor G Jetten
+AU  - C.J. van Westen
+AU  - Bastian van den Bout
+AU  - Samuel Jonson Sutanto
+TI  - Revised Rainfall Threshold in the Indonesian Landslide Early Warning System
+T2  - Geosciences
+PY  - 2022
+VL  - 12
+IS  - 3
+SP  - 129-129
+DO  - 10.3390/geosciences12030129
+UR  - https://www.mdpi.com/2076-3263/12/3/129/pdf?version=1646970478
+KW  - Saran longsor
+AB  - Landslides are one of the most disastrous natural hazards that frequently occur in Indonesia. In 2017, Balai Sabo developed an Indonesia Landslide Early Warning System (ILEWS) by utilizing a single rainfall threshold for an entire nation, leading to inaccuracy in landslide predictions. The study aimed to improve the accuracy of the system by updating the rainfall threshold. We analyzed 420 landslide events in Java with the 1-day and 3-day effective antecedent rainfall for each landslide event. Rainfall data were obtained from the Global Precipitation Measurement (GPM), which is also used in the ILEWS. We propose four methods to derive the thresholds: the first is the existing threshold applied in the Balai Sabo ILEWS, the second and third use the average and minimum values of rainfall that trigger landslides, respectively, and the fourth uses the minimum value of rainfall that induces major landslides. We used receiver operating characteristic (ROC) analysis to evaluate the predictability of the rainfall thresholds. The fourth method showed the best results compared with the others, and this method provided a good prediction of landslide events with a low error value. The chosen threshold was then applied in the Balai Sabo-ILEWS.
+ER  - 
+
+TY  - JOUR
+AU  - Rafaela Barbosa Nascimento
+AU  - Elton Pereira Teixeira
+AU  - Orlem Pinheiro de Lima
+AU  - Márcia Ribeiro Maduro
+AU  - Vanessa Coelho da Silva
+TI  - Process mapping: A case study in the contract sector of the Public Defender's office in the state of Amazonas
+T2  - ITEGAM- Journal of Engineering and Technology for Industrial Applications (ITEGAM-JETIA)
+PY  - 2023
+VL  - 9
+IS  - 44
+SP  - 
+DO  - 10.5935/jetia.v9i44.1012
+UR  - http://dx.doi.org/10.5935/jetia.v9i44.1012
+KW  - 8 5W1H
+AB  - The objective of the study was to analyze, from the perspective of process management, the bottlenecks in lease contracts at the Public Defender's Office of the State of Amazonas. It consists of an applied case study, with a descriptive qualitative approach, using Business Process Management (BPM) as the guiding methodology and the 5W1H quality tool to suggest improvements in the processes. The results identified the main bottlenecks as the lack of procedure and flowchart development, absence of a schedule for opening branches, low synergy and communication among employees, as well as a lack of clear roles for those responsible for the processes. It is considered that through process mapping and bottleneck identification, it was possible to propose the following actions to ensure the continuous improvement of the process: development of procedures and flows, organizational climate research, meetings to understand departmental demands, and the creation of an opening schedule for processes and alignment of deadlines.
+ER  - 
+
+TY  - JOUR
+AU  - Muhammad Alfafa Rizky
+AU  - Sumiati Sumiati
+TI  - Performance Analysis Of Marketing and Customer Service Division Using The 5W1H Method and Fishbone Diagram At PT XYZ
+T2  - International Journal of Mechanical, Industrial and Control Systems Engineering
+PY  - 2024
+VL  - 1
+IS  - 4
+SP  - 65-71
+DO  - 10.61132/ijmicse.v1i4.130
+UR  - https://international.aritekin.or.id/index.php/IJMICSE/article/download/130/127
+KW  - 8 5W1H
+AB  - In an era of increasingly fierce competition in the energy sector, companies are required to not only meet customer needs, but also to improve service quality and customer satisfaction in a sustainable manner. This study aims to analyze and improve the performance of the Marketing and Customer Service Division at PT XYZ by applying the 5W1H method and the Fishbone Diagram. The study identified a number of factors that contributed to the division's low performance, including a lack of adequate training and decreased work motivation. Through in-depth analysis, this study provides strategic recommendations to improve the quality of training, the development of an integrated information system, and the establishment of clear service standards. The implementation of these recommendations is expected to improve productivity, service quality, and customer satisfaction, as well as strengthen the company's position in a competitive market.
+ER  - 
+
+TY  - JOUR
+AU  - Totok Sulistyo
+AU  - Karmila Achmad
+AU  - Ida Bagus Irawan Purnama
+TI  - The Asset Management and Tracking System for Technical and Vocational Education and Training (TVET) Institution Based on Ubiquitous Computing
+T2  - ComTech Computer Mathematics and Engineering Applications
+PY  - 2022
+VL  - 13
+IS  - 1
+SP  - 23-34
+DO  - 10.21512/comtech.v13i1.7342
+UR  - https://journal.binus.ac.id/index.php/comtech/article/download/7342/4474
+KW  - 8 5W1H
+AB  - Generally, Technical and Vocational Education and Training (TVET) has numerous types of assets used for conducting various skill-based learning activities. The failure to properly manage the TVET assets can lead to inefficient operation and administration, such as difficulty in tracking the history of the asset, location, and users. The research solved the problems by developing and implementing asset management and tracking system based on ubiquitous cloud computing for movable and fixed assets. The research activities were conducted in Politeknik Negeri Balikpapan, one of ten state-owned TVET institutions in Indonesia. This system was accessed using a web and mobile application. Quick Response (QR) code was used for asset identification to make a mobile device read the code with their built-in camera. Meanwhile, the geolocation was attached to provide the spatial information of assets’ whereabouts. Then, the research adopted the 5W1H question principle, so all aspects of asset management were collected and understood. The results show that the system helps TVET to keep track of their equipment and vital inventories in realtime. Moreover, the implementation of the system has a great impact administratively and ease in delivering instantaneous data and assets history for decisionmaking to internal and external asset auditors.
+ER  - 

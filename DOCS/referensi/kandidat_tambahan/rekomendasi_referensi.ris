@@ -1,0 +1,211 @@
+TY  - JOUR
+AU  - Vaivaw Kumar Singh
+AU  - Kunal Sinha
+TI  - A Theoretical Analysis of Functional Dependencies and Normalization in Relational Database Design
+T2  - International Journal of Research and Innovation in Applied Science
+PY  - 2026
+VL  - 11
+IS  - 8
+SP  - 550-566
+DO  - 10.51584/ijrias.2026.11080041
+UR  - https://rsisinternational.org/journals/ijrias/uploads/vol11-iss8-pg550-566-202609_pdf.pdf
+KW  - 1_normalisasi
+AB  - Relational database design focuses on organizing data in a way that cuts down on redundancy, keeps data integrity intact, and allows for efficient data access and updates. At the core of this process are functional dependencies and normalization. Functional dependencies act as a formal way to capture how different attributes relate to each other. Normalization leverages these dependencies, breaking down poorly structured tables into well-designed relational schemas. This paper explores the theory behind functional dependencies and normalization in relational database design. It looks closely at the basics of functional dependencies, Armstrong's axioms, attribute closure, candidate keys, and how dependencies intersect with relational keys. The discussion then moves through the steps of normalization: starting with First Normal Form (1NF), moving to Second (2NF), Third (3NF), Boyce-Codd (BCNF), Fourth (4NF), and Fifth Normal Form (5NF). The research uses a theoretical and conceptual approach, analyzing key database literature. The findings show that functional dependencies are key in spotting redundancy and update problems, while normalization offers a structured way to remove these issues through decompositions that preserve both loss lessness and dependencies. Even so, normalization sometimes requires balancing theoretical soundness with practical performance concerns. The main takeaway is that good relational database design depends on applying normalization rules wisely, analyzing dependencies, enforcing integrity constraints, and considering real-world system needs.
+ER  - 
+
+
+TY  - JOUR
+AU  - Shamsa Kanwal
+AU  - Nauman Riaz Chaudhry
+AU  - Reema Choudhary
+AU  - Younus Ahamad Shaik
+AU  - Pankaj Yadav
+AU  - Ayesha Rashid
+TI  - Foreign Key Constraints to Maintain Referential Integrity in Distributed Database in Microservices Architecture
+T2  - International Journal of Advanced Computer Science and Applications
+PY  - 2025
+VL  - 16
+IS  - 6
+SP  - 
+DO  - 10.14569/ijacsa.2025.0160696
+UR  - http://thesai.org/Downloads/Volume16No6/Paper_96-Foreign_Key_Constraints_to_Maintain_Referential_Integrity.pdf
+KW  - 2_constraint
+AB  - In the world of modern software development, microservices architecture has become increasingly popular due to its ability to help developers to build large and complex applications that are more agile, faster and more scalable. In large scale applications (such as e-commerce, healthcare, finance, social media, inventory management, travel booking, content management, and customer relationship management systems etc.) with many interconnected services, it is tough to keep the data accurate and consistent. The concept of referential integrity is applied to validate the data. Referential integrity refers to the preservation of relationships between tables. In a monolithic architecture, where the application and database are closely linked and co-located on the same server, referential integrity via foreign key constraints makes it feasible to preserve consistent and accurate data. But in the microservices architecture, maintaining referential integrity across distributed databases poses significant challenges due to its decentralized nature of data management. This study utilizes a hybrid research methodology, combining empirical research and design science research to discover and address the challenges of maintaining referential integrity in distributed databases in microservice architecture and calculate the response time by comparing and analyzing with existing models. The results of the evolution in term of response time are presented in this work.
+ER  - 
+
+
+TY  - JOUR
+AU  - Hao‐Chen Huang
+AU  - Bingyu Shen
+AU  - Li Zhong
+AU  - Yuanyuan Zhou
+TI  - Protecting Data Integrity of Web Applications with Database Constraints Inferred from Application Code
+T2  - ACM International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)
+PY  - 2023
+VL  - 
+IS  - 
+SP  - 632-645
+DO  - 10.1145/3575693.3575699
+UR  - https://dl.acm.org/doi/pdf/10.1145/3575693.3575699
+KW  - 2_constraint
+AB  - Database-backed web applications persist a large amount of production data and have high requirements for integrity. To protect data integrity against application code bugs and operator mistakes, most RDBMSes allow application developers to specify various types of integrity constraints. Unfortunately, applications (e.g., e-commerce web apps) often do not take full advantage of this capability and miss specifying many database constraints, resulting in many severe consequences, such as crashing the order placement page and corrupting the store inventory data.
+ER  - 
+
+
+TY  - JOUR
+AU  - Raghu Gollapudi
+TI  - Backup Integrity and Recovery Readiness Assessment for High-Availability Databases
+T2  - Computer Fraud & Security
+PY  - 2024
+VL  - 
+IS  - 
+SP  - 35-48
+DO  - 10.52710/cfs.1031
+UR  - https://computerfraudsecurity.com/index.php/journal/article/download/1031/739
+KW  - 3_backup_recovery
+AB  - High-availability databases that support payment, settlement, and other always-on transactional workloads require more than status-based backup monitoring; they require explicit evidence that protected data can be restored within recovery-point and recovery-time constraints. In many operational estates, protection posture is still summarized through a small set of signals such as validation success, warning counts, or dashboard status. Those signals remain useful, but they do not reliably surface latent recovery blockers such as incomplete change-history chains, stale recovery metadata, unresolved replication gaps, restore-target dependency failures, or policy breaches that make a nominally protected database operationally unrecoverable. This study proposes a dual-score assessment framework consisting of a Backup Integrity Score (BIS) and a Restore Readiness Score (RRS) for continuous post-backup evaluation in high-availability database environments. BIS measures artifact trustworthiness through validation state, corruption-free status, continuity of recoverable history, freshness, and metadata completeness. RRS extends BIS by incorporating restore-target compatibility, dependency availability, prior restore evidence, and policy penalties linked to safety-critical constraints. Hard-gate rules override favorable weighted scores whenever a single critical blocker exists. The paper presents an implementation-oriented control loop driven by scripts, SQL-based health checks, and scheduler chains, together with a controlled synthetic study of twenty scenarios used to illustrate method behavior. Within that controlled set, the framework shows stronger safety behavior than status-oriented baselines, especially for the Not-Ready class. The paper closes with a practical evidence-collection checklist to support future laboratory or field-scale validation.
+ER  - 
+
+
+TY  - JOUR
+AU  - Sathishkumar Veerappampalayam Easwaramoorthy
+AU  - Ng Soon Teck
+AU  - Ng Wen Chao
+AU  - Samuel Lee Zhi Jian
+TI  - A Detailed Analysis of Backup and Recovery Techniques in Database Management Systems (DBMS)
+T2  - Journal of AI-Driven Communication Engineering
+PY  - 2025
+VL  - 1
+IS  - 
+SP  - 77-109
+DO  - 10.31875/2979-1081.2025.01.09
+UR  - https://zealpress.com/index.php/jaicde/article/download/736/596
+KW  - 3_backup_recovery
+AB  - In this exponential growth age and frequent disruption, data has to be really secure, integral, and accessible. DBMS plays a keynote in all these aspects. This report reviews the backup and recovery techniques of four DBMSs: Cassandra, MongoDB, Neo4j, and Oracle. It discusses their efficacy in restoring data loss and maintaining schema integrity. This study throws light on the challenge of complete data and schema recovery considering operational nuances and system-specific requirements. The recovery processes were recreated in the controlled environments by using hands-on experimentation. Recovery percentages for each DBMS were computed from recovered data. The results of the study indicate that 100% success rate for all systems, which means these systems do not fail in case of a disaster. These results give critical insight into the reliability and application-specific advantages of each DBMS in guiding database administrators in the design of resilient systems.
+ER  - 
+
+
+TY  - JOUR
+AU  - Siska Narulita
+AU  - Ahmad Nugroho
+AU  - M. Zakki Abdillah
+TI  - Diagram Unified Modelling Language (UML) untuk Perancangan Sistem Informasi Manajemen Penelitian dan Pengabdian Masyarakat (SIMLITABMAS)
+T2  - Bridge
+PY  - 2024
+VL  - 2
+IS  - 3
+SP  - 244-256
+DO  - 10.62951/bridge.v2i3.174
+UR  - https://doi.org/10.62951/bridge.v2i3.174
+KW  - 4_uml
+AB  - The management of data collection of research activities, community service, and publications that occur at the National University of Karangturi Semarang is still done manually using Microsoft Excel, which still has various problems related to collecting, storing, searching, processing, and presenting data when needed for the accreditation process. Based on these problems, an information system is needed that can accommodate all the problems experienced by users. Therefore, an information system will be developed to manage all data related to research activities, community service, and publications carried out by lecturers and improve the efficiency of data management. System design is one of the stages of developing an information system. Simlitabmas design has two main objectives, namely to fulfill the needs of users and to provide a clear picture to all personnel involved in system development. System design is one of the important steps in a system development in which a visual representation of a series of processes or activities in an institution or organization is made. One of the modeling or design tools that can be used is the Unified Modeling Language (UML). UML helps describe and design systems, especially in object-oriented programming. In this research, UML diagrams made consist of use case diagrams, activity diagrams, and sequence diagrams.
+ER  - 
+
+
+TY  - JOUR
+AU  - Zainab Hassan Muhamad
+AU  - Dhafer Abdulameer Abdulmonim
+AU  - Bashar Alathari
+TI  - An integration of uml use case diagram and activity diagram with Z language for formalization of library management system
+T2  - International Journal of Electrical and Computer Engineering (IJECE)
+PY  - 2019
+VL  - 9
+IS  - 4
+SP  - 3069-3069
+DO  - 10.11591/ijece.v9i4.pp3069-3076
+UR  - http://ijece.iaescore.com/index.php/IJECE/article/download/14044/12892
+KW  - 4_uml
+AB  - Unified Modeling Language (UML) is the effective standard for modeling object-oriented software systems. However, the ambiguity of semantics and the absence of consistency among UML diagrams lead to lack of precisely defining the requirements of a system. On the other hand, formal methods are techniques and tools use the mathematical notations, and they involve the precise syntax and semantics of the unambiguous software requirements specification. It applied in early stages of Software Development Life Cycle (SDLC). Therefore, an integrated between UML specification and formal specification is required to reduce the requirements' ambiguity and error, and to improve the quality and security of software systems. This paper proposes an approach involves the combining UML use-case diagram and activity diagrams with Z language for formalization of Library Management System (LMS). The focus of this paper is on consistency between the UML diagrams to Z Schema, and then verified by using the Z / EVEs tool.
+ER  - 
+
+
+TY  - JOUR
+AU  - Nurhayati Nurhayati
+AU  - Eni Nur Rahmawati
+AU  - Imanuel Dwi Anand Sinar Putra
+AU  - Dimas Rizky Maulana
+TI  - Designing a Child Behavior Disorder Expert System Database Using the Database Life Cycle Method
+T2  - Proceeding of International Conference on Science Health And Technology
+PY  - 2024
+VL  - 
+IS  - 
+SP  - 430-442
+DO  - 10.47701/icohetech.v5i1.4223
+UR  - https://ojs.udb.ac.id/icohetech/article/download/4223/2968
+KW  - 5_dbsdlc
+AB  - Behavioral disorders in children are complex issues that require careful handling in order to avoid affecting their future development. An expert system has been developed to assist parents, teachers, and health professionals in diagnosing and treating various types of behavioral disorders in children. A well-designed database is essential for an effective expert system, ensuring integrity, availability, and optimal performance. This research aims to design a database for an expert system for behavioral disorders in children using the database life cycle method. The study employs relational database design, including conceptual, logical, and physical design and implementation in MySQL DBMS. The results of the study indicate that the database design approach, including conceptual, logical, and physical databases, can produce an efficient database that adheres to the principles of a relational database.
+ER  - 
+
+
+TY  - JOUR
+AU  - Muhammad Rehan Anwar
+AU  - Suryari Purnama
+TI  - Boarding House Search Information System Database Design
+T2  - International Journal of Cyber and IT Service Management
+PY  - 2022
+VL  - 2
+IS  - 1
+SP  - 70-81
+DO  - 10.34306/ijcitsm.v2i1.89
+UR  - https://doi.org/10.34306/ijcitsm.v2i1.89
+KW  - 5_dbsdlc
+AB  - Technological advancements are causing humans to produce several inventions and developments to accomplish anything. Which one utilizes internet technology to obtain information as quickly and simply as possible? For example, if someone moves to a new area for work or school, they will need boarding houses. However, this information is difficult to obtain because it is traditionally passed down from person to person, and the boarding house owner finds it difficult to promote his boarding house. As a result, individuals require a computerized system to resolve this issue. This study aims to create a database design for a boarding home information system. This study employs the DBLC (Database Life Cycle) technique, which illustrates the life cycle of a database that may be developed at any time. Database design is separated into three parts: conceptual, logical, and physical database design.
+ER  - 
+
+
+TY  - JOUR
+AU  - Retno Kartika Ningrum
+AU  - Perdinan Perdinan
+AU  - Supari Supari
+AU  - Muh Taufik
+TI  - Atmospheric Stability Index Threshold for Very Heavy Rainfall Events in Indonesia
+T2  - Agromet
+PY  - 2026
+VL  - 
+IS  - 
+SP  - 61-61
+DO  - 10.29244/j.agromet.40.1.61-69
+UR  - https://journal.ipb.ac.id/agromet/article/download/69655/33724
+KW  - 6_bmkg_hujan
+AB  - Indonesia's maritime tropical climate exhibits high atmospheric variability often triggering extreme rainfall that disrupts flight and increases hydrometeorological disaster risks. This study investigates threshold values of atmospheric stability indices —Lifted Index (LI), K-Index (KI), and Precipitable Water (PW)— as predictors of very heavy rainfall events (>100 mm/day). Daily rainfall data from six meteorological stations (Medan, Padang, Tangerang, Surabaya, Merauke, Kupang) across Indonesia for 1993-2024 was analysed for very high rainfall events. We used the receiver operating characteristic area under the curve (ROC AUC) method to quantify the indices’ ability to characterize and distinguish very heavy and non-very heavy rainfall, objectively identifying the optimal threshold. The results show spatially varying thresholds reflecting dominant local atmospheric factors, with KI dominant in Kupang, while LI and PW in Merauke. This suggests that the optimal threshold value is a region specific, emphasizing a local calibration. further, the findings are crucial for enhancing prediction accuracy and extreme weather warnings at airports.
+ER  - 
+
+
+TY  - JOUR
+AU  - Orfefs Voutyras
+AU  - Aamir H. Bokhari
+AU  - Akira Tsuge
+AU  - Georgios Palaiokrassas
+AU  - Takafumi Kawasaki
+AU  - Xavier Cases-Camats
+AU  - Jin Nakazawa
+AU  - Αντώνιος Λίτκε
+AU  - T. Okoshi
+AU  - Theodora A. Varvarigou
+TI  - A Methodology for Generating Systems Architectural Glimpse Statements Using the 5W1H Maxim
+T2  - Computers
+PY  - 2021
+VL  - 10
+IS  - 10
+SP  - 131-131
+DO  - 10.3390/computers10100131
+UR  - https://www.mdpi.com/2073-431X/10/10/131/pdf?version=1634788449
+KW  - 8_5w1h
+AB  - Attempts to facilitate and streamline systems architecting have resulted in a great number of reusable principles, practices, mechanisms, frameworks, and tools. Such a practice is the use of architectural viewpoints and views. However, as systems change, these practices should also evolve. The increasing scale and complexity of systems resulting from an ever-growing pool of human needs and breakthroughs may lead, in some cases, to an increased gap between the abstraction activities attempting to capture the whole of a system, and the instantiation activities that produce concrete and detailed descriptions of a system’s architecture. To address this issue, this article introduces a new notion, that of architectural glimpse statements, fundamental questions acting as the building blocks for architectural views and products. This notion can help architects ask the right questions in the right manner to create fundamental statements, the elaboration on which can lead directly to concrete architectural products. Working on top of standardized and common approaches, the article introduces a language for the creation of architectural glimpse statements using the 5W1H maxim. Based on this language, a tool and guidelines are also provided to facilitate the usage of glimpses. Finally, the overall methodology is demonstrated in two case studies.
+ER  - 
+
+
+TY  - JOUR
+AU  - Muhammad Alfafa Rizky
+AU  - Sumiati Sumiati
+TI  - Performance Analysis Of Marketing and Customer Service Division Using The 5W1H Method and Fishbone Diagram At PT XYZ
+T2  - International Journal of Mechanical, Industrial and Control Systems Engineering
+PY  - 2024
+VL  - 1
+IS  - 4
+SP  - 65-71
+DO  - 10.61132/ijmicse.v1i4.130
+UR  - https://international.aritekin.or.id/index.php/IJMICSE/article/download/130/127
+KW  - 8_5w1h
+AB  - In an era of increasingly fierce competition in the energy sector, companies are required to not only meet customer needs, but also to improve service quality and customer satisfaction in a sustainable manner. This study aims to analyze and improve the performance of the Marketing and Customer Service Division at PT XYZ by applying the 5W1H method and the Fishbone Diagram. The study identified a number of factors that contributed to the division's low performance, including a lack of adequate training and decreased work motivation. Through in-depth analysis, this study provides strategic recommendations to improve the quality of training, the development of an integrated information system, and the establishment of clear service standards. The implementation of these recommendations is expected to improve productivity, service quality, and customer satisfaction, as well as strengthen the company's position in a competitive market.
+ER  - 

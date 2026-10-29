@@ -24,8 +24,8 @@
       desc: "Area pantauan Sentinel-1 per lintasan, scene, metrik numerik, dan log siklus." },
     { id: "M6", name: "Observasi, Peringatan & Kejadian", color: "#1f7a35", tint: "#e4f3e8",
       tables: ["region_observations", "alert_rules", "alert_events", "band_forecasts", "band_forecast_points", "band_forecast_scores",
-               "disaster_types", "disaster_events"],
-      desc: "Inti sistem: nilai harian per kecamatan, aturan dan peringatan hujan, forecast 15 hari, dan arsip kejadian bencana sebagai pembanding (RM1, RM3)." },
+               "disaster_types", "disaster_events", "user_notify_regions", "notify_sent"],
+      desc: "Inti sistem: nilai harian per kecamatan, aturan dan peringatan hujan, langganan dan jejak email peringatan per kecamatan, forecast 15 hari, dan arsip kejadian bencana sebagai pembanding (RM1, RM3)." },
   ];
   const MOD_OF = {};
   MODULES.forEach((m) => m.tables.forEach((t) => (MOD_OF[t] = m)));
