@@ -61,7 +61,7 @@ Status: **Terjawab** = ada artefak yang bisa ditunjukkan · **Sebagian** = artef
 
 | Evaluasi | Bukti | Hasil |
 |---|---|---|
-| Requirement/user review | Web tinjauan `lampiran/user_review_webapp/`; lembar `lampiran/Lembar_Tinjauan_Kebutuhan_GMLS.*` | **Belum ada jawaban asli.** Naskah memakai `CONTOH_DUMMY_jawaban_tinjauan_kebutuhan.csv` atas arahan pembimbing (24 Okt 2026); ganti begitu ekspor Sheet GMLS masuk |
+| Requirement/user review | Web tinjauan `lampiran/user_review_webapp/`; lembar `lampiran/Lembar_Tinjauan_Kebutuhan_GMLS.*` | Jawaban asli 3 responden GMLS (27 Okt 2026, `lampiran/user_review_webapp/Jawaban Tinjauan Kebutuhan GMLS – Orbit-U.xlsx`): disetujui, 2 dengan perbaikan; pemberitahuan ponsel menjadi batasan dan saran. Pelengkap: uji coba 13 pengguna (`lampiran/uat_webapp/`), 62/67 berhasil |
 | Integrity | `tests/test_database.py`, `test_schema_comments.py`, `test_audit.py` | Lulus |
 | Functional | Skenario black-box `tests/test_*_api.py`, `test_alert_engine.py`, `test_notify.py`, … | Lulus |
 | Security | `tests/test_rbac_api.py` (165 kasus), `tests/security/grant_matrix.sql` | Lulus |

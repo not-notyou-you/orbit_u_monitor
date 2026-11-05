@@ -586,7 +586,7 @@ def blocks():
             "(notulen D.6), serta bahwa kalimat peringatan harus disusun hati-hati (D.7). Masukan ini diwujudkan dengan "
             "mengubah Beranda menjadi Pantau Lokasi pada 16 Oktober 2026 dan menambahkan peringatan surel per kecamatan "
             "pada 19 Oktober 2026, beserta tabel user_notify_regions dan notify_sent. Putaran kedua berupa kuesioner tinjauan "
-            "kebutuhan yang tindak lanjutnya dibahas pada subbab 4.3.4.")]
+            "kebutuhan oleh GMLS dan uji coba aplikasi oleh 13 pengguna awam, yang tindak lanjutnya dibahas pada subbab 4.3.4.")]
     b += [P("Tampilan utama prototipe diambil dari video demonstrasi pada lampiran. {G:sc_beranda} menunjukkan Beranda Pantau Lokasi yang menampilkan status kecamatan "
             "lokasi pengguna, dan {G:sc_citra} menunjukkan perbandingan dua tanggal citra Sentinel-1.")]
     b += [FIG("sc_beranda", "sc_beranda.png", "Halaman Beranda Pantau Lokasi", 14.0)]
@@ -610,27 +610,39 @@ def blocks():
     b += [FIG("strategi", "strategi.png", "Strategi Pengujian", 8.0)]
     b += [P('Pengujian otomatis dijalankan pada basis data uji yang terpisah, sehingga tidak mengubah data produksi. Uji pencadangan dan pemulihan memakai salinan basis data produksi agar hasilnya mencerminkan data yang sebenarnya.')]
     b += [H4("Requirement/User Review")]
-    b += [P("Kuesioner tinjauan kebutuhan dengan lima bagian (Tabel 3.3) diisi oleh tiga pengurus GMLS, yaitu Ketua, "
-            "Koordinator Lapangan, dan seorang Relawan. Rekapitulasi jawabannya ditunjukkan pada {T:review}.")]
-    b += [TAB("review", "Rekapitulasi Tinjauan Kebutuhan oleh GMLS", [3700, 1400, 2800], ["Butir", "Hasil", "Catatan"], [
+    b += [P("Kuesioner tinjauan kebutuhan dengan lima bagian (Tabel 3.3) diisi pada 27 Oktober 2026 oleh tiga orang "
+            "dari GMLS, yaitu Ketua GMLS dan dua Relawan GMLS. Rekapitulasi jawabannya ditunjukkan pada {T:review}.")]
+    b += [TAB("review", "Rekapitulasi Tinjauan Kebutuhan oleh GMLS", [3100, 1900, 2900], ["Butir", "Hasil", "Catatan"], [
         ["K1 Kondisi di lokasi sendiri", "3 sesuai", "—"],
-        ["K2 Peringatan hujan lebat melalui surel", "2 sesuai, 1 perlu diubah", "Pemberitahuan sebaiknya juga melalui WhatsApp"],
+        ["K2 Peringatan hujan lebat melalui surel", "1 sesuai, 1 perlu diubah, 1 tidak sesuai", "Pemberitahuan sebaiknya melalui kanal yang biasa dipakai masyarakat di ponsel karena tidak semua orang rutin membuka surel"],
         ["K3 Bahasa peringatan dan tampilan awam", "3 sesuai", "—"],
         ["K4 Pemantauan genangan dan perkiraan 15 hari", "3 sesuai", "—"],
         ["K5 Arsip kejadian dari sumber resmi", "3 sesuai", "—"],
         ["K6 Akses sesuai peran", "3 sesuai", "—"],
-        ["Data yang dicatat (model konseptual)", "2 cukup, 1 kurang", "Jumlah rumah terdampak per desa"],
+        ["Data yang dicatat (model konseptual)", "2 cukup, 1 kurang", "Tambahkan proyeksi potensi hujan"],
         ["Aturan pencatatan (model logikal)", "3 sesuai", "—"],
-        ["Batasan sistem", "3 dapat diterima", "—"],
+        ["Batasan sistem", "2 dapat diterima, 1 tidak dapat diterima", "Upayakan notifikasi di ponsel bagi akun yang mendaftar dan menginginkannya"],
         ["Sepuluh kecamatan wilayah kajian", "3 ya", "—"],
-        ["Persetujuan akhir", "2 disetujui, 1 disetujui dengan perbaikan", "Tambahkan pemberitahuan WhatsApp"],
+        ["Persetujuan akhir", "1 disetujui, 2 disetujui dengan perbaikan", "—"],
     ])]
-    b += [P("Seluruh kebutuhan, aturan pencatatan, batasan, dan wilayah kajian dinyatakan sesuai. Dua masukan ditindaklanjuti "
-            "sebagai berikut. Pemberitahuan melalui WhatsApp berada di luar batasan penelitian (subbab 1.3) sehingga dicatat "
-            "sebagai saran pengembangan. Jumlah rumah terdampak per desa dapat dicatat pada kolom ringkasan dampak "
-            "(impact_summary) di disaster_events tanpa mengubah skema. Untuk pemetaan peran, GMLS menyebut Koordinator "
-            "Lapangan atau Relawan senior sebagai Analis, Ketua atau Sekretaris sebagai Administrator, dan tidak memiliki "
-            "personel untuk peran Data Engineer.")]
+    b += [P("Kebutuhan K1, K3, K4, K5, dan K6, aturan pencatatan, serta sepuluh kecamatan wilayah kajian dinyatakan sesuai "
+            "oleh ketiga responden, dan rancangan disetujui oleh seluruh responden, dua di antaranya dengan perbaikan. "
+            "Masukan terbesar menyangkut kanal pemberitahuan. Ketua GMLS menilai K2 tidak sesuai dan batasan sistem tidak "
+            "dapat diterima karena masyarakat belum terbiasa memakai surel dalam keseharian, sedangkan ponsel menjadi sarana "
+            "informasi yang andal; seorang Relawan menyampaikan masukan serupa pada K2. Pemberitahuan melalui SMS atau "
+            "WhatsApp tidak dapat diwujudkan dalam penelitian ini karena layanan pengiriman pesan ke ponsel berbayar per pesan "
+            "atau per bulan, sementara penelitian tidak memiliki anggaran operasional untuk layanan tersebut dan GMLS belum "
+            "memiliki akun layanannya. Karena itu, kanal surel dipertahankan, pemberitahuan ponsel ditetapkan sebagai batasan "
+            "penelitian (subbab 1.3), dan diajukan sebagai saran pengembangan. Rancangan basis data tidak menghalangi "
+            "pengembangan ini, karena pilihan kecamatan per pengguna (user_notify_regions) dan catatan pengiriman "
+            "(notify_sent) tidak bergantung pada kanal pengiriman.")]
+    b += [P("Masukan lain ditindaklanjuti sebagai berikut. Proyeksi potensi hujan telah tersedia sebagai bagian dari "
+            "prakiraan 15 hari pada band_forecasts, yang juga mencakup variabel curah hujan RAIN_24H hingga RAIN_30D, "
+            "sehingga tidak memerlukan perubahan skema; prakiraan ini tetap bersifat proyeksi statistik sesuai batasan "
+            "penelitian. Untuk pemetaan peran, peran Analis diserahkan kepada tim analis GMLS, dan seorang Relawan menyatakan "
+            "bersedia mengisi peran Data Engineer dan Administrator. Responden yang sama mengusulkan agar masyarakat di "
+            "setiap kecamatan dapat mencatat dan melaporkan kejadian; usulan ini dicatat sebagai saran karena pada rancangan "
+            "saat ini kejadian dicatat oleh Analis agar sumber dan status verifikasinya terjaga.")]
     b += [H4("Integrity dan Functional")]
     b += [P("Pengujian otomatis dengan pytest dijalankan pada 24 Oktober 2026 terhadap basis data uji. Dari 1.185 kasus uji, "
             "1.183 lulus, 0 gagal, dan 2 dilewati karena membutuhkan berkas *shapefile* COD-AB, dengan waktu eksekusi 150 "
@@ -656,6 +668,35 @@ def blocks():
         ["14", "Setiap tabel dan kolom memiliki COMMENT", "Katalog skema", "Tidak ada objek tanpa komentar", "Lulus"],
     ])]
     b += [P('Pengujian fungsional juga mencakup komponen ETL, seperti agregasi zonal, mesin peringatan, dan pengiriman surel. Pengiriman surel diuji dengan server SMTP tiruan sehingga pengujian tidak pernah mengirim surel sungguhan; pengiriman melalui layanan surel sungguhan belum diuji secara otomatis.')]
+    b += [H4("Uji Coba Pengguna")]
+    b += [P("Sebagai pelengkap uji *black-box* melalui REST API, aplikasi dicoba langsung oleh pengguna awam melalui formulir "
+            "uji coba berbasis web (Tabel 3.7). Formulir diisi oleh 13 responden pada 27 Oktober hingga 5 November 2026, "
+            "yaitu 3 mahasiswa Humanity Project dan 10 mahasiswa di luar Fakultas Teknik dan Informatika, dua di antaranya "
+            "mengisi asal sebagai masyarakat umum. Sebanyak 7 responden memakai ponsel, 5 memakai komputer atau laptop, dan "
+            "1 memakai keduanya. Responden memakai akun uji yang disediakan, sehingga uji coba tidak mengubah data "
+            "kejadian yang sebenarnya. Hasil per skenario ditunjukkan pada {T:uat}.")]
+    b += [TAB("uat", "Rekapitulasi Uji Coba Pengguna", [500, 2800, 900, 800, 900, 900, 1100],
+              ["No", "Skenario", "Berhasil", "Dengan Kesulitan", "Tidak Berhasil", "Tidak Dicoba", "Rata-rata Kemudahan"], [
+        ["S1", "Melihat keadaan di tempat pengguna berada", "13", "0", "0", "0", "4,31"],
+        ["S2", "Mengatur pemberitahuan melalui surel", "7", "1", "4", "1", "3,75"],
+        ["S3", "Melihat citra satelit", "13", "0", "0", "0", "4,54"],
+        ["S4", "Melihat riwayat kejadian bencana", "12", "0", "1", "0", "4,54"],
+        ["S5", "Mencatat kejadian bencana baru (Analis)", "8", "0", "0", "5", "4,50"],
+        ["S6", "Menindaklanjuti peringatan hujan (Analis)", "8", "0", "0", "5", "4,62"],
+    ])]
+    b += [P("Rata-rata kemudahan dihitung dari skala 1 (sangat sulit) hingga 5 (sangat mudah) dan hanya mencakup skenario "
+            "yang dicoba. Dari 67 percobaan, 62 berhasil (92,5%), termasuk satu yang berhasil dengan kesulitan, dengan "
+            "rata-rata kemudahan 4,36. Skenario S5 dan S6 tidak dicoba oleh lima responden karena keduanya merupakan tugas "
+            "akun Analis dan bersifat pilihan pada formulir. Sebanyak 9 responden menilai aplikasi layak dipakai dan 4 "
+            "menilai layak dengan perbaikan; tidak ada responden yang menilai tidak layak.")]
+    b += [P("Kegagalan terpusat pada S2: empat responden tidak berhasil menyimpan alamat surel pemberitahuan, dan sebagian "
+            "tidak mengetahui bahwa pengaturan ini mengharuskan pengguna masuk (*login*) lebih dulu. Satu kegagalan pada S4 "
+            "terjadi karena daftar kejadian tidak menampilkan data. Sesuai alur pada Gambar 3.2, kedua temuan ini "
+            "dikembalikan ke tahap implementasi dan telah diperbaiki. Saran responden yang lain berkaitan dengan "
+            "keterbacaan, yaitu ukuran huruf isi yang terlalu kecil dan tipis terutama di ponsel, subjudul yang perlu "
+            "dibedakan dari teks isi, penjelasan yang perlu memakai bahasa yang lebih awam, serta perlunya petunjuk atau "
+            "tutorial untuk langkah yang tidak langsung jelas. Saran ini dicatat untuk pengembangan antarmuka berikutnya "
+            "dan tidak memengaruhi rancangan basis data.")]
     b += [H4("Security")]
     b += [P("Keamanan diuji pada dua tingkat. Pada tingkat API, test_rbac_api menjalankan 165 kasus uji yang mencoba setiap "
             "*endpoint* dengan setiap peran, termasuk pengujian lapis basis data dengan pemeriksaan peran API dimatikan. Pada "
@@ -679,7 +720,7 @@ def blocks():
     ])]
     b += [P("Rekapitulasi enam evaluasi minimum ditunjukkan pada {T:rekap}.")]
     b += [TAB("rekap", "Rekapitulasi Evaluasi Minimum", [2000, 3900, 2000], ["Evaluasi", "Bukti", "Hasil"], [
-        ["*Requirement/user review*", "Kuesioner tinjauan kebutuhan, tiga responden GMLS", "Disetujui, dua masukan ditindaklanjuti"],
+        ["*Requirement/user review*", "Kuesioner tinjauan kebutuhan, tiga responden GMLS", "Disetujui (dua dengan perbaikan); kanal ponsel menjadi saran"],
         ["*Integrity*", "test_database, test_schema_comments, test_audit", "Lulus"],
         ["*Functional*", "Skenario *black-box* melalui REST API (pytest)", "Lulus"],
         ["*Security*", "test_rbac_api (165 kasus), grant_matrix.sql (390 sel)", "Lulus"],
@@ -705,8 +746,8 @@ def blocks():
             "*lineage* sebagai metadata terstruktur dalam tata kelola ETL [@gopaluni].")]
     b += [P("**RM3.** Informasi disajikan melalui 22 VIEW, REST API, dan aplikasi web: kondisi per kecamatan di Beranda, "
             "peringatan hujan berbasis ambang BMKG yang dikirim melalui surel kepada pengguna yang berlangganan, arsip kejadian "
-            "dengan sumber dan status verifikasi, serta laporan berkala. Pada tinjauan kebutuhan, keenam kebutuhan K1–K6 dinilai "
-            "sesuai oleh responden GMLS, dengan satu masukan pada K2 agar pemberitahuan juga dikirim melalui WhatsApp. Evaluasi ketepatan peringatan telah tersedia melalui v_evaluasi_alert, tetapi hasilnya bergantung "
+            "dengan sumber dan status verifikasi, serta laporan berkala. Pada tinjauan kebutuhan, kebutuhan K1 dan K3–K6 dinilai "
+            "sesuai oleh ketiga responden GMLS, sedangkan K2 mendapat masukan agar pemberitahuan dikirim ke ponsel, yang belum dapat diwujudkan karena keterbatasan biaya layanan pesan. Pada uji coba pengguna, 62 dari 67 percobaan oleh 13 responden berhasil dengan rata-rata kemudahan 4,36 dari 5. Evaluasi ketepatan peringatan telah tersedia melalui v_evaluasi_alert, tetapi hasilnya bergantung "
             "pada jumlah kejadian terverifikasi dari sumber resmi.")]
     b += [P("**RM4.** Kontrol akses ditegakkan di basis data melalui lima role PostgreSQL yang diaktifkan dengan SET LOCAL ROLE "
             "per transaksi, GRANT tingkat tabel dan kolom, VIEW dengan batas waktu per peran, dan RLS. Jejak audit dicatat "

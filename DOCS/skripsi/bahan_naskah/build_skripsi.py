@@ -350,10 +350,13 @@ def bab1():
         "kependudukan, titik evakuasi, dan kawasan rawan bencana tetap dikelola aplikasi SIGAP DESA dan tidak "
         "diintegrasikan.",
         "Aplikasi web dan REST API dibangun sebagai prototipe untuk mengakses basis data. Pemberitahuan hanya dikirim "
-        "melalui surel; aplikasi seluler serta notifikasi melalui SMS atau WhatsApp tidak termasuk.",
+        "melalui surel; aplikasi seluler serta notifikasi melalui SMS atau WhatsApp tidak termasuk karena layanan "
+        "pengiriman pesan ke ponsel memerlukan biaya berlangganan atau biaya per pesan yang berada di luar anggaran "
+        "penelitian.",
         "Evaluasi dibatasi pada enam kriteria evaluasi minimum jalur *Design and Implementation*, yaitu tinjauan "
         "kebutuhan oleh pengguna (*requirement/user review*), integritas, fungsional, keamanan, kueri, serta "
-        "pencadangan dan pemulihan (*backup/recovery*).",
+        "pencadangan dan pemulihan (*backup/recovery*). Uji coba aplikasi oleh pengguna awam dilakukan sebagai "
+        "pelengkap evaluasi fungsional.",
     ])
     out["_Toc207196477"] = para("Sesuai rumusan masalah, tujuan penelitian ini adalah sebagai berikut.") + items([
         "Menghasilkan rancangan basis data relasional spasial yang mengintegrasikan data Sentinel-1, MODIS, dan GPM "
@@ -859,6 +862,13 @@ def bab3():
         ["5", "Persetujuan atas rancangan sistem", "Disetujui, disetujui dengan perbaikan, atau tidak disetujui, disertai saran"],
     ]))
     x.append(para('Kuesioner tidak memakai istilah teknis seperti entitas atau constraint. Aturan "peringatan untuk satu kecamatan hanya dicatat sekali per hari", misalnya, mewakili batasan UNIQUE pada tabel peringatan. Bila responden memilih jawaban perlu diubah, kuesioner meminta responden menuliskan bagian yang perlu diperbaiki, sehingga setiap masukan dapat ditindaklanjuti secara spesifik.'))
+    x.append(h3("Kuesioner Uji Coba Pengguna"))
+    x.append(para(
+        "Kuesioner kedua digunakan untuk uji coba aplikasi oleh pengguna awam. Formulir uji coba berbentuk halaman web "
+        "yang memuat enam skenario beserta video contoh, langkah, dan tanda berhasilnya, dengan jawaban tersimpan di "
+        "Google Sheet. Untuk setiap skenario, responden memilih hasil, menilai kemudahan, dan menuliskan kendala; di "
+        "akhir formulir responden menilai kelayakan aplikasi dan memberi saran. Rinciannya dibahas pada subbab "
+        "Rancangan Evaluasi (Tabel 3.7)."))
     x.append(h3("Data Sekunder"))
     x.append(para(
         "Data satelit diambil melalui layanan resmi penyedianya, sedangkan batas wilayah diambil dari COD-AB. Sumber "
@@ -934,6 +944,24 @@ def bab3():
                   "berubah, sedangkan tinjauan kebutuhan melibatkan pengguna dari GMLS. Bukti setiap evaluasi, berupa "
                   "keluaran pengujian, hasil benchmark, dan catatan pemulihan, disimpan bersama kode sumber agar hasil "
                   "pada BAB IV dapat diperiksa kembali."))
+    x.append(para("Sebagai pelengkap evaluasi fungsional, aplikasi juga diuji coba oleh pengguna awam. Uji *black-box* "
+                  "melalui REST API memastikan keluaran setiap fungsi benar, sedangkan uji coba pengguna menilai apakah "
+                  "fungsi tersebut dapat diselesaikan oleh orang yang tidak mengenal sistem. Skenario uji coba "
+                  "ditunjukkan pada Tabel 3.7."))
+    x.append(caption("Tabel", 3, 7, "Skenario Uji Coba Pengguna"))
+    x.append(table([600, 3300, 1500, 2500], ["Kode", "Skenario", "Akun", "Tanda Berhasil"], [
+        ["S1", "Melihat keadaan di tempat pengguna berada", "Pengunjung", "Status kecamatan lokasi pengguna tampil di Beranda"],
+        ["S2", "Mengatur pemberitahuan melalui surel", "Relawan", "Surel dan kecamatan langganan tersimpan"],
+        ["S3", "Melihat citra satelit", "Pengunjung", "Citra tanggal yang dipilih tampil di peta"],
+        ["S4", "Melihat riwayat kejadian bencana", "Pengunjung", "Daftar dan titik kejadian tampil di peta"],
+        ["S5", "Mencatat kejadian bencana baru", "Analis", "Kejadian baru muncul di daftar kejadian"],
+        ["S6", "Menindaklanjuti peringatan hujan", "Analis", "Peringatan berstatus sudah ditindaklanjuti"],
+    ]))
+    x.append(para("Untuk setiap skenario, responden memilih hasil berhasil, berhasil dengan kesulitan, tidak berhasil, "
+                  "atau tidak dicoba, menilai kemudahan pada skala 1 (sangat sulit) hingga 5 (sangat mudah), dan "
+                  "menuliskan kendala bila ada. S5 dan S6 bersifat pilihan karena merupakan tugas Analis. Di akhir "
+                  "formulir, responden menilai apakah aplikasi layak dipakai, layak dengan perbaikan, atau tidak layak. "
+                  "Setiap kegagalan yang ditemukan dikembalikan ke tahap implementasi."))
     return "".join(x)
 
 
@@ -1004,15 +1032,17 @@ def bab5():
         "dimanfaatkan GMLS untuk pemantauan kondisi wilayah dan pencatatan kejadian bencana (RM3). Fitur utamanya meliputi "
         "Pantau Lokasi, peringatan hujan berbasis ambang BMKG 50, 100, dan 150 mm yang dikirim melalui surel kepada "
         "pengguna yang berlangganan, arsip kejadian beserta sumber dan status verifikasinya, serta laporan berkala. "
-        "Pada tinjauan kebutuhan, responden GMLS menilai keenam kebutuhan K1–K6 sesuai, dengan satu responden meminta "
-        "perubahan pada K2 agar pemberitahuan juga dikirim melalui WhatsApp, dan menyetujui rancangan; masukan lainnya "
-        "adalah pencatatan jumlah rumah terdampak per desa.",
+        "Pada tinjauan kebutuhan, ketiga responden GMLS menilai K1 dan K3–K6 sesuai dan menyetujui rancangan, dua di "
+        "antaranya dengan perbaikan. Masukan utamanya adalah agar pemberitahuan pada K2 dikirim ke ponsel, yang belum "
+        "dapat diwujudkan karena layanan pesan ponsel berbayar. Pada uji coba oleh 13 pengguna awam, 62 dari 67 "
+        "percobaan berhasil dengan rata-rata kemudahan 4,36 dari 5, dan seluruh responden menilai aplikasi layak "
+        "dipakai, empat di antaranya dengan perbaikan.",
         "Kontrol akses berbasis peran dan jejak audit ditegakkan pada tingkat basis data (RM4). Lima peran aplikasi "
         "dipetakan ke lima role PostgreSQL yang diaktifkan dengan SET LOCAL ROLE pada setiap transaksi, dengan GRANT "
         "tingkat tabel dan kolom, VIEW dengan batas waktu per peran, dan *row-level security*, sedangkan setiap perubahan "
         "pada tabel penting dicatat trigger audit ke audit_log. Pengujian keamanan pada 165 kasus API dan 390 sel matriks "
         "GRANT menunjukkan bahwa akses yang tidak berhak ditolak oleh basis data walaupun pemeriksaan di API dimatikan.",
-        "Keenam evaluasi minimum jalur *Design and Implementation* terpenuhi: tinjauan kebutuhan disetujui GMLS, pengujian "
+        "Keenam evaluasi minimum jalur *Design and Implementation* terpenuhi: tinjauan kebutuhan disetujui GMLS dengan perbaikan, pengujian "
         "otomatis menghasilkan 1.183 kasus lulus, 0 gagal, dan 2 dilewati dari 1.185 kasus, kelima kueri inti selesai di "
         "bawah 2 milidetik, dan pemulihan dari cadangan maupun dari proses yang dihentikan paksa menghasilkan data yang "
         "identik tanpa duplikasi.",
@@ -1022,10 +1052,15 @@ def bab5():
         "ketepatan peringatan melalui v_evaluasi_alert dapat disimpulkan dari data yang memadai.",
         "Ambang hujan pemicu longsor perlu ditetapkan dari literatur atau instansi pemerintah agar aturan peringatan "
         "longsor yang telah tersedia di basis data dapat diaktifkan.",
-        "Pemberitahuan dapat dikembangkan ke kanal yang lebih sering dibuka relawan, seperti WhatsApp atau notifikasi "
-        "ponsel, sesuai masukan tinjauan kebutuhan.",
-        "Bila GMLS membutuhkan analisis dampak yang lebih rinci, jumlah rumah terdampak per desa dapat dicatat sebagai "
-        "atribut terstruktur, dan batas desa dapat ditambahkan sebagai data wilayah apabila tersedia dari sumber resmi.",
+        "Pemberitahuan sebaiknya dikembangkan ke ponsel, misalnya melalui WhatsApp, SMS, atau notifikasi aplikasi, "
+        "sesuai masukan Ketua GMLS bahwa masyarakat lebih terbiasa memakai ponsel daripada surel. Pengembangan ini "
+        "membutuhkan anggaran untuk layanan pengiriman pesan, sehingga dapat diwujudkan bila GMLS atau mitranya "
+        "menyediakan biaya tersebut; rancangan basis data yang ada dapat dipakai tanpa perubahan karena langganan "
+        "kecamatan dan catatan pengiriman tidak bergantung pada kanal.",
+        "Pencatatan kejadian oleh masyarakat di setiap kecamatan, sebagaimana diusulkan Relawan GMLS, dapat dikaji "
+        "dengan tetap menandai catatan tersebut belum terverifikasi sampai diperiksa Analis.",
+        "Antarmuka perlu disempurnakan sesuai masukan uji coba pengguna, yaitu huruf isi yang lebih besar dan tebal, "
+        "subjudul yang dibedakan dari teks isi, bahasa yang lebih awam, serta petunjuk atau tutorial di dalam aplikasi.",
         "Sumber data dengan pembaruan lebih cepat, seperti satelit geostasioner Himawari yang diusulkan GMLS, dan laporan "
         "warga dari Are You In Sys dapat dikaji sebagai sumber data tambahan.",
         "Bagi penelitian selanjutnya, perbandingan DBMS sebaiknya diulang dengan data produksi dan media penyimpanan yang "
@@ -1053,13 +1088,14 @@ ABSTRAK = (
     "ditelusuri, padahal data satelit Sentinel-1, MODIS, dan GPM IMERG tersedia terbuka meskipun berbeda format, "
     "resolusi, dan frekuensi. Penelitian ini merancang dan mengimplementasikan sistem basis data pemantauan "
     "hidrometeorologi bagi GMLS dengan metode Database System Development Life Cycle (DBSDLC) dan Unified Modeling "
-    "Language (UML). Data dikumpulkan melalui wawancara, pemeriksaan dokumen, studi pustaka, dan kuesioner tinjauan "
-    "kebutuhan. Hasilnya adalah basis data PostgreSQL dengan PostGIS, yang dipilih melalui perbandingan dengan MySQL 8.0 "
+    "Language (UML). Data dikumpulkan melalui wawancara, pemeriksaan dokumen, studi pustaka, kuesioner tinjauan "
+    "kebutuhan, dan uji coba pengguna. Hasilnya adalah basis data PostgreSQL dengan PostGIS, yang dipilih melalui perbandingan dengan MySQL 8.0 "
     "dengan skor terbobot 4,90 dibandingkan 2,90, berisi 43 tabel dan 22 VIEW. Basis data ini mengintegrasikan ketiga "
     "satelit ke dalam deret waktu per kecamatan, mencatat asal-usul data dengan checksum SHA-256 beserta mutunya, serta "
     "menegakkan kontrol akses lima peran dan jejak audit di tingkat basis data. Keenam evaluasi minimum, yaitu tinjauan "
     "kebutuhan, integritas, fungsional, keamanan, kueri, serta pencadangan dan pemulihan, terpenuhi dengan 1.183 dari "
-    "1.185 kasus uji otomatis lulus dan 2 dilewati. Rancangan ini menyediakan sumber data hidrometeorologi terpusat yang "
+    "1.185 kasus uji otomatis lulus dan 2 dilewati. GMLS menyetujui rancangan dengan perbaikan, dan pada uji coba "
+    "oleh 13 pengguna, 62 dari 67 percobaan berhasil. Rancangan ini menyediakan sumber data hidrometeorologi terpusat yang "
     "dapat ditelusuri bagi GMLS.")
 KATA_KUNCI = "Kata kunci: basis data spasial, DBSDLC, hidrometeorologi, kontrol akses berbasis peran, mitigasi bencana"
 ABSTRACT = (
@@ -1067,13 +1103,14 @@ ABSTRACT = (
     "though Sentinel-1, MODIS, and GPM IMERG satellite data are openly available in different formats, resolutions, and "
     "frequencies. This research designs and implements a hydrometeorological monitoring database system for GMLS using "
     "the Database System Development Life Cycle (DBSDLC) and the Unified Modeling Language (UML). Data were collected "
-    "through an interview, document examination, literature study, and a requirements review questionnaire. The result "
+    "through an interview, document examination, literature study, a requirements review questionnaire, and a user trial. The result "
     "is a PostgreSQL database with PostGIS, selected through a comparison with MySQL 8.0 with a weighted score of 4.90 "
     "against 2.90, containing 43 tables and 22 views. The database integrates the three satellites into a time series "
     "per sub-district, records data lineage with SHA-256 checksums together with data quality, and enforces access "
     "control for five roles and an audit trail at the database level. All six minimum evaluations, namely requirements "
     "review, integrity, functional, security, query, and backup and recovery, were met, with 1,183 of 1,185 automated "
-    "test cases passing and 2 skipped. The design provides GMLS with a centralized and traceable source of "
+    "test cases passing and 2 skipped. GMLS approved the design with revisions, and in a trial by 13 users, 62 of 67 "
+    "attempts succeeded. The design provides GMLS with a centralized and traceable source of "
     "hydrometeorological data.")
 KEYWORDS = ("Keywords: DBSDLC, disaster mitigation, hydrometeorology, role-based access control, spatial database")
 

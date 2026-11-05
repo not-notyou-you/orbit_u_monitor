@@ -21,7 +21,7 @@ Saya melanjutkan pekerjaan skripsi dari percakapan sebelumnya. Tolong baca konte
 3. Pedoman prodi TIDAK boleh disebut, dikutip, atau disitasi di naskah (arahan dosen).
 4. Setiap tabel dan gambar harus diikuti paragraf yang menambah informasi, bukan mengulang isinya.
 5. Tabel/visualisasi hanya bila memperjelas. Tidak menambah hal yang tidak diminta ketentuan atau tidak didukung proyek.
-6. Arahan dosen: jawaban tinjauan kebutuhan GMLS boleh memakai data dummy (`themonitor/DOCS/skripsi/lampiran/user_review_webapp/CONTOH_DUMMY_jawaban_tinjauan_kebutuhan.csv`) seolah asli; data kejadian bencana resmi boleh kosong; syarat 2 jurnal dosen UMN sudah terpenuhi; semua referensi di `DOCS/skripsi/referensi/` disimpan. UAT dummy TIDAK dipakai.
+6. Tinjauan kebutuhan dan uji coba pengguna memakai jawaban asli: `lampiran/user_review_webapp/Jawaban Tinjauan Kebutuhan GMLS – Orbit-U.xlsx` (3 responden, 27 Okt 2026) dan `lampiran/uat_webapp/Jawaban UAT – Orbit-U.xlsx` (13 responden, 27 Okt–5 Nov 2026). Responden disebut dengan jabatan, bukan nama. Pemberitahuan ponsel (SMS/WhatsApp) diminta Ketua GMLS tetapi tidak diwujudkan karena biaya layanan; atas arahan dosen ditulis sebagai batasan (1.3) dan saran. Data kejadian bencana resmi boleh kosong; syarat 2 jurnal dosen UMN sudah terpenuhi; semua referensi di `DOCS/skripsi/referensi/` disimpan. Uji coba pengguna ditulis sebagai pelengkap evaluasi fungsional (subbab Uji Coba Pengguna di 4.3.4, Tabel 3.7), bukan evaluasi minimum ketujuh.
 7. Setelah mengubah naskah: bangun ulang, validasi .docx, cek tidak ada rujukan gambar/tabel menggantung, nomor sitasi berurutan, dan tidak ada inkonsistensi antarbab.
 
 ## Sumber utama
@@ -38,11 +38,11 @@ Saya melanjutkan pekerjaan skripsi dari percakapan sebelumnya. Tolong baca konte
 - DBMS: PostgreSQL 18.6 + PostGIS 3.6.2 vs MySQL 8.0.40, skor 4,90 vs 2,90.
 - Pengujian: pytest 1.185 kasus (1.183 lulus, 0 gagal, 2 dilewati); test_rbac_api 165 kasus; grant_matrix 390 sel; backup/restore dan kill-and-resume lulus.
 - Ambang hujan BMKG: lebat 50, sangat lebat 100, ekstrem >150 mm/hari; aturan longsor belum aktif.
-- Kebutuhan pengguna K1–K6; kuesioner tinjauan lima bagian (formulir web).
+- Kebutuhan pengguna K1–K6; kuesioner tinjauan lima bagian (formulir web). Hasil: K1, K3–K6 sesuai (3/3); K2 1 sesuai, 1 perlu diubah, 1 tidak sesuai; persetujuan 1 disetujui, 2 dengan perbaikan.
+- Uji coba pengguna S1–S6: 62 dari 67 percobaan berhasil, rata-rata kemudahan 4,36; 9 layak, 4 layak dengan perbaikan. Kegagalan S2 (simpan surel) dan S4 sudah diperbaiki.
 
 ## Yang masih terbuka
 - Nama/NIDN pembimbing, kaprodi, dekan, rektor, penguji, dan tanggal di halaman awal; centang pernyataan AI dan persetujuan publikasi (diisi mahasiswa).
-- Jawaban asli tinjauan kebutuhan GMLS (ganti data dummy di subbab 4.3.4 dan BAB V bila sudah ada).
 - Lampiran (ERD semua modul, kamus data lengkap, notulen, hasil uji) belum disusun.
 - Tampilan dokumen belum diperiksa visual di Word.
 
