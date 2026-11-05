@@ -1,0 +1,32 @@
+flowchart TB
+  subgraph SRC[Official data providers]
+    S1[ESA CDSE<br/>Sentinel-1 GRD]
+    MO[NASA LANCE / LAADS<br/>MODIS]
+    GP[NASA GES DISC<br/>GPM IMERG]
+  end
+  subgraph ETL[ETL layer - Python]
+    SCH[APScheduler<br/>+ advisory lock]
+    DL[Daily hydromet job]
+    LV[Sentinel-1 live cycle]
+    RP[Periodic reports]
+    AL[E-mail alerts]
+    SCH --> DL & LV & RP
+    DL --> AL
+  end
+  subgraph STO[Storage]
+    DB[(PostgreSQL 18 + PostGIS<br/>43 tables, 22 views<br/>GRANT, RLS, audit)]
+    FS[(File system<br/>COG, HDF5, PNG, PDF)]
+  end
+  subgraph APP[Application layer]
+    API[FastAPI REST API<br/>SET LOCAL ROLE per request]
+    WEB[Web client<br/>Leaflet, MapLibre]
+  end
+  SRC --> ETL
+  ETL --> DB
+  ETL --> FS
+  DB --> API
+  FS --> API
+  API <--> WEB
+  AL --> SMTP[(SMTP server)]
+  SMTP --> U([Users in five roles])
+  WEB <--> U

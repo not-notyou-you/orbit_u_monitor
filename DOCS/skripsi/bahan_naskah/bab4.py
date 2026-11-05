@@ -17,7 +17,7 @@ EQ = lambda t: ("eq", t)
 
 def blocks():
     b = []
-    b += [P("Bab ini menyajikan hasil setiap tahap DBSDLC sesuai alur pada Gambar 3.2 dan kegiatan pada Tabel 3.2. "
+    b += [P("Bab ini menyajikan hasil setiap tahap DBSDLC sesuai alur pada Gambar 3.4 dan kegiatan pada Tabel 3.2. "
             "Penyajiannya mengikuti subbab template program studi, sehingga beberapa tahap ditempatkan sedikit berbeda dari "
             "urutan DBSDLC: pemodelan sistem disajikan pada 4.2.1 sebelum perancangan basis data, dan pemilihan DBMS disajikan "
             "sebelum desain fisik karena desain fisik menerjemahkan model logikal ke DBMS target. Pemetaannya ditunjukkan pada "
@@ -66,7 +66,10 @@ def blocks():
     b += [P("Akar masalah dari tabel tersebut dikelompokkan ke dalam tiga aspek, yaitu data, proses, serta pengguna dan "
             "akses, sebagaimana ditunjukkan pada {G:masalah}.")]
     b += [FIG("masalah", "masalah.png", "Diagram Sebab-Akibat Masalah Pemantauan Hidrometeorologi GMLS", 14.0)]
-    b += [P("Setiap kelompok masalah dipetakan ke rumusan masalah dan objek basis data yang menjawabnya pada {T:rm}.")]
+    b += [P("Diagram tersebut menunjukkan bahwa masalah tidak hanya bersumber dari ketiadaan data, tetapi juga dari "
+            "proses yang bergantung pada pembacaan manual dan dari belum adanya pembagian akses. Karena itu, solusi "
+            "tidak cukup berupa penyimpanan data, melainkan juga otomatisasi dan kontrol akses. Setiap kelompok masalah "
+            "dipetakan ke rumusan masalah dan objek basis data yang menjawabnya pada {T:rm}.")]
     b += [TAB("rm", "Pemetaan Masalah, Rumusan Masalah, dan Solusi", [2600, 700, 2400, 2200], ["Masalah", "RM", "Solusi di Sistem", "Objek Basis Data"], [
         ["Data tiga satelit tidak terintegrasi", "RM1", "Pengambilan otomatis Sentinel-1, MODIS, GPM; nilai harian per kecamatan", "satellite_scenes, nasa_scenes, region_observations"],
         ["Asal-usul dan mutu data tidak dapat ditelusuri", "RM2", "Lineage dengan *checksum* SHA-256 dan metrik mutu per scene", "data_products, data_lineage, quality_metrics"],
@@ -180,7 +183,10 @@ def blocks():
     b += [FIG("uc_a", "uc_a.png", "Use Case Diagram Aktor Analis", 14.0)]
     b += [P('Use case Analis berpusat pada peringatan dan kejadian, yaitu melihat prakiraan (UC-10), menindaklanjuti peringatan (UC-11), mengelola kejadian (UC-12), dan melihat evaluasi peringatan (UC-13). Ketiga use case terakhir saling berkaitan, karena evaluasi hanya bermakna bila peringatan ditindaklanjuti dan kejadian dicatat beserta status verifikasinya.')]
     b += [FIG("uc_d", "uc_d.png", "Use Case Diagram Aktor Data Engineer", 14.0)]
-    b += [P("Skenario use case yang paling berkaitan dengan basis data dijabarkan pada {T:ucd}.")]
+    b += [P("Use case Data Engineer berpusat pada kesehatan data, yaitu mutu, kelengkapan, dan pengolahan ulang, bukan "
+            "pada tindak lanjut peringatan. Karena Analis dan Data Engineer tidak saling mewarisi hak, urusan pengolahan "
+            "data terpisah dari keputusan analisis. Skenario use case yang "
+            "paling berkaitan dengan basis data dijabarkan pada {T:ucd}.")]
     b += [TAB("ucd", "Deskripsi Use Case Menindaklanjuti Peringatan dan Mengelola Kejadian", [1800, 6100], ["Bagian", "Isi"], [
         ["UC-11 Skenario utama", "1. Analis membuka daftar peringatan aktif.\n2. Analis memilih peringatan dan mengisi catatan.\n3. Sistem mengunci baris (SELECT … FOR UPDATE) dan memeriksa statusnya.\n4. Sistem mengisi acknowledged_by, acknowledged_at, dan ack_note melalui GRANT tingkat kolom.\n5. Trigger audit_row mencatat perubahan ke audit_log."],
         ["UC-11 Alternatif", "3a. Peringatan sudah ditindaklanjuti: sistem menolak dengan ALERT_ALREADY_ACKED."],
@@ -338,7 +344,9 @@ def blocks():
         ["band_forecast_points, band_forecast_scores", "(forecast_id, step); (forecast_id, model)", "✓", "✓", "✓", "Dipisah agar bebas *multivalued dependency*"],
         ["data_lineage", "lineage_id; (parent_product_id, child_product_id)", "✓", "✓", "✓", "Satu baris per sisi graf"],
     ])]
-    b += [P("Batasan integritas ditetapkan pada tingkat logikal dan diterjemahkan ke DBMS pada tahap fisik ({T:cons}). Skema "
+    b += [P("Satu-satunya pengecualian pada tabel tersebut adalah salinan nilai historis di alert_events, yang sengaja "
+            "dipertahankan agar peringatan lama tetap menunjukkan nilai dan ambang saat dibangkitkan walaupun aturannya "
+            "kemudian diubah. Batasan integritas ditetapkan pada tingkat logikal dan diterjemahkan ke DBMS pada tahap fisik ({T:cons}). Skema "
             "akhir memuat 43 PRIMARY KEY, 80 FOREIGN KEY, 36 UNIQUE, dan 67 CHECK. Model logikal ditinjau kembali bersama "
             "GMLS dengan menerjemahkan batasan utamanya ke dalam aturan pencatatan berbahasa sehari-hari pada bagian 2 "
             "kuesioner, yaitu peringatan dicatat sekali per kecamatan per hari (UNIQUE pada alert_events), kejadian wajib "
@@ -383,7 +391,9 @@ def blocks():
         ["F2 Row-level security", "Didukung (CREATE POLICY)", "Tidak didukung; harus diemulasi dengan VIEW"],
         ["F3 Trigger audit OLD/NEW sebagai JSON", "Didukung dengan satu fungsi untuk semua tabel", "Sebagian; setiap kolom harus disebut per tabel"],
     ])]
-    b += [P("Skor terbobot dihitung dengan persamaan pada subbab 3.4.2 dan ditunjukkan pada {T:skor}.")]
+    b += [P("Perbedaan F1 paling menentukan bagi rancangan ini, karena tanpa pergantian peran per transaksi seluruh "
+            "pengguna aplikasi akan memakai hak akun koneksi yang sama dan pembatasan per peran hanya dapat dilakukan di "
+            "aplikasi. Skor terbobot dihitung dengan persamaan pada subbab 3.4.2 dan ditunjukkan pada {T:skor}.")]
     b += [TAB("skor", "Skor Terbobot Pemilihan DBMS", [3300, 900, 1200, 1100, 1400], ["Kriteria", "Bobot", "PostgreSQL", "MySQL", "Dasar"], [
         ["Keamanan per peran dan audit", "25%", "5", "2", "F1–F3"],
         ["Kueri spasial", "20%", "5", "2", "Q3 17×, galat 3516"],
@@ -415,7 +425,8 @@ def blocks():
         ["Nilai tertutup lintas tabel", "ENUM, misalnya job_status_enum, product_tier_enum, alert_severity_enum"],
         ["Struktur bebas per baris", "JSONB untuk parameter tahap, pengaturan, dan isi audit"],
     ])]
-    b += [P("Hasil implementasi skema pada basis data yang berjalan per 24 Oktober 2026 adalah 43 tabel, 22 VIEW, 528 "
+    b += [P("Pemilihan NUMERIC dan TIMESTAMPTZ mencegah selisih pembulatan dan kerancuan zona waktu, karena data satelit "
+            "dicatat dalam UTC sedangkan pengguna membaca dalam WIB. Hasil implementasi skema pada basis data yang berjalan per 24 Oktober 2026 adalah 43 tabel, 22 VIEW, 528 "
             "kolom, 226 *constraint*, 162 indeks, 29 *trigger*, dan 3 *policy* RLS. Prasyarat program studi mensyaratkan "
             "sekurang-kurangnya 10 tabel master dan tabel transaksi dengan sekurang-kurangnya 100 *record*. {T:record} "
             "menunjukkan bahwa terdapat 12 tabel master dan 17 tabel transaksi dengan 100 *record* atau lebih.")]
@@ -438,12 +449,15 @@ def blocks():
         ["", "", "scene_job_state", "156"],
         ["", "", "user_activity_logs", "132"],
     ])]
-    b += [P("ERD fisik relasi inti modul M6 dengan tipe data PostgreSQL ditunjukkan pada {G:erdf}. ERD fisik seluruh modul dan kamus data "
+    b += [P("Tabel master berjumlah kecil karena berisi rujukan yang jarang berubah, sedangkan tabel transaksi bertambah "
+            "setiap hari dari pekerjaan otomatis; region_observations saja bertambah rata-rata sekitar 70 *record* per hari "
+            "sejak 1 Januari 2024. ERD fisik relasi inti modul M6 dengan tipe data PostgreSQL ditunjukkan pada {G:erdf}. ERD fisik seluruh modul dan kamus data "
             "lengkap tersedia pada repositori kode sumber penelitian. Kamus data dibangkitkan oleh tools/data_dictionary.py dari COMMENT pada setiap tabel dan "
             "kolom, dan kewajiban COMMENT ini diuji oleh test_schema_comments, sehingga kamus data tidak dapat berbeda dari "
             "skema.")]
     b += [FIG("erdf", "erd_fisik_core.png", "ERD Fisik Relasi Inti Modul M6", 14.0)]
-    b += [P("Organisasi berkas dan indeks dirancang berdasarkan pola akses ({T:indeks}). Berkas raster disimpan di "
+    b += [P("Dibandingkan ERD logikal, ERD fisik menetapkan tipe data PostgreSQL, termasuk geometri PostGIS dan cap waktu "
+            "berzona, sehingga batasan domain yang semula konseptual kini ditegakkan langsung oleh DBMS. Organisasi berkas dan indeks dirancang berdasarkan pola akses ({T:indeks}). Berkas raster disimpan di "
             "*filesystem* dengan tier RAW, ALIGNED, DESPECKLED, INDICES, ACCUMULATED, COG, dan FUSED, sedangkan basis data "
             "hanya menyimpan metadata, lokasi, dan *checksum*-nya.")]
     b += [TAB("indeks", "Rancangan Indeks Berdasarkan Pola Akses", [2900, 1700, 3300], ["Pola Akses", "Jenis Indeks", "Contoh"], [
@@ -454,7 +468,8 @@ def blocks():
         ["Lineage dua arah", "B-tree", "idx_lineage_parent_id, idx_lineage_child_id"],
         ["Prakiraan terbaru per deret", "B-tree komposit", "idx_band_forecasts_latest"],
     ])]
-    b += [P("Pandangan pengguna diwujudkan dalam 22 VIEW. VIEW utama dan peran pembacanya ditunjukkan pada {T:view}. Batas "
+    b += [P("Setiap indeks pada tabel tersebut dibuat untuk kueri yang benar-benar dijalankan aplikasi, sehingga indeks "
+            "tidak menambah beban penulisan tanpa manfaat; rencana eksekusinya diperiksa dengan EXPLAIN. Pandangan pengguna diwujudkan dalam 22 VIEW. VIEW utama dan peran pembacanya ditunjukkan pada {T:view}. Batas "
             "waktu per peran ditegakkan di dalam VIEW berdasarkan role basis data yang aktif, bukan hanya di menu aplikasi.")]
     b += [TAB("view", "VIEW Utama per Peran", [2600, 3800, 1500], ["VIEW", "Isi", "Dibaca"], [
         ["v_citra_scenes", "Scene dengan batas waktu: Pengunjung 30 hari, Relawan 365 hari, lainnya semua", "Pengunjung+"],
@@ -467,7 +482,8 @@ def blocks():
         ["v_kelengkapan_data", "Tanggal berdata per sumber dan celahnya", "Data Engineer"],
         ["v_log_login, v_log_unduhan", "Log masuk, registrasi, dan unduhan", "Administrator"],
     ])]
-    b += [P("Mekanisme keamanan dirancang berlapis. Lima peran aplikasi dipetakan ke lima role PostgreSQL dengan hierarki "
+    b += [P("Dengan VIEW tersebut, setiap peran hanya membaca kolom dan rentang waktu yang dibutuhkannya; misalnya "
+            "Pengunjung tidak dapat melihat siapa yang mencatat kejadian. Mekanisme keamanan dirancang berlapis. Lima peran aplikasi dipetakan ke lima role PostgreSQL dengan hierarki "
             "pewarisan pada {G:role}. API terhubung sebagai monitor_app yang bersifat NOINHERIT, sehingga tanpa SET ROLE role "
             "ini tidak memiliki hak apa pun. *Scheduler* dan *pipeline* terhubung sebagai monitor_etl. Tidak ada role aplikasi "
             "yang berstatus SUPERUSER, CREATEDB, CREATEROLE, atau BYPASSRLS.")]
@@ -476,7 +492,8 @@ def blocks():
             "memeriksa peran, dan basis data menegakkan GRANT, VIEW, RLS, serta mencatat audit. Karena lapis ketiga berada di "
             "basis data, kueri yang lolos dari pemeriksaan API akibat kesalahan program tetap ditolak.")]
     b += [FIG("lapis", "lapis.png", "Tiga Lapis Penegakan Hak Akses", 12.0)]
-    b += [P("Hak akses langsung setiap role terhadap tabel dirangkum pada {T:grant}. Hak peran di bawah juga berlaku untuk "
+    b += [P("Lapis pertama dan kedua bertujuan memudahkan pengguna dan memberi pesan galat yang jelas, sedangkan lapis "
+            "ketiga adalah satu-satunya lapis yang tidak dapat dilewati oleh skrip yang terhubung langsung ke API. Hak akses langsung setiap role terhadap tabel dirangkum pada {T:grant}. Hak peran di bawah juga berlaku untuk "
             "peran di atasnya.")]
     b += [TAB("grant", "Matriks GRANT Tabel per Role", [2600, 700, 700, 900, 900, 900, 1100], ["Objek", "PUBLIC", "USER", "ANALYST", "DATA_ENG", "ADMIN", "ETL"], [
         ["Master rujukan (wilayah, jenis bencana, sumber, band)", "S", "S", "", "", "SIU", "S"],
@@ -510,7 +527,8 @@ def blocks():
         ["Sesi", "JWT HS256 dalam *cookie*, berlaku 8 jam"],
         ["Token API", "Disimpan sebagai prefiks dan hash SHA-256; masa berlaku paling lama 180 hari; 120 *request* per menit"],
     ])]
-    b += [P("Redundansi terkendali diperkenalkan hanya bila nilainya dibaca berulang dan konsistensinya dapat dijaga "
+    b += [P("Penguncian akun dan masa berlaku token membatasi dampak sandi atau token yang bocor, sedangkan penyimpanan "
+            "token dalam bentuk hash membuat isi basis data yang tercuri tidak dapat langsung dipakai. Redundansi terkendali diperkenalkan hanya bila nilainya dibaca berulang dan konsistensinya dapat dijaga "
             "({T:redund}). Pemantauan dan penyelarasan dilakukan dengan database/db_manifest.sql, yang mencetak jumlah objek "
             "dan *record* per tabel, serta rencana eksekusi kueri yang disimpan di benchmark/results/explain_*.txt.")]
     b += [TAB("redund", "Redundansi Terkendali", [2900, 2400, 2600], ["Redundansi", "Alasan", "Penjaga Konsistensi"], [
@@ -561,14 +579,16 @@ def blocks():
             "https://github.com/not-notyou-you/orbit_u_monitor.")]
     b += [FIG("arsitektur", "arsitektur.png", "Arsitektur Sistem", 14.0)]
     b += [P("Setiap satelit diproses melalui tier berurutan dan menghasilkan COG per band. Nilai per kecamatan dihitung dari "
-            "COG dengan agregasi zonal berbobot luas irisan sel dan poligon, lalu disimpan ke region_observations dan dipakai "
+            "COG dengan agregasi zonal berbobot luas irisan sel dan poligon dikalikan kosinus lintang sel sebagai pendekatan luas di permukaan bumi, lalu disimpan ke region_observations dan dipakai "
             "untuk peringatan dan prakiraan ({G:pipeline}).")]
     b += [FIG("pipeline", "pipeline.png", "Pipeline per Satelit", 13.0)]
     b += [P("Setiap berkas keluaran dicatat di data_products dengan *checksum* SHA-256, dan setiap transformasi dicatat di "
             "data_lineage sebagai sisi graf dari produk induk ke produk anak ({G:lineage}). Dengan demikian, nilai di "
             "region_observations dapat ditelusuri melalui source_product_id hingga berkas mentah dan scene asalnya.")]
     b += [FIG("lineage", "lineage.png", "Alur Lineage Data", 6.5)]
-    b += [P("Pekerjaan otomatis dijalankan APScheduler dengan *advisory lock* PostgreSQL agar satu pekerjaan tidak berjalan "
+    b += [P("Karena setiap sisi graf menyimpan *checksum* masukan dan keluaran, perubahan berkas setelah diproses dapat "
+            "dideteksi, dan nilai yang meragukan dapat dihitung ulang dari produk induknya tanpa mengunduh ulang seluruh "
+            "data. Pekerjaan otomatis dijalankan APScheduler dengan *advisory lock* PostgreSQL agar satu pekerjaan tidak berjalan "
             "ganda ({T:jadwal}).")]
     b += [TAB("jadwal", "Jadwal Scheduler", [3000, 2700, 2200], ["Pekerjaan", "Jadwal (WIB)", "Kunci"], [
         ["Hidromet harian", "02.00 setiap hari", "hydromet"],
@@ -600,7 +620,9 @@ def blocks():
     b += [FIG("sc_beranda", "sc_beranda.png", "Halaman Beranda Pantau Lokasi", 14.0)]
     b += [P('Tangkapan layar tersebut diambil dengan akun Relawan yang berada di Kecamatan Bayah. Status Waspada dipicu oleh peta genangan optik MODIS yang melewati ambang, waktu pembaruan menunjukkan perhitungan Job Hidromet terakhir, dan luas 145 km² berasal dari kolom area_km2 yang dihitung otomatis dari poligon kecamatan. Daftar di atas peta menunjukkan status kesepuluh kecamatan sekaligus.')]
     b += [FIG("sc_citra", "sc_citra.png", "Halaman Citra Satelit dengan Perbandingan Dua Tanggal", 14.0)]
-    b += [P("{G:sc_kejadian} dan {G:sc_form} menunjukkan halaman Kejadian dan formulir pencatatan kejadian, termasuk kolom "
+    b += [P("Perbandingan dua tanggal membantu pengguna membedakan genangan baru dari badan air yang memang ada, karena "
+            "keduanya tampak serupa pada satu citra radar. Batas tanggal yang dapat dipilih mengikuti VIEW v_citra_scenes, "
+            "sehingga Pengunjung hanya melihat 30 hari terakhir. {G:sc_kejadian} dan {G:sc_form} menunjukkan halaman Kejadian dan formulir pencatatan kejadian, termasuk kolom "
             "sumber informasi dan status verifikasi yang dibutuhkan evaluasi peringatan. {G:sc_ack} menunjukkan tindak lanjut "
             "peringatan oleh Analis, dan {G:sc_email} menunjukkan pengaturan surel dan kecamatan langganan peringatan.")]
     b += [FIG("sc_kejadian", "sc_kejadian.png", "Halaman Kejadian", 14.0)]
@@ -656,7 +678,7 @@ def blocks():
             "1.183 lulus, 0 gagal, dan 2 dilewati karena membutuhkan berkas *shapefile* COD-AB, dengan waktu eksekusi 150 "
             "detik. Uji integritas meliputi test_database, test_schema_comments, dan test_audit. Uji fungsional dilakukan "
             "dengan skenario *black-box* melalui REST API; contoh skenarionya ditunjukkan pada {T:bb}. Sesuai alur pada Gambar "
-            "3.2, hasil uji yang belum lulus dikembalikan ke tahap implementasi: run 8 Oktober 2026 dengan 1.140 kasus lulus "
+            "3.4, hasil uji yang belum lulus dikembalikan ke tahap implementasi: run 8 Oktober 2026 dengan 1.140 kasus lulus "
             "menemukan dua kegagalan, yaitu kode galat OUTSIDE_RASTER_WINDOW yang belum memiliki terjemahan di antarmuka dan "
             "pemeriksa cakupan CSS tema yang salah memecah selektor, dan keduanya diperbaiki sebelum run akhir.")]
     b += [TAB("bb", "Contoh Skenario Uji Black-Box", [400, 2400, 1500, 2300, 1300], ["No", "Skenario", "Masukan", "Hasil yang Diharapkan", "Hasil"], [
@@ -730,7 +752,9 @@ def blocks():
         ["Pekerjaan saat kunci dipegang proses lain", "Pytest: kunci advisory dipegang lebih dulu, lalu scheduler menjalankan job dengan kunci yang sama dan backfill dipicu dari halaman Data", "Lulus: job tidak dijalankan dan dicatat SKIPPED_LOCKED; backfill ditolak 409 BACKFILL_RUNNING"],
         ["Backup terjadwal", "Tugas pg_dump harian dijalankan manual", "Berhasil: 5,0 MB dalam 1,3 detik dan dapat dibaca pg_restore"],
     ])]
-    b += [P("Rekapitulasi enam evaluasi minimum ditunjukkan pada {T:rekap}.")]
+    b += [P("Hasil uji kunci menunjukkan bahwa pemulihan tidak hanya bergantung pada cadangan, tetapi juga pada pekerjaan "
+            "yang dapat diulang dengan aman: *backfill* yang terputus cukup dijalankan ulang tanpa membersihkan data secara "
+            "manual. Rekapitulasi enam evaluasi minimum ditunjukkan pada {T:rekap}.")]
     b += [TAB("rekap", "Rekapitulasi Evaluasi Minimum", [2000, 3900, 2000], ["Evaluasi", "Bukti", "Hasil"], [
         ["*Requirement/user review*", "Kuesioner tinjauan kebutuhan, tiga responden GMLS", "Disetujui (dua dengan perbaikan); kanal ponsel menjadi saran"],
         ["*Integrity*", "test_database, test_schema_comments, test_audit", "Lulus"],

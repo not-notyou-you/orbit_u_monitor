@@ -206,6 +206,16 @@ def table(widths, header, rows, size=20):
 
 
 IMAGES = []  # (rid, nama berkas)
+VIS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "naskah", "visualisasi")
+
+
+def sumber(text):
+    return ('<w:p><w:pPr><w:spacing w:before="0" w:after="200"/><w:jc w:val="center"/></w:pPr>'
+            + runs("Sumber: " + text, size=20) + "</w:p>")
+
+
+def gambar_rujukan(file, bab, n, judul, src, width=14.0):
+    return figure(os.path.join(VIS, file), width) + caption("Gambar", bab, n, judul) + sumber(src)
 
 
 def figure(path, width_cm):
@@ -250,7 +260,11 @@ def bab1():
         "pengelolaan data menyebabkan sebagian wilayah tidak memiliki data yang memadai untuk pemodelan banjir "
         "[@shafiya]. Pada daerah aliran sungai yang tidak memiliki atau jarang memiliki pos hujan, data presipitasi "
         "satelit seperti GPM IMERG menjadi solusi yang layak, dan di Indonesia akurasinya terbukti melampaui produk "
-        "satelit lain seperti TRMM [@hidayah].",
+        "satelit lain seperti TRMM [@hidayah]. Hasil pemodelan banjir skala Pulau Jawa pada Gambar 1.1 "
+        "memperlihatkan bahwa kedalaman genangan dan debit sungai berubah sepanjang tahun dan memuncak pada bulan "
+        "basah, sehingga kondisi hidrometeorologi perlu dipantau dan disimpan secara berkala, bukan hanya saat "
+        "kejadian [@shafiya].",
+        "@FIG1",
 
         "Akses terhadap data satelit juga semakin terbuka. Copernicus Data Space Ecosystem (CDSE), platform data "
         "resmi Program Copernicus, menyediakan akses citra satelit melalui *Application Programming Interface* (API) "
@@ -315,7 +329,9 @@ def bab1():
         "[@pradipta]. Sistem hasil penelitian ini diberi nama Orbit-U: The Monitor, dan rincian rancangannya "
         "dibahas pada BAB IV.",
     ]
-    out["_Toc207196473"] = "".join(para(t) for t in latar)
+    out["_Toc207196473"] = "".join(
+        gambar_rujukan("V1_shafiya2025_debit_sungai_jawa.png", 1, 1, "Peta Kedalaman Genangan dan Debit Sungai di Pulau Jawa Tahun 2014", "Shafiya dkk. [@shafiya]")
+        if t == "@FIG1" else para(t) for t in latar)
     out["_Toc207196474"] = para("Berdasarkan latar belakang tersebut, rumusan masalah penelitian ini adalah sebagai berikut.") + items([
         "Bagaimana merancang basis data relasional spasial yang mengintegrasikan data hidrometeorologi dari "
         "Sentinel-1, MODIS, dan GPM IMERG, yang berbeda format, resolusi, dan frekuensi, ke dalam satu unit analisis "
@@ -474,9 +490,23 @@ def bab2():
         "memungkinkan pemetaan genangan yang konsisten di bawah tutupan awan, baik siang maupun malam [@misra]. Namun, "
         "geometri pencitraan radar yang menyamping menimbulkan distorsi radiometrik, seperti *speckle*, dan distorsi "
         "geometrik, seperti *foreshortening*, *layover*, dan bayangan, sehingga data Level-1 harus dikoreksi sebelum "
-        "dianalisis [@weiss]."))
+        "dianalisis [@weiss]. Tahapan koreksi tersebut, yaitu kalibrasi radiometrik, penapisan *speckle*, koreksi "
+        "medan, dan pemotongan wilayah, ditunjukkan pada Gambar 2.1 [@upadhyay]."))
+    x.append(gambar_rujukan("V4_upadhyay2022_pipeline_sentinel1.png", 2, 1, "Tahapan Pra-Pemrosesan Sentinel-1",
+                            "Upadhyay dkk. [@upadhyay]"))
     x.append(para(
-        "Untuk pemetaan air permukaan, Tran dkk. memilih polarisasi silang VH setelah membandingkan beberapa "
+        "Setiap tahap pada gambar tersebut menghasilkan citra antara yang berbeda dari masukannya, sehingga hasil "
+        "akhirnya hanya dapat dipercaya bila urutan tahap dan parameternya tercatat. Hal ini menjadi alasan penelitian "
+        "ini mencatat setiap tahap pengolahan sebagai *lineage*. Kemampuan SAR menembus awan juga memungkinkan pemetaan "
+        "banjir secara global. Gambar 2.2 memperlihatkan sebaran "
+        "banjir yang terdeteksi dari data Sentinel-1 selama sepuluh tahun, termasuk di wilayah Indonesia yang sering "
+        "tertutup awan, serta wilayah yang deteksinya kurang andal, misalnya kawasan perkotaan dan lereng curam [@misra]."))
+    x.append(gambar_rujukan("V2_misra2025_peta_banjir_global_sentinel1.png", 2, 2,
+                            "Peta Banjir Global dari Sepuluh Tahun Data Sentinel-1", "Misra dkk. [@misra]"))
+    x.append(para(
+        "Wilayah yang ditandai kurang andal pada peta tersebut menunjukkan bahwa deteksi radar tetap memerlukan "
+        "informasi mutu, misalnya porsi piksel valid, agar nilai genangan di wilayah perbukitan seperti Lebak Selatan "
+        "tidak dibaca tanpa konteks. Untuk pemetaan air permukaan, Tran dkk. memilih polarisasi silang VH setelah membandingkan beberapa "
         "polarisasi Sentinel-1, menerapkan ambang Otsu dinamis untuk memisahkan piksel air dan bukan air, lalu "
         "menentukan piksel banjir dengan membandingkan kondisi setiap piksel pada waktu *t* terhadap kondisinya pada "
         "waktu *t*−1 [@tran]."))
@@ -503,7 +533,15 @@ def bab2():
         "memiliki keterbatasan dalam mendeteksi hujan berintensitas rendah [@hidayah]. Evaluasi di Jawa Timur "
         "menunjukkan bahwa IMERG unggul pada skala bulanan dan andal untuk pemantauan regional, tetapi kurang presisi "
         "pada skala harian di daerah aliran sungai kecil dan cenderung meremehkan kejadian hujan ekstrem [@ansori]. "
-        "Karakteristik ketiga sumber data dirangkum pada Tabel 2.2."))
+        "Gambar 2.3 memperlihatkan bahwa estimasi GPM mendekati pos hujan pada periode ulang pendek, tetapi jauh di "
+        "bawahnya pada periode ulang panjang [@ansori]. Karena itu, peringatan hujan yang dihitung dari GPM IMERG "
+        "pada penelitian ini diposisikan sebagai indikasi, bukan pengganti pengamatan lapangan."))
+    x.append(gambar_rujukan("V3_ansori2026_gpm_meremehkan_hujan_ekstrem.png", 2, 3,
+                            "Perbandingan Hujan Maksimum Tahunan dan Periode Ulang antara Pos Hujan dan GPM IMERG",
+                            "Ansori dan JBS [@ansori]", 12.0))
+    x.append(para("Selisih pada periode ulang panjang berarti hujan yang jarang terjadi tetapi paling berbahaya justru "
+                  "paling mungkin terlewat bila hanya mengandalkan GPM, sehingga GPM perlu dilengkapi pengamatan genangan "
+                  "dari Sentinel-1 dan MODIS. Karakteristik ketiga sumber data dirangkum pada Tabel 2.2."))
     x.append(caption("Tabel", 2, 2, "Karakteristik Tiga Sumber Data Satelit"))
     x.append(table([1700, 2300, 2100, 1800], ["Aspek", "Sentinel-1", "MODIS", "GPM IMERG"], [
         ["Jenis pengamatan", "Radar SAR pita C [@weiss]", "Sensor pada satelit Terra dan Aqua [@roman]", "Presipitasi global multi-satelit [@zhu]"],
@@ -634,7 +672,13 @@ def bab2():
         "dengan metode DBSDLC yang mencakup fase perancangan basis data [@pradipta]. DBSDLC juga mencakup tahap "
         "perencanaan dan studi literatur sebelum perancangan [@siregar]. Metode Database Life Cycle juga telah dipakai "
         "untuk merancang basis data relasional melalui tahapan analisis kebutuhan serta desain konseptual, logikal, dan "
-        "fisik [@syaddam,@trihap]. Tahapan DBSDLC yang digunakan dalam penelitian ini adalah sebagai berikut."))
+        "fisik [@syaddam,@trihap]. Contoh penerapannya ditunjukkan pada Gambar 2.4, yang menempatkan tahap Database "
+        "Planning hingga DBMS Selection setelah identifikasi masalah, studi pustaka, dan pengumpulan data [@syaddam]."))
+    x.append(gambar_rujukan("V7_syaddam2025_tahapan_dblc.png", 2, 4, "Contoh Penerapan Tahapan Database Life Cycle",
+                            "Syaddam dkk. [@syaddam]", 10.0))
+    x.append(para(
+        "Gambar 2.4 hanya memuat tahap perancangan basis data. Penelitian ini memakai tahapan DBSDLC yang lengkap, "
+        "yaitu sebagai berikut."))
     x.append(items([
         "**Database Planning**, menyusun *mission statement* yang mendefinisikan tujuan utama sistem basis data dan "
         "*mission objective* yang mendefinisikan tugas yang harus didukung.",
@@ -720,7 +764,14 @@ def bab3():
         "(MoU). Kolaborasi ini dipimpin Fakultas Teknik dan Informatika dan didukung Fakultas Ilmu Komunikasi, dengan "
         "prinsip yang dipegang GMLS bahwa masyarakat tidak boleh dipandang hanya sebagai objek penelitian. Dengan "
         "kemitraan resmi tersebut dan masa kegiatan sejak berdiri pada 2020, GMLS memenuhi prasyarat objek penelitian, "
-        "yaitu diakui secara kelembagaan dan telah beroperasi lebih dari dua tahun."))
+        "yaitu diakui secara kelembagaan dan telah beroperasi lebih dari dua tahun. Kegiatan dan informasi resmi GMLS "
+        "dipublikasikan melalui situs gmls.org, yang halaman utamanya ditunjukkan pada Gambar 3.1 [@tilung]."))
+    x.append(gambar_rujukan("V5_tilung2025_situs_gmls.png", 3, 1, "Halaman Utama Situs Resmi GMLS",
+                            "Tilung dkk. [@tilung]", 10.0))
+    x.append(para(
+        "Situs tersebut berfungsi sebagai kanal informasi kegiatan dan ajakan kolaborasi, bukan sebagai sistem data. "
+        "Profil, wilayah kerja, dan kegiatan pada situs ini menjadi salah satu sumber observasi (subbab 3.3.1), "
+        "sedangkan data pemantauan wilayah belum tersedia di dalamnya."))
 
     x.append(h3("Aplikasi dalam Kerja Sama GMLS dan UMN"))
     x.append(para(
@@ -739,6 +790,17 @@ def bab3():
         "informasi cuaca dan menerima pelaporan bencana. Oleh karena itu, sistem dalam penelitian ini tidak menerima "
         "laporan warga, yang tetap disalurkan melalui Are You In Sys, dan tidak menyimpan data penduduk, yang tetap "
         "dikelola SIGAP DESA."))
+    x.append(para(
+        "Kerja sama GMLS dan UMN sebelumnya juga telah menghasilkan dasbor pra-bencana tsunami untuk Panggarangan yang "
+        "memvisualisasikan data kependudukan, rambu, dan kejadian gempa-tsunami, sebagaimana ditunjukkan pada Gambar 3.2 "
+        "[@wong]. Dasbor ini berfokus pada bahaya geologi dan belum memuat data hidrometeorologi, yang menjadi cakupan "
+        "penelitian ini."))
+    x.append(gambar_rujukan("V6_wong2024_dasbor_prabencana_gmls.png", 3, 2, "Dasbor Pra-Bencana Tsunami GMLS",
+                            "Wong dkk. [@wong]"))
+    x.append(para(
+        "Dasbor tersebut menyajikan kondisi kependudukan dan kawasan rawan yang relatif tetap, bukan deret waktu "
+        "pengamatan yang berubah setiap hari. Karena itu, sistem dalam penelitian ini melengkapinya dengan basis data "
+        "yang diperbarui setiap hari, bukan menggantikan dasbor yang sudah ada."))
 
     x.append(h3("Sistem yang Sedang Berjalan"))
     x.append(para(
@@ -769,12 +831,12 @@ def bab3():
     x.append(h3("Wilayah Kajian"))
     x.append(para(
         "Wilayah kajian terdiri atas sepuluh kecamatan di Kabupaten Lebak, yaitu Banjarsari, Bayah, Cibeber, Cigemblong, "
-        "Cihara, Cijaku, Cilograng, Malingping, Panggarangan, dan Wanasalam, sebagaimana ditunjukkan pada Gambar 3.1. "
+        "Cihara, Cijaku, Cilograng, Malingping, Panggarangan, dan Wanasalam, sebagaimana ditunjukkan pada Gambar 3.3. "
         "Batas wilayah bersumber dari data COD-AB Indonesia tingkat kecamatan, dengan luas total sekitar 1.575,8 km² "
         "yang dihitung dari poligon tersebut. Cakupan sepuluh kecamatan ini dikonfirmasi oleh GMLS melalui kuesioner "
         "tinjauan kebutuhan (subbab 4.3.4)."))
     x.append(figure(os.path.join(IMG, "peta_wilayah.png"), 14.0))
-    x.append(caption("Gambar", 3, 1, "Peta Wilayah Kajian"))
+    x.append(caption("Gambar", 3, 3, "Peta Wilayah Kajian"))
 
     x.append(para('Luas kecamatan dalam wilayah kajian bervariasi, dari Cilograng sekitar 94,9 km² hingga Cibeber sekitar 400,8 km². Perbedaan ini berpengaruh pada data hujan GPM IMERG yang beresolusi 0,1°: satu kecamatan hanya tercakup oleh satu hingga enam sel grid, sehingga nilai per kecamatan dihitung dengan bobot luas irisan sel dan poligon, bukan dengan mengambil satu sel terdekat. Cara perhitungan ini diuraikan pada subbab 4.3.1.'))
     x.append(h2("Metode Penelitian"))
@@ -783,9 +845,9 @@ def bab3():
         "kebutuhan, perancangan konseptual, logikal, dan fisik, integritas, keamanan, serta implementasi basis data. "
         "Alur penelitian dan metode pengembangannya diuraikan pada subbab berikut."))
     x.append(h3("Alur Penelitian"))
-    x.append(para("Alur penelitian ditunjukkan pada Gambar 3.2."))
+    x.append(para("Alur penelitian ditunjukkan pada Gambar 3.4."))
     x.append(figure(os.path.join(IMG, "alur_penelitian.png"), 14.0))
-    x.append(caption("Gambar", 3, 2, "Alur Penelitian"))
+    x.append(caption("Gambar", 3, 4, "Alur Penelitian"))
     x.append(para(
         "Penelitian diawali dengan analisis sistem yang sedang berjalan melalui observasi, wawancara dengan GMLS, dan pemeriksaan "
         "dokumen. Hasilnya diidentifikasi dengan metode 5W1H untuk merumuskan masalah dari sisi apa, siapa, kapan, di "
@@ -793,7 +855,7 @@ def bab3():
         "penelitian terdahulu dan menentukan celah penelitian (*research gap*), sehingga diperoleh empat rumusan masalah "
         "(RM1–RM4) pada BAB I."))
     x.append(para(
-        "Setiap rumusan masalah dijawab melalui sebelas tahap DBSDLC. Dua umpan balik ditunjukkan pada Gambar 3.2: "
+        "Setiap rumusan masalah dijawab melalui sebelas tahap DBSDLC. Dua umpan balik ditunjukkan pada Gambar 3.4: "
         "temuan pada tahap *Prototyping* dikembalikan ke tahap desain antarmuka, dan hasil *Testing* yang belum memenuhi "
         "kriteria dikembalikan ke tahap *Implementation* untuk diperbaiki. Setelah seluruh evaluasi terpenuhi, hasil "
         "setiap tahap dibahas terhadap RM1–RM4 untuk menarik simpulan dan saran."))
@@ -873,9 +935,19 @@ def bab3():
         "(20 hingga kurang dari 50 mm), lebat (50 hingga kurang dari 100 mm), sangat lebat (100 hingga 150 mm), dan "
         "ekstrem (lebih dari 150 mm) [@bmkg_sumsel,@bmkg_kalsel]. Penyediaan dan penyebarluasan peringatan dini cuaca "
         "ekstrem, termasuk hujan lebat, diatur sebagai kewenangan BMKG [@perban], sehingga sistem ini memosisikan "
-        "keluarannya sebagai informasi pendukung, bukan peringatan dini resmi. "
+        "keluarannya sebagai informasi pendukung, bukan peringatan dini resmi. Contoh produk peringatan dini curah "
+        "hujan tinggi BMKG ditunjukkan pada Gambar 3.5. Peringatan tersebut dibagi ke dalam kelas Waspada, Siaga, dan "
+        "Awas, tetapi disajikan per kabupaten dan per dasarian, sehingga belum menggambarkan kondisi harian per "
+        "kecamatan yang dibutuhkan GMLS [@bmkg_kalsel]. "
         "Selain itu, kode dan skema basis data Orbit-U: The DataLab, yaitu sistem pengolah data satelit yang menjadi "
         "dasar pengembangan sistem ini, diperiksa untuk menentukan komponen yang dipertahankan, diubah, atau dihapus."))
+    x.append(gambar_rujukan("V8_bmkg2026_peta_pdcht_kalsel.png", 3, 5, "Contoh Peta Peringatan Dini Curah Hujan Tinggi BMKG",
+                            "Stasiun Klimatologi Kalimantan Selatan, BMKG [@bmkg_kalsel]", 11.0))
+    x.append(para(
+        "Klasifikasi Waspada, Siaga, dan Awas pada peta tersebut sejalan dengan ambang hujan lebat, sangat lebat, dan "
+        "ekstrem, sehingga ketiga tingkat inilah yang dipakai sebagai severity aturan peringatan. Perbedaannya, sistem "
+        "ini menghitung ambang tersebut dari hujan harian GPM IMERG per kecamatan, sehingga keluarannya lebih rinci "
+        "tetapi tetap berstatus informasi pendukung."))
     x.append(h3("Studi Pustaka"))
     x.append(para(
         "Studi pustaka dilakukan terhadap artikel jurnal dan prosiding tentang pemantauan bencana berbasis satelit, "

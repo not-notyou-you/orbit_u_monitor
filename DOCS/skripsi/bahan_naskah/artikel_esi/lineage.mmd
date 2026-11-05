@@ -1,0 +1,13 @@
+flowchart TB
+  PJ[(processing_jobs)]
+  SC[(satellite_scenes)] --> R[data_products<br/>RAW .zip, SHA-256]
+  R -- "data_lineage: CALIBRATE" --> AL[data_products<br/>ALIGNED VV/VH]
+  AL -- "data_lineage: SPECKLE_FILTER" --> DS[data_products<br/>DESPECKLED]
+  DS -- "data_lineage: COG" --> CG[data_products<br/>COG VV/VH]
+  DS -. QUALITY_ANALYTICS .-> QM[(quality_metrics)]
+  CG -- "zonal aggregation" --> RO[(region_observations<br/>source_product_id)]
+  PJ -.-> R
+  PJ -.-> AL
+  PJ -.-> DS
+  PJ -.-> CG
+  classDef default fill:#ffffff,stroke:#222,color:#000;

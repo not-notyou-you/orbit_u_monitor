@@ -1,0 +1,21 @@
+flowchart TB
+  subgraph S1[Sentinel-1]
+    A1[RAW<br/>GRD IW VV+VH] --> A2[ALIGNED<br/>σ⁰ calibration, EPSG:4326, AOI crop] --> A3[DESPECKLED<br/>Lee filter 7×7]
+    A3 --> A4[COG]
+    A3 --> A5[QA → quality_metrics]
+  end
+  subgraph MO[MODIS]
+    B1[RAW<br/>MCDWD, MOD09A1/GA] --> B2[ALIGNED<br/>flood map] --> B3[INDICES<br/>NDVI, NDWI] --> B4[COG]
+  end
+  subgraph GP[GPM IMERG]
+    C1[RAW<br/>Final → Late → Early] --> C2[ALIGNED<br/>1-day rainfall] --> C3[ACCUMULATED<br/>24 h, 72 h, 7 d, 30 d] --> C4[COG]
+  end
+  A4 --> F[FUSED<br/>multi-sensor HDF5]
+  B4 --> F
+  C4 --> F
+  A4 --> Z[Zonal aggregation per sub-district<br/>→ region_observations]
+  B4 --> Z
+  C4 --> Z
+  Z --> E[alert_events]
+  Z --> G[band_forecasts]
+  classDef default fill:#ffffff,stroke:#222,color:#000;

@@ -1,0 +1,51 @@
+erDiagram
+  administrative_regions ||--o{ region_observations : ""
+  spectral_bands ||--o{ region_observations : ""
+  data_products ||--o{ region_observations : ""
+  data_products ||--o{ data_lineage : ""
+  spectral_bands ||--o{ alert_rules : ""
+  disaster_types ||--o{ alert_rules : ""
+  alert_rules ||--o{ alert_events : ""
+  administrative_regions ||--o{ alert_events : ""
+  region_observations |o--o{ alert_events : ""
+  disaster_types ||--o{ disaster_events : ""
+  administrative_regions ||--o{ disaster_events : ""
+  region_observations {
+    int obs_id PK
+    int region_id FK,UK
+    int band_id FK,UK
+    date obs_date UK
+    decimal value
+    decimal valid_fraction
+    int source_product_id FK
+  }
+  alert_events {
+    int alert_id PK
+    int rule_id FK,UK
+    int region_id FK,UK
+    date observation_date UK
+    decimal observed_value
+    int acknowledged_by FK
+    timestamptz acknowledged_at
+  }
+  disaster_events {
+    int event_id PK
+    int disaster_type_id FK
+    int region_id FK
+    date event_date
+    text info_source
+    bool is_verified
+  }
+  data_products {
+    int product_id PK
+    text file_path
+    int job_id FK
+    varchar data_hash_sha256
+  }
+  data_lineage {
+    bigint lineage_id PK
+    bigint parent_product_id FK,UK
+    bigint child_product_id FK,UK
+    varchar transformation_type
+    varchar output_checksum
+  }
