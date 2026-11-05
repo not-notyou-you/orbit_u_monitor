@@ -1,15 +1,4 @@
-# etl/lokasi_data.py
-"""Angka, kalimat kondisi, dan citra SATU kecamatan (M63, M64).
-
-Satu tempat untuk dua pemakai yang harus melihat hal yang sama:
-* Beranda / Pantau Lokasi (api/routes/lokasi.py), di bawah role pemanggil;
-* peringatan email (etl/notify.py), di bawah ``monitor_etl``.
-
-Angka dibaca lewat VIEW ``v_public_lokasi_*``: batas waktunya per role
-pemanggil (``monitor_etl`` = jendela pengunjung, 30 hari + dua observasi
-terakhir per band). Kalimat kondisi dari etl/lokasi_interpret.py; ambang hujan
-diselaraskan dengan ``alert_rules`` lewat sync_bmkg_thresholds.
-"""
+"""Angka, kalimat kondisi, dan citra SATU kecamatan (M63, M64)."""
 from __future__ import annotations
 
 import json
@@ -17,7 +6,6 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-# Kelompok grafik tren = baris tile (Sentinel-1, MODIS, GPM).
 GROUPS = (
     ("s1", "Sentinel-1 (radar)", ("VV", "VH", "WATER_PCT")),
     ("modis", "MODIS (optik)", ("FLOOD", "NDVI", "NDWI")),
@@ -58,10 +46,7 @@ def obs(sess, region_id: int | None = None) -> dict[int, tuple[dict, dict]]:
 
 
 def updated_at(etl, region_id: int):
-    """Kapan angka kecamatan ini terakhir dihitung (max ``computed_at``).
-
-    Dibaca lewat monitor_etl karena VIEW publik tidak memuat kolom waktu
-    hitung; yang keluar hanya satu stempel waktu, bukan angkanya."""
+    """Kapan angka kecamatan ini terakhir dihitung (max ``computed_at``)."""
     with etl.session() as s:
         return s.scalar(text("SELECT max(computed_at) FROM region_observations WHERE region_id = :r"),
                         {"r": region_id})
@@ -116,8 +101,6 @@ def conditions(sess, region_ids=None) -> dict[int, dict]:
     return out
 
 
-# ------------------------------------------------------------------------- citra
-
 def area_for(etl, region_id: int) -> int | None:
     """Live Area aktif yang bbox-nya paling banyak menutupi kecamatan."""
     with etl.session() as s:
@@ -130,8 +113,6 @@ def area_for(etl, region_id: int) -> int | None:
             LIMIT 1"""), {"r": region_id})
 
 
-# Isi v_public_live_latest. monitor_etl membaca tabelnya langsung dengan
-# syarat yang sama (VIEW itu hanya diberikan ke role pengunjung).
 _LATEST_BASE = """
     SELECT s.area_id, a.name AS area_name, s.live_scene_id, s.scene_date, s.status, s.area_status,
            s.interpretations, s.previews, s.source_status

@@ -1,4 +1,3 @@
-// js/login.js — /masuk. POST /api/auth/login menyetel cookie HttpOnly; sukses → ?next atau /app.
 'use strict';
 Pages['login'] = {
   init(root) {
@@ -15,7 +14,6 @@ Pages['login'] = {
       input.setAttribute('aria-invalid', msg ? 'true' : 'false');
       UI.$('#' + input.id + 'Err', root).textContent = msg || '';
     };
-    // Validasi langsung saat mengetik (setelah field pernah disentuh).
     [u, p].forEach(i => {
       i.addEventListener('blur', () => setErr(i, i.value.trim() ? '' : 'Wajib diisi.'));
       i.addEventListener('input', () => { if (i.getAttribute('aria-invalid') === 'true' && i.value.trim()) setErr(i, ''); });

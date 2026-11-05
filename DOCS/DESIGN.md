@@ -91,7 +91,7 @@ Primitifnya dibangun lewat `web/js/ui.js` supaya markup tetap seragam.
 |---|---|
 | **Jendela** (`.window`) | Bevel menonjol, lebar maksimal 1200px (`.small` 420, `.medium` 720). Isi di `.window-body` dengan padding 8px |
 | **Title bar** | Gradasi biru, teks putih tebal, ikon 16px di kiri, tombol 16×14 di kanan. Jendela tidak aktif: abu-abu |
-| **Menu bar** (`.menubar`) | Tepat di bawah title bar. Navigasi utama terlihat tanpa harus membuka Mulai. Halaman aktif ditandai `aria-current="page"` dengan latar `--select` |
+| **Menu bar** (`.menubar`) | Tepat di bawah title bar. Navigasi utama terlihat tanpa harus membuka Mulai. Halaman aktif ditandai `aria-current="page"` dengan latar `--select`. Di ujung kanan (`.mb-account`): **Masuk** dan **Daftar** untuk pengunjung, **Keluar** bila sudah login. Menu bar selalu tampil walau peran hanya punya satu halaman (M82) |
 | **Lede** (`.page-lede`) | Satu baris instruksi di setiap halaman: untuk apa halaman ini dan apa langkah pertamanya (M53). Diletakkan di chrome, bukan di layar |
 | **Status bar** | Panel-panel cekung 11px di dasar jendela |
 | **Tombol** | Bevel menonjol, `.default` untuk aksi utama. Saat sibuk, tombol diberi `aria-busy` |
@@ -167,7 +167,7 @@ surut). Palet ini juga selalu disertai legenda berteks (PIPELINE.md §4.1).
 
 Orbital 95 adalah tema **dasar** (satu-satunya tanpa `css/tema/`), tetapi tema **bawaan** sejak M65 adalah
 Kertas Mint: dipakai bila peramban belum menyimpan pilihan. Tiga tema lain diambil dari konsep di
-`DOCS/design tambahan/`:
+`DOCS/desain/`:
 
 | Kunci | Nama | Konsep |
 |---|---|---|
@@ -175,7 +175,8 @@ Kertas Mint: dipakai bila peramban belum menyimpan pilihan. Tiga tema lain diamb
 | `pasir` | Mika Pasir | konsep41 |
 | `piksel` | Piksel Marun | konsep44 |
 
-- Tema dipilih di bagian bawah Beranda (M65; M63–M64 di Tentang), lalu diterapkan `web/js/theme.js` sebagai `data-theme` di `<html>` **sebelum**
+- Tema dipilih di Beranda, di antara Informasi lokasi dan Detail lokasi (M66; sebelumnya di bawah Beranda M65, di
+  Tentang M63–M64), lewat kartu radio (`css/tema/pilihan.css`), lalu diterapkan `web/js/theme.js` sebagai `data-theme` di `<html>` **sebelum**
   `<body>` diurai, sehingga tidak ada kedipan tema bawaan.
 - Pilihan disimpan di `localStorage` (`orbit-u.tema`) per peramban, bukan per akun.
 - CSS tema ada di `web/css/tema/`: `umum.css` (struktur bersama, tercakup `html.tema-alt`) ditambah satu

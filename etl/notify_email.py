@@ -1,21 +1,4 @@
-# etl/notify_email.py
-"""Isi email peringatan dan konfirmasi (M64), Bahasa Indonesia.
-
-Satu email dibaca dua jenis pembaca: Relawan (awam) dan analis/data
-engineer. Karena itu tiap kecamatan disusun berlapis:
-
-1. Ringkasnya   -- status + bahasa sehari-hari: apa yang terjadi, artinya,
-                   dan saran umum; selalu ditutup "bukan peringatan dini resmi".
-2. Bukti        -- citra scene terbaru yang dipotong ke kecamatan (ditempel
-                   inline, CID) dan tabel nilai · ambang · sebelumnya ·
-                   rentang biasa · tanggal data.
-3. Detail teknis -- kalimat aturan lengkap, produk sumber dan run, bagian
-                   kecamatan yang teramati, sumber ambang, metode rentang
-                   biasa, keterbatasan.
-
-HTML memakai tabel + CSS inline (klien email tidak membaca <style> dengan
-andal) dan selalu disertai versi teks polos.
-"""
+"""Isi email peringatan dan konfirmasi (M64), Bahasa Indonesia."""
 from __future__ import annotations
 
 from datetime import date
@@ -26,7 +9,6 @@ from etl.live_interpret import fmt
 BULAN = ("Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des")
 LEVEL_COLOR = {2: "#b00020", 1: "#9a5b00", 0: "#1b6b3a", -1: "#555555"}
 
-# Bahasa sehari-hari per butir: (judul, artinya, saran).
 PLAIN: dict[str, tuple[str, str, str]] = {
     "gpm_rain_24h": ("Hujan sangat deras dalam sehari",
                      "Curah hujan satu hari (07.00–07.00 WIB) melewati batas hujan lebat.",
@@ -57,7 +39,6 @@ PLAIN: dict[str, tuple[str, str, str]] = {
               "Ikuti informasi BMKG dan BPBD setempat."),
 }
 
-# Produk sumber per band, untuk lapisan teknis.
 SOURCE: dict[str, str] = {
     "VV": "Sentinel-1 GRD IW (ESA Copernicus), backscatter VV rerata kecamatan per lintasan",
     "VH": "Sentinel-1 GRD IW (ESA Copernicus), backscatter VH rerata kecamatan per lintasan",
@@ -70,11 +51,8 @@ SOURCE: dict[str, str] = {
     "RAIN_7D": "GPM IMERG (NASA/JAXA), akumulasi 7 hari rerata kecamatan",
 }
 RUN = {"F": "Final", "L": "Late (sementara)", "E": "Early (sementara)"}
-# Indeks memakai 3 desimal di tabel bukti: dengan 2 desimal nilai yang sedikit
-# di atas batas rentang biasa tampak sama dengan batasnya.
 DIGITS = {"NDVI": 3, "NDWI": 3}
 
-# Tile citra yang paling menjelaskan tiap butir.
 IMAGE_KEYS: dict[str, tuple[str, ...]] = {
     "s1_vv": ("s1_vv",), "s1_vh": ("s1_vh", "s1_water_change"), "modis_flood": ("modis_flood",),
     "modis_ndvi": ("modis_ndvi",), "modis_ndwi": ("modis_ndwi",), "gpm_rain_24h": ("gpm_rain_24h",),
@@ -104,8 +82,6 @@ def _val(band: str, v, unit: str | None) -> str:
     return fmt(v, DIGITS.get(band, 1)) + u
 
 
-# ---------------------------------------------------------------- konfirmasi
-
 def confirmation_message(name: str, email: str, cfg) -> tuple[str, str, str]:
     akun = cfg.link("/app#sistem/akun")
     subject = "Orbit-U · Email Anda tersimpan untuk peringatan kondisi"
@@ -133,14 +109,11 @@ def confirmation_message(name: str, email: str, cfg) -> tuple[str, str, str]:
     return subject, text, html
 
 
-# ---------------------------------------------------------------- peringatan
-
 def alert_message(name: str, regions: list[dict], cfg, units: dict[str, str], thresholds) -> tuple[str, str, str, list]:
     """regions: [{region, status, items(baru), all_abnormal, latest, prev, ranges,
     scene_date, images:[(cid, key, label, png)]}]. thresholds(band) ->
     [{label, value}] (etl.band_catalog.thresholds).
-
-    Mengembalikan (subjek, teks, html, [(cid, png)])."""
+    """
     worst = max(r["status"]["level"] for r in regions)
     if len(regions) == 1:
         r = regions[0]
@@ -199,7 +172,6 @@ def _region_block(r: dict, cfg, units, thresholds) -> tuple[list[str], str, list
               f"<i>{escape(advice)}</i> <span style='color:#555'>(data {escape(tgl(it['date']))})</span></li>")
     h += "</ul>"
 
-    # Bukti: gambar + tabel
     imgs = []
     t += ["", "BUKTI"]
     h += "<h3 style='margin:12px 0 4px;font-size:14px'>Bukti</h3>"
@@ -240,7 +212,6 @@ def _region_block(r: dict, cfg, units, thresholds) -> tuple[list[str], str, list
                               for c in cells) + "</tr>"
     h += "</table>"
 
-    # Detail teknis
     t += ["", "DETAIL TEKNIS"]
     h += ("<h3 style='margin:12px 0 4px;font-size:14px'>Detail teknis</h3>"
           "<ul style='margin:0;padding-left:18px;font-size:12px;color:#333'>")

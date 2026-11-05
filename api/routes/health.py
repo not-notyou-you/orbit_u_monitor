@@ -1,4 +1,3 @@
-# api/routes/health.py
 """GET /api/health — database connectivity and pool statistics."""
 
 from __future__ import annotations

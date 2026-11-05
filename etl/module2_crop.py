@@ -1,4 +1,3 @@
-# etl/module2_crop.py
 from __future__ import annotations
 
 import logging

@@ -1,24 +1,5 @@
 #!/usr/bin/env python
-"""Muat batas COD-AB Kabupaten Lebak dan tandai AOI GMLS (PIPELINE.md §10, langkah 2–4 dan 8).
-
-Pakai:
-    python scripts/load_regions.py
-    python scripts/load_regions.py --aoi "Bayah,Panggarangan,Cihara,..."
-    python scripts/load_regions.py --aoi-only --aoi "ID3602030,ID3602020"
-    python scripts/load_regions.py --adm2 path/idn_admin2.shp --adm3 path/idn_admin3.shp
-
-Langkah:
-  1. adm2 + adm3 dengan ADM2_PCODE Lebak -> administrative_regions (upsert per
-     pcode, ST_Multi(ST_MakeValid)). in_aoi yang sudah ada tidak diubah.
-  2. --aoi: kecamatan (nama atau pcode) yang in_aoi; sisanya false.
-  3. ROI AOI GMLS (is_monitor_aoi) + ROI per kecamatan AOI + dataset sistem
-     HYDROMET_AOI dibangun ulang dari kecamatan in_aoi.
-  4. Live Area default ("Lebak Selatan", app_settings) dibuat bila belum ada
-     area untuk ROI AOI. Backfill-nya dimulai scheduler saat API berjalan
-     (status BACKFILLING dilanjutkan otomatis), bukan oleh skrip ini.
-
-Terkoneksi sebagai pemilik skema (DB_USER), seperti skrip setup lain.
-"""
+"""Muat batas COD-AB Kabupaten Lebak dan tandai AOI GMLS (PIPELINE.md §10, langkah 2–4 dan 8)."""
 
 from __future__ import annotations
 

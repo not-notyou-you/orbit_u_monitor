@@ -1,19 +1,4 @@
-# etl/alert_engine.py
-"""Evaluasi ``alert_rules`` terhadap ``region_observations`` -> ``alert_events`` (PIPELINE.md §3.5).
-
-    untuk setiap rule aktif:
-      untuk setiap observasi (band = rule.band, obs_date = target, value bukan NULL):
-        jika value <comparator> threshold:
-          INSERT alert_events ... ON CONFLICT (rule_id, region_id, observation_date) DO NOTHING
-
-Satu kecamatan bisa memicu INFO, WARNING, dan CRITICAL sekaligus. Alert yang
-sudah ada tidak dihapus atau diubah walau nilai observasinya kemudian
-direvisi (Late -> Final): alert adalah catatan apa yang diketahui saat itu,
-dan nilai/ambang/severity-nya disalin ke baris alert (§3.4, DATABASE §5.2).
-
-Perbandingan dikerjakan satu pernyataan SQL per tanggal; comparator hanya
-diambil dari whitelist (CHECK di tabel juga membatasinya).
-"""
+"""Evaluasi ``alert_rules`` terhadap ``region_observations`` -> ``alert_events`` (PIPELINE.md §3.5)."""
 
 from __future__ import annotations
 

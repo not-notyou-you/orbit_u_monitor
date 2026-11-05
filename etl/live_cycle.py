@@ -1,24 +1,4 @@
-# etl/live_cycle.py
-"""Siklus otomatis satu Daerah Live (PIPELINE.md §4).
-
-    1. cek scene Sentinel-1 baru (discover_scenes)
-    2. unduh + proses S1/MODIS/GPM lewat run_dataset_job (pipeline biasa)
-    3. per scene: metrik -> 8 preview -> peta perubahan air (preview ke-9,
-       PIPELINE §4.1) -> kalimat kondisi
-    4. hitung ulang forecast
-    5. retensi: hapus berkas scene yang lebih tua dari jendela raster (M58)
-    6. semua langkah dicatat ke live_events
-
-Backfill adalah siklus yang sama (M58): discovery selalu melihat seluruh
-jendela ``storage.raster_retention_days`` (1 tahun), jadi tanggal S1 mana pun
-di jendela itu yang belum diproses ikut dikerjakan, terbaru lebih dulu, per
-``INGEST_BATCH`` tanggal supaya kemajuan tersimpan bertahap. Setiap scene yang
-lolos juga ditulis per kecamatan ke region_observations (s1_observations).
-
-Kegagalan satu sumber tidak menggagalkan scene: MODIS/GPM yang berkasnya tidak
-ada ditandai FAILED di source_status, scene tetap PARTIAL (tampil), dan tiap
-siklus berikutnya mencoba ulang sumber itu (retry_failed_sources).
-"""
+"""Siklus otomatis satu Daerah Live (PIPELINE.md §4)."""
 from __future__ import annotations
 
 import logging
@@ -44,21 +24,9 @@ from etl.live_monitor import (
 
 logger = logging.getLogger(__name__)
 
-# Scene yang S1-nya gagal diproses dicoba ulang sampai sekian kali (siklus
-# berbeda), lalu dibiarkan FAILED -- tetap di log, tidak tampil di kartu.
 MAX_S1_ATTEMPTS = 3
-# Peta perubahan air dihitung di grid preview yang diperhalus WC_REFINE kali:
-# luas km2 dari piksel 768-an terlalu kasar, sedangkan PNG-nya tetap harus
-# seukuran preview lain. 3 menjaga kehalusannya setara MAX_SIDE lama (2048).
 WC_REFINE = 3
-# Tanggal per run_dataset_job. Backfill setahun = puluhan tanggal; satu job
-# raksasa yang mati di tengah membuang semua kerjanya, satu job per beberapa
-# tanggal hanya kehilangan batch yang sedang jalan.
 INGEST_BATCH = 3
-# Backfill (scripts/backfill_s1.py, halaman Data) berjalan berprioritas normal:
-# 3 unduhan CDSE paralel (S1_PARALLEL_DOWNLOADS) alih-alih 1, dan batch lebih
-# besar supaya ketiga jalur unduh tetap terisi. CDSE membatasi ±1 MB/s per
-# koneksi, jadi unduhan serial membuat backfill setahun ±3 hari (8 Okt 2026).
 BACKFILL_BATCH = 6
 
 
@@ -83,11 +51,6 @@ def run_cycle(mon: LiveMonitor, area_id: int, date_range: tuple[date, date] | No
         key, prev_status = _queue_key(mon, area_id)
         if _CYCLE_LOCK.busy():
             _set_area(mon, area_id, status="WAITING", status_message="Waiting its turn")
-        # Seluruh siklus (termasuk retry MODIS/GPM di luar run_dataset_job)
-        # mengalah ke unduhan Dataset Saya di slot koneksi download_guard.
-        # Selama riwayat jendela raster belum lengkap, siklus mana pun (penjadwal,
-        # pemulihan setelah restart server, skrip) adalah backfill: unduhan
-        # paralel dan batch besar, bukan mode rutin yang mengalah (M58).
         backfill = backfill or _history_incomplete(mon, area_id)
         with _CYCLE_LOCK.hold(key), dg.low_priority(not backfill):
             started = time.time()
@@ -97,12 +60,9 @@ def run_cycle(mon: LiveMonitor, area_id: int, date_range: tuple[date, date] | No
                                         batch=BACKFILL_BATCH if backfill else INGEST_BATCH)
             finally:
                 _report_auth_failures(mon, area_id, started)
-                # Jalur keluar awal (daerah nonaktif/terhapus) tidak menulis
-                # status; jangan biarkan kartu tertahan "Menunggu giliran".
                 _restore_if_waiting(mon, area_id, prev_status)
     finally:
         lock.release()
-    # Scene/angka S1 baru -> forecast tersimpan (M62); di luar kunci siklus.
     from etl import forecast_store
     forecast_store.refresh_quietly(getattr(mon, "_db", None))
     return res
@@ -188,19 +148,7 @@ def _set_area(mon: LiveMonitor, area_id: int, **fields) -> None:
 
 
 def _recover_interrupted_ingest(mon: LiveMonitor, area_id: int) -> None:
-    """Pulihkan ingest yang terputus (proses mati/restart di tengah _ingest).
-
-    Dipanggil sambil memegang JobLock daerah + _CYCLE_LOCK, jadi tidak ada
-    ingest daerah ini yang sedang berjalan: setiap scene yang masih PROCESSING
-    pasti yatim. Tanpa ini scene itu macet selamanya -- _discover_new_dates
-    menganggap PROCESSING sudah "dikenal" sehingga tidak diunduh ulang, dan
-    tidak pernah difinalisasi sehingga tidak tampil. Dijadikan FAILED supaya
-    ditemukan ulang, TANPA menambah attempts: proses yang dihentikan/restart
-    bukan kegagalan data, dan tiga restart tidak boleh membuat tanggal yang
-    sehat ditinggalkan selamanya (MAX_S1_ATTEMPTS). Frame yang COG-nya sudah
-    jadi tidak diunduh ulang (module5_orchestrator._keep_live_target_dates).
-    Job LIVE_INGEST-nya yang tertinggal DOWNLOADING/PROCESSING ditutup FAILED.
-    """
+    """Pulihkan ingest yang terputus (proses mati/restart di tengah _ingest)."""
     from etl.module5_orchestrator import LIVE_JOB_TYPE
 
     active = ("QUEUED", "PREPARING", "DOWNLOADING", "PROCESSING")
@@ -277,7 +225,6 @@ def _run_cycle_locked(mon: LiveMonitor, area_id: int, date_range: tuple[date, da
         if echo:
             echo(f"[INFO] {len(new_dates)} Sentinel-1 date(s) to process")
         processed: list[date] = []
-        # Terbaru lebih dulu: scene baru tidak menunggu backfill selesai.
         step = batch
         for i in range(0, len(new_dates), step):
             batch = sorted(new_dates[i:i + step])
@@ -291,7 +238,6 @@ def _run_cycle_locked(mon: LiveMonitor, area_id: int, date_range: tuple[date, da
             if echo:
                 echo(f"[{i + len(batch)}/{len(new_dates)}] {batch[0]}..{batch[-1]}: "
                      f"{len(done)}/{len(batch)} scene(s) ready ({time.monotonic() - t0:.0f}s)")
-        # Sumber yang gagal di scene lama dicoba ulang tiap siklus.
         retry_failed_sources(mon, area_id, skip=set(processed))
         reinterpret_all(mon, area_id)
         mon.enforce_retention(area_id)
@@ -367,10 +313,6 @@ def _cycle_result(mon: LiveMonitor, area_id: int, targets: list[date], stored: i
     return {"level": level, "text": "Done: " + "; ".join(parts)}
 
 
-# ---------------------------------------------------------------------------
-# 1. discovery
-# ---------------------------------------------------------------------------
-
 def _discover_new_dates(mon, area_id, bbox_wkt, window_start: date, scenes,
                         date_range: tuple[date, date] | None = None) -> list[date]:
     """Tanggal S1 di jendela raster yang belum diproses, TERBARU LEBIH DULU."""
@@ -378,9 +320,6 @@ def _discover_new_dates(mon, area_id, bbox_wkt, window_start: date, scenes,
     from etl.module1_download import discover_scenes
     from etl.module5_orchestrator import _drop_dates_barely_covering_aoi, _scene_date
 
-    # Seluruh jendela setiap siklus: satu kueri katalog (<1000 produk untuk 2
-    # tahun AOI ini), dan tanggal yang terlewat/gagal di tengah jendela ikut
-    # tertangkap tanpa status backfill terpisah.
     date_from = window_start
     date_to = _now() + timedelta(days=1)
     if date_range:
@@ -397,12 +336,6 @@ def _discover_new_dates(mon, area_id, bbox_wkt, window_start: date, scenes,
     except Exception as exc:
         mon.log(area_id, "DISCOVER", "FAILED", f"Failed to check for Sentinel-1 scenes: {exc}")
         raise
-    # LAPIS 1 gerbang kelengkapan AOI (etl/aoi_coverage.py): buang tanggal yang
-    # footprint-nya saja sudah tidak menutup AOI, SEBELUM diunduh. Ambangnya
-    # live.min_aoi_coverage, bukan MIN_S1_AOI_COVERAGE milik orchestrator --
-    # yang itu penjaga pemborosan unduhan arsip (5%), terlalu longgar untuk
-    # menjamin kelengkapan. Footprint bersifat optimis, jadi lapis 2 di
-    # finalize_scene masih mengukur ulang dari pikselnya.
     with mon._db.session() as sess:
         min_cov = aoi_cov.min_coverage(sess)
     found = _drop_dates_barely_covering_aoi(found, bbox_wkt, job_id=0,
@@ -424,10 +357,6 @@ def _discover_new_dates(mon, area_id, bbox_wkt, window_start: date, scenes,
             found=[d.isoformat() for d in dates], targets=[d.isoformat() for d in targets])
     return targets
 
-
-# ---------------------------------------------------------------------------
-# 2-3. ingest + finalisasi scene
-# ---------------------------------------------------------------------------
 
 def _ingest(mon: LiveMonitor, area_id: int, dataset_id: int, dates: list[date]) -> list[date]:
     from etl.module5_orchestrator import LIVE_JOB_TYPE, run_dataset_job
@@ -460,7 +389,6 @@ def _ingest(mon: LiveMonitor, area_id: int, dataset_id: int, dates: list[date]) 
     try:
         run_dataset_job(mon._db, job_id)
     except Exception as exc:
-        # Scene yang sebagian berkasnya sudah jadi tetap difinalisasi di bawah.
         mon.log(area_id, "INGEST", "FAILED", f"Job {job_id} berhenti: {exc}", job_id=job_id)
     with mon._db.session() as sess:
         job = sess.get(DatasetJob, job_id)
@@ -534,19 +462,12 @@ def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
         bbox_wkt = area.bbox_wkt if area else None
         min_cov = aoi_cov.min_coverage(sess)
 
-    # LAPIS 2 gerbang kelengkapan AOI: diukur dari piksel, bukan footprint.
-    # Dicatat juga saat lolos -- angkanya yang membuat scene lama bisa diaudit
-    # ulang tanpa membaca rasternya lagi (scripts/repair_incomplete_scenes.py).
     coverage = aoi_cov.scene_coverage(inputs.get("s1"), bbox_wkt) if bbox_wkt else None
     if coverage is not None:
         status["sentinel1"]["aoi_coverage"] = round(coverage, 4)
         status["sentinel1"]["aoi_coverage_min"] = min_cov
 
     if status["sentinel1"]["status"] == "OK" and coverage is not None and coverage < min_cov:
-        # Bukan FAILED: FAILED memicu unduh ulang sampai MAX_S1_ATTEMPTS,
-        # padahal mengulang tidak akan menambah cakupan -- pada tanggal itu
-        # satelitnya memang tidak melewati sisa AOI. Baris ini tetap disimpan
-        # sebagai catatan supaya tanggalnya tidak ditemukan ulang tiap siklus.
         status["sentinel1"]["status"] = "INCOMPLETE"
         scene_status = "INCOMPLETE"
         previews = {}
@@ -585,8 +506,6 @@ def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
             LiveScene.area_id == area_id, LiveScene.scene_date == scene_date))
         if row is not None:
             row.status = scene_status
-            # M31: angka ke live_scene_metrics, deskriptor teks ke
-            # source_status[sumber].meta (K6).
             meta = lmx.save_scene_metrics(sess, row.live_scene_id, scene_date, _jsonable(metrics))
             for src, entries in meta.items():
                 status.setdefault(src, {})["meta"] = entries
@@ -597,9 +516,6 @@ def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
             ]
             row.updated_at = _now()
     if scene_status == "INCOMPLETE":
-        # Berkasnya tidak berguna untuk apa pun -- dihapus sekarang, bukan
-        # menunggu retensi: enforce_retention hanya menghitung READY/PARTIAL,
-        # jadi scene ini tidak akan pernah tersapu dan COG-nya menumpuk.
         mon.delete_scene(area_id, scene_date,
                          reason=f"AOI coverage {coverage * 100:.1f}% below "
                                 f"{min_cov * 100:.0f}%")
@@ -607,8 +523,6 @@ def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
             row = sess.scalar(select(LiveScene).where(
                 LiveScene.area_id == area_id, LiveScene.scene_date == scene_date))
             if row is not None:
-                # delete_scene menyetel DELETED; alasan sebenarnya disimpan di
-                # status supaya terbedakan dari scene yang kena retensi.
                 row.status = "INCOMPLETE"
                 row.source_status = _jsonable(status)
     if scene_status in ("READY", "PARTIAL"):
@@ -616,7 +530,6 @@ def finalize_scene(mon: LiveMonitor, area_id: int, scene_date: date) -> str:
         try:
             water_change_stage(mon, area_id, scene_date, files, inputs)
         except Exception as exc:
-            # Tahap opsional (processing_stages.is_mandatory = false).
             logger.exception("[LIVE] perubahan air %s gagal", scene_date)
             mon.log(area_id, "WATER_CHANGE", "FAILED", f"Water change map for {scene_date} failed: {exc}",
                     scene_date=scene_date)
@@ -640,11 +553,7 @@ def record_s1_observations(mon: LiveMonitor, area_id: int, scene_date: date, fra
 
 def _drop_water_change(mon: LiveMonitor, area_id: int, scene_date: date,
                        files: _LiveFiles) -> None:
-    """Buang PNG + entri preview peta perubahan air satu scene.
-
-    Dipakai saat scene tidak lagi punya pembanding. Metrik di
-    live_scene_water_change dibiarkan: tabel itu log, dan baris lamanya tetap
-    benar untuk tanggal pembanding yang dicatatnya."""
+    """Buang PNG + entri preview peta perubahan air satu scene."""
     from etl import water_change as wcm
 
     pdir = files.preview_dir(scene_date)
@@ -707,10 +616,6 @@ def water_change_stage(mon: LiveMonitor, area_id: int, scene_date: date, files: 
     prev = next(((sid, d, prods, fr) for sid, d, prods in candidates
                  if (fr := lmx.s1_frames(files.root, d))), None)
     if prev is None:
-        # Sisa render terdahulu harus ikut pergi. Tanpa ini, scene yang
-        # pembandingnya baru saja hilang (kena retensi, atau ditolak gerbang
-        # AOI) menyimpan PNG lama selamanya: bingkainya ketinggalan zaman dan
-        # isinya membandingkan dengan tanggal yang rasternya sudah tidak ada.
         _drop_water_change(mon, area_id, scene_date, files)
         mon.log(area_id, "WATER_CHANGE", "SKIPPED", f"Scene {scene_date}: no comparison scene yet",
                 scene_date=scene_date)
@@ -724,9 +629,6 @@ def water_change_stage(mon: LiveMonitor, area_id: int, scene_date: date, files: 
             mon.log(area_id, "WATER_CHANGE", "SKIPPED", f"Scene {scene_date}: VH band missing",
                     scene_date=scene_date)
             return None
-        # Satu bingkai dengan tujuh preview lain: grid AOI yang sama, cuma
-        # WC_REFINE kali lebih halus supaya luas km2 tidak dihitung dari
-        # piksel 768-an. Penurunannya kembali ke ukuran preview jadi bulat.
         grid = out_shape = None
         if bbox_wkt:
             from etl import aoi_coverage as aoi_cov
@@ -744,7 +646,6 @@ def water_change_stage(mon: LiveMonitor, area_id: int, scene_date: date, files: 
         legend = wcm.render_png(wc, files.preview_dir(scene_date) / f"{wcm.PREVIEW_KEY}.png",
                                 orbit_differs=same is False, regions=load_regions(mon._db),
                                 out_shape=out_shape)
-        # "file_adm" milik item preview, bukan legenda yang dikirim ke UI.
         file_adm = legend.pop("file_adm", None)
     finally:
         for d in (s1, s2):
@@ -831,17 +732,11 @@ def reinterpret_all(mon: LiveMonitor, area_id: int) -> None:
             prev = current
 
 
-# ---------------------------------------------------------------------------
-# 4. forecast
-# ---------------------------------------------------------------------------
-
 def refresh_forecast(mon: LiveMonitor, area_id: int) -> None:
     from etl.live_forecast import build_area_forecast
     from etl.live_metrics import load_scene_metrics
 
     with mon._db.session() as sess:
-        # Prakiraan dari N scene terbaru saja (live_areas.retention, M58):
-        # riwayat setahun membuat SES/Holt mengikuti musim lalu, bukan kondisi kini.
         n = sess.get(LiveArea, area_id).retention
         rows = sess.scalars(select(LiveScene).where(
             LiveScene.area_id == area_id, LiveScene.deleted_at.is_(None),
@@ -854,10 +749,6 @@ def refresh_forecast(mon: LiveMonitor, area_id: int) -> None:
     mon.log(area_id, "FORECAST", "OK",
             f"Forecast computed from {len(series)} scene(s), {fc.get('steps', 0)} step(s)")
 
-
-# ---------------------------------------------------------------------------
-# util
-# ---------------------------------------------------------------------------
 
 def _area_files(mon: LiveMonitor, area_id: int) -> _LiveFiles | None:
     with mon._db.session() as sess:

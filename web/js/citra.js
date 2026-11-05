@@ -1,11 +1,3 @@
-// js/citra.js — Citra Satelit › Ringkasan (#citra/ringkasan, INTERFACE.md §2 halaman 3.1, M56).
-// Sumber: GET /api/citra/summary. Batas waktu (pengunjung 30 hari, Relawan
-// 1 tahun, peran lain semua) dihitung VIEW v_citra_scenes; di sini hanya
-// dijelaskan supaya pengguna tahu kenapa daftar tanggalnya sependek itu.
-//
-// M66: tiga kartu satelit berjajar tanpa panel "Lanjut ke" dan tanpa layar
-// status area; pilihan Live Area hanya untuk Administrator (peran lain
-// memakai area bawaan dari API).
 'use strict';
 Pages['citra'] = (() => {
   const TAB = { s1: 'sentinel-1', modis: 'modis', gpm: 'gpm' };

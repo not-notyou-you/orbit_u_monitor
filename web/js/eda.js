@@ -1,8 +1,3 @@
-// js/eda.js — Data › EDA (#data/eda, INTERFACE.md §2 halaman 6.6, M56).
-// GET /api/data/eda?source=…&date_from=…&date_to=… → per variabel: n,
-// kekosongan, statistik deskriptif, histogram, pencilan; korelasi Pearson
-// berpasangan; kelengkapan per hari. GPM/MODIS: unit analisis kecamatan × hari
-// (region_observations). Sentinel-1: scene × band (quality_metrics).
 'use strict';
 Pages['eda'] = (() => {
   let st = null;
@@ -10,8 +5,6 @@ Pages['eda'] = (() => {
   async function init(root, ctx) {
     st = { root, ctx };
     const $ = s => UI.$(s, root);
-    // Akhir rentang bawaan = tanggal terakhir yang punya angka per kecamatan
-    // untuk satelit terpilih (Job Hidromet bisa tertinggal dari hari ini).
     const today = UI.isoDate(new Date());
     let last = {};
     try { (await API.get('/api/data/summary')).sources.forEach(s => { last[s.key] = s.key === 's1' ? s.last_date : s.last_obs_date; }); }

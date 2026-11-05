@@ -1,23 +1,4 @@
-# api/routes/data.py
-"""Halaman Data (INTERFACE.md §4.6, M56): DATA_ENGINEER dan ADMIN.
-
-    GET   /data/summary                          keadaan data per satelit
-    GET   /data/{source}/items                   daftar scene/granule (termasuk yang dinonaktifkan)
-    PATCH /data/{source}/items/{id}              {is_valid, reason}: nonaktifkan/pulihkan (soft delete, M23/M24)
-    POST  /data/{source}/items/{id}/reprocess    proses ulang
-    POST  /data/{source}/backfill                {date_from, date_to}
-    GET   /data/{source}/backfill                proses berjalan + riwayat per tanggal
-    GET   /data/backfill/runs/{run_id}           progres + baris log (polling)
-    GET   /data/eda                              EDA per satelit dan rentang tanggal
-
-``source`` = s1 | modis | gpm. Backfill GPM/MODIS = Job Hidromet di thread
-latar (``etl.backfill_runs``, log terlihat langsung). Backfill Sentinel-1 =
-siklus Live yang dibatasi ke rentang itu (``live_cycle.backfill_s1``, M58):
-scene masuk ke dataset utama (Live Area) dan angka per kecamatan ke
-region_observations, dengan run + log yang sama seperti GPM/MODIS. Dataset
-S1 terpisah untuk keperluan lain dibuat di Katalog Dataset. Tidak ada "tambah
-scene manual" (M24): data hanya masuk lewat API resmi.
-"""
+"""Halaman Data (INTERFACE.md §4.6, M56): DATA_ENGINEER dan ADMIN."""
 
 from __future__ import annotations
 
@@ -63,13 +44,6 @@ class BackfillRequest(BaseModel):
         return self
 
 
-# --- backfill di luar halaman ini --------------------------------------------------
-#
-# Job Hidromet juga dijalankan scripts/backfill_hydromet.py, scheduler harian,
-# atau worker API lain. Semuanya memegang advisory lock "hydromet" (M22), jadi
-# kunci itu -- bukan daftar jalan di memori proses ini -- yang menentukan
-# apakah backfill sedang berjalan. pg_locks bisa dibaca semua role.
-
 _HYDROMET_LOCKED = text("""
     SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND granted
                    AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
@@ -99,8 +73,6 @@ def hydromet_activity(sess: Session) -> dict:
     out.update(done_last_hour=row["done"], last_completed_date=row["last_done"])
     return out
 
-
-# --- ringkasan ----------------------------------------------------------------------
 
 @router.get("/summary", summary="Data status per satellite: counts, coverage, running backfills")
 def summary(sess: Session = Depends(get_session)) -> dict:
@@ -140,8 +112,6 @@ def summary(sess: Session = Depends(get_session)) -> dict:
     return {"sources": items, "datasets": dict(datasets), "hydromet": activity_h, "main": main,
             "recent_runs": [r.as_dict() for r in br.runs()[:10]]}
 
-
-# --- daftar & ubah ------------------------------------------------------------------
 
 @router.get("/activity", summary="Running work on the main dataset: Hydromet job and Live (Sentinel-1) cycles")
 def activity(sess: Session = Depends(get_session)) -> dict:
@@ -242,8 +212,6 @@ def reprocess_item(source: str, item_id: int, sess: Session = Depends(get_sessio
     return am.reprocess_scene(_src(source), item_id, sess, etl)
 
 
-# --- backfill -----------------------------------------------------------------------
-
 @router.post("/{source}/backfill", status_code=202, summary="Backfill a date range for one satellite")
 def start_backfill(source: str, req: BackfillRequest, request: Request, sess: Session = Depends(get_session),
                    db=Depends(get_db), etl=Depends(get_etl_db),
@@ -273,8 +241,6 @@ def start_backfill(source: str, req: BackfillRequest, request: Request, sess: Se
                              "date_to": str(req.date_to)}, **meta)
         return {"accepted": True, "source": key, "kind": "LIVE", "run": run.as_dict()}
     if br.running("gpm") or br.running("modis") or sess.scalar(_HYDROMET_LOCKED):
-        # Kunci dipegang skrip/scheduler/worker lain: jalan baru akan langsung
-        # SKIPPED, jadi tolak di sini dengan pesan yang jelas.
         raise ApiError(409, "A Hydromet backfill (GPM/MODIS) is already running", "BACKFILL_RUNNING")
     from etl import hydromet_job as hj
 
@@ -298,7 +264,6 @@ def backfill_status(source: str, sess: Session = Depends(get_session),
     key = source.lower()
     out = {"source": key, "runs": [r.as_dict() for r in br.runs(key)]}
     if code == "S1":
-        # Riwayat per tanggal lintasan: status scene Live + angka per kecamatan.
         out["days"] = [dict(r) for r in sess.execute(text("""
             SELECT s.scene_date AS date, s.status, s.updated_at AS completed_at,
                    (s.status IN ('FAILED', 'INCOMPLETE'))::int AS failed_count,
@@ -326,9 +291,6 @@ def backfill_status(source: str, sess: Session = Depends(get_session),
           AND j.job_id = (SELECT max(j2.job_id) FROM dataset_jobs j2 WHERE j2.dataset_id = j.dataset_id
                            AND j2.job_type = j.job_type AND j2.date_range_start = j.date_range_start)
         ORDER BY j.date_range_start DESC LIMIT :n"""), {"d": hyd["dataset_id"], "n": days}).mappings().all()]
-    # PROCESSING yang bukan tanggal yang sedang dikerjakan = jalan yang
-    # terputus (proses mati/dihentikan). Tanggal itu dikerjakan ulang oleh
-    # backfill berikutnya (pending_dates hanya melewati COMPLETED).
     for r in rows:
         r["stale"] = r["status"] == "PROCESSING" and not (
             activity["locked"] and r["date"] == activity["current_date"])
@@ -350,8 +312,6 @@ def backfill_run(run_id: int, since: int = Query(0, ge=0, description="Return li
                        "NOT_FOUND")
     return run.as_dict(with_lines=True, since=since)
 
-
-# --- EDA ----------------------------------------------------------------------------
 
 @router.get("/eda", summary="Exploratory data analysis for one satellite and date range")
 def eda_view(sess: Session = Depends(get_session), source: str = Query(..., pattern="^(s1|modis|gpm)$"),

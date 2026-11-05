@@ -1,4 +1,3 @@
-# api/routes/datasets.py
 from __future__ import annotations
 import json
 import logging
@@ -60,10 +59,7 @@ async def create_dataset(
     etl: DatabaseClient = Depends(get_etl_db),
     principal: Principal = Depends(current_principal),
 ) -> DatasetCreateResponse:
-    """Buat dataset dari konfigurasi per-satelit (DOCS/INTERFACE.md "Create Dataset").
-
-    `tiers` tidak lagi diterima: diturunkan internal dari `sources`.
-    """
+    """Buat dataset dari konfigurasi per-satelit (DOCS/INTERFACE.md "Create Dataset")."""
     try:
         result = _mgr(db, etl).create_dataset(
             created_by=principal.user_id,
@@ -86,9 +82,6 @@ async def create_dataset(
     return DatasetCreateResponse(**result)
 
 
-# Didaftarkan SEBELUM /{dataset_id}: FastAPI mencocokkan rute sesuai urutan
-# deklarasi, jadi kalau rute ini di bawah, "last-config" akan ditangkap
-# /{dataset_id} dan ditolak sebagai int yang tidak sah (422, bukan 200).
 @router.get(
     "/last-config",
     response_model=DatasetLastConfigResponse,
@@ -100,10 +93,6 @@ async def get_last_dataset_config(
 ) -> DatasetLastConfigResponse:
     """Config dataset terakhir yang dibuat: region, sources + level pemrosesan,
     strategi fusi, opsi preview, dan rentang tanggal.
-
-    Tanpa `name` -- sengaja harus diisi ulang user supaya tidak tanpa sengaja
-    menduplikasi dataset (DOCS/DECISIONS.md D13). Rentang tanggal diikutkan
-    sebagai preset yang bisa diedit di wizard, bukan dikunci.
     """
     config = db.get_last_dataset_config(created_by=principal.user_id)
     if not config:
@@ -276,8 +265,6 @@ async def download_dataset(
     if tier is None:
         files = [f for f in base_dir.rglob("*") if f.is_file()] if base_dir.exists() else []
     else:
-        # Satu tier tersebar di banyak folder tanggal ({tanggal}/{tier}/),
-        # jadi file-nya dikumpulkan lintas tanggal lewat folder_manager.
         tier_l, source_l = _resolve_tier_source(tier, source)
         files = (
             fm.get_source_files(dataset_id, info["name"], tier_l, source_l)
@@ -291,8 +278,6 @@ async def download_dataset(
     tmp.close()
     with zipfile.ZipFile(tmp.name, "w", zipfile.ZIP_DEFLATED) as zf:
         for f in files:
-            # arcname tetap relatif ke root dataset walau di-filter, supaya ZIP
-            # parsial dan ZIP penuh punya struktur folder yang sama.
             zf.write(f, arcname=str(f.relative_to(base_dir)))
 
     suffix = "".join(f"_{part}" for part in (tier, source) if part)
@@ -310,11 +295,7 @@ async def download_dataset(
 
 @router.get("/{dataset_id}/metadata", summary="metadata.json level-dataset")
 async def get_dataset_metadata(dataset_id: int, db: DatabaseClient = Depends(get_db)) -> dict:
-    """Isi data/datasets/{id}_{slug}/metadata.json apa adanya.
-
-    Ini ringkasan yang ditulis orchestrator tiap job selesai, bukan sumber
-    kebenaran - kalau berbeda dari endpoint lain, database yang benar. Berguna
-    untuk melihat kondisi dataset persis seperti yang terekam di disk."""
+    """Isi data/datasets/{id}_{slug}/metadata.json apa adanya."""
     info = _mgr(db).get_dataset(dataset_id)
     if info is None:
         raise HTTPException(404, f"Dataset {dataset_id} not found")
@@ -329,36 +310,16 @@ async def get_dataset_metadata(dataset_id: int, db: DatabaseClient = Depends(get
     return metadata
 
 
-# ---------------------------------------------------------------------------
-# Tier PREVIEW
-# ---------------------------------------------------------------------------
-# Isi tier ini dibaca langsung dari disk, bukan dari data_products. PNG preview
-# sengaja tidak didaftarkan sebagai produk data (lihat migrasi 015): dia
-# turunan murni yang bisa dibangun ulang dari gold/, dan sidecar JSON yang
-# ditulis module10 sudah memuat seluruh keterangan yang dibutuhkan UI. Menaruh
-# 8+ baris per scene di data_products cuma untuk itu akan menambah beban tulis
-# tanpa ada yang membacanya.
-
-
 def _read_preview_json(path: Path) -> dict | None:
     try:
         with open(path, encoding="utf-8") as f:
             return json.load(f)
     except (OSError, json.JSONDecodeError):
-        # Sidecar hilang/rusak tidak boleh menjatuhkan seluruh listing:
-        # PNG-nya sendiri masih ada dan masih berguna ditampilkan.
         return None
 
 
 def _read_dated_preview_json(directory: Path, scene: str, stem: str) -> dict:
-    """Sidecar *_info.json satu tanggal.
-
-    Nama berprefiks tanggal lebih dulu. Dataset yang dirender SEBELUM sidecar
-    diberi prefiks hanya punya satu berkas bersama untuk seluruh tanggal;
-    berkas itu tetap dipakai karena keterangannya (colormap, rentang, cara
-    stretch) berlaku untuk semua tanggal — yang spesifik tanggal cuma daftar
-    `images`, dan itu disaring pemanggil lewat _belongs_to_scene.
-    """
+    """Sidecar *_info.json satu tanggal."""
     dated = _read_preview_json(directory / fm.dated_filename(scene, stem))
     if dated is not None:
         return dated
@@ -366,14 +327,7 @@ def _read_dated_preview_json(directory: Path, scene: str, stem: str) -> dict:
 
 
 def _read_dated_preview_metadata(directory: Path, scene: str) -> dict:
-    """preview_metadata.json satu tanggal.
-
-    Beda dari sidecar *_info.json: isinya SELURUHNYA tentang satu tanggal
-    (scene S1-nya, lapisan yang dilewati, waktu render). Sidecar bersama
-    peninggalan render lama menggambarkan tanggal yang kebetulan selesai
-    terakhir, jadi hanya dipakai kalau `acquisition_date`-nya memang tanggal
-    yang diminta — kalau tidak, galeri akan menyajikan keterangan tanggal lain.
-    """
+    """preview_metadata.json satu tanggal."""
     dated = _read_preview_json(
         directory / fm.dated_filename(scene, "preview_metadata.json")
     )
@@ -389,11 +343,7 @@ def _belongs_to_scene(filename: str, scene: str) -> bool:
 
 
 def preferred_preview_level(levels: list[str]) -> str:
-    """Level yang ditampilkan galeri kalau pemanggil tidak memilih.
-
-    PROCESSED lebih dulu: itu artefak analysis-ready dataset, dan level RAW
-    ada terutama sebagai pembanding. Kalau cuma RAW yang ada, itu yang dipakai.
-    """
+    """Level yang ditampilkan galeri kalau pemanggil tidak memilih."""
     if "PROCESSED" in levels:
         return "PROCESSED"
     return levels[0] if levels else fm.DEFAULT_PREVIEW_LEVEL
@@ -415,20 +365,13 @@ def _preview_level_payload(
             filename = entry.get("file")
             if not filename or not (kind_dir / filename).exists():
                 continue
-            # Sidecar lama bisa memuat entri tanggal lain; entri yang bukan
-            # milik tanggal ini tidak boleh ikut ditampilkan di sini.
             if not _belongs_to_scene(filename, scene):
                 continue
             img = {**entry, "url": f"{base_url}/{kind}/{filename}"}
-            # Varian garis wilayah (etl/admin_overlay.py) dikirim sebagai URL
-            # kedua pada gambar yang sama, bukan sebagai gambar tersendiri:
-            # galeri menukar src-nya saat checkbox "Garis wilayah" aktif.
             adm = entry.get("file_adm")
             if adm and (kind_dir / adm).exists():
                 img["url_boundaries"] = f"{base_url}/{kind}/{adm}"
             images.append(img)
-        # Cadangan kalau sidecar tidak terbaca: listing PNG tanggal ini apa
-        # adanya, supaya galeri tetap terisi walau tanpa keterangan.
         if not images:
             images = [
                 {"key": f.stem, "file": f.name, "label": f.stem,
@@ -457,18 +400,8 @@ def _preview_level_payload(
 
 
 def _read_coverage_quality(dataset_id: int, name: str, scene: str) -> dict:
-    """Baca attr coverage_quality/coverage_min_valid_fraction dari H5 fusion.
-
-    Ditulis oleh module9_fusion setelah fusion selesai, jadi bisa saja belum
-    ada (dataset lama, atau tanggal ini belum sampai tahap fusion) -- itu
-    kondisi normal, bukan error, jadi selalu balikin dict kosong dan tidak
-    pernah melempar.
-    """
+    """Baca attr coverage_quality/coverage_min_valid_fraction dari H5 fusion."""
     fusion_dir = fm.get_fusion_dir(dataset_id, name, scene)
-    # Nama subfolder & sufiks berkas beda per strategi fusion (hybrid /
-    # co-occurrence / full-coverage, lihat etl/fusion_strategies.SUBFOLDER) --
-    # daripada query DB buat tahu strategi dataset ini, cukup coba ketiganya
-    # dan pakai yang pertama kebetulan ada.
     h5_path = next(
         (p for p in fusion_dir.glob(f"*/fusion_{scene}_*_processed.h5") if p.is_file()),
         None,
@@ -493,12 +426,6 @@ def _read_coverage_quality(dataset_id: int, name: str, scene: str) -> dict:
 def _preview_scene_payload(dataset_id: int, name: str, scene: str) -> dict:
     """Rakit satu entri scene preview: isi preview_metadata.json ditambah URL
     gambar yang siap dipakai <img src>.
-
-    Satu tanggal bisa punya dua level (RAW dan PROCESSED) kalau datasetnya
-    meminta sebuah sumber di keduanya, jadi payload-nya bertingkat per level.
-    `kinds` di tingkat atas tetap ada dan menunjuk level yang dipilih
-    preferred_preview_level() — pembaca lama (galeri web) memakainya apa adanya
-    dan tidak perlu tahu soal level.
     """
     scene_dir = fm.get_preview_dir(dataset_id, name, scene)
     metadata = _read_dated_preview_metadata(scene_dir, scene)
@@ -538,14 +465,9 @@ async def list_dataset_previews(
     scene: str | None = Query(None, description="Limit to one date (YYYYMMDD)"),
     db: DatabaseClient = Depends(get_db),
 ) -> dict:
-    """
-    Daftar PNG preview yang ada di disk untuk dataset ini, dikelompokkan per
+    """Daftar PNG preview yang ada di disk untuk dataset ini, dikelompokkan per
     tanggal akuisisi lalu per jenis (grayscale / colored), lengkap dengan
     keterangan colormap dan interpretasinya dari sidecar JSON.
-
-    Selalu 200 walau tier preview kosong: dataset lama (dan dataset yang
-    berhenti sebelum GOLD) memang tidak punya preview, dan itu kondisi normal
-    yang perlu dibedakan UI dari error.
     """
     info = _mgr(db).get_dataset(dataset_id)
     if info is None:
@@ -573,13 +495,7 @@ async def list_dataset_previews(
 def _resolve_preview_image(
     dataset_id: int, name: str, scene: str, level: str, kind: str, filename: str
 ) -> Path:
-    """Path PNG preview yang sudah divalidasi.
-
-    Keempat komponen path divalidasi ketat lalu hasilnya dicek harus
-    benar-benar berada di dalam folder kind: `filename` datang dari URL, jadi
-    tanpa pemeriksaan itu ".." di dalamnya bisa membaca berkas mana pun yang
-    bisa dijangkau proses ini.
-    """
+    """Path PNG preview yang sudah divalidasi."""
     if kind not in fm.PREVIEW_KINDS:
         raise HTTPException(
             400, f"Invalid preview kind: {kind}. Valid: {list(fm.PREVIEW_KINDS)}"
@@ -643,11 +559,7 @@ async def get_preview_image(
     filename: str,
     db: DatabaseClient = Depends(get_db),
 ) -> FileResponse:
-    """Kirim satu PNG dari level default tanggal ini.
-
-    Bentuk URL tanpa level dipertahankan untuk tautan lama; level yang dipakai
-    dipilih preferred_preview_level(), yaitu PROCESSED kalau ada.
-    """
+    """Kirim satu PNG dari level default tanggal ini."""
     info = _mgr(db).get_dataset(dataset_id)
     if info is None:
         raise HTTPException(404, f"Dataset {dataset_id} not found")
@@ -662,18 +574,10 @@ async def get_preview_image(
     return FileResponse(
         path,
         media_type="image/png",
-        # Preview di-render ulang tiap job jalan lagi, tapi selalu untuk
-        # tanggal yang isinya sudah final -- aman di-cache lama di browser.
         headers={"Cache-Control": "public, max-age=86400"},
     )
 
 
-# Tahap per satelit untuk panel Detail: tier di disk dikelompokkan jadi
-# "download" (rank 0-1, artefak hasil unduh + crop) dan "processing"
-# (rank 2-3, nilai tambah per-source + COG). Urutan = urutan pipeline.
-# Nama pra-D14 (bronze/gold/...) sengaja tidak ikut: folder_manager
-# menyelesaikannya ke laci yang sama dengan nama barunya, jadi berkasnya akan
-# terhitung dua kali.
 _DETAIL_STAGES: tuple[tuple[str, str], ...] = (
     ("raw", "download"), ("aligned", "download"),
     ("despeckled", "processing"), ("indices", "processing"),
@@ -823,7 +727,6 @@ async def list_dataset_tier_files(
         )
 
     if not fm.sources_for_tier(tier_l):
-        # Tier fusion/preview: langsung scene, tanpa level source.
         scenes = [scene] if scene else fm.list_sourceless_scenes(dataset_id, name, tier_l)
         for sc in scenes:
             result.append(
@@ -837,10 +740,6 @@ async def list_dataset_tier_files(
                 result.append(
                     _entry(sc, src, fm.get_scene_files(dataset_id, name, tier_l, src, sc))
                 )
-            # Cache granule mentah MODIS/GPM duduk di _granule_cache/{source}/
-            # di luar folder tanggal, jadi list_scenes() di atas melewatinya.
-            # Tanpa cabang ini listing berkas melaporkan tier RAW kosong
-            # untuk MODIS/GPM padahal storage/summary menghitung granulenya.
             if scene is None:
                 loose = fm.list_loose_files(dataset_id, name, tier_l, src)
                 if loose:

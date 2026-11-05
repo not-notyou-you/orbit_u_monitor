@@ -1,10 +1,5 @@
-# api/openapi_docs.py
 """Pelengkap OpenAPI untuk developer (INTERFACE.md §6.1): deskripsi Bahasa
 Inggris, contoh request/response, skema error, dan catatan role per operasi.
-
-Dipanggil `custom_openapi()` di api/main.py setelah `x-min-role` diisi. Teks di
-sini sengaja dipisah dari route supaya kontrak dokumentasi bisa diuji
-(tests/test_openapi_docs.py) tanpa mengubah perilaku endpoint.
 """
 
 from __future__ import annotations
@@ -31,7 +26,6 @@ _ERR = {
     429: ("More than 120 requests/minute with one API token (Retry-After: 60)", "RATE_LIMITED", "Rate limit exceeded"),
 }
 
-# (METHOD, path) -> description / request example / response example.
 DOCS: dict[tuple[str, str], dict] = {
     ("POST", "/api/auth/login"): {
         "description": "Sign in. On success sets the `orbit_u_session` cookie (HttpOnly, SameSite=Strict, 8 h). "

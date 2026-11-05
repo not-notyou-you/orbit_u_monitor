@@ -1,4 +1,3 @@
-# etl/module6_analytics.py
 from __future__ import annotations
 
 import logging
@@ -13,10 +12,6 @@ logger = logging.getLogger(__name__)
 VALID_BACKSCATTER_MIN = -35.0
 VALID_BACKSCATTER_MAX = 5.0
 
-# Ambang skor kualitas tinggal di tabel quality_thresholds (DATABASE.md §3.8),
-# bukan di sini. Nilai ini hanya cadangan bila tabel tidak punya baris aktif
-# untuk band itu, dan pemakaiannya selalu dicatat ke log. Bobot skor 50/30/20
-# di compute_quality_score tetap konstanta: bobot bukan ambang.
 FALLBACK_FAIL_BELOW = 60.0
 
 
@@ -103,30 +98,17 @@ def compute_band_metrics(
     cloud_threshold: float = 20.0,
     min_quality_score: float = FALLBACK_FAIL_BELOW,
 ) -> BandMetrics:
-    """Statistik + skor kualitas satu band S1.
-
-    `min_quality_score` adalah fail_below band ini; pemanggil pipeline
-    mengambilnya dari quality_thresholds (threshold_for). Flag di sini hanya
-    PASS/FAIL; pita WARNING diterapkan pemanggil lewat classify_quality."""
+    """Statistik + skor kualitas satu band S1."""
     with rasterio.open(file_path) as src:
         data = src.read(1).astype(np.float32)
         nodata = src.nodata if src.nodata is not None else nodata_value
 
     total = int(data.size)
-    # NaN selalu invalid, apa pun nilai nodata di header: COG GOLD memakai
-    # nodata numerik sementara piksel di luar footprint reprojeksi bisa NaN.
     valid_mask = np.isfinite(data)
     if not (isinstance(nodata, float) and np.isnan(nodata)):
         valid_mask &= data != nodata
     valid = data[valid_mask]
     if valid.size and float(valid.min()) >= 0.0:
-        # Sigma0 LINEAR (module1b: DN^2/A^2), bukan dB. Kolom *_db dan batas
-        # VALID_BACKSCATTER_* dinyatakan dalam dB, jadi statistiknya dihitung
-        # setelah konversi. Dulu nilai linear dilaporkan apa adanya sebagai
-        # "dB" (try3: mean 0.50, max 145.6), speckle_index std/mean linear
-        # selalu >1 sehingga komponen speckle skor selalu 0, dan VV/VH
-        # mendapat skor identik 69.81. Piksel <=0 di data linear = tanpa sinyal
-        # (module1b menulis 0 di luar LUT) dan tidak punya nilai dB.
         positive = valid > 0
         valid = 10.0 * np.log10(valid[positive])
     nodata_count = total - int(valid.size)
@@ -170,7 +152,6 @@ def run(
     scene_id: int,
     gold_products: dict[str, str],
     db,
-    analytics_dir: str = "analytics",
 ) -> list[BandMetrics]:
     from etl.metadata_manager import MetadataManager
 

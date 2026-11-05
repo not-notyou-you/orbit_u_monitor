@@ -1,19 +1,11 @@
-# etl/advisory_lock.py
-"""Satu worker per jenis job lewat PostgreSQL advisory lock (PIPELINE.md §7, M22).
-
-``pg_try_advisory_lock(hashtext('orbit-u:' || key))`` dipegang di koneksi
-khusus selama job berjalan. Bila gagal, worker lain sedang menjalankannya ->
-pemanggil melewati job dan mencatat ``SKIPPED_LOCKED``. Kunci lepas sendiri
-bila prosesnya mati karena koneksinya putus. Ini melengkapi ``job_lock``
-berkas (per job/area), bukan menggantikannya.
-"""
+"""Satu worker per jenis job lewat PostgreSQL advisory lock (PIPELINE.md §7, M22)."""
 
 from __future__ import annotations
 
 import logging
 import time
 from contextlib import contextmanager
-from typing import Iterator
+from collections.abc import Iterator
 
 from sqlalchemy import text
 

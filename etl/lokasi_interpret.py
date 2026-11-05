@@ -1,32 +1,13 @@
-# etl/lokasi_interpret.py
-"""Kalimat kondisi SATU kecamatan untuk Pantau Lokasi di Beranda (M63).
-
-Kalimat Live (etl/live_interpret.py) dibuat per scene untuk seluruh Live Area.
-Pantau Lokasi butuh kalimat yang sama untuk satu kecamatan, dari deret waktu
-dataset utama (``region_observations``: GPM/MODIS harian, Sentinel-1 per
-lintasan). Ambang, format kalimat, dan aturan status gabungan TIDAK ditulis
-ulang: semuanya dipakai dari live_interpret, jadi Beranda, kartu Live, garis
-ambang Forecast, dan alert hidromet selalu memakai angka yang sama.
-
-Yang berbeda dari kalimat Live hanya bentuk masukannya:
-* MODIS per kecamatan berupa rerata indeks (NDWI) dan persen genangan
-  (FLOOD) dengan ``valid_fraction``, bukan statistik piksel scene;
-* pembanding = observasi SEBELUMNYA kecamatan itu (lintasan S1 sebelumnya,
-  komposit MODIS sebelumnya), bukan scene Live sebelumnya;
-* alert hujan 7 hari terakhir kecamatan itu ikut menaikkan status.
-"""
+"""Kalimat kondisi SATU kecamatan untuk Pantau Lokasi di Beranda (M63)."""
 from __future__ import annotations
 
 from etl.live_interpret import (
-    GENANGAN, NA, NORMAL, THRESHOLDS, TINGGI, WASPADA,
+    GENANGAN, NA, NORMAL, THRESHOLDS, WASPADA,
     _change_phrase, _modis_ndvi, _rain, _s1_vh, _s1_vv, _sentence, area_status, fmt,
 )
 
-# Urutan tampil = urutan baris tile (Sentinel-1, MODIS, GPM).
 KEYS = ("s1_vv", "s1_vh", "modis_flood", "modis_ndvi", "modis_ndwi",
         "gpm_rain_24h", "gpm_rain_72h", "gpm_rain_7d")
-# Band yang angkanya menjadi dasar tiap kalimat: tanggal observasinya adalah
-# "tanggal data" butir itu (kunci anti-duplikat peringatan email, M64).
 BAND_OF = {"s1_vv": "VV", "s1_vh": "WATER_PCT", "modis_flood": "FLOOD", "modis_ndvi": "NDVI",
            "modis_ndwi": "NDWI", "gpm_rain_24h": "RAIN_24H", "gpm_rain_72h": "RAIN_72H",
            "gpm_rain_7d": "RAIN_7D"}
@@ -67,8 +48,6 @@ def _ndwi(latest: dict, prev: dict, rng: dict) -> dict:
         return _sentence(what, NA, "belum ada angka NDWI untuk kecamatan ini (tertutup awan atau belum diolah)")
     thr = THRESHOLDS["ndwi_water"]
     hi = (rng.get("NDWI") or {}).get("p98")
-    # Tiga desimal bila dua desimal membuat nilai dan batasnya tampak sama
-    # ("-0,59, di atas rentang biasa s.d. -0,59" membingungkan pembaca).
     nd = 3 if hi is not None and fmt(v, 2) == fmt(hi, 2) else 2
     base = f"rata-rata NDWI {fmt(v, nd)}"
     if v > thr:
@@ -82,10 +61,7 @@ def interpret_region(latest: dict, prev: dict, ranges: dict | None = None,
                      alerts: list[dict] | None = None) -> dict:
     """latest/prev: {band_code: {value, obs_date, valid_fraction, run_type}}.
     ranges: {band_code: {p02, p98}}. alerts: baris v_public_lokasi_alert.
-
-    Hasil: {status: {label, level, text}, items: {key: kalimat},
-    abnormal: [kalimat yang tidak normal + alert, masing-masing dengan `band` dan
-    `date` = tanggal data yang mendasarinya], dates: {s1, modis, gpm}}."""
+    """
     ranges = ranges or {}
     alerts = alerts or []
 
@@ -116,8 +92,6 @@ def interpret_region(latest: dict, prev: dict, ranges: dict | None = None,
         "gpm_rain_72h": _rain("72h", "72 jam")(m_gpm(latest), None, None),
         "gpm_rain_7d": _rain("7d", "7 hari")(m_gpm(latest), None, None),
     }
-    # Kalimat Live menyebut "scene"; untuk satu kecamatan pembandingnya adalah
-    # lintasan/komposit sebelumnya kecamatan itu sendiri.
     for it in items.values():
         it["text"] = it["text"].replace("scene sebelumnya", "pengamatan sebelumnya")
         it["because"] = it["because"].replace("scene sebelumnya", "pengamatan sebelumnya")
@@ -135,9 +109,6 @@ def interpret_region(latest: dict, prev: dict, ranges: dict | None = None,
         abnormal.append({
             "key": "alert", "what": "alert hujan BMKG 7 hari terakhir", "category": "alert",
             "level": 2 if sev == "CRITICAL" else 1, "band": worst.get("band_code") or "RAIN_24H",
-            # Tanggal = alert TERBARU, bukan yang terparah: kunci anti-duplikat
-            # email (M64) harus berganti saat alert baru masuk, walau alert
-            # lama yang lebih parah masih dalam jendela 7 hari.
             "date": max((a.get("observation_date") for a in alerts if a.get("observation_date")),
                         default=worst.get("observation_date")),
             "severity": sev,
@@ -153,10 +124,6 @@ def interpret_region(latest: dict, prev: dict, ranges: dict | None = None,
             reasons.append("ada alert hujan BMKG dalam 7 hari terakhir")
             st = {**st, "label": label, "level": lvl, "text": f"{label} — " + " dan ".join(reasons)}
 
-    # Status gabungan Live hanya membaca VH, indeks air, dan hujan 72 jam.
-    # Untuk satu lokasi, setiap kalimat yang tidak normal (mis. hujan 7 hari,
-    # NDVI turun) harus tercermin di status, karena Beranda menjelaskannya
-    # sebagai "yang tidak normal" tepat di bawah status itu.
     if abnormal and st["level"] <= 0:
         worst_lvl = 2 if any(a["level"] >= 2 for a in abnormal) else 1
         label = "Tinggi" if worst_lvl == 2 else "Waspada"

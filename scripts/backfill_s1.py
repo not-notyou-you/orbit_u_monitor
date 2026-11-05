@@ -1,22 +1,5 @@
 #!/usr/bin/env python
-"""Backfill Sentinel-1 dataset utama: 1 tahun terakhir (M58).
-
-Pakai:
-    python scripts/backfill_s1.py                  # semua Live Area aktif, sampai jendela penuh
-    python scripts/backfill_s1.py --area 1
-    python scripts/backfill_s1.py --aggregate-only # hanya tulis ulang S1 per kecamatan
-                                                   # dari scene yang berkasnya masih ada
-
-Backfill adalah siklus Live biasa (etl/live_cycle.py): discovery melihat
-seluruh jendela ``storage.raster_retention_days``, tanggal terbaru dikerjakan
-lebih dulu per 3 tanggal, dan tiap scene yang lolos ditulis ke
-region_observations (VV, VH, WATER_PCT). Siklus diulang sampai tidak ada
-tanggal baru, jadi scene yang gagal sementara dicoba lagi (maks 3 kali).
-
-Bisa dibunuh kapan saja: scene yang sudah READY tidak diunduh ulang; jalankan
-perintah yang sama untuk melanjutkan. JobLock per area mencegah siklus
-terjadwal di proses API mengerjakan area yang sama bersamaan (dilewati).
-"""
+"""Backfill Sentinel-1 dataset utama: 1 tahun terakhir (M58)."""
 
 from __future__ import annotations
 

@@ -1,24 +1,4 @@
-# etl/region_crop.py
-"""Tile preview Live yang dipotong ke SATU kecamatan (Pantau Lokasi, M63).
-
-PNG preview Live menutupi seluruh Live Area. Beranda menampilkan citra untuk
-kecamatan yang dipantau saja, jadi dari PNG itu dibuat salinan:
-
-* piksel di luar poligon kecamatan dibuat transparan (alpha 0; lubang
-  poligon ikut transparan);
-* gambar dipotong ke kotak pembatas kecamatan + sedikit tepi.
-
-Georeferensi PNG dibaca dari ``live_scenes.previews.grid`` (empat sudut
-WGS84 + CRS raster, etl/live_preview.py ``grid_dict``), bukan dari bbox
-area: extent grid milik SCENE itu (lihat module10 ``grid_corners_wgs84``).
-Affine dibangun ulang dari sudut kiri-atas, kanan-atas, dan kiri-bawah yang
-diproyeksikan ke CRS raster; proyeksi titik poligon sama dengan
-etl/admin_overlay.py, jadi potongan sejajar piksel dengan garis wilayah.
-
-Hasilnya di-cache di ``data/_lokasi_cache`` (di luar folder preview dataset,
-supaya galeri dan laporan yang membaca ``*.png`` di sana tidak ikut
-memungutnya). Cache dianggap basi bila PNG asal lebih baru.
-"""
+"""Tile preview Live yang dipotong ke SATU kecamatan (Pantau Lokasi, M63)."""
 from __future__ import annotations
 
 import logging
@@ -30,8 +10,6 @@ PAD_PX = 6
 
 
 def cache_dir() -> Path:
-    # Dibaca saat dipanggil: tests/conftest.py mengalihkan DATA_ROOT ke
-    # direktori sementara.
     from etl import folder_manager as fm
     return fm.DATA_ROOT.parent / "_lokasi_cache"
 

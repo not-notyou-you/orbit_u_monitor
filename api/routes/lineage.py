@@ -1,10 +1,4 @@
-# api/routes/lineage.py
-"""
-GET /api/metadata/lineage/{product_id} — transformation provenance chain.
-
-Author : Julius Marselinus (BRONTO) - NIM 00000111989
-Program: Sistem Informasi - Universitas Multimedia Nusantara
-"""
+"""GET /api/metadata/lineage/{product_id} — transformation provenance chain."""
 
 from __future__ import annotations
 
@@ -40,12 +34,7 @@ async def get_lineage(
         description="ancestors = trace back to source | descendants = trace forward",
     ),
 ) -> LineageResponse:
-    """
-    Retrieve the full data lineage chain for a given product.
-
-    - **ancestors**: starts from `product_id` and walks backwards to the RAW source.
-    - **descendants**: starts from `product_id` and walks forward to all derived products.
-    """
+    """Retrieve the full data lineage chain for a given product."""
     with db.session() as sess:
         p = sess.get(DataProduct, product_id)
         if not p:

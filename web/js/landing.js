@@ -1,14 +1,3 @@
-// js/landing.js — Beranda publik (`/`), INTERFACE.md §2.1.
-//
-// Halaman sambutan, bukan monitor. Urutannya sambutan → penjelasan → navigasi
-// halaman: pengunjung baru perlu tahu dulu ini apa dan apa batasannya sebelum
-// melihat angka. Tile satelit ada di halaman tersendiri `/kondisi` (§2.2); di
-// sini hanya strip satu baris status area sebagai pengantar ke sana.
-//
-// Sumber strip: GET /api/public/live (area pertama). Kartu menu dirakit dari
-// Shell.ROUTES yang lolos izin Auth, jadi daftarnya tidak pernah menyimpang
-// dari menu bar dan menu Mulai di dalam aplikasi; izin tetap dari
-// GET /api/auth/me, dan API/DB tetap menegakkan akses.
 'use strict';
 Pages['landing'] = {
   async init(root, ctx) {
@@ -29,7 +18,6 @@ Pages['landing'] = {
   },
 };
 
-// ------------------------------------------------------------------ menu peran
 function card(href, icon, title, desc, ext) {
   return '<a class="navcard" href="' + href + '"' + (ext ? ' target="_blank" rel="noopener"' : '') + '>' +
     UI.icon(icon) + '<span class="nc-body"><span class="nc-title">' + UI.esc(title) + '</span>' +
@@ -45,8 +33,6 @@ function renderMenu(root, me) {
   if (!me) {
     legend.textContent = 'Menu';
     intro.textContent = 'Anda belum masuk. Bagian di bawah terbuka untuk umum; halaman lain terbuka setelah masuk.';
-    // Pengguna yang sudah masuk tidak diberi kartu ini: mereka punya kartu
-    // "Kondisi" milik aplikasi, yang isinya lebih lengkap (30 hari + prakiraan).
     cards.push(card('/kondisi', 'monitor', 'Kondisi terkini',
       'Status area dan tile satelit terbaru. Tanpa login.'));
     cards.push(card('/relief', 'satellite', 'Relief 3D',
@@ -66,10 +52,6 @@ function renderMenu(root, me) {
   box.innerHTML = cards.join('');
 }
 
-// ------------------------------------------------------------- strip status
-// Strip satu baris di bawah hero: status area terbaru + tanggal scene, dengan
-// tautan ke `/kondisi`. Beranda sengaja tidak memuat tile — itu pekerjaan
-// halaman Kondisi Terkini (§2.2).
 async function renderStrip(root, status) {
   const strip = UI.$('#heroStrip .screen-inner', root);
   const line = html => { strip.innerHTML = '<p class="hs-line">' + html + '</p>'; };
@@ -78,7 +60,6 @@ async function renderStrip(root, status) {
   try {
     items = (await API.get('/api/public/live')).items || [];
   } catch (e) {
-    // Beranda tetap berguna tanpa data: sambutan, penjelasan, dan menu utuh.
     line('<span class="lbl">STATUS AREA:</span> <span class="v-alert">TIDAK DAPAT DIMUAT</span>' +
       '<a class="hs-more" href="/kondisi">Coba halaman Kondisi →</a>');
     status('Kondisi terkini gagal dimuat');

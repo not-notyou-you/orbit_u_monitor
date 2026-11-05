@@ -1,24 +1,4 @@
-# etl/live_metrics.py
-"""Metrik ringkas satu scene Daerah Live, dihitung dari COG PROCESSED.
-
-Satu fungsi publik, scene_inputs() + compute_metrics(). Hasilnya angka-angka
-kecil (rata-rata, persen) yang dipakai untuk kalimat kondisi
-(etl/live_interpret.py), grafik, dan forecast. Karena itu harus tetap ada
-walau berkasnya sudah dihapus retensi -- yang disimpan adalah angkanya, bukan
-pointer ke raster.
-
-Penyimpanan (M31): angka ditulis sebagai baris live_scene_metrics (satu baris
-per band x metrik, save_scene_metrics); deskriptor teks (run IMERG, periode
-komposit, tanggal observasi) ikut di live_scenes.source_status[sumber].meta.
-load_scene_metrics menyusun ulang dict yang sama persis bentuknya dengan
-compute_metrics(), sehingga live_interpret, live_forecast, dan kartu Live
-tidak perlu tahu tabelnya.
-
-Nilai dihitung dari raster ASLI (bukan dari PNG preview). Satu pengecualian:
-raster Sentinel-1 dibaca turun ke sisi terpanjang S1_METRIC_MAX_SIDE (rata-rata
-di ranah linear) supaya AOI besar tidak memuat ratusan juta piksel ke memori.
-Raster yang sudah difilter Lee tidak berubah berarti oleh agregasi ini.
-"""
+"""Metrik ringkas satu scene Daerah Live, dihitung dari COG PROCESSED."""
 from __future__ import annotations
 
 import logging
@@ -41,10 +21,6 @@ S1_METRIC_MAX_SIDE = 2048
 MODIS_BANDS = ("FLOOD", "NDVI", "NDWI")
 GPM_WINDOWS = ("24h", "72h", "7d")
 
-
-# ---------------------------------------------------------------------------
-# Pencarian berkas
-# ---------------------------------------------------------------------------
 
 def s1_frames(root: Path, scene_date: date) -> list[dict[str, Path]]:
     """[{VV: path, VH: path}] per frame S1 tanggal itu (COG _lee)."""
@@ -84,10 +60,6 @@ def scene_inputs(root: Path, scene_date: date) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Pembacaan
-# ---------------------------------------------------------------------------
-
 def _read(path: Path, band: int = 1, max_side: int | None = None) -> tuple[np.ndarray, dict]:
     """Band sebagai float64 dengan NaN di NoData, plus tag berkasnya."""
     with rasterio.open(path) as src:
@@ -113,10 +85,6 @@ def _to_db(lin: np.ndarray) -> np.ndarray:
     return out
 
 
-# ---------------------------------------------------------------------------
-# Metrik per sumber
-# ---------------------------------------------------------------------------
-
 def s1_metrics(frames: list[dict[str, Path]]) -> dict | None:
     """Rata-rata VV/VH (dB) dan % piksel VH di bawah ambang air, dikumpulkan
     dari semua frame hari itu."""
@@ -125,9 +93,6 @@ def s1_metrics(frames: list[dict[str, Path]]) -> dict | None:
         for band, bucket in (("VV", vv_all), ("VH", vh_all)):
             if band in f:
                 arr, _ = _read(f[band], max_side=S1_METRIC_MAX_SIDE)
-                # GOLD menyimpan sigma0 linear (0 = di luar swath). Data yang
-                # sudah dB (instalasi dengan cog_convert_db) punya median
-                # negatif; linear tidak pernah.
                 valid = arr[np.isfinite(arr)]
                 if valid.size and np.median(valid) > 0:
                     arr = _to_db(arr)
@@ -161,7 +126,6 @@ def modis_metrics(files: dict[str, tuple[Path, date]]) -> dict:
             "observation_date": tags.get("OBSERVATION_DATE"),
             "valid_pct": _r(n / total * 100 if total else 0),
             "cloud_pct": _r(100 - n / total * 100 if total else 100),
-            # Persen dari piksel yang TERAMATI, bukan dari seluruh AOI.
             "flood_pct": _r((v == 3).mean() * 100) if n else None,
             "recurring_pct": _r((v == 2).mean() * 100) if n else None,
             "water_pct": _r(np.isin(v, (1, 2, 3)).mean() * 100) if n else None,
@@ -182,7 +146,6 @@ def modis_metrics(files: dict[str, tuple[Path, date]]) -> dict:
             "cloud_pct": _r(100 - n / arr.size * 100 if arr.size else 100),
             "mean": _r(v.mean(), 3) if n else None,
             "age_days_median": _r(np.nanmedian(age[valid]), 1) if n else None,
-            # MOD09A1 = komposit 8 hari; tanggal awal periode terbaru dipakai.
             "composite_period": periods[0] if periods else None,
             "lookback_days": int(tags["LOOKBACK_DAYS"]) if tags.get("LOOKBACK_DAYS") else None,
         }
@@ -212,9 +175,7 @@ def gpm_metrics(files: dict[str, tuple[Path, date]]) -> dict:
 def compute_metrics(inputs: dict, scene_date: date | None = None) -> dict:
     """{'sentinel1': {...}|None, 'modis': {...}, 'gpm': {...}}. Satu sumber
     yang gagal dibaca tidak menggugurkan yang lain.
-
-    Entri MODIS/GPM yang berkasnya diambil dari tanggal lain (D-1) diberi
-    `nearest: True` supaya UI dan kalimat kondisi menyebutnya "terdekat"."""
+    """
     result: dict = {}
     for key, fn, arg in (
         ("sentinel1", s1_metrics, inputs.get("s1") or []),
@@ -258,12 +219,6 @@ def source_status(inputs: dict, metrics: dict) -> dict:
     return st
 
 
-# ---------------------------------------------------------------------------
-# Penyimpanan 1NF (M31): dict compute_metrics() <-> baris live_scene_metrics
-# ---------------------------------------------------------------------------
-
-# (sumber, entri, field dict) -> (band_code, metric_name). entri None = dict
-# sumbernya langsung (Sentinel-1 tidak bersarang per band).
 METRIC_ROWS: tuple[tuple[str, str | None, str, str, str], ...] = (
     ("sentinel1", None, "vv_mean_db", "VV", "mean"),
     ("sentinel1", None, "vh_mean_db", "VH", "mean"),
@@ -282,7 +237,6 @@ METRIC_ROWS: tuple[tuple[str, str | None, str, str, str], ...] = (
 )
 _ROW_BY_KEY = {(band, metric): (src, entry, field) for src, entry, field, band, metric in METRIC_ROWS}
 _INT_FIELDS = frozenset({"frames", "valid_pixels", "lookback_days"})
-# Deskriptor teks: tidak dikueri, jadi ikut source_status[sumber].meta (K6).
 META_FIELDS: dict[str, tuple[str, ...]] = {
     "modis": ("observation_date", "composite_period"),
     "gpm": ("imerg_runs", "window_start", "window_end"),

@@ -1,21 +1,4 @@
-# etl/job_lock.py
-"""Lock lintas-PROSES untuk job dataset.
-
-_active_threads di dataset_manager cuma melindungi dalam satu proses Python.
-Itu tidak cukup: `uvicorn --reload` menjalankan proses baru sementara proses
-lama masih menutup diri, dan proses baru menjalankan recover_interrupted_jobs()
-lalu me-resume job yang MASIH dikerjakan proses lama. Dua proses yang menggarap
-job yang sama saling menimpa berkas — dataset 31/32 (21 Sep 2026) berakhir
-dengan granule GPM korup dan dua event SCENE_PIPELINE COMPLETED parsial untuk
-tanggal yang sama.
-
-Lock-nya lock berkas tingkat OS, bukan penanda di database atau berkas PID,
-karena satu-satunya properti yang benar-benar dibutuhkan adalah: kalau proses
-pemegangnya mati dengan cara apa pun (exit normal, crash, taskkill), locknya
-HARUS lepas sendiri. Kernel yang menjamin itu. Berkas PID tidak: PID yang
-tertinggal dari proses yang di-kill tidak bisa dibedakan dari PID yang masih
-hidup tanpa menebak, dan PID dipakai ulang OS.
-"""
+"""Lock lintas-PROSES untuk job dataset."""
 
 from __future__ import annotations
 
@@ -61,12 +44,7 @@ else:
 
 
 class JobLock:
-    """Kepemilikan eksklusif satu job_id lintas proses.
-
-    Dipakai lewat `acquire()` yang mengembalikan None kalau proses lain sudah
-    memegangnya. Pemanggil WAJIB memanggil `release()` saat job selesai --
-    kalau prosesnya mati duluan, OS yang melepas.
-    """
+    """Kepemilikan eksklusif satu job_id lintas proses."""
 
     def __init__(self, key: str, lock_dir: Path) -> None:
         self._key = key
@@ -74,11 +52,11 @@ class JobLock:
         self._fd: int | None = None
 
     @classmethod
-    def acquire(cls, job_id: int, lock_dir: Path) -> "JobLock | None":
+    def acquire(cls, job_id: int, lock_dir: Path) -> JobLock | None:
         return cls.acquire_key(f"job-{job_id}", lock_dir)
 
     @classmethod
-    def acquire_key(cls, key: str, lock_dir: Path) -> "JobLock | None":
+    def acquire_key(cls, key: str, lock_dir: Path) -> JobLock | None:
         """Sama seperti `acquire()`, tapi untuk pemanggil yang bukan job
         dataset biasa -- kuncinya string bebas (mis. "live-area-{id}"), bukan
         job_id. Nama filenya persis `key`, dan pemanggil bertanggung jawab
@@ -88,9 +66,6 @@ class JobLock:
             lock_dir.mkdir(parents=True, exist_ok=True)
             fd = os.open(lock._path, os.O_RDWR | os.O_CREAT, 0o644)
         except OSError:
-            # Tanpa lock lebih baik lanjut daripada job tidak pernah jalan:
-            # disk penuh atau folder read-only bukan alasan menghentikan
-            # pipeline, dan race-nya cuma terjadi saat ada dua proses.
             logger.warning(
                 "[JOBLOCK] key=%s tidak bisa membuka berkas lock, lanjut tanpa lock",
                 key, exc_info=True,
@@ -103,9 +78,6 @@ class JobLock:
 
         lock._fd = fd
         try:
-            # Lebar tetap supaya isi dari pemegang sebelumnya selalu tertimpa
-            # penuh; tidak di-truncate karena byte 0 sedang dikunci. Isinya
-            # murni untuk diagnosa, bukan bagian dari mekanisme lock.
             os.write(fd, f"pid={os.getpid()}".ljust(32)[:32].encode())
         except OSError:
             pass

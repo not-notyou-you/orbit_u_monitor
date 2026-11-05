@@ -1,25 +1,4 @@
-# etl/hydromet_aggregate.py
-"""Zonal statistics COG GPM/MODIS per kecamatan -> ``region_observations`` (PIPELINE.md §3.3).
-
-Raster tidak disimpan di DB, jadi agregasi dikerjakan di Python:
-
-1. Poligon kecamatan ``in_aoi`` dari ``administrative_regions``.
-2. Sel raster yang tersentuh poligon: ``geometry_mask(..., all_touched=True)``.
-3. Bobot tiap sel = luas irisan ``sel ∩ poligon`` (derajat²) × ``cos(lat)`` pusat
-   irisan, yaitu luas permukaan relatif. Untuk GPM 0,1° satu kecamatan hanya
-   1–6 sel, sehingga sel tepi yang cuma tersentuh sedikit tidak boleh berbobot
-   penuh. Bobot dihitung sekali per (grid, kecamatan) dan di-cache.
-4. Nilai:
-   ``MEAN``      Σ(w·v) / Σw atas sel valid.
-   ``FRACTION``  persen bobot sel valid berkelas air MCDWD (2, 3) terhadap
-                 bobot sel valid.
-5. ``valid_fraction`` = Σw sel valid / Σw semua sel dalam poligon. Di bawah
-   ``app_settings.hydromet.min_valid_fraction`` (0,1) -> ``value = NULL``.
-6. Upsert ``ON CONFLICT (region_id, band_id, obs_date)`` hanya bila run baru
-   tidak lebih buruk (F > L > E) atau nilai lama NULL, dan nilai NULL tidak
-   pernah menimpa nilai yang ada. Inilah yang membuat Final Run menggantikan
-   Late Run tanpa logika is_valid (K7/M6).
-"""
+"""Zonal statistics COG GPM/MODIS per kecamatan -> ``region_observations`` (PIPELINE.md §3.3)."""
 
 from __future__ import annotations
 
@@ -40,7 +19,6 @@ MIN_VALID_FRACTION = 0.1
 FLOOD_WATER_CLASSES = (2, 3)
 FLOOD_NODATA = 255
 
-# Urutan kualitas run IMERG. None (MODIS) tidak punya run.
 RUN_RANK = {"F": 3, "L": 2, "E": 1}
 
 
@@ -58,8 +36,6 @@ class ZonalResult:
     n_cells: int
 
 
-# --- bobot sel ------------------------------------------------------------------
-
 _WEIGHT_CACHE: dict[tuple, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
 
 
@@ -68,12 +44,7 @@ def _grid_key(transform, shape, region_key) -> tuple:
 
 
 def cell_weights(transform, shape: tuple[int, int], geom, region_key=None):
-    """(rows, cols, weights) sel yang tersentuh ``geom`` (EPSG:4326).
-
-    ``weights`` = luas irisan sel∩poligon (derajat²) × cos(lat pusat irisan).
-    Sel di dalam penuh tidak perlu dipotong; hanya sel tepi yang dihitung
-    irisannya (vektorisasi shapely 2).
-    """
+    """(rows, cols, weights) sel yang tersentuh ``geom`` (EPSG:4326)."""
     import shapely
     from rasterio.features import geometry_mask
 
@@ -119,8 +90,6 @@ def cell_weights(transform, shape: tuple[int, int], geom, region_key=None):
 def clear_cache() -> None:
     _WEIGHT_CACHE.clear()
 
-
-# --- zonal ----------------------------------------------------------------------
 
 def zonal(data: np.ndarray, valid: np.ndarray, transform, geom, aggregation: str,
           min_valid_fraction: float = MIN_VALID_FRACTION, region_key=None) -> ZonalResult:
@@ -177,8 +146,6 @@ def aggregate_raster(path: Path, regions: list[dict], aggregation: str,
                                     region_key=r["region_id"])
     return out
 
-
-# --- upsert ---------------------------------------------------------------------
 
 _UPSERT = text("""
     INSERT INTO region_observations

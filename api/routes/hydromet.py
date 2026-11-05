@@ -1,10 +1,4 @@
-# api/routes/hydromet.py
-"""Hidromet (INTERFACE.md §4.4): statistik hari ini, observasi, tren, ekspor CSV.
-
-Tanggal = hari UTC (``region_observations.obs_date``). USER hanya melihat 30
-hari terakhir; ANALYST (dan ADMIN) bebas. Router dijaga
-``require_role("USER")`` di api/main.py.
-"""
+"""Hidromet (INTERFACE.md §4.4): statistik hari ini, observasi, tren, ekspor CSV."""
 
 from __future__ import annotations
 
@@ -23,8 +17,6 @@ from api.errors import ApiError
 
 router = APIRouter()
 
-# Batas USER sama dengan halaman Citra (M56): 365 hari. ANALYST dan
-# DATA_ENGINEER melihat seluruh arsip. Rentang bawaan tanpa date_from: 30 hari.
 USER_MAX_DAYS = 365
 DEFAULT_DAYS = 30
 WIB = ZoneInfo("Asia/Jakarta")
@@ -74,7 +66,6 @@ def today(sess: Session = Depends(get_session)) -> dict:
     end = start + timedelta(days=1)
     return {
         "obs_date": obs_date,
-        # Hari UTC = 07:00 WIB s.d. 07:00 WIB hari berikutnya.
         "window_wib": f"{start.isoformat(timespec='minutes')}/{end.isoformat(timespec='minutes')}",
         "regions": [{
             "region_id": r["region_id"], "pcode": r["pcode"], "name": r["region_name"],

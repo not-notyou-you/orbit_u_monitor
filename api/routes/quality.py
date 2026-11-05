@@ -1,4 +1,3 @@
-# api/routes/quality.py
 """
 GET /api/quality/{scene_id}                        — quality metrics for all bands of a scene
 GET /api/quality/summary/stats                     — aggregated quality statistics
@@ -135,9 +134,6 @@ async def quality_summary(
     return summary
 
 
-# Band yang diharapkan ada per scene untuk tiap source non-SAR. Dipakai
-# menghitung coverage: berapa persen dari yang seharusnya benar-benar
-# mendarat di disk dan tercatat di data_products.
 _EXPECTED_BANDS: dict[str, tuple[str, ...]] = {
     "MODIS": ("FLOOD", "NDVI", "NDWI"),
     "GPM": ("RAIN_24H", "RAIN_72H", "RAIN_7D"),
@@ -178,7 +174,6 @@ def compute_quality_by_source(db: DatabaseClient, dataset_id: int) -> list[Sourc
     sources: list[SourceQualityItem] = []
 
     with db.session() as sess:
-        # --- Sentinel-1: skor radiometrik per band -------------------------
         rows = sess.execute(
             select(
                 QualityMetric.band_name,
@@ -214,7 +209,6 @@ def compute_quality_by_source(db: DatabaseClient, dataset_id: int) -> list[Sourc
                 bands=bands,
             ))
 
-        # --- MODIS / GPM: coverage band yang benar-benar ada ---------------
         for source, expected in _EXPECTED_BANDS.items():
             band_rows = sess.execute(
                 select(DataProduct.band_name, func.count(DataProduct.product_id))
@@ -232,9 +226,6 @@ def compute_quality_by_source(db: DatabaseClient, dataset_id: int) -> list[Sourc
 
             counts = {band: int(n) for band, n in band_rows}
             scene_count = max(counts.values())
-            # Coverage per band: berapa hari band itu ada, dibanding hari
-            # terbanyak yang dipunyai source ini. Band yang tidak muncul sama
-            # sekali tetap dilaporkan sebagai 0.0, bukan dihilangkan diam-diam.
             bands = {
                 band: round(counts.get(band, 0) / scene_count * 100, 2)
                 for band in expected

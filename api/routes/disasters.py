@@ -1,13 +1,4 @@
-# api/routes/disasters.py
-"""Kejadian bencana dan master jenis (INTERFACE.md §4.6).
-
-Baca ``/disasters`` terbuka untuk semua (M56): pengunjung membaca VIEW
-``v_public_kejadian`` (365 hari terakhir, tanpa kolom internal), role login
-membaca ``disaster_events`` tanpa batas waktu. Tulis ANALYST (GRANT analyst
-SIU, tanpa D -> hapus = soft delete ``deleted_at``). ``/disaster-types``: GET
-PUBLIC, tulis ADMIN. Validasi bersama dengan ``scripts/import_disasters.py``
-ada di ``etl.disasters``.
-"""
+"""Kejadian bencana dan master jenis (INTERFACE.md §4.6)."""
 
 from __future__ import annotations
 
@@ -30,7 +21,6 @@ ADMIN = [Depends(require_role("ADMIN"))]
 ANALYST = [Depends(require_role("ANALYST"))]
 PUBLIC_WINDOW_DAYS = 365
 
-# Kolom VIEW publik = EVENT_SELECT tanpa source_reference/recorded_by/verified_by.
 _PUBLIC_SELECT = """
     SELECT e.event_id, e.disaster_type_code, e.disaster_type_name, e.region_id, e.pcode, e.region_name,
            e.village_name, e.lat, e.lon, e.event_date, e.event_end_date, e.description, e.impact_summary,
@@ -85,7 +75,6 @@ def list_disasters(sess: Session = Depends(get_session),
     rows = sess.execute(text(f"{select_sql} WHERE {cond} ORDER BY e.event_date DESC, e.event_id DESC "
                              "LIMIT :limit OFFSET :offset"), {**params, "limit": limit, "offset": offset}).mappings().all()
     return {"items": [dz.event_dict(r) for r in rows], "total": total, "limit": limit, "offset": offset,
-            # Batas yang berlaku untuk pemanggil, supaya UI bisa mengatakannya.
             "window_days": PUBLIC_WINDOW_DAYS if public else None}
 
 
@@ -99,7 +88,6 @@ def get_disaster(event_id: int, sess: Session = Depends(get_session),
         return {**dz.event_dict(row), "rain": None}
     event = _get(sess, event_id)
     if not principal.has_role("ANALYST"):
-        # v_kejadian_dan_hujan milik ANALYST (evaluasi alert, M16).
         return {**event, "rain": None}
     rain = sess.execute(text("SELECT * FROM v_kejadian_dan_hujan WHERE event_id = :e"), {"e": event_id}).mappings().first()
     event["rain"] = [{
@@ -139,8 +127,6 @@ def delete_disaster(event_id: int, sess: Session = Depends(get_session)) -> dict
                  {"e": event_id})
     return {"ok": True, "message": f"Disaster event {event_id} deleted"}
 
-
-# --- jenis bencana ------------------------------------------------------------
 
 _TYPE_SELECT = "SELECT disaster_type_id, type_code, type_name, category, indicator_bands, is_active FROM disaster_types"
 

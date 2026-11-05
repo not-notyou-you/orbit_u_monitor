@@ -1,11 +1,4 @@
-# api/routes/public.py
-"""Halaman publik (INTERFACE.md §4.2): scene Live terbaru per area aktif, tanpa login.
-
-Hanya scene TERBARU yang publik: tanpa prakiraan, tanpa riwayat tanggal.
-Data dibaca lewat ``v_public_live_latest`` di bawah role ``monitor_public``;
-path berkas PNG (folder dataset, yang tidak boleh dibaca PUBLIC) dicari
-dengan koneksi ``monitor_etl`` SETELAH VIEW memastikan tanggalnya terbaru.
-"""
+"""Halaman publik (INTERFACE.md §4.2): scene Live terbaru per area aktif, tanpa login."""
 
 from __future__ import annotations
 
@@ -42,11 +35,6 @@ def _public_item(r) -> dict:
         "interpretations": r["interpretations"] or {},
         "previews": {key: _preview(v, f"/api/public/live/{r['area_id']}/preview/{key}.png")
                      for key, v in items.items()},
-        # Georeferensi grid PNG (empat sudut lon/lat) -- dipakai halaman Relief
-        # 3D publik untuk menempatkan citra di atas DEM. Ikut dari manifest
-        # `previews` yang sudah ada di VIEW, jadi tidak ada kolom baru yang
-        # perlu dibuka ke role monitor_public. None untuk scene yang dirender
-        # sebelum ini dicatat; halaman tujuan mengatakannya, bukan menebak.
         "preview_grid": (r["previews"] or {}).get("grid"),
     }
 

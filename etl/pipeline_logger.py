@@ -1,4 +1,3 @@
-# etl/pipeline_logger.py
 from __future__ import annotations
 
 import json
@@ -9,7 +8,8 @@ import time
 import traceback
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
+from collections.abc import Iterator
 
 import psutil
 from sqlalchemy import func, select
@@ -24,24 +24,12 @@ _SAMPLE_INTERVAL_SEC = 0.5
 _TRACEBACK_MAX_CHARS = 4000
 
 
-# The whole `etl` package logger, not just this module's. Stage transitions
-# come from here ([PLOG]), but the tracebacks that explain a failure come from
-# etl.module5_orchestrator, etl.module9_fusion, etc. Attaching to the parent
-# captures both.
 _ETL_LOGGER_NAME = __name__.split(".")[0]
 
-# threading.Thread does not inherit contextvars, and two datasets can process
-# concurrently (etl.dataset_manager keys its worker threads per dataset), so
-# thread ident -> log path is what keeps one run's lines out of another's file.
 _scope_lock = threading.Lock()
 _thread_scopes: dict[int, Path] = {}
 _scope_depth = 0
 _saved_level: int | None = None
-# One FileHandler per log path, reference-counted. Two runs of the same
-# dataset (a job and a live MODIS/GPM ingest) resolve to the same file, and
-# attaching a second handler to the same path made the `etl` logger write
-# every record twice -- the scope filter matches on path, so it cannot tell
-# the handlers apart.
 _path_handlers: dict[Path, tuple[logging.Handler, int]] = {}
 
 
@@ -58,11 +46,7 @@ class _DatasetScopeFilter(logging.Filter):
 
 
 def adopt_dataset_log_scope(log_path: Path) -> None:
-    """Enroll the calling thread in `log_path`'s dataset run.
-
-    Worker threads started inside a `dataset_log_file(...)` block must call
-    this first; records from threads that never enroll are filtered out of the
-    file (they still reach the console via propagation)."""
+    """Enroll the calling thread in `log_path`'s dataset run."""
     with _scope_lock:
         _thread_scopes[threading.get_ident()] = log_path
 
@@ -89,11 +73,7 @@ def dataset_log_file(
     stage transitions alike) plus any module traceback is appended to one .txt
     file immediately, without waiting for the batch to finish. Removed again
     on exit.
-
-    The `etl` logger is forced to INFO for the duration: it is NOTSET by
-    default, so it inherited root's WARNING and dropped every INFO record
-    before any handler could see it — which is why these files previously
-    contained FAILED lines only, or nothing at all."""
+    """
     global _scope_depth, _saved_level
 
     log_path = dataset_log_path(dataset_id, dataset_name, logs_dir)
@@ -133,8 +113,6 @@ def dataset_log_file(
                 del _path_handlers[log_path]
                 etl_logger.removeHandler(handler)
                 handler.close()
-                # Thread scopes are keyed by path too, so they may only be
-                # dropped once the last run using this file has finished.
                 for ident, path in [
                     (i, p) for i, p in _thread_scopes.items() if p == log_path
                 ]:
@@ -182,13 +160,6 @@ class PipelineLogManager:
                 sess.flush()
                 log_id = row.log_id
         except IntegrityError:
-            # processing_logs.dataset_id is ON DELETE CASCADE, so a dataset
-            # deleted with force=True while its job threads are still running
-            # takes its rows with it and every later insert violates the FK.
-            # That is an expected end-of-life race, not a pipeline failure:
-            # losing a log line must not abort (or mask) the work being
-            # logged, and must not turn the failure handler into a second,
-            # noisier exception.
             logger.warning(
                 "[PLOG] dataset_id=%s sudah tidak ada - event %s/%s (%s) tidak disimpan",
                 dataset_id, module, stage, status,
@@ -237,19 +208,7 @@ class PipelineLogManager:
     def completed_aux_dates(
         self, dataset_id: int, date_keys: list[str]
     ) -> set[str]:
-        """date_key yang pra-penelusuran aux-nya sudah TUNTAS.
-
-        Dipakai _ingest_aux_days supaya restart server tidak mengunduh dan
-        memproses ulang tanggal yang sudah jadi. Tanpa ini, tiap resume
-        mengulang seluruh rentang aux dari tanggal pertama (~20 menit untuk
-        dataset 3 bulan) sebelum antrean Sentinel-1 sempat jalan, dan karena
-        fase itu tidak menaikkan counter scene, UI tampak diam.
-
-        Syaratnya details.aux_complete, bukan sekadar status COMPLETED:
-        COMPLETED cuma berarti ADA berkas yang ditulis, dan tanggal yang
-        MODIS-nya berhasil tapi GPM-nya gagal juga tercatat COMPLETED.
-        Melewati tanggal seperti itu akan membuat kekurangannya permanen,
-        padahal sebelumnya run berikutnya yang menambalnya."""
+        """date_key yang pra-penelusuran aux-nya sudah TUNTAS."""
         if not date_keys:
             return set()
         with self._db.session() as sess:
@@ -288,9 +247,6 @@ class _StageHandle:
 
     def __init__(self) -> None:
         self.details: dict[str, Any] = {}
-        # Populated after the `with` block exits successfully, so callers can
-        # read timing/resource numbers back out (e.g. to also populate
-        # processing_jobs.cpu_usage_percent / memory_usage_mb).
         self.duration_seconds: float | None = None
         self.memory_peak_mb: float | None = None
         self.cpu_peak_percent: float | None = None

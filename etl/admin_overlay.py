@@ -1,26 +1,4 @@
-# etl/admin_overlay.py
-"""Varian "garis wilayah" dari setiap PNG preview (INTERFACE: checkbox taskbar).
-
-Setiap preview map disimpan DUA kali:
-
-    {key}.png       citra apa adanya (yang tampil secara default)
-    {key}_adm.png   citra yang sama + batas kecamatan dan nama wilayahnya
-
-Dua berkas, bukan satu berkas plus overlay di browser: batas wilayah harus
-sejajar piksel dengan rasternya, dan satu-satunya tempat yang tahu transform
-affine + CRS raster itu adalah perender PNG di sini. Menggambarnya di CSS/SVG
-berarti menebak georeferensi di sisi klien.
-
-Geometrinya dari ``administrative_regions`` (COD-AB adm3, EPSG:4326), dibaca
-SEKALI per proses lalu dipakai ulang semua scene (batas administratif tidak
-berubah di tengah siklus). Garis digambar putih dengan casing hitam, nama
-wilayah putih dengan stroke hitam -- satu-satunya pasangan yang tetap terbaca
-di atas citra gelap (air), terang (NoData putih), maupun colormap hujan.
-
-Modul ini TIDAK PERNAH melempar ke pemanggil: varian garis wilayah adalah
-tambahan, jadi kegagalannya (DB mati, batas belum dimuat) hanya berarti
-preview biasa saja yang ada dan UI diam-diam memakai itu.
-"""
+"""Varian "garis wilayah" dari setiap PNG preview (INTERFACE: checkbox taskbar)."""
 from __future__ import annotations
 
 import json
@@ -31,9 +9,6 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 SUFFIX = "_adm"
-# Toleransi penyederhanaan batas, derajat (~33 m di ekuator). Garis preview
-# tebalnya 2-3 px pada 768-1024 px untuk AOI seukuran kabupaten, jadi simpul
-# yang lebih rapat dari ini tidak pernah terlihat -- hanya memperlambat.
 SIMPLIFY_DEG = 0.0003
 LINE_RGB = (255, 255, 255)
 CASING_RGB = (0, 0, 0)
@@ -117,8 +92,6 @@ def _default_db():
     return _own_db
 
 
-# --- menggambar ----------------------------------------------------------------
-
 def _project(lons, lats, crs):
     """lon/lat -> koordinat CRS raster (identitas kalau rasternya sudah 4326)."""
     from rasterio.crs import CRS
@@ -130,14 +103,7 @@ def _project(lons, lats, crs):
 
 
 def _to_pixels(regions, transform, crs):
-    """[(wilayah, cincin piksel, titik label piksel)] pada grid PNG.
-
-    Semua titik semua wilayah direproyeksi dalam SATU panggilan: transformasi
-    koordinat rasterio punya biaya tetap per panggilan yang jauh lebih besar
-    daripada per titik, dan satu kecamatan bisa punya ribuan simpul."""
-    # Affine dipakai sebagai enam koefisien, bukan lewat operator `*` per
-    # titik: satu kecamatan bisa punya ribuan simpul dan pemanggilan operator
-    # itu mendominasi waktu render (plus memperingatkan deprecation).
+    """[(wilayah, cincin piksel, titik label piksel)] pada grid PNG."""
     ia, ib, ic, id_, ie, if_ = (~transform)[:6]
     lons: list[float] = []
     lats: list[float] = []
@@ -154,7 +120,7 @@ def _to_pixels(regions, transform, crs):
         return []
     xs, ys = _project(lons, lats, crs)
     rings_of: dict[int, list] = {ri: [] for ri in range(len(regions))}
-    label_of: dict[int, tuple | None] = {ri: None for ri in range(len(regions))}
+    label_of: dict[int, tuple | None] = dict.fromkeys(range(len(regions)))
     at = 0
     for ri, n in index:
         pts = [(ia * xs[i] + ib * ys[i] + ic, id_ * xs[i] + ie * ys[i] + if_)
@@ -168,12 +134,7 @@ def _to_pixels(regions, transform, crs):
 
 
 def _nudge_inside(box, point, w: int, h: int, pad: int = 3):
-    """Geser titik label secukupnya supaya seluruh teks masuk gambar.
-
-    Wilayah yang titik tengahnya dekat tepi akan terpotong setengah huruf
-    kalau digambar apa adanya -- nama yang terpotong lebih buruk daripada
-    nama yang bergeser beberapa piksel dari pusat wilayahnya. Teks yang tetap
-    tidak muat (lebih lebar dari gambarnya) dibuang: None."""
+    """Geser titik label secukupnya supaya seluruh teks masuk gambar."""
     bw, bh = box[2] - box[0], box[3] - box[1]
     if bw > w - 2 * pad or bh > h - 2 * pad:
         return None
@@ -221,9 +182,6 @@ def draw(img, transform, crs, regions=None) -> int:
     shown = [(reg, rings, label) for reg, rings, label in _to_pixels(regions, transform, crs)
              if _visible(rings, w, h)]
     drawn = len(shown)
-    # Casing hitam SEMUA wilayah dulu, lalu garis putihnya: kalau digambar
-    # berpasangan per wilayah, casing tetangga akan menimpa garis putih yang
-    # sudah jadi di batas yang mereka bagi bersama.
     for _reg, rings, _label in shown:
         for ring in rings:
             pen.line(ring, fill=_c(img, CASING_RGB), width=lw + 2, joint="curve")
@@ -238,7 +196,7 @@ def draw(img, transform, crs, regions=None) -> int:
             continue
         box = pen.textbbox(label, reg.name.upper(), font=font, anchor="mm")
         if any(box[0] < b[2] and b[0] < box[2] and box[1] < b[3] and b[1] < box[3] for b in boxes):
-            continue   # nama bertumpuk: lebih baik hilang satu daripada dua-duanya tak terbaca
+            continue
         boxes.append(box)
         pen.text(label, reg.name.upper(), font=font, anchor="mm", fill=_c(img, LABEL_RGB),
                  stroke_width=max(2, lw), stroke_fill=_c(img, CASING_RGB))

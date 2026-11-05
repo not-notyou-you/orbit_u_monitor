@@ -1,24 +1,8 @@
-// web/js/app.js — kerangka "desktop" Orbital 95: router hash, jendela utama, taskbar.
-//
-// Susunan halaman mengikuti INTERFACE.md §2 (M56, rancangan pemilik proyek;
-// M63): Beranda (Pantau Lokasi) → Tentang → 3D AOI → Citra Satelit →
-// Forecast → Kejadian → Data → Laporan → Sistem, ditambah Masuk (/masuk) dan
-// Registrasi (/daftar) di luar aplikasi. Aplikasi terbuka untuk pengunjung:
-// menu disusun dari izin di GET /api/auth/session, jadi pengunjung hanya
-// melihat Beranda, Tentang, Citra (30 hari), dan Kejadian (1 tahun). Hash
-// susunan lama (M53) tetap hidup lewat ALIASES.
-//
-// /app#<tujuan>[/<tab>[/<bagian>]] memuat fragmen pages/<berkas>.html ke panel
-// jendela dan skrip js/<berkas>.js (sekali), lalu memanggil
-// Pages[<berkas>].init(root, ctx). Satu berkas boleh dipakai beberapa tab
-// (mis. citra-sat untuk Sentinel-1/MODIS/GPM); tabnya membawa `source`/`kind`.
 'use strict';
 
 window.Pages = window.Pages || {};
 const ASSET_V = '6.39';
 
-// `lede` = keterangan halaman; tidak lagi ditampilkan di jendela (dihapus atas
-// permintaan pemilik proyek), disimpan sebagai dokumentasi rute.
 const ROUTES = [
   {
     hash: 'beranda', file: 'home', title: 'Beranda', icon: 'globe', perm: ['home.view'],
@@ -26,9 +10,6 @@ const ROUTES = [
     desc: 'Pantau lokasi: kondisi satu kecamatan, citra satelitnya per satelit, dan angka 30 hari terakhir; pilihan tema tampilan.',
   },
   {
-    // M63: isi Beranda lama (sambutan, penjelasan, kartu halaman, peta AOI)
-    // digabung dengan Sistem › Tentang menjadi menu sendiri. Tema tampilan
-    // kembali ke Beranda (M65).
     hash: 'tentang', file: 'about', title: 'Tentang', icon: 'help', perm: ['about.view'],
     lede: 'Apa aplikasi ini, yang perlu diketahui lebih dulu, sumber data, dan versi.',
     desc: 'Apa aplikasi ini, yang perlu diketahui, dan sumber data.',
@@ -73,14 +54,12 @@ const ROUTES = [
         lede: 'Semua band dalam satu grafik, 30 hari terakhir plus forecast 15 hari, diperbarui otomatis. Klik nama band untuk menyembunyikan atau membaca penjelasannya.',
       },
       {
-        // M67: termasuk evaluasi alert & kejadian (dulu tab "Tren & evaluasi alert").
         key: 'analisa-daerah', file: 'diagram', mode: 'regions', title: 'Analisa daerah', perm: ['diagram.view'],
         lede: 'Pilih kecamatan (dan warnanya), rentang tanggal, dan band, lalu tekan Tampilkan. Forecast 15 hari dihitung dari data s.d. tanggal akhir. Evaluasi alert & kejadian terlipat di bawah grafik; PDF dan CSV di kotak Unduh.',
       },
     ],
   },
   {
-    // M68: satu halaman untuk semua peran; catat/ubah/hapus tampil bila izin disasters.manage.
     hash: 'kejadian', file: 'disasters', title: 'Kejadian', icon: 'alarm', perm: ['disasters.view'],
     lede: 'Kejadian tercatat di wilayah AOI, di peta dan daftar yang berdampingan. Saring lewat baris di atas atau lencana; klik baris atau titik untuk detail. Analis dan Administrator juga bisa mencatat, mengubah, dan menghapus (hanya menandai).',
     desc: 'Kejadian bencana yang benar-benar terjadi di lapangan, di peta dan daftar.',
@@ -88,9 +67,6 @@ const ROUTES = [
   {
     hash: 'data', title: 'Data', icon: 'folder', perm: ['datasets.manage'],
     desc: 'Proses yang berjalan, data per satelit dengan backfill, dataset (buat dan unduh), dan EDA.',
-    // M67: 8 tab → 4. Proses berjalan masuk Ringkasan; tiga tab satelit jadi
-    // satu (#data/satelit/<satelit>); Unduh data dan Dataset tersimpan jadi
-    // Dataset (#data/dataset/baru = wizard).
     tabs: [
       {
         key: 'ringkasan', file: 'data-home', title: 'Ringkasan', perm: ['datasets.manage'],
@@ -148,15 +124,9 @@ const ROUTES = [
   },
 ];
 
-// Hash susunan lama → lokasi baru. Tautan dan bookmark lama tetap hidup;
-// router menulis ulang alamatnya ke bentuk kanonik tanpa menambah riwayat.
-// Dicocokkan dari awalan terpanjang, jadi "pengaturan/operasi/live" ikut
-// pindah dengan sisa segmennya.
 const ALIASES = {
-  // M68: tab Lihat/Kelola kejadian jadi satu halaman
   'kejadian/lihat': 'kejadian',
   'kejadian/kelola': 'kejadian',
-  // M67: tab Forecast, Data, dan bagian Sistem digabung
   'forecast/evaluasi': 'forecast/analisa-daerah',
   'data/sentinel-1': 'data/satelit/sentinel-1',
   'data/modis': 'data/satelit/modis',
@@ -170,11 +140,8 @@ const ALIASES = {
   'sistem/pengaturan/arsip': 'sistem/pengaturan/penyimpanan',
   'sistem/pengaturan/aturan': 'sistem/pengaturan/wilayah',
   'sistem/pengguna/token': 'sistem/pengguna',
-  // M63: Tentang keluar dari Sistem menjadi menu sendiri
   'sistem/tentang': 'tentang',
-  // M61: halaman Diagram berganti nama menjadi Forecast
   'diagram': 'forecast',
-  // susunan M53
   'kondisi': 'citra',
   'kondisi/citra': 'citra/sentinel-1',
   'kondisi/kecamatan': 'citra/gpm',
@@ -192,7 +159,6 @@ const ALIASES = {
   'pengaturan/akses': 'sistem/pengguna',
   'pengaturan/jejak': 'sistem/log',
   'akun': 'sistem/akun',
-  // susunan sebelum M53
   'pantauan': 'citra/sentinel-1',
   'hari-ini': 'citra/gpm',
   'statistik': 'citra/gpm',
@@ -209,10 +175,6 @@ const Shell = (() => {
   const tasks = [];         // tujuan yang pernah dibuka sesi ini (tombol taskbar)
   let healthOk = null;
 
-  // M75: skrip yang gagal diunduh (jaringan tersendat) dicoba sekali lagi,
-  // dan bila tetap gagal TIDAK disimpan sebagai gagal — dulu promise yang
-  // ditolak tersimpan selamanya, jadi satu kali gagal membuat halaman itu
-  // terus gagal sampai peramban dimuat ulang.
   function injectScript(file, attempt) {
     return new Promise((resolve, reject) => {
       const s = document.createElement('script');
@@ -230,7 +192,6 @@ const Shell = (() => {
     }
     return loadedScripts[file];
   }
-  // Fragmen halaman: satu kali coba ulang bila jaringan/server sesaat gagal.
   async function fetchFragment(file) {
     for (let i = 0; ; i++) {
       try {
@@ -250,15 +211,12 @@ const Shell = (() => {
     document.head.appendChild(l); loadedCss[file] = true;
   }
 
-  // ------------------------------------------------------------ izin & susunan
   const visibleRoutes = () => ROUTES.filter(r => !r.tray && allowed(r));
   function visibleTabs(route) { return (route.tabs || []).filter(t => Auth.canAny(t.perm)); }
-  // Tujuan bertab boleh dibuka bila minimal satu tabnya boleh dibuka.
   function allowed(route) {
     return route.tabs ? visibleTabs(route).length > 0 : Auth.canAny(route.perm);
   }
 
-  // ---------------------------------------------------------------- taskbar
   function taskbarHTML(publicMode) {
     return '<nav class="taskbar" aria-label="Taskbar">' +
       '<button type="button" class="start" id="startBtn" aria-haspopup="menu" aria-expanded="false" aria-controls="startMenu"><img class="start-logo" src="assets/img/logo.svg" alt="" width="16" height="16"><span>Mulai</span></button>' +
@@ -275,9 +233,6 @@ const Shell = (() => {
 
   function menuItems(me) {
     const items = [];
-    // Tujuan bertab dirender bersama tabnya supaya #laporan/keadaan-aoi tercapai
-    // dalam satu tindakan. `data-hash` tetap hanya di item tingkat atas: itu
-    // yang dipakai untuk menandai halaman aktif dan memeriksa izin per peran.
     ROUTES.filter(r => allowed(r)).forEach(r => {
       items.push({ href: '/app#' + r.hash, label: r.title, icon: r.icon, hash: r.hash });
       const ts = visibleTabs(r);
@@ -288,7 +243,6 @@ const Shell = (() => {
       items.push({ href: '/masuk', label: 'Masuk…', icon: 'key' });
       items.push({ href: '/daftar', label: 'Daftar akun…', icon: 'user' });
     }
-    // Dokumentasi API (Swagger) hanya ditautkan untuk pengguna yang masuk (M66).
     if (me) {
       items.push({ sep: true });
       items.push({ href: '/docs', label: 'Dokumentasi API', icon: 'help', ext: true });
@@ -299,7 +253,6 @@ const Shell = (() => {
 
   function bindTaskbar(me) {
     const btn = UI.$('#startBtn'), menu = UI.$('#startMenu'), list = UI.$('#startList');
-    // Menu Mulai hanya memuat halaman utama; sub-halaman dibuka lewat tab di jendela.
     list.innerHTML = menuItems(me).filter(it => !it.tabHash).map(it => it.sep ? '<li role="separator"><hr></li>' :
       '<li role="none">' + (it.action
         ? '<button type="button" role="menuitem" data-action="' + it.action + '">' + UI.icon(it.icon) + '<span>' + UI.esc(it.label) + '</span></button>'
@@ -325,7 +278,6 @@ const Shell = (() => {
       if (a.dataset.action === 'logout') { open(false); Auth.logout(); return; }
       open(false);
     });
-    // Nama pengguna di tray adalah jalan ke "Akun Saya" (tidak lagi menu utama).
     if (me) {
       const label = UI.esc((me.full_name || me.username) + ' · ' + (UI.ROLE_LABEL[me.role_code] || me.role_code));
       const trayEl = UI.$('#trayUser');
@@ -343,9 +295,6 @@ const Shell = (() => {
     checkHealth(); setInterval(checkHealth, 60000);
   }
 
-  // Alt+1…9 melompat ke tujuan ke-n yang terlihat; Alt+←/→ memutar sub-tab
-  // tujuan yang sedang terbuka. Tidak aktif saat fokus ada di kolom isian, dan
-  // Alt+Ctrl dilewati karena kombinasi itu adalah AltGr di papan tuts non-US.
   function bindShortcuts() {
     document.addEventListener('keydown', e => {
       if (!e.altKey || e.ctrlKey || e.metaKey) return;
@@ -354,8 +303,6 @@ const Shell = (() => {
       if (/^[1-9]$/.test(e.key)) {
         const r = visibleRoutes()[Number(e.key) - 1]; if (!r) return;
         e.preventDefault();
-        // Halaman publik memakai taskbar yang sama tanpa router hash, jadi
-        // pintasannya harus memuat /app, bukan hanya mengganti hash.
         location.href = '/app' + canonical(r, visibleTabs(r)[0] || null);
         return;
       }
@@ -369,9 +316,6 @@ const Shell = (() => {
     });
   }
 
-  // Checkbox "Garis wilayah": satu saklar untuk SEMUA pratinjau citra di
-  // aplikasi (tile Live, lightbox, galeri Katalog). Hanya menukar src <img>
-  // lewat UI.setBoundaries, jadi halaman yang sedang terbuka tidak dimuat ulang.
   function bindBoundaries() {
     const box = UI.$('#admToggle'); if (!box) return;
     box.checked = UI.boundaries();
@@ -392,8 +336,6 @@ const Shell = (() => {
     UI.$('#linkLamp').title = ok ? 'Server dan basis data terhubung' : 'Server atau basis data tidak terjangkau';
   }
 
-  // "Tujuan › Tab" dipakai di title bar jendela dan di tombol taskbar, supaya
-  // keduanya menyebut lokasi yang sama lengkapnya.
   const windowTitle = (route, tab) => route.title + (tab ? ' › ' + tab.title : '');
 
   function renderTasks() {
@@ -408,14 +350,14 @@ const Shell = (() => {
     UI.$$('button', box).forEach(b => b.addEventListener('click', () => { location.hash = b.dataset.hash; }));
   }
 
-  // ------------------------------------------------------------- menu bar
-  // Navigasi yang terlihat tanpa harus membuka tombol Mulai (DESIGN.md §4
-  // mengizinkan menu bar di bawah title bar).
   function menubarHTML(route) {
     const rs = visibleRoutes();
-    if (rs.length < 2) return '';
-    return '<nav class="menubar" aria-label="Menu utama">' + rs.map(r =>
-      '<a href="#' + r.hash + '"' + (r === route ? ' aria-current="page"' : '') + '>' + UI.esc(r.title) + '</a>').join('') + '</nav>';
+    const pages = rs.length < 2 ? '' : rs.map(r =>
+      '<a href="#' + r.hash + '"' + (r === route ? ' aria-current="page"' : '') + '>' + UI.esc(r.title) + '</a>').join('');
+    const account = Auth.user()
+      ? '<button type="button" data-action="logout">Keluar</button>'
+      : '<a href="/masuk">Masuk</a><a href="/daftar">Daftar</a>';
+    return '<nav class="menubar" aria-label="Menu utama">' + pages + '<span class="mb-account">' + account + '</span></nav>';
   }
 
   function subtabsHTML(route, tab) {
@@ -429,9 +371,6 @@ const Shell = (() => {
   const panelHTML = () =>
     '<div id="pageRoot" aria-busy="true">' + UI.screenHTML({ channel: 'SYS', body: UI.loadingHTML() }) + '</div>';
 
-  // ---------------------------------------------------------------- router
-  // "#pengaturan/jejak/audit" → { h: 'pengaturan', t: 'jejak', s: 'audit' };
-  // hash lama diterjemahkan lewat ALIASES.
   function parseHash() {
     const raw = (location.hash || '').replace(/^#/, '').split('?')[0];
     const parts = raw.split('/');
@@ -445,8 +384,6 @@ const Shell = (() => {
   }
   function findRoute(h) { return ROUTES.find(r => r.hash === h); }
   function defaultRoute() { return visibleRoutes()[0] || ROUTES.find(r => allowed(r)) || ROUTES[0]; }
-  // Segmen ketiga hanya ditulis bila segmen tabnya juga tertulis, supaya "sub"
-  // tidak pernah bergeser ke posisi tab saat sebagian tab tersembunyi oleh izin.
   function canonical(route, tab, sub) {
     const withTab = !!(tab && visibleTabs(route).length > 1);
     return '#' + route.hash + (withTab ? '/' + tab.key : '') + (withTab && sub ? '/' + sub : '');
@@ -467,10 +404,7 @@ const Shell = (() => {
     const parsed = parseHash();
     let route = findRoute(parsed.h);
     if (route && !allowed(route)) {
-      // Pengunjung: halaman ini butuh akun, jadi antar ke Masuk dan kembali
-      // ke sini sesudahnya. Pengguna yang sudah masuk: perannya kurang.
       if (!Auth.user()) { location.href = Auth.loginUrl('masuk'); return; }
-      // Halaman sebelumnya tetap perlu dibereskan (mis. peta Leaflet).
       if (current && current.page && current.page.destroy) { try { current.page.destroy(); } catch (e) { /* abaikan */ } }
       current = null;
       denied(route);
@@ -483,9 +417,6 @@ const Shell = (() => {
     const want = canonical(route, tab, sub);
     if ((location.hash || '') !== want) history.replaceState(null, '', want);
 
-    // Pindah bagian di dalam tab yang sama (hanya segmen ketiga yang berubah):
-    // halaman menggantinya sendiri lewat onSub, jadi fragmen, peta Leaflet, dan
-    // tabel yang sudah dimuat tidak ikut dibuang lalu dimuat ulang.
     if (current && current.route === route && current.tab === tab && current.page && current.page.onSub && UI.$('#pageWindow')) {
       current.sub = sub;
       try { await current.page.onSub(sub); }
@@ -493,7 +424,6 @@ const Shell = (() => {
       return;
     }
 
-    // Pindah tab di dalam tujuan yang sama: cukup ganti panel, jendela tetap.
     const sameRoute = !!(current && current.route === route && UI.$('#pageWindow'));
     if (current && current.page && current.page.destroy) { try { current.page.destroy(); } catch (e) { /* abaikan */ } }
     current = { route: route, tab: tab, sub: sub, page: null };
@@ -523,10 +453,9 @@ const Shell = (() => {
     }
 
     UI.$$('.menubar a').forEach(a => a.toggleAttribute('aria-current', a.getAttribute('href') === '#' + route.hash));
+    UI.$$('.menubar [data-action=logout]').forEach(b => { b.onclick = () => Auth.logout(); });
     UI.$$('#startList a[data-hash]').forEach(a => a.toggleAttribute('aria-current', a.dataset.hash === route.hash));
     UI.$$('#startList a[data-tab-hash]').forEach(a => a.toggleAttribute('aria-current', a.dataset.tabHash === route.hash + '/' + (tab ? tab.key : '')));
-    // Satu tombol per tujuan+tab: dulu dua tab dari satu tujuan muncul sebagai
-    // satu tombol yang selalu tampak "tertekan".
     if (!tasks.some(x => x.route === route && x.tab === tab)) { tasks.push({ route: route, tab: tab }); if (tasks.length > 5) tasks.shift(); }
     renderTasks();
 
@@ -546,11 +475,8 @@ const Shell = (() => {
       setStatus('Siap');
       if (page && page.init) await page.init(root, ctx);
     } catch (e) {
-      // Pengguna sudah pindah halaman: kegagalan halaman lama tidak dilaporkan.
       if (current.route !== route || current.tab !== tab) return;
       setStatus('Gagal');
-      // Pesan + tombol coba lagi di tempat halaman, bukan hanya dialog yang
-      // meninggalkan jendela kosong.
       const root = UI.$('#pageRoot');
       if (root) {
         root.removeAttribute('aria-busy');
@@ -564,15 +490,9 @@ const Shell = (() => {
   }
 
   function setStatus(text) { const s = UI.$('#pageStatus'); if (s) s.textContent = 'Status: ' + text; }
-  // Dipakai halaman untuk mengantar pengguna ke tujuan/tab lain (mis. tombol
-  // "Buat dataset baru" di Katalog) tanpa perlu tahu bentuk hash-nya.
   function go(hash) { location.hash = hash.charAt(0) === '#' ? hash : '#' + hash; }
 
-  // ---------------------------------------------------------------- mount
   async function mountApp() {
-    // Aplikasi terbuka untuk pengunjung (M56). requires-auth hanya 'true'
-    // untuk pengguna yang sudah masuk, supaya sesi yang kedaluwarsa di tengah
-    // jalan mengantar ke /masuk, sedangkan pengunjung tidak pernah dialihkan.
     let me = null;
     try { me = await Auth.load(); } catch (e) { me = null; }
     document.body.dataset.requiresAuth = me ? 'true' : 'false';

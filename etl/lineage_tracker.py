@@ -1,10 +1,5 @@
-# etl/lineage_tracker.py
-"""
-Data lineage tracking: SHA-256 hashing, parent→child product linking,
+"""Data lineage tracking: SHA-256 hashing, parent→child product linking,
 and provenance query for audit trail.
-
-Author : Julius Marselinus (BRONTO) - NIM 00000111989
-Program: Sistem Informasi - Universitas Multimedia Nusantara
 """
 
 from __future__ import annotations
@@ -25,36 +20,12 @@ from etl.database_client import (
 
 logger = logging.getLogger(__name__)
 
-# Chunk size for streaming SHA-256 computation (8 MB)
 _HASH_CHUNK_BYTES = 8 * 1024 * 1024
 
 
 class LineageTracker:
-    """
-    Tracks data provenance across ETL pipeline stages.
+    """Tracks data provenance across ETL pipeline stages."""
 
-    Responsibilities:
-        - Compute SHA-256 hashes for all output files
-        - Record parent→child product relationships in data_lineage
-        - Query full transformation history for any product
-
-    The transformation DAG maps pipeline stages to lineage links:
-        RAW (download) ──CROP────────► BRONZE
-        BRONZE         ──LEE_FILTER──► SILVER
-        SILVER         ──GOLD_EXPORT─► GOLD  (per-source analysis-ready COG)
-        GOLD           ──FUSION──────► FUSION (multi-modal HDF5 stack)
-
-    Args:
-        db: Initialized DatabaseClient instance
-    """
-
-    # Maps transformation_type → expected stage_name.
-    # GOLD_EXPORT was added to processing_stages by migration 013 (SILVER →
-    # GOLD per-source COG, for Sentinel-1 as well as MODIS/GPM) but never
-    # registered here, so every record_transformation() call from
-    # module5_orchestrator / module9_fusion raised "Unknown
-    # transformation_type" and failed the whole GOLD stage. COG_EXPORT stays:
-    # it is still referenced by pre-013 historical lineage rows.
     _TRANSFORM_STAGE_MAP: dict[str, str] = {
         "CROP":        "CROP",
         "LEE_FILTER":  "LEE_FILTER",
@@ -67,25 +38,10 @@ class LineageTracker:
     def __init__(self, db: DatabaseClient) -> None:
         self._db = db
 
-    # ------------------------------------------------------------------
-    # HASHING
-    # ------------------------------------------------------------------
-
     @staticmethod
     def compute_sha256(file_path: str | Path) -> str:
-        """
-        Compute SHA-256 hash of a file using streaming reads.
+        """Compute SHA-256 hash of a file using streaming reads.
         Handles large GeoTIFF files (multiple GB) without loading into RAM.
-
-        Args:
-            file_path : Absolute path to the file
-
-        Returns:
-            Lowercase hex digest string (64 characters)
-
-        Raises:
-            FileNotFoundError : If file does not exist
-            IOError           : On read error
         """
         path = Path(file_path)
         if not path.exists():
@@ -105,20 +61,8 @@ class LineageTracker:
 
     @staticmethod
     def compute_sha256_from_bytes(data: bytes) -> str:
-        """
-        Compute SHA-256 from an in-memory bytes object.
-
-        Args:
-            data : Raw bytes to hash
-
-        Returns:
-            Lowercase hex digest string
-        """
+        """Compute SHA-256 from an in-memory bytes object."""
         return hashlib.sha256(data).hexdigest()
-
-    # ------------------------------------------------------------------
-    # LINEAGE RECORDING
-    # ------------------------------------------------------------------
 
     def record_transformation(
         self,
@@ -128,24 +72,7 @@ class LineageTracker:
         job_id: int,
         params: dict | None = None,
     ) -> int:
-        """
-        Record a parent→child product transformation in data_lineage.
-
-        Args:
-            parent_product_id   : Source product (input to transformation)
-            child_product_id    : Result product (output of transformation)
-            transformation_type : 'CROP' | 'LEE_FILTER' | 'GOLD_EXPORT' |
-                                  'FUSION' | 'ANALYTICS' | 'COG_EXPORT' (legacy)
-            job_id              : ProcessingJob that performed the transformation
-            params              : Transformation parameters dict (bbox, window_size, etc.)
-
-        Returns:
-            lineage_id (int)
-
-        Raises:
-            ValueError    : On unknown transformation_type or missing stage
-            IntegrityError: If identical lineage link already exists
-        """
+        """Record a parent→child product transformation in data_lineage."""
         stage_name = self._TRANSFORM_STAGE_MAP.get(transformation_type)
         if not stage_name:
             raise ValueError(
@@ -154,7 +81,6 @@ class LineageTracker:
             )
 
         with self._db.session() as sess:
-            # Resolve stage_id from stage_name
             stage_id = sess.scalar(
                 select(ProcessingStage.stage_id).where(
                     ProcessingStage.stage_name == stage_name
@@ -163,7 +89,6 @@ class LineageTracker:
             if not stage_id:
                 raise ValueError(f"Stage '{stage_name}' not found in processing_stages")
 
-            # Retrieve checksums from products
             parent = sess.get(DataProduct, parent_product_id)
             child  = sess.get(DataProduct, child_product_id)
             if not parent:
@@ -189,26 +114,8 @@ class LineageTracker:
                     lineage_id, parent_product_id, transformation_type, child_product_id)
         return lineage_id
 
-
-    # ------------------------------------------------------------------
-    # PROVENANCE QUERIES
-    # ------------------------------------------------------------------
-
     def get_lineage_chain(self, product_id: int, direction: str = "ancestors") -> list[dict]:
-        """
-        Recursively trace the transformation chain for a product.
-
-        Args:
-            product_id : Starting product
-            direction  : 'ancestors' (trace back to source) or
-                         'descendants' (trace forward to derived products)
-
-        Returns:
-            Ordered list of lineage step dicts:
-                lineage_id, parent_product_id, child_product_id,
-                transformation_type, stage_name, job_id,
-                transformation_params, input_checksum, output_checksum, created_at
-        """
+        """Recursively trace the transformation chain for a product."""
         chain = []
         visited = set()
 
@@ -233,7 +140,6 @@ class LineageTracker:
         visited.add(product_id)
 
         if direction == "ancestors":
-            # Find the lineage record where this product is the CHILD
             lineages = sess.scalars(
                 select(DataLineage).where(DataLineage.child_product_id == product_id)
             ).all()
@@ -241,7 +147,6 @@ class LineageTracker:
                 chain.insert(0, self._lineage_to_dict(lin, sess))
                 self._trace_recursive(sess, lin.parent_product_id, direction, chain, visited)
         else:
-            # Find lineage records where this product is the PARENT
             lineages = sess.scalars(
                 select(DataLineage).where(DataLineage.parent_product_id == product_id)
             ).all()
@@ -250,13 +155,7 @@ class LineageTracker:
                 self._trace_recursive(sess, lin.child_product_id, direction, chain, visited)
 
     def _lineage_to_dict(self, lin: DataLineage, sess=None) -> dict:
-        """Serialize a DataLineage ORM object to dict.
-
-        `source`/`product_tier` tiap ujung langkah ikut dibawa: sejak layout
-        tier-source, satu dataset punya rantai paralel per sensor (S1
-        RAW->BRONZE->SILVER->GOLD, MODIS/GPM SILVER->GOLD), dan tanpa kolom
-        ini pembaca rantai tidak bisa tahu langkah mana milik sensor mana
-        tanpa menarik tiap product satu per satu."""
+        """Serialize a DataLineage ORM object to dict."""
         out = {
             "lineage_id":             lin.lineage_id,
             "parent_product_id":      lin.parent_product_id,
@@ -285,17 +184,7 @@ class LineageTracker:
         return out
 
     def verify_integrity(self, product_id: int, file_path: str) -> dict:
-        """
-        Verify a file's current SHA-256 against the stored hash.
-
-        Args:
-            product_id : DataProduct to verify
-            file_path  : Current file location on disk
-
-        Returns:
-            dict with keys: product_id, stored_hash, computed_hash,
-                            integrity_ok (bool), file_size_mb
-        """
+        """Verify a file's current SHA-256 against the stored hash."""
         with self._db.session() as sess:
             product = sess.get(DataProduct, product_id)
             if not product:

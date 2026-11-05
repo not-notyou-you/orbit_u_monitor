@@ -1,86 +1,4 @@
-# etl/module10_generate_preview.py
-"""
-Tier PREVIEW: render PNG siap-pandang dari produk satu tanggal akuisisi.
-
-Posisi di pipeline:
-
-    ... -> GOLD_EXPORT (gold/) -> PREVIEW (preview/) -> FUSION (fusion/)
-
-PREVIEW dijalankan SETELAH semua input satu tanggal lengkap (Sentinel-1 dari
-scene itu sendiri, MODIS/GPM dari `module9_fusion.ensure_aux_inputs_for_date`)
-dan SEBELUM fusion menulis HDF5. Urutan itu bukan kebetulan: dataset yang cuma
-meminta tier FUSION akan menghapus gold/ di tahap cleanup, jadi kalau preview
-digenerate belakangan tidak ada lagi rasternya untuk dirender. Dengan urutan
-ini, PNG di preview/ tetap jadi rekaman visual tier sumbernya walaupun
-GeoTIFF-nya sendiri sudah dipangkas.
-
-DARI TIER MANA?
-`processing_level` menentukan tier yang dibaca, mengikuti aturan yang sama
-dengan fusion (DOCS/PIPELINE.md, "Preview Stage"):
-
-    PROCESSED -> gold/    (COG hasil Lee filter / NDVI-NDWI / akumulasi)
-    RAW       -> bronze/  (S1 terkalibrasi+crop, MODIS FLOOD saja,
-                           GPM curah hujan harian saja)
-
-Level RAW karena itu me-render lebih sedikit lapisan — bukan karena gagal,
-tapi karena band turunannya memang tidak pernah dihitung di jalur itu. Level
-ikut ke path output (`preview/{tanggal}/{LEVEL}/...`) supaya dataset yang
-meminta sebuah sumber di KEDUA level bisa menyimpan dua set PNG berdampingan
-tanpa saling menimpa.
-
-SATU TANGGAL, SATU SET PNG
-Folder preview dikunci per tanggal, bukan per scene -- sama dengan granularitas
-FUSION. Kalau AOI tertutup dua scene Sentinel-1 di hari yang sama (dua orbit,
-atau dua frame berurutan), render scene kedua MENIMPA milik scene pertama. Ini
-disengaja, tapi tidak boleh diam-diam: saat scene_key di sidecar lama berbeda
-dari scene yang sedang dirender, modul menulis WARNING dan mencatat scene yang
-tergantikan di `replaced_s1_scene_key` pada preview_metadata.json.
-
-Tiga jenis render, tiga tujuan berbeda:
-
-    grayscale/  Stretch persentil 2–98 per-berkas, colormap netral (abu-abu).
-                Untuk pembacaan ilmiah: tidak ada hue yang mengarang struktur
-                yang tidak ada di data, dan kontras dimaksimalkan ke sebaran
-                nilai berkas itu sendiri.
-    colored/    Colormap per-source dengan rentang yang punya arti fisik
-                (NDVI -0.2..0.8, NDWI -0.5..0.5, hujan mulai 0, peta banjir
-                MODIS per kelas). Untuk
-                publikasi/presentasi: warna bisa dibaca lintas tanggal karena
-                skalanya tidak ikut bergeser mengikuti isi berkas.
-    composite/  False-color RGB Sentinel-1 (R=VV, G=VH, B=VV-VH). Folder
-                terpisah dari colored/ karena isinya bukan satu band yang
-                diberi warna melainkan tiga band yang digabung — legenda
-                colormap tidak berlaku untuknya, dan menyimpannya di colored/
-                membuat sidecar colored_info.json memuat satu entri yang
-                skema-nya berbeda dari yang lain.
-
-GRID BERSAMA
-Kalau ada Sentinel-1, semua lapisan MODIS/GPM direproject ke grid preview S1
-(ukuran PNG, extent, dan posisi piksel identik) dengan nearest-neighbour. Tanpa
-itu MODIS 500 m di AOI kecil jadi PNG belasan piksel, dan GPM punya extent
-berbeda sehingga tidak bisa ditumpuk. Nearest dipakai supaya piksel sensor
-kasar tetap tampil sebagai blok — seperti di Worldview/GEE — bukan gradien
-hasil interpolasi. Tanpa S1, raster kecil diperbesar kelipatan bulat (nearest)
-mendekati MAX_SIDE.
-
-Keduanya ditulis RGBA/LA — piksel NoData jadi transparan, bukan hitam. Hitam
-adalah nilai yang sah untuk backscatter rendah (air tenang), jadi memetakan
-NoData ke hitam persis menghapus beda antara "air" dan "tidak ada data".
-
-Nama berkas sumber tidak pernah ditebak dari string literal di sini: MODIS/GPM
-dicari lewat `module7.band_filename`/`module8.band_filename` (tempat pola nama
-itu didefinisikan), dan Sentinel-1 lewat dict yang dioper orchestrator atau
-glob per-band sebagai cadangan untuk pemakaian CLI.
-
-Colormap sengaja jadi konstanta modul, bukan setelan di config.json — sama
-seperti `COG_PROFILE` di module4 dan `FUSION_LAYERS` di module9. Arti warna
-adalah bagian dari kontrak data (NDVI hijau = vegetasi), bukan preferensi
-tampilan; membuatnya bisa diubah per-instalasi berarti dua dataset dengan
-warna sama bisa berarti hal berbeda.
-
-CLI:
-    python -m etl.module10_generate_preview <dataset_id> <dataset_name> <YYYYMMDD>
-"""
+"""Tier PREVIEW: render PNG siap-pandang dari produk satu tanggal akuisisi."""
 
 from __future__ import annotations
 
@@ -105,30 +23,14 @@ logger = logging.getLogger(__name__)
 
 MODULE = "MODULE10_PREVIEW"
 
-# Sisi TERPANJANG maksimum PNG. 1024 px cukup untuk dilihat penuh di layar dan
-# di-zoom sedikit, tapi tetap ~200–600 KB per berkas — raster S1 penuh
-# (belasan ribu piksel) akan jadi puluhan MB per PNG dan membuat tier ini lebih
-# besar dari GOLD yang dirender-nya.
-#
-# Sisi terpanjang, bukan lebar: scene Sentinel-1 yang cuma menyerempet AOI
-# menghasilkan crop berbentuk jalur sempit (mis. 1488 x 8789 piksel). Membatasi
-# lebarnya saja membuat PNG-nya jadi 1024 x 6048 — enam kali lebih tinggi dari
-# batas yang dikira berlaku, beberapa MB per berkas, dan di galeri tampil
-# sebagai pita panjang di samping preview tanggal lain yang normal.
 MAX_SIDE = 1024
 
 
-# Stretch persentil default untuk folder grayscale/. 2–98 memangkas ekor
-# outlier (speckle terang, piksel rusak) yang kalau ikut akan menekan seluruh
-# citra jadi abu-abu rata.
 PCT_LOW = 2.0
 PCT_HIGH = 98.0
 
-# Opasitas lapisan kontinu (hujan, NDVI, NDWI) saat ditumpuk di atas citra S1.
 OVERLAY_OPACITY = 0.55
 
-# Level kompresi PNG. 6 adalah titik henti yang wajar: 9 cuma menghemat ~3%
-# untuk citra kontinu seperti ini tapi 3–4x lebih lambat.
 PNG_COMPRESS_LEVEL = 6
 
 
@@ -144,23 +46,12 @@ class PreviewSpec:
     label: str
     units: str
     cmap: str
-    # "percentile":  rentang dari isi berkas (2–98).
-    # "fixed":       rentang tetap vmin..vmax, arti fisik lintas tanggal.
-    # "zero_based":  0..persentil-atas — nol selalu berarti nol.
-    # "categorical": nilai kelas diskret; warna dari `categories`, grayscale
-    #                vmin..vmax, resampling selalu nearest.
     scale: str
     vmin: float | None = None
     vmax: float | None = None
-    # Nilai di bawah ini dianggap "tidak ada fenomena" dan dibuat transparan
-    # di render colored (hujan 0 mm bukan informasi, cuma latar).
     transparent_below: float | None = None
-    # Konversi ke desibel sebelum di-stretch. Wajib untuk backscatter SAR —
-    # lihat _maybe_to_db().
     log_db: bool = False
     interpretation: str = ""
-    # Untuk scale="categorical": (nilai, warna hex, alpha 0-255, label). Nilai
-    # yang tidak terdaftar dirender transparan.
     categories: tuple[tuple[int, str, int, str], ...] = ()
 
     @property
@@ -168,7 +59,6 @@ class PreviewSpec:
         return self.scale == "categorical"
 
 
-# Urutan di sini adalah urutan tampil di UI dan di preview_metadata.json.
 PREVIEW_SPECS: tuple[PreviewSpec, ...] = (
     PreviewSpec(
         key="s1_vv",
@@ -176,8 +66,6 @@ PREVIEW_SPECS: tuple[PreviewSpec, ...] = (
         band="VV",
         label="Sentinel-1 VV",
         units="dB",
-        # Sequential perseptual-uniform: backscatter adalah besaran berurut,
-        # bukan divergen, jadi tidak boleh pakai colormap dua-kutub.
         cmap="viridis",
         scale="percentile",
         log_db=True,
@@ -212,9 +100,6 @@ PREVIEW_SPECS: tuple[PreviewSpec, ...] = (
         scale="categorical",
         vmin=0.0,
         vmax=3.0,
-        # Palet mengikuti konvensi peta banjir NASA: air referensi biru, banjir
-        # merah. "No water" abu-abu semi-transparan supaya area yang teramati
-        # kering tetap beda dari "insufficient data" (255, transparan).
         categories=(
             (0, "#bdbdbd", 110, "No water"),
             (1, "#2171b5", 255, "Permanent water (reference)"),
@@ -236,9 +121,6 @@ PREVIEW_SPECS: tuple[PreviewSpec, ...] = (
         units="index",
         cmap="RdYlGn",
         scale="fixed",
-        # Rentang palet NDVI yang lazim (NASA/GEE): nilai < -0.2 hanya air
-        # dan > 0.8 hanya kanopi paling rapat, jadi -1..1 membuang separuh
-        # colormap dan membuat kota seperti Jakarta (0..0.4) kuning rata.
         vmin=-0.2,
         vmax=0.8,
         interpretation=(
@@ -257,8 +139,6 @@ PREVIEW_SPECS: tuple[PreviewSpec, ...] = (
         units="index",
         cmap="BrBG",
         scale="fixed",
-        # Tetap simetris di nol (ambang air McFeeters), tapi dipersempit:
-        # daratan jarang di bawah -0.5 dan air terbuka sudah jelas di +0.5.
         vmin=-0.5,
         vmax=0.5,
         interpretation=(
@@ -274,8 +154,6 @@ PREVIEW_SPECS: tuple[PreviewSpec, ...] = (
         band="RAIN_24H",
         label="GPM Rainfall 24 h",
         units="mm",
-        # Sequential gelap-di-atas: intensitas hujan tinggi harus jadi warna
-        # paling pekat, bukan paling terang, supaya menonjol di atas latar.
         cmap="YlGnBu",
         scale="zero_based",
         transparent_below=0.1,
@@ -316,8 +194,6 @@ PREVIEW_SPECS: tuple[PreviewSpec, ...] = (
     ),
 )
 
-# Komposit RGB Sentinel-1: kanal warna dipetakan ke besaran polarimetrik, bukan
-# ke warna asli apa pun. Ini konvensi baku untuk GRD dual-pol.
 S1_RGB_KEY = "s1_rgb_composite"
 S1_RGB_LABEL = "Sentinel-1 RGB Composite (VV / VH / VV-VH)"
 S1_RGB_INTERPRETATION = (
@@ -329,14 +205,6 @@ S1_RGB_INTERPRETATION = (
 )
 
 
-# ---------------------------------------------------------------------------
-# Pencarian berkas GOLD
-# ---------------------------------------------------------------------------
-
-# Tier yang dibaca tiap level, dan sufiks nama berkas Sentinel-1 yang ditulis
-# tahap terakhir level itu (module3_lee_filter -> "_lee", module2_crop ->
-# "_crop"). Satu-satunya tempat pemetaan level -> tier untuk PREVIEW; fusion
-# menyatakan aturan yang sama lewat SourcePlan.tier_for_run().
 _TIER_BY_LEVEL: dict[str, str] = {"PROCESSED": "cog", "RAW": "aligned"}
 _S1_SUFFIX_BY_LEVEL: dict[str, str] = {"PROCESSED": "_lee", "RAW": "_crop"}
 
@@ -368,7 +236,6 @@ def _s1_source_path(
         scene_dir.glob(f"*_{band.upper()}{_S1_SUFFIX_BY_LEVEL[level]}.tif")
     )
     if not matches:
-        # Cadangan longgar: instalasi lama bisa punya sufiks berbeda.
         matches = sorted(p for p in scene_dir.glob("*.tif") if f"_{band.upper()}" in p.name)
     return matches[0] if matches else None
 
@@ -377,17 +244,10 @@ def _aux_source_path(
     dataset_id: int, dataset_name: str, source: str, band: str, date_key: str,
     processing_level: str,
 ) -> Path | None:
-    """Cari raster MODIS/GPM satu band untuk satu tanggal di tier level ini.
-
-    Nama berkasnya identik di bronze/ dan gold/ (module7/module8 memakai
-    `band_filename()` yang sama untuk semua target), jadi cuma folder induknya
-    yang berbeda. Band turunan (NDVI/NDWI, akumulasi 72h/7d) memang tidak ada
-    di bronze/ — jalur RAW tidak pernah menghitungnya — jadi pencariannya
-    gagal wajar dan lapisan itu masuk daftar "dilewati"."""
+    """Cari raster MODIS/GPM satu band untuk satu tanggal di tier level ini."""
     if source == "modis":
         filename = m7.band_filename(band, date_key)
     elif source == "gpm":
-        # band RAIN_24H -> window "24h", bentuk yang dipakai module8.
         filename = m8.band_filename(band.removeprefix("RAIN_").lower(), date_key)
     else:  # pragma: no cover - dijaga PREVIEW_SPECS
         raise ValueError(f"unknown aux source: {source!r}")
@@ -404,20 +264,7 @@ def resolve_source_inputs(
     s1_files: dict[str, str] | None = None,
     processing_level: str = fm.DEFAULT_PREVIEW_LEVEL,
 ) -> dict[str, Path]:
-    """
-    Petakan `PreviewSpec.key` -> path raster yang ada di disk, di tier yang
-    sesuai `processing_level`.
-
-    `s1_files` ({band: path}) adalah keluaran tahap terakhir S1 yang dioper
-    orchestrator (COG GOLD untuk PROCESSED, hasil crop BRONZE untuk RAW):
-    dipakai lebih dulu karena itu jawaban pasti untuk scene yang baru saja
-    diproses. Tanpa itu (pemakaian CLI / regenerasi), path dicari lewat glob
-    di folder scene.
-
-    Key yang berkasnya tidak ada sengaja tidak muncul di hasil, bukan
-    dipetakan ke None — pemanggil melaporkannya sebagai "dilewati", dan
-    dataset yang MODIS/GPM-nya gagal diunduh tetap dapat preview Sentinel-1.
-    """
+    """Petakan `PreviewSpec.key` -> path raster yang ada di disk, di tier yang sesuai `processing_level`."""
     level = fm.normalize_preview_level(processing_level)
     inputs: dict[str, Path] = {}
     for spec in PREVIEW_SPECS:
@@ -446,20 +293,13 @@ def resolve_gold_inputs(
     s1_scene_key: str | None = None,
     s1_gold_files: dict[str, str] | None = None,
 ) -> dict[str, Path]:
-    """Alias lama `resolve_source_inputs` untuk level PROCESSED (tier GOLD).
-
-    Dipertahankan karena nama ini sudah dipakai di luar modul; kode baru
-    sebaiknya memanggil resolve_source_inputs() dan menyatakan levelnya."""
+    """Alias lama `resolve_source_inputs` untuk level PROCESSED (tier GOLD)."""
     return resolve_source_inputs(
         dataset_id, dataset_name, date_key,
         s1_scene_key=s1_scene_key, s1_files=s1_gold_files,
         processing_level="PROCESSED",
     )
 
-
-# ---------------------------------------------------------------------------
-# Pembacaan raster & normalisasi
-# ---------------------------------------------------------------------------
 
 @dataclass
 class _Layer:
@@ -478,27 +318,11 @@ class _Layer:
         return self.data[~self.mask]
 
 
-# Lantai dB. Sigma0 linear bisa menyentuh nol di piksel bayangan radar, dan
-# log10(0) = -inf akan meracuni seluruh perhitungan persentil. -40 dB jauh di
-# bawah backscatter apa pun yang punya arti fisik di citra GRD.
 DB_FLOOR = -40.0
 
 
 def _maybe_to_db(data: np.ndarray, mask: np.ndarray) -> tuple[np.ndarray, bool]:
-    """Konversi sigma0 linear -> desibel, kalau datanya memang masih linear.
-
-    GOLD Sentinel-1 di pipeline ini menyimpan sigma0 LINEAR (config
-    `cog_convert_db` default false), sebarannya menjulur ekstrem ke kanan:
-    persentil 98 ada di ~1.2 sementara maksimumnya ratusan. Stretch persentil
-    langsung di atas nilai linear menempelkan hampir semua piksel darat ke
-    ujung gelap dan preview-nya jadi bintik-bintik gelap tak terbaca.
-    Backscatter SAR memang dibaca dalam dB justru karena itu.
-
-    Konversinya dijaga auto-deteksi, bukan diasumsikan: kalau ada nilai valid
-    yang <= 0 atau persentil atasnya sudah negatif, datanya sudah dalam dB
-    (mis. instalasi yang menyalakan `cog_convert_db`) dan mengambil log kedua
-    kali akan merusaknya.
-    """
+    """Konversi sigma0 linear -> desibel, kalau datanya memang masih linear."""
     valid = data[~mask]
     if valid.size == 0:
         return data, False
@@ -520,16 +344,7 @@ class _PreviewGrid:
 
 
 def _preview_shape(width: int, height: int, max_side: int) -> tuple[int, int]:
-    """(out_w, out_h) PNG untuk raster `width` x `height`.
-
-    Sisi terpanjang melebihi `max_side` -> seluruh gambar diperkecil sampai
-    sisi itu pas (rasio aspek dipertahankan). Kedua sisi masih di bawah ->
-    diperbesar dengan faktor BULAT terbesar yang tidak melewati `max_side`,
-    supaya tiap piksel sumber jadi blok persegi utuh (MODIS 21 px -> 1008 px),
-    bukan PNG belasan piksel yang di UI tampil sebagai titik atau di-blur
-    browser.
-
-    Yang dibatasi sisi terpanjang, bukan lebar: lihat MAX_SIDE."""
+    """(out_w, out_h) PNG untuk raster `width` x `height`."""
     longest = max(width, height)
     if longest > max_side:
         scale = max_side / longest
@@ -550,22 +365,6 @@ def _preview_grid(path: Path, max_side: int = MAX_SIDE) -> _PreviewGrid:
 def grid_corners_wgs84(grid: _PreviewGrid) -> list[list[float]]:
     """Empat sudut PNG grid `grid` dalam lon/lat WGS84, urut kiri-atas →
     kanan-atas → kanan-bawah → kiri-bawah.
-
-    Empat sudut, bukan bbox (west/south/east/north), karena dua hal berbeda:
-
-    1. Extent grid ini milik SCENE itu, bukan milik AOI. Scene yang cuma satu
-       frame menutupi AOI lebih sempit daripada scene mosaik beberapa frame,
-       jadi bbox daerah bukan pengganti yang sah untuk salah satu pun.
-    2. Grid preview hidup di CRS raster sumbernya. Kalau itu CRS proyeksi
-       (UTM), persegi di sana bukan persegi di lon/lat dan tepinya miring;
-       kalau sumbernya sudah EPSG:4326 keempat sudut ini memang sejajar sumbu.
-       Empat sudut benar untuk KEDUA kasus tanpa pemanggil perlu tahu yang mana.
-
-    Urutannya sengaja sama dengan `coordinates` image source MapLibre/Mapbox,
-    yang jadi konsumen pertamanya.
-
-    Dibulatkan 7 desimal (~1 cm): presisi float penuh cuma menggelembungkan
-    JSON sidecar tanpa arti -- piksel preview sendiri puluhan meter.
     """
     t = grid.transform
     cols = (0, grid.width, grid.width, 0)
@@ -583,22 +382,7 @@ def _read_downsampled(
     grid: _PreviewGrid | None = None,
     categorical: bool = False,
 ) -> _Layer:
-    """Baca band 1 ke ukuran preview.
-
-    Tanpa `grid`: ukuran dari _preview_shape(). Downsample dilakukan rasterio
-    (bukan setelah membaca penuh) supaya raster S1 belasan ribu piksel tidak
-    pernah masuk memori utuh: COG punya overview internal, jadi pembacaan ini
-    membaca level piramida yang sudah ada. Upsample selalu nearest.
-
-    Dengan `grid`: raster direproject ke grid itu (extent & ukuran identik
-    dengan preview S1). Nearest kalau sumbernya lebih kasar dari grid atau
-    datanya kategorikal; average kalau sumbernya lebih halus.
-
-    `log_db=True` mengubah sigma0 linear jadi dB setelah masking — lihat
-    _maybe_to_db(). Rata-rata downsample sengaja dilakukan di ranah linear
-    (rata-rata daya), baru dikonversi: merata-ratakan nilai dB adalah
-    rata-rata geometrik daya, yang bukan yang dimaksud di sini.
-    """
+    """Baca band 1 ke ukuran preview."""
     with rasterio.open(path) as src:
         nodata = src.nodata
         src_h, src_w = src.height, src.width
@@ -654,12 +438,7 @@ def _read_downsampled(
 
 
 def _stretch_range(layer: _Layer, spec: PreviewSpec | None) -> tuple[float, float]:
-    """Rentang (lo, hi) yang dipakai memetakan nilai ke 0..1.
-
-    Tanpa `spec` (dan untuk folder grayscale/) selalu persentil: tujuannya
-    kontras maksimum untuk berkas itu sendiri. Dengan `spec`, mode diambil
-    dari `spec.scale` supaya render colored bisa dibandingkan antar tanggal.
-    """
+    """Rentang (lo, hi) yang dipakai memetakan nilai ke 0..1."""
     valid = layer.valid
     if valid.size == 0:
         return 0.0, 1.0
@@ -669,8 +448,6 @@ def _stretch_range(layer: _Layer, spec: PreviewSpec | None) -> tuple[float, floa
 
     if spec is not None and spec.scale == "zero_based":
         hi = float(np.percentile(valid, PCT_HIGH))
-        # Hujan sering nyaris seluruhnya nol; persentil atas bisa jatuh di 0
-        # dan membuat seluruh citra jenuh. Jatuh balik ke nilai maksimum.
         if hi <= 0:
             hi = float(valid.max())
         return 0.0, hi if hi > 0 else 1.0
@@ -699,10 +476,6 @@ def _alpha(layer: _Layer, spec: PreviewSpec | None = None) -> np.ndarray:
         opaque &= layer.data >= spec.transparent_below
     return (opaque * 255).astype(np.uint8)
 
-
-# ---------------------------------------------------------------------------
-# Penulisan PNG
-# ---------------------------------------------------------------------------
 
 def _save_png(img, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -773,13 +546,7 @@ def _class_percentages(layer: _Layer, spec: PreviewSpec) -> dict[str, float]:
 
 
 def _render_s1_rgb(vv: _Layer, vh: _Layer, out_path: Path) -> Path | None:
-    """Komposit false-color VV/VH/(VV-VH).
-
-    Ketiga kanal di-stretch persentil sendiri-sendiri: VV dan VH punya rentang
-    dB yang berbeda (VH umumnya 5–10 dB lebih rendah), jadi memakai satu
-    rentang bersama akan membuat kanal hijau nyaris gelap total dan komposit
-    ini kehilangan gunanya.
-    """
+    """Komposit false-color VV/VH/(VV-VH)."""
     from PIL import Image
 
     if vv.data.shape != vh.data.shape:
@@ -827,24 +594,16 @@ def _render_overlay_on_s1(
 
     lo, hi = _stretch_range(base, None)
     gray = (_normalize(base, lo, hi) * 255).astype(np.float32)
-    # Piksel NoData S1 (di luar swath) dijadikan putih, bukan hitam: hitam
-    # adalah nilai sah untuk air tenang.
     gray = np.where(base.mask, 255.0, gray)
 
     fg = _colored_rgba(layer, spec).astype(np.float32)
     alpha = fg[..., 3:4] / 255.0
     if not spec.categorical:
-        # Lapisan kontinu opak di seluruh AOI (mis. hujan 7 hari > 0.1 mm di
-        # mana-mana) akan menutup peta dasar sepenuhnya.
         alpha = alpha * OVERLAY_OPACITY
     rgb = fg[..., :3] * alpha + gray[..., None] * (1.0 - alpha)
     img = Image.fromarray(np.clip(rgb, 0, 255).astype(np.uint8), mode="RGB")
     return _save_png(img, out_path)
 
-
-# ---------------------------------------------------------------------------
-# Metadata sidecar
-# ---------------------------------------------------------------------------
 
 def _write_json(path: Path, payload: dict) -> Path:
     """Tulis JSON secara atomik (tmp lalu replace), pola yang sama dengan
@@ -895,7 +654,6 @@ def _grayscale_info(entries: list[dict]) -> dict:
     }
 
 
-# Nama opsi di datasets.preview_options -> nama folder render.
 _OPTION_TO_KIND: dict[str, str] = {
     "GRAYSCALE": "grayscale",
     "COLORED": "colored",
@@ -904,16 +662,7 @@ _OPTION_TO_KIND: dict[str, str] = {
 
 
 def _normalize_options(options) -> set[str]:
-    """Ubah datasets.preview_options jadi himpunan nama folder render.
-
-    None berarti "tidak dinyatakan" -> ketiganya, yaitu perilaku modul ini
-    sebelum opsi per-varian ada. Himpunan KOSONG yang dinyatakan eksplisit
-    dihormati apa adanya (dataset yang memang tidak mau PNG apa pun);
-    membedakan keduanya itulah alasan default-nya None dan bukan tuple penuh.
-    Opsi tak dikenal dibuang dengan warning — preview adalah artefak turunan,
-    menjatuhkan scene karena satu string asing di kolom array jauh lebih mahal
-    daripada merender lebih sedikit varian.
-    """
+    """Ubah datasets.preview_options jadi himpunan nama folder render."""
     if options is None:
         return set(_OPTION_TO_KIND.values())
     out: set[str] = set()
@@ -997,15 +746,7 @@ def _colored_info(entries: list[dict]) -> dict:
 def _previous_s1_scene_key(metadata_path: Path, date_key: str) -> str | None:
     """s1_scene_key dari sidecar render sebelumnya, HANYA kalau sidecar itu
     menggambarkan tanggal yang sama.
-
-    Syarat tanggal itu bukan kehati-hatian berlebih: satu folder preview
-    dipakai bersama seluruh tanggal dataset (lihat `fm.get_preview_dir` —
-    `scene_key` tidak ikut ke path), jadi sidecar yang ada di sana hampir
-    selalu milik tanggal LAIN. Tanpa syarat ini setiap scene berikutnya akan
-    dituduh menimpa scene sebelumnya.
-
-    None kalau sidecar belum ada, tanggalnya beda, atau isinya tidak terbaca —
-    sidecar rusak bukan alasan menggagalkan render baru."""
+    """
     try:
         with open(metadata_path, encoding="utf-8") as f:
             payload = json.load(f)
@@ -1016,10 +757,6 @@ def _previous_s1_scene_key(metadata_path: Path, date_key: str) -> str | None:
         return None
     return value if isinstance(value, str) and value else None
 
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
 
 def generate_previews(
     dataset_id: int,
@@ -1034,41 +771,7 @@ def generate_previews(
     options: tuple[str, ...] | list[str] | None = None,
     max_width: int | None = None,
 ) -> dict:
-    """
-    Render seluruh preview untuk satu tanggal akuisisi pada SATU level
-    pemrosesan.
-
-    Args:
-        acquisition_date: tanggal scene S1; dinormalisasi ke kunci YYYYMMDD.
-        s1_scene_key:     product_identifier scene S1 (untuk glob folder scene).
-        s1_files:         {band: path} keluaran tahap terakhir S1 pada level
-                          ini (COG GOLD untuk PROCESSED, hasil crop BRONZE
-                          untuk RAW), kalau pemanggil sudah punya.
-        s1_gold_files:    nama lama `s1_files`, masih diterima.
-        max_side:         batas sisi TERPANJANG PNG (lihat MAX_SIDE).
-        max_width:        nama lama `max_side`, masih diterima. Artinya ikut
-                          berubah: sekarang membatasi sisi terpanjang, bukan
-                          lebar — itu memang perbaikannya.
-        processing_level: RAW atau PROCESSED. Menentukan tier yang dibaca
-                          (bronze/ vs gold/) DAN folder output
-                          preview/{tanggal}/{LEVEL}/.
-        options:          varian yang dirender, dari datasets.preview_options
-                          ("GRAYSCALE", "COLORED", "COMPOSITE"). None = ketiganya.
-        overwrite:        True (default) me-render ulang semua PNG. Preview
-                          adalah turunan murni dan murah, jadi menulis ulang
-                          lebih aman daripada menyimpan PNG basi dari raster
-                          versi lama. False melewati berkas yang sudah ada —
-                          untuk mengisi ulang preview yang hilang saja.
-
-    Returns:
-        Ringkasan yang sama isinya dengan preview_metadata.json, ditambah
-        daftar path absolut di key "files".
-
-    Tidak pernah melempar karena satu band gagal: band yang berkas sumbernya
-    tidak ada atau rusak masuk ke daftar "skipped" beserta alasannya. Preview
-    adalah artefak turunan — kegagalan render tidak boleh menjatuhkan scene
-    yang datanya sendiri baik-baik saja.
-    """
+    """Render seluruh preview untuk satu tanggal akuisisi pada SATU level pemrosesan."""
     if max_width is not None:
         max_side = max_width
     level = fm.normalize_preview_level(processing_level)
@@ -1078,8 +781,6 @@ def generate_previews(
     preview_dir = fm.ensure_preview_dir(dataset_id, dataset_name, date_key)
     level_dir = fm.get_preview_level_dir(dataset_id, dataset_name, date_key, level)
 
-    # Dibaca SEBELUM render, karena render menimpa sidecar yang sama. Lihat
-    # "SATU TANGGAL, SATU SET PNG" di docstring modul.
     replaced_scene_key = _previous_s1_scene_key(
         level_dir / fm.dated_filename(date_key, "preview_metadata.json"), date_key
     )
@@ -1092,8 +793,6 @@ def generate_previews(
             date_key, level, s1_scene_key, replaced_scene_key,
         )
 
-    # Folder tiap varian dibuat hanya kalau varian itu diminta: folder kosong
-    # akan membuat API melaporkan varian yang sebenarnya tidak pernah dirender.
     def _kind_dir(kind: str) -> Path | None:
         if kind not in wanted:
             return None
@@ -1112,10 +811,6 @@ def generate_previews(
         processing_level=level,
     )
 
-    # Varian "garis wilayah" tiap PNG (lihat etl/admin_overlay.py). Hanya
-    # mungkin kalau ada grid bersama S1 -- itu satu-satunya sumber transform
-    # affine + CRS di tahap ini; tanpa S1, lapisan aux diperbesar kelipatan
-    # bulat dan tidak ada georeferensi yang dipegang di sini.
     regions = admin_overlay.load_regions()
 
     def _adm_variant(path: Path, entry: dict) -> None:
@@ -1134,7 +829,6 @@ def generate_previews(
     skipped: list[dict] = []
     layers: dict[str, _Layer] = {}
 
-    # Grid bersama dari Sentinel-1 (lihat "GRID BERSAMA" di docstring modul).
     grid: _PreviewGrid | None = None
     grid_source: str | None = None
     for s1_key in ("s1_vv", "s1_vh"):
@@ -1157,9 +851,6 @@ def generate_previews(
             })
             continue
 
-        # Prefiks tanggal wajib sejak relayout: folder preview tidak lagi
-        # bersarang di bawah folder tanggal, jadi tanpa ini render tanggal
-        # kedua akan menimpa tanggal pertama dengan nama yang sama.
         png_name = fm.dated_filename(date_key, f"{spec.key}.png")
         gray_path = gray_dir / png_name if gray_dir else None
         color_path = color_dir / png_name if color_dir else None
@@ -1249,8 +940,6 @@ def generate_previews(
                         {"value": v, "color": c, "alpha": a, "label": lbl}
                         for v, c, a, lbl in spec.categories
                     ]
-                # PNG yang seluruhnya transparan tampak "rusak" di UI padahal
-                # datanya sah (mis. hujan 0 mm di seluruh AOI) — tandai.
                 if not _colored_rgba(layer, spec)[..., 3].any():
                     entry["all_transparent"] = True
                     entry["note"] = (
@@ -1268,9 +957,6 @@ def generate_previews(
                 "reason": f"render failed: {exc}",
             })
 
-    # Komposit RGB hanya mungkin kalau VV dan VH dua-duanya berhasil dibaca.
-    # Berlaku di kedua level: BRONZE S1 sudah terkalibrasi, jadi selisih
-    # VV-VH-nya tetap punya arti fisik yang sama, cuma belum di-despeckle.
     composite_entries: list[dict] = []
     if composite_dir is not None and "s1_vv" in layers and "s1_vh" in layers:
         rgb_path = composite_dir / fm.dated_filename(date_key, f"{S1_RGB_KEY}.png")
@@ -1301,9 +987,6 @@ def generate_previews(
                 "reason": f"render failed: {exc}",
             })
 
-    # Overlay MODIS/GPM di atas Sentinel-1: hanya bermakna kalau ada S1 sebagai
-    # peta dasar (dan otomatis begitu, karena lapisan aux baru punya grid yang
-    # sama dengan S1 saat S1 ada).
     if composite_dir is not None and grid is not None and grid_source in layers:
         base_layer = layers[grid_source]
         for spec in PREVIEW_SPECS:
@@ -1348,22 +1031,13 @@ def generate_previews(
                     "band": spec.band, "reason": f"render failed: {exc}",
                 })
 
-    # PNG render lama untuk lapisan yang kali ini dilewati (mis. NDVI yang
-    # sekarang seluruhnya awan) harus hilang: API mendaftar PNG lewat glob
-    # folder, jadi berkas basi akan tetap tampil seolah hasil render terbaru.
     if overwrite:
-        # Dibatasi ke tanggal yang sedang dirender: satu folder kind sekarang
-        # memuat PNG SEMUA tanggal (tidak ada lagi folder tanggal), jadi
-        # mencocokkan nama tanpa prefiks akan menghapus render tanggal lain
-        # yang justru masih sahih.
         known = {
             fm.dated_filename(date_key, f"{spec.key}.png") for spec in PREVIEW_SPECS
         } | {fm.dated_filename(date_key, f"{S1_RGB_KEY}.png")} | {
             fm.dated_filename(date_key, overlay_filename(spec.key))
             for spec in PREVIEW_SPECS if spec.source != "sentinel1"
         }
-        # Varian garis wilayah ikut dibersihkan: namanya turunan nama PNG-nya,
-        # jadi berkas basinya juga akan tetap terdaftar kalau dibiarkan.
         known |= {admin_overlay.adm_name(n) for n in known}
         for kind_dir, entries in (
             (gray_dir, gray_entries), (color_dir, color_entries),
@@ -1385,11 +1059,6 @@ def generate_previews(
     ):
         if kind_dir is None:
             continue
-        # Berprefiks tanggal, persis seperti PNG-nya. Satu folder kind memuat
-        # PNG SEMUA tanggal dataset (tidak ada lagi folder tanggal), jadi
-        # sidecar tanpa prefiks akan ditulis ulang penuh oleh tiap scene dan
-        # yang tersisa cuma milik scene yang selesai terakhir -- galeri lalu
-        # menampilkan gambar tanggal itu untuk SEMUA tanggal.
         info_name = fm.dated_filename(date_key, f"{kind}_info.json")
         written.append(_write_json(kind_dir / info_name, info_fn(entries)))
         kinds[kind] = {
@@ -1404,16 +1073,11 @@ def generate_previews(
         "dataset_name": dataset_name,
         "acquisition_date": date_key,
         "s1_scene_key": s1_scene_key,
-        # Scene lain di tanggal yang sama yang preview-nya baru saja ditimpa;
-        # None kalau tidak ada penimpaan lintas scene.
         "replaced_s1_scene_key": replaced_scene_key,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "generator": MODULE,
         "tier": "PREVIEW",
         "processing_level": level,
-        # Tier asalnya, bukan konstanta "COG": preview level RAW dirender
-        # dari tier ALIGNED, dan menuliskan "COG" di situ akan membuat sidecar
-        # berbohong soal provenance-nya.
         "derived_from": tier.upper(),
         "options": sorted(wanted),
         "max_side_px": max_side,
@@ -1438,13 +1102,9 @@ def generate_previews(
             "not_for": "Quantitative analysis — use gold/*.tif or fusion/*.h5.",
         },
     }
-    # Sidecar per level DAN per tanggal. Level karena dua level menulis ke
-    # folder yang sama; tanggal karena folder preview dipakai bersama seluruh
-    # tanggal dataset (lihat komentar info_name di atas).
     metadata_name = fm.dated_filename(date_key, "preview_metadata.json")
     level_dir.mkdir(parents=True, exist_ok=True)
     written.append(_write_json(level_dir / metadata_name, metadata))
-    # Salinan di akar preview/ untuk pembaca yang belum menyebut level.
     written.append(_write_json(preview_dir / metadata_name, metadata))
 
     total_mb = sum(p.stat().st_size for p in written if p.exists()) / (1024 ** 2)

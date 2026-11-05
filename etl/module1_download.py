@@ -1,19 +1,4 @@
-# etl/module1_download.py
-"""
-Tahap DOWNLOAD Sentinel-1: discovery CDSE + unduh SAFE ZIP + ekstrak VV/VH.
-
-TAHAP INI TIDAK BERCABANG PER LEVEL. DOWNLOAD, CALIBRATE (module1b), dan CROP
-(module2) jalan sama persis untuk level RAW maupun PROCESSED: nilai DN mentah
-tanpa LUT sigma-nought tidak punya arti fisik, jadi "RAW" untuk SAR pun berarti
-terkalibrasi dan ter-crop (DOCS/PIPELINE.md, "What RAW means for Sentinel-1").
-
-Percabangan level Sentinel-1 ada satu lapis di atas, di mana urutan tahap
-memang disusun:
-    keputusan  -> etl/processing_plan.py (SourcePlan.s1_skip_stages)
-    eksekusi   -> etl/module5_orchestrator.py (_run_s1_chain)
-LEE_FILTER, QUALITY_ANALYTICS, dan GOLD_EXPORT-lah yang dilewati saat SENTINEL1
-dikonfigurasi RAW-only; modul ini tidak perlu tahu levelnya sama sekali.
-"""
+"""Tahap DOWNLOAD Sentinel-1: discovery CDSE + unduh SAFE ZIP + ekstrak VV/VH."""
 from __future__ import annotations
 
 import hashlib
@@ -26,7 +11,7 @@ import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 from etl import download_guard as dg
 
@@ -60,18 +45,8 @@ class DownloadResult:
     kept_raw: bool = False
 
 
-# Status yang berarti "server tidak mau melayani permintaan lanjutan ini".
-# 501 yang dijawab CDSE untuk header Range, 405 kalau metodenya ditolak, dan
-# 400 yang dipakai sebagian gateway untuk Range yang tidak dikenal.
 _RANGE_UNSUPPORTED = frozenset({400, 405, 501})
 
-# 429 dibatasi lebih longgar daripada error jaringan biasa: itu bukan
-# kegagalan transfer, melainkan akun sedang dijatah CDSE (maksimal 4 unduhan
-# paralel -- lihat module5_orchestrator.S1_PARALLEL_DOWNLOADS) dan pasti pulih
-# kalau didiamkan sebentar. Kalau dipukul rata dengan MAX_RETRIES=3 tanpa
-# jeda, 3 worker yang throttle bersamaan menghabiskan jatahnya dalam
-# hitungan detik dan scene yang sehat gagal permanen (okt_dec_2025_hybrid
-# 2026-09-23: 12 scene begitu; jul_sep_2025_hybrid: 236).
 MAX_RATE_LIMIT_RETRIES = 8
 
 
@@ -90,14 +65,8 @@ def _retry_sleep(
                     max_attempts=max_attempts, cancel_event=cancel_event)
 
 
-# Token CDSE dipakai bersama semua thread unduhan. Dulu tiap scene login
-# sendiri (password grant): job 100 scene = 100 login, dan 9 worker yang kena
-# 401 berbarengan login 9 kali. Sekarang satu token per proses, diperbarui
-# sekali saat mendekati kedaluwarsa atau saat server menolaknya.
 _TOKEN_LOCK = threading.Lock()
 _token_cache: dict = {"token": None, "expires_at": 0.0}
-# Diperbarui sekian detik sebelum expires_in supaya request yang baru mulai
-# tidak membawa token yang habis di tengah jalan.
 _TOKEN_EARLY_REFRESH_S = 60
 _TOKEN_MAX_ATTEMPTS = 4
 
@@ -160,22 +129,13 @@ def _fetch_cdse_token(user: str, password: str) -> tuple[str, float]:
     raise RuntimeError(f"CDSE auth failed after {_TOKEN_MAX_ATTEMPTS} attempts: {last}")
 
 
-# Di bawah porsi AOI ini sebuah TANGGAL S1 (gabungan semua frame-nya) tidak
-# diunduh. Sama dengan ambang "lapisan nyaris kosong" di module9: 24_try8
-# mengunduh 1,6 GB untuk scene descending 14 Jan yang cuma menyentuh 0,6% AOI,
-# lalu menulis stack fusion 455 MB yang 99,4% NaN. Footprint sudah ada di
-# respons katalog, jadi ini bisa diputuskan sebelum unduhan dimulai.
 MIN_S1_AOI_COVERAGE = 0.05
 
 _DISCOVER_MAX_ATTEMPTS = 3
 
 
 def _footprint_wkt(item: dict) -> str | None:
-    """Footprint scene dari respons OData CDSE sebagai WKT, atau None.
-
-    `GeoFootprint` (GeoJSON) dipakai lebih dulu karena bisa langsung dibaca
-    shapely; `Footprint` berbentuk "geography'SRID=4326;POLYGON(...)'" dan
-    hanya jadi cadangan."""
+    """Footprint scene dari respons OData CDSE sebagai WKT, atau None."""
     from shapely import wkt as shapely_wkt
     from shapely.geometry import shape
 
@@ -197,9 +157,7 @@ def _footprint_wkt(item: dict) -> str | None:
 def aoi_coverage(footprints_wkt: list[str], bbox_wkt: str) -> float | None:
     """Porsi luas AOI yang tertutup gabungan `footprints_wkt` (0..1), atau
     None kalau tidak ada satu pun footprint yang bisa dibaca.
-
-    Dihitung di derajat lon/lat: yang dicari rasio, dan distorsi luas di
-    dalam AOI selebar <1 derajat di dekat ekuator bisa diabaikan."""
+    """
     from shapely import wkt as shapely_wkt
     from shapely.ops import unary_union
 
@@ -261,9 +219,6 @@ def discover_scenes(
 
     logger.info("[M1] Querying CDSE: area=%s... from=%s to=%s", bbox_wkt[:40], date_from.date(), date_to.date())
 
-    # Katalog yang sibuk (429/5xx) atau koneksi putus tidak boleh langsung
-    # menggagalkan siklus Live / pembuatan dataset: dicoba ulang dengan
-    # backoff. 4xx lain (filter salah) final.
     r = None
     last = ""
     for attempt in range(1, _DISCOVER_MAX_ATTEMPTS + 1):
@@ -302,10 +257,6 @@ def discover_scenes(
             "product_identifier": item.get("Name", item.get("Id", "")),
             "acquisition_datetime": acq_dt,
             "orbit_direction": attrs.get("orbitDirection", "ASCENDING").upper(),
-            # Nama atribut CDSE OData: orbitNumber / relativeOrbitNumber
-            # (nama lama absoluteOrbit / relativeOrbit tidak pernah ada, jadi
-            # kolom orbit selalu NULL; T3-28). Nama lama tetap dibaca sebagai
-            # cadangan.
             "orbit_number": attrs.get("orbitNumber", attrs.get("absoluteOrbit")),
             "relative_orbit": attrs.get("relativeOrbitNumber", attrs.get("relativeOrbit")),
             "cloud_cover": attrs.get("cloudCover"),
@@ -376,9 +327,6 @@ def download_scene(
             logger.info("[M1] ZIP dipakai ulang dari dataset lain (%s): %s", how, found)
             _long(out / f"{name}.zip.part").unlink(missing_ok=True)
 
-    # ZIP terpotong yang tertinggal dari run sebelumnya (dataset 59
-    # 2026-10-01: .part 605 MB dari 1642 MB di-rename jadi .zip) dulu dipakai
-    # ulang di setiap retry dan selalu gagal BadZipFile. Buang, unduh ulang.
     if _long(zip_path).exists() and not _zip_is_complete(zip_path):
         logger.warning("[M1] ZIP di disk rusak/terpotong, dihapus dan diunduh ulang: %s", zip_path.name)
         _long(zip_path).unlink(missing_ok=True)
@@ -407,20 +355,10 @@ def download_scene(
             logger.info("[M1] Melanjutkan download dari %.0f MB...", resume_from / 1e6)
             session.headers.update({"Range": f"bytes={resume_from}-"})
 
-        # 6 dengan dg.connection_retry_delay: bertahan ~2.5 menit gangguan
-        # CDSE sebelum scene dinyatakan gagal (dulu 3 x 2-4 s).
         MAX_RETRIES = 6
         attempt = 0
-        # 401 di tengah retry (token kedaluwarsa selama unduhan panjang) tidak
-        # boleh menghabiskan jatah: dataset 54 2026-09-30, token diperbarui di
-        # attempt 3/3 lalu loop berhenti tanpa memakainya -- 3 scene yang
-        # sudah ~1.1 GB gagal.
         auth_refreshes_left = 2
-        # Percobaan ulang yang tidak menghabiskan jatah MAX_RETRIES: server
-        # menolak Range. Dibatasi sendiri supaya server yang terus-menerus
-        # menolak tidak membuat loop tak berujung.
         restarts_left = 2
-        # 429 punya jatah dan ritme retry sendiri -- lihat MAX_RATE_LIMIT_RETRIES.
         rate_limit_attempt = 0
         while attempt < MAX_RETRIES:
             attempt += 1
@@ -431,8 +369,6 @@ def download_scene(
                 ) as resp:
                     if resp.status_code == 401:
                         logger.info("[M1] Token expired, refreshing (attempt %d)...", attempt)
-                        # Token lama diserahkan supaya cache hanya login
-                        # ulang kalau belum ada thread lain yang melakukannya.
                         token = _get_cdse_token(user, pwd, token)
                         session.headers.update({"Authorization": f"Bearer {token}"})
                         if auth_refreshes_left > 0:
@@ -441,8 +377,6 @@ def download_scene(
                         continue
 
                     if resp.status_code == 416:
-                        # 416 tidak menjamin .part lengkap: CDSE juga
-                        # menjawab 416 untuk Range pada berkas setengah jadi.
                         if _zip_is_complete(part_path):
                             logger.info("[M1] File sudah lengkap di .part, rename saja.")
                             os.replace(_long(part_path), _long(zip_path))
@@ -461,14 +395,6 @@ def download_scene(
                         _long(part_path).unlink(missing_ok=True)
                         raise RuntimeError("HTTP 416 berulang dan .part tidak lengkap")
 
-                    # CDSE tidak selalu melayani permintaan lanjutan: endpoint
-                    # /$value menjawab 501 Not Implemented untuk header Range.
-                    # Karena 501 bukan error jaringan, retry berikutnya
-                    # mengirim Range yang sama dan ditolak lagi -- scene sehat
-                    # yang cuma putus sekali di tengah jadi gagal permanen
-                    # (26_JAWA 2026-09-20: IncompleteRead di attempt 1, lalu
-                    # dua 501 berturut-turut). Kalau server menolak Range,
-                    # .part dibuang dan berkas diunduh ulang dari nol.
                     if (
                         resp.status_code in _RANGE_UNSUPPORTED
                         and resume_from > 0
@@ -481,8 +407,6 @@ def download_scene(
                         session.headers.pop("Range", None)
                         resume_from = 0
                         _long(part_path).unlink(missing_ok=True)
-                        # Penolakan Range bukan kegagalan transfer, jadi tidak
-                        # menghabiskan jatah percobaan.
                         restarts_left -= 1
                         attempt -= 1
                         continue
@@ -498,19 +422,11 @@ def download_scene(
                             reason="rate-limited by server (429)",
                             max_attempts=MAX_RATE_LIMIT_RETRIES,
                         )
-                        # Throttle bukan kegagalan transfer, jadi tidak
-                        # menghabiskan jatah MAX_RETRIES.
                         attempt -= 1
                         continue
 
                     resp.raise_for_status()
 
-                    # A Range request is only honoured when the server answers
-                    # 206. CDSE sometimes replies 200 with the whole file
-                    # anyway; appending that to the existing .part silently
-                    # produces a corrupt ZIP (and a nonsense total, e.g.
-                    # "948 / 2922 MB" for a 2024 MB product), so fall back to
-                    # restarting the file from scratch.
                     resumed = resume_from > 0 and resp.status_code == 206
                     if resume_from > 0 and not resumed:
                         logger.warning(
@@ -539,8 +455,6 @@ def download_scene(
                                             progress_cb(pct, f"{downloaded / 1e6:.0f} / {total / 1e6:.0f} MB")
 
                     if total and downloaded < total:
-                        # Stream berakhir tanpa exception tapi kurang byte:
-                        # perlakukan seperti koneksi putus supaya di-resume.
                         raise ConnectionError(
                             f"stream berakhir di {downloaded} dari {total} byte"
                         )
@@ -557,9 +471,6 @@ def download_scene(
                         resume_from = _long(part_path).stat().st_size
                         session.headers.update({"Range": f"bytes={resume_from}-"})
                         logger.info("[M1] Akan resume dari %.0f MB", resume_from / 1e6)
-                    # Backoff + jitter: retry instan terhadap server yang
-                    # baru saja memutus koneksi (SSL EOF, 429 yang habis
-                    # jatahnya di atas) cuma menabrak kondisi yang sama lagi.
                     delay = dg.connection_retry_delay(attempt)
                     logger.info("[M1] Menunggu %.0f s sebelum mencoba lagi (connection lost, attempt %d)...",
                                 delay, attempt)
@@ -581,7 +492,6 @@ def download_scene(
     try:
         vv_path, vh_path = _extract_bands(zip_path, out)
     except zipfile.BadZipFile:
-        # Jangan tinggalkan ZIP rusak untuk retry berikutnya.
         _long(zip_path).unlink(missing_ok=True)
         raise
 
@@ -629,10 +539,6 @@ def _extract_bands(zip_path: Path, output_dir: Path) -> tuple[Path, Path]:
         vv_out = output_dir / f"{stem}_VV.tif"
         vh_out = output_dir / f"{stem}_VH.tif"
 
-        # Diekstrak ke berkas antara lalu dipindahkan sekali jalan: tahap
-        # berikutnya menilai keberadaan _VV.tif/_VH.tif sebagai "ekstraksi
-        # beres", jadi ekstraksi yang terhenti di tengah tidak boleh
-        # meninggalkan berkas berukuran wajar di path final.
         for member, out_path in ((vv_files[0], vv_out), (vh_files[0], vh_out)):
             tmp_out = out_path.with_name(
                 f"{out_path.name}.{os.getpid()}.{threading.get_ident()}.tmp"

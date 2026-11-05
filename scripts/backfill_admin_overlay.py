@@ -1,20 +1,4 @@
-"""Isi varian "garis wilayah" ({key}_adm.png) untuk scene Live yang sudah ada.
-
-Varian itu baru ikut dirender sejak etl/admin_overlay.py ada, jadi scene yang
-sudah terlanjur jadi hanya punya PNG polos dan checkbox "Garis wilayah" di
-taskbar tidak berpengaruh untuknya. Skrip ini me-render ULANG preview scene
-tersebut dari COG yang masih tersimpan -- hasil polosnya identik (perendernya
-sama persis), yang bertambah hanya berkas _adm.png dan field "file_adm" di
-live_scenes.previews.
-
-Scene yang COG Sentinel-1 nya sudah dibersihkan retensi dilewati: tanpa raster
-sumber, tidak ada grid untuk menempatkan garis wilayahnya.
-
-    python -m scripts.backfill_admin_overlay [--area 1] [--limit 50] [--dry-run]
-
-Prasyarat: batas wilayah sudah dimuat (scripts/load_regions.py), kalau belum
-skrip berhenti dengan pesan -- bukan menulis preview tanpa garis diam-diam.
-"""
+"""Isi varian "garis wilayah" ({key}_adm.png) untuk scene Live yang sudah ada."""
 from __future__ import annotations
 
 import argparse
@@ -92,21 +76,11 @@ def main(argv: list[str] | None = None) -> int:
                     LiveScene.area_id == area_id, LiveScene.scene_date == scene_date))
                 previews = dict(row.previews or {})
                 merged = dict(previews.get("items") or {})
-                # Hanya lapisan yang baru saja dirender yang ditimpa: entri
-                # lain (mis. s1_water_change, yang bukan milik modul ini)
-                # harus tetap apa adanya.
                 merged.update({k: {**merged.get(k, {}), **v} for k, v in items.items()})
                 previews["items"] = merged
-                # Render ulang ini juga menghasilkan georeferensi grid, dan
-                # PNG-nya baru ditulis dari grid itu -- jadi keduanya pasti
-                # cocok. Menyimpannya di sini membuat halaman Relief 3D ikut
-                # terisi tanpa perlu scripts.backfill_preview_grid menyusul.
                 if result.get("grid"):
                     previews["grid"] = result["grid"]
                 row.previews = previews
-            # Tile "Perubahan air" bukan milik live_preview: dirender jalur
-            # water_change. Tahapnya idempoten (metrik diganti, PNG ditimpa),
-            # jadi dijalankan ulang untuk mendapat varian garis wilayahnya.
             try:
                 water_change_stage(mon, area_id, scene_date, files, inputs)
             except Exception:

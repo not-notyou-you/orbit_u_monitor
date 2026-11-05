@@ -1,21 +1,4 @@
-# api/routes/diagram.py
-"""Halaman Forecast (dulu Diagram; INTERFACE.md §4.3, M56, M61): ANALYST dan ADMIN.
-
-* ``/latest``  — keadaan terbaru: SEMUA band dalam satu grafik, 30 hari
-  terakhir, satu warna per band. Band per kecamatan (GPM, MODIS) dirata-rata
-  ke seluruh kecamatan AOI; Sentinel-1 (VV, VH) dari metrik scene Live
-  (tingkat AOI, karena radar tidak dihitung per kecamatan). ``updated_at``
-  dipakai UI untuk memperbarui grafik otomatis saat data baru masuk.
-* ``/regions`` — analisa daerah: kecamatan × band × rentang tanggal bebas.
-* ``/forecast`` — forecast 15 hari satu band (rerata AOI, satu kecamatan,
-  atau rerata beberapa kecamatan) dari seluruh riwayatnya. Dibaca dari
-  ``band_forecasts`` bila masih berlaku (``etl.forecast_store``, M62), selain
-  itu dihitung di tempat (``etl.band_forecast``).
-* ``/report.pdf`` — PDF analisa daerah: daerah & tanggal pilihan pengguna,
-  isinya SEMUA band per kecamatan.
-
-Penjelasan, warna, dan garis ambang tiap band dari ``etl.band_catalog``.
-"""
+"""Halaman Forecast (dulu Diagram; INTERFACE.md §4.3, M56, M61): ANALYST dan ADMIN."""
 
 from __future__ import annotations
 
@@ -139,8 +122,6 @@ def band_ranges(sess: Session, end: date) -> dict[str, tuple[float, float]]:
 
 @router.get("/bands", summary="Bands shown in the diagrams: explanation, colour, thresholds")
 def bands(sess: Session = Depends(get_session)) -> dict:
-    # Tanggal observasi per kecamatan terakhir: UI memakainya sebagai akhir
-    # rentang bawaan dan untuk menjelaskan grafik yang kosong.
     last = sess.scalar(text("SELECT max(obs_date) FROM region_observations"))
     return {"items": _bands(sess), "last_obs_date": last}
 
@@ -204,9 +185,6 @@ def latest(sess: Session = Depends(get_session), days: int = Query(30, ge=7, le=
             "last_obs_date": sess.scalar(text("SELECT max(obs_date) FROM region_observations")), "bands": out}
 
 
-# Forecast yang tidak tersimpan (rentang di masa lalu, rerata beberapa
-# kecamatan, horizon selain 15) dihitung di tempat dan disimpan di memori
-# sampai cap data band berubah.
 _FC_CACHE: OrderedDict[tuple, dict] = OrderedDict()
 _FC_CACHE_MAX = 256
 _FC_LOCK = threading.Lock()
@@ -219,12 +197,7 @@ def forecast(sess: Session = Depends(get_session),
              region_ids: str | None = Query(None, description="Comma-separated kecamatan (max 12): forecast of their daily mean"),
              end: date | None = Query(None, description="Use data up to this day; default today (UTC)"),
              horizon: int = Query(bf.HORIZON, ge=1, le=30)) -> dict:
-    """Satu deret per request supaya UI bisa menampilkan progres per deret.
-
-    Jalur cepat (M62): forecast tersimpan di band_forecasts, dihitung saat data
-    baru masuk (etl/forecast_store.py). Dipakai bila cap data band sama dengan
-    saat dihitung dan `end` tidak memotong data yang dipakainya (end >=
-    observasi terakhir). Selain itu dihitung di tempat (etl/band_forecast.py)."""
+    """Satu deret per request supaya UI bisa menampilkan progres per deret."""
     code = band.strip().upper()
     ids = _parse_ids(region_ids, "region_ids") if region_ids else [region_id] if region_id is not None else None
     if ids and len(ids) > MAX_REGIONS:

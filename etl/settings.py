@@ -1,10 +1,4 @@
-# etl/settings.py
-"""Baca ``app_settings`` (PIPELINE.md §11): nilai yang boleh diubah ADMIN tanpa restart.
-
-Default di sini sama dengan seed ``monitor_seed.sql`` dan hanya dipakai bila
-barisnya tidak ada (mis. database lama yang belum di-seed ulang), supaya kode
-tidak gagal karena satu kunci hilang.
-"""
+"""Baca ``app_settings`` (PIPELINE.md §11): nilai yang boleh diubah ADMIN tanpa restart."""
 
 from __future__ import annotations
 
@@ -22,21 +16,12 @@ DEFAULTS: dict[str, Any] = {
     "live.default_area_name": "Lebak Selatan",
     "report.timezone": "Asia/Jakarta",
     "water.vh_threshold_db": -20,
-    # Porsi AOI yang WAJIB tertutup Sentinel-1 agar sebuah tanggal dipakai
-    # Daerah Live. Beda tujuan dengan MIN_S1_AOI_COVERAGE (module1_download),
-    # yang cuma penjaga pemborosan unduhan arsip: yang ini penjaga KELENGKAPAN
-    # -- scene yang lolos harus menggambarkan seluruh AOI, bukan sepotong.
-    # Orbit yang cuma menyerempet AOI menutup ~30%, yang melintas penuh ~99%,
-    # jadi nilai mana pun di antaranya memisahkan keduanya.
     "live.min_aoi_coverage": 0.90,
     "dataset.max_days": 366,
     "hydromet.min_valid_fraction": 0.1,
     "hydromet.waiting_max_days": 3,
     "report.wait_hydromet_minutes": 60,
-    # M58: berkas raster dataset utama dan scene Live yang lebih tua dari ini
-    # dihapus; angka per kecamatan dan metrik scene tetap disimpan.
     "storage.raster_retention_days": 365,
-    # M64: peringatan email. Data lebih tua dari max_age_days (backfill) tidak dikirim.
     "notify.enabled": True,
     "notify.max_age_days": 7,
 }

@@ -1,14 +1,5 @@
-# api/routes/citra.py
 """Halaman Citra Satelit (INTERFACE.md §4.3, M56): ringkasan, satu halaman per
 satelit (Sentinel-1, MODIS, GPM), dan laporan PDF gabungan.
-
-Semua role, termasuk pengunjung. Batas waktu per role TIDAK dihitung di
-sini: setiap kueri membaca VIEW ``v_citra_scenes``/``v_citra_metrics`` di
-bawah role pemanggil (SET LOCAL ROLE), dan VIEW itu yang memotong tanggal —
-PUBLIC 30 hari, USER 365 hari, ANALYST/DATA_ENGINEER/ADMIN semua, scene
-terbaru tiap area selalu terlihat. Path berkas PNG (folder dataset, yang tidak
-boleh dibaca role interaktif) dicari koneksi ``monitor_etl`` SETELAH VIEW
-membuktikan scene itu terlihat (pola /public, M51).
 """
 
 from __future__ import annotations
@@ -76,8 +67,6 @@ def _scene(sess: Session, area_id: int, scene_date: date):
     row = sess.execute(text("""SELECT * FROM v_citra_scenes WHERE area_id = :a AND scene_date = :d"""),
                        {"a": area_id, "d": scene_date}).mappings().first()
     if row is None:
-        # Scene yang ada tapi di luar batas role tampak sama dengan yang tidak
-        # ada untuk VIEW; bedakan supaya UI bisa menjelaskan.
         raise ApiError(404, "Scene not found or outside the time window of your role", "NOT_FOUND")
     return row
 
@@ -116,15 +105,6 @@ def _scene_payload(sess: Session, row, key: str) -> dict:
         "preview_grid": (row["previews"] or {}).get("grid"),
     }
 
-
-# --- angka harian GPM/MODIS (Job Hidromet, termasuk backfill) --------------------
-#
-# Scene Live hanya ada pada tanggal lintasan Sentinel-1 (±6–12 hari sekali) dan
-# hanya sebanyak retensi. Angka harian GPM/MODIS per kecamatan diisi Job
-# Hidromet dan backfill-nya untuk SETIAP hari, tanpa gambar PNG. Halaman
-# GPM/MODIS menampilkan keduanya: tanggal scene (gambar + angka) dan tanggal
-# angka harian (angka saja). Agregat AOI lewat v_citra_obs_aoi (batas waktu
-# per role); angka per kecamatan hanya untuk USER+ (region_observations).
 
 _OBS_METRICS = (("aoi_mean", "mean_value"), ("aoi_max", "max_value"), ("aoi_min", "min_value"))
 
@@ -189,12 +169,9 @@ def _payload(sess: Session, principal: Principal, area: dict, d: date, key: str)
         out["daily_metrics"] = daily
         out["per_region"] = _per_region(sess, principal, d, src["source_code"]) if daily else None
         if row is None:
-            # Tanpa scene Live: angka harian adalah satu-satunya angka.
             out["metrics"] = daily
     return out
 
-
-# --- endpoint ---------------------------------------------------------------------
 
 @router.get("/summary", summary="Imagery overview per satellite for one area (role time window applied)")
 def summary(sess: Session = Depends(get_session), principal: Principal = Depends(current_principal),

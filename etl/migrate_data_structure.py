@@ -1,54 +1,4 @@
-# etl/migrate_data_structure.py
-"""
-Migrasi struktur folder data/datasets/... ke layout dataset-tanggal-tier.
-
-Layout tujuan (lihat etl/folder_manager.py):
-
-    data/datasets/{dataset_id}_{slug_nama}/
-        {YYYYMMDD}/{raw,bronze,silver,gold}/{source}/[{scene S1}/]...
-        {YYYYMMDD}/fusion/...
-        _granule_cache/{modis,gpm}/...
-
-Script ini menerima tiga layout asal sekaligus, jadi bisa dijalankan dari
-mana pun instalasi berada:
-
-  L1 (paling lama)  data/datasets/{dataset_id}/{YYYYMMDD}/{tier}/*
-  L2                data/datasets/{dataset_id}_{slug}/{tier}/{scene}/*
-  L3 (sebelumnya)   data/datasets/{dataset_id}_{slug}/{tier}/{source}/{scene}/*
-
-Layout tujuan dibangun seluruhnya lewat folder_manager, jadi file cukup
-dipindah ke path yang dikembalikannya. Stack fusion lama di `gold/{tanggal}/`
-ikut pindah ke tier `fusion/` (arti GOLD berubah -- lihat
-database/migrations/013).
-
-Kunci scene:
-  - Produk Sentinel-1 memakai `product_identifier` scene tsb, diambil dari
-    satellite_scenes lewat data_products.scene_id -- bukan diparse dari
-    nama folder.
-  - Artefak yang bukan milik satu scene S1 tertentu (MODIS/GPM harian dan
-    output fusion yang di-dedup per tanggal) memakai tanggal YYYYMMDD,
-    diambil dari posisi folder tanggal kalau layout asalnya punya, kalau
-    tidak dari tanggal di nama file.
-
-Kolom `source` di data_products ikut diisi kalau masih kosong -- migrasi SQL
-013 sudah membackfill-nya, ini cuma jaring pengaman untuk baris yang masuk
-setelah itu lewat kode lama.
-
-Setiap dataset di-backup penuh ke backup/data_structure_migration/ sebelum
-satu file pun dipindah. Setelah `shutil.move`, checksum SHA-256 file di
-lokasi baru dibandingkan dengan data_products.data_hash_sha256 (atau dihitung
-ulang dari file lama kalau kolom itu kosong) -- kalau tidak cocok, file
-dikembalikan ke lokasi lama dan product itu dilaporkan gagal, tidak pernah
-didiamkan begitu saja. Script idempotent: file yang sudah di lokasi baru
-dilewati.
-
-JALANKAN SETELAH database/migrations/013_add_fusion_tier_and_source.sql.
-
-Usage:
-    python -m etl.migrate_data_structure                  # migrasi semua dataset
-    python -m etl.migrate_data_structure --dataset-id 2    # migrasi 1 dataset
-    python -m etl.migrate_data_structure --dry-run         # tampilkan rencana saja
-"""
+"""Migrasi struktur folder data/datasets/... ke layout dataset-tanggal-tier."""
 
 from __future__ import annotations
 
@@ -75,10 +25,6 @@ LOG_DIR = Path("logs_pipeline")
 _DATE_DIR_RE = re.compile(r"^\d{8}$")
 _DATE_IN_NAME_RE = re.compile(r"(\d{8})")
 
-# product_type -> source folder. Produk yang tidak terdaftar di sini
-# dianggap Sentinel-1: semua product_type S1 historis (ORIGINAL_TIFF,
-# RAW_EXTRACTED_TIFF, CROPPED_TIFF, LEE_FILTERED, COG, S1_COG) berasal dari
-# satu-satunya sensor yang punya pipeline per-scene.
 _SOURCE_BY_PRODUCT_TYPE = {
     "MODIS_FLOOD": "modis",
     "MODIS_NDVI": "modis",
@@ -88,8 +34,6 @@ _SOURCE_BY_PRODUCT_TYPE = {
     "GPM_COG": "gpm",
 }
 
-# product_type yang tidak terikat ke satu scene Sentinel-1 -- kunci scene-nya
-# tanggal, bukan product_identifier.
 _AUX_PRODUCT_TYPES = set(_SOURCE_BY_PRODUCT_TYPE) | {"FUSION_H5"}
 
 
@@ -210,10 +154,6 @@ def _target_path(dataset_id: int, dataset_name: str, row: dict, old_path: Path) 
     if tier == "fusion":
         return fm.get_fusion_dir(dataset_id, dataset_name, scene_key) / row["file_name"]
 
-    # Tier antara tidak punya laci di layout baru (RAW = ZIP SAFE, SILVER =
-    # Lee pre-COG): get_scene_dir akan mengarahkannya ke _work/, yang justru
-    # dibuang setelah scene selesai. Memindahkan berkas ke sana sama dengan
-    # menghapusnya lewat jalan memutar, jadi dilewati secara eksplisit.
     if fm.level_for_tier(tier) is None:
         logger.info(
             "[MIGRATE] tier %s tidak punya laci di layout baru, dilewati "
@@ -264,7 +204,6 @@ def _migrate_untracked_files(
 
     for root in roots:
         for zip_path in root.rglob("*.SAFE.zip"):
-            # "{product_identifier}.SAFE.zip" -> "{product_identifier}.SAFE"
             scene_key = zip_path.name[: -len(".zip")]
             dst = fm.get_scene_dir(
                 dataset_id, dataset_name, "raw", "sentinel1", scene_key
@@ -297,8 +236,6 @@ def _migrate_untracked_files(
             dst = fm.get_fusion_dir(dataset_id, dataset_name, scene_key) / meta_path.name
             counts[_move_untracked(meta_path, dst, dry_run)] += 1
 
-        # Cache granule mentah MODIS/GPM: L1/L3 memakai raw/{source}/, L2
-        # memakai raw/_aux_{source}/. Keduanya jadi _granule_cache/{source}/.
         for source in ("modis", "gpm"):
             new_cache = fm.get_granule_cache_dir(dataset_id, dataset_name, source)
             for legacy in (root / "raw" / f"_aux_{source}", root / "raw" / source):
@@ -379,8 +316,6 @@ def migrate_dataset(db: DatabaseClient, dataset_id: int, dry_run: bool = False) 
                 continue
             if not old_path.exists():
                 if new_path.exists():
-                    # Sudah pindah di run sebelumnya tapi baris DB belum
-                    # ikut di-update (mis. proses terhenti di tengah).
                     if not dry_run:
                         product = sess.get(DataProduct, row["product_id"])
                         if product is not None:

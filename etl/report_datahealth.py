@@ -1,10 +1,4 @@
-# etl/report_datahealth.py
-"""Laporan Kesehatan Data mingguan/bulanan untuk DATA_ENGINEER (PIPELINE.md §6.3).
-
-Delapan bagian; semua angka dari DB (dan checksum berkas untuk sampel
-lineage). Bagian tanpa data -> "—". Batas waktu periode untuk kolom
-TIMESTAMPTZ dihitung dalam WIB (00:00 Senin s.d. 23:59 Minggu).
-"""
+"""Laporan Kesehatan Data mingguan/bulanan untuk DATA_ENGINEER (PIPELINE.md §6.3)."""
 
 from __future__ import annotations
 
@@ -52,7 +46,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
     s1_score = sess.scalar(text("SELECT avg(quality_score) FROM quality_metrics WHERE assessed_at >= :t0 AND assessed_at < :t1"), P)
     vf = sess.scalar(text("SELECT avg(valid_fraction) FROM region_observations WHERE obs_date BETWEEN :a AND :b"), P)
 
-    # 1 -------------------------------------------------------------------------
     doc.h1("1. Skor kesehatan")
     completeness = None
     if present:
@@ -66,7 +59,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
     doc.note("Adaptasi skor DataLab REPORT §9.1: komponen tanpa data pada periode ini tidak dihitung "
              "(ditulis —), bukan dianggap nol.")
 
-    # 2 -------------------------------------------------------------------------
     doc.h1("2. Kelengkapan per sumber")
     gaps = sess.execute(text("""SELECT source_code, count(*) AS n, max(gap_days) AS longest FROM v_kelengkapan_data
                                 WHERE data_date BETWEEN :a AND :b AND is_gap GROUP BY source_code"""), P).mappings().all()
@@ -82,7 +74,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
               [[str(runs.get("F", 0)), str(runs.get("L", 0)), str(runs.get("E", 0)), str(runs.get("?", 0))]]
               if runs else [])
 
-    # 3 -------------------------------------------------------------------------
     doc.h1("3. Kualitas")
     q = sess.execute(text("""SELECT source_code, week_start, n_quality_metrics, avg_quality_score, n_fail, n_warning,
                                     n_quality_alerts, n_observations, avg_valid_fraction
@@ -93,7 +84,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
                 str(r["n_fail"]), str(r["n_warning"]), str(r["n_quality_alerts"]), str(r["n_observations"]),
                 num(r["avg_valid_fraction"], 3)] for r in q])
 
-    # 4 -------------------------------------------------------------------------
     doc.h1("4. Pipeline")
     jobs = sess.execute(text("""
         SELECT s.stage_name, count(*) AS n,
@@ -123,7 +113,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
     doc.table(["Kode", "Pesan", "Jumlah"], [[e["code"], txt(e["msg"]), str(e["n"])] for e in errs],
               empty="Tidak ada job gagal pada periode ini.")
 
-    # 5 -------------------------------------------------------------------------
     doc.h1("5. Lineage")
     tiers = sess.execute(text("""SELECT product_tier::text AS tier, count(*) AS n FROM data_products
                                  WHERE created_at >= :t0 AND created_at < :t1 GROUP BY 1 ORDER BY 1"""), P).mappings().all()
@@ -152,7 +141,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
                                           ORDER BY lineage_id LIMIT 1"""), {"c": current})
         doc.table(["product_id", "Tier", "Band", "Berkas", "Checksum SHA-256"], chain)
 
-    # 6 -------------------------------------------------------------------------
     doc.h1("6. Fusion")
     fus = sess.execute(text("""
         SELECT COALESCE(fusion_strategy, '?') AS strategy, count(*) AS n,
@@ -163,7 +151,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
               [[f["strategy"], str(f["n"]), num(f["off_modis"], 1), num(f["off_gpm"], 1), pct(f["with_s1"], f["n"])]
                for f in fus], empty="Tidak ada stack fusion dibuat pada periode ini.")
 
-    # 7 -------------------------------------------------------------------------
     doc.h1("7. Penyimpanan")
     store = sess.execute(text("""
         SELECT CASE WHEN d.is_system THEN 'A (hidromet)' WHEN d.dataset_kind = 'LIVE_AREA' THEN 'B (Live)'
@@ -179,7 +166,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
             ("Ruang dibebaskan", num(freed["b"] / 1024 ** 2, 1, "MB") if freed["n"] else DASH)])
     doc.note("Ukuran dari data_products (is_latest) saat laporan dibuat, bukan pemindaian disk.")
 
-    # 8 -------------------------------------------------------------------------
     doc.h1("8. Unduhan")
     dl = sess.execute(text("""SELECT action, role_code, sum(n_downloads) AS n, sum(bytes_sent) AS b
                               FROM v_unduhan_per_role WHERE log_date_wib BETWEEN :a AND :b

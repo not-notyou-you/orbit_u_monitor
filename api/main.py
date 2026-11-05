@@ -1,91 +1,75 @@
-# api/main.py
 from __future__ import annotations
+
 from dotenv import load_dotenv
+
 load_dotenv()
+
 import logging
 import mimetypes
 import os
-import time
-
-mimetypes.add_type("image/webp", ".webp")
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-from fastapi import Depends, FastAPI, Request, Response
+from collections.abc import AsyncGenerator
+
+from fastapi import Depends, FastAPI
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from etl.database_client import DatabaseClient
+
 from api import errors
 from api.activity import ActivityLogMiddleware
-# get_db di-re-export supaya `from api.main import get_db` tetap jalan; objeknya
-# sama persis dengan api.deps.get_db, jadi dependency_overrides lewat jalur mana
-# pun mengenai callable yang sama.
-from api.deps import get_db, require_role, set_clients
-from api.security import jwt_secret
+from api.compression import GZipTextMiddleware
+from api.deps import get_db, require_role, set_clients  # noqa: F401  (get_db di-re-export)
 from api.routes import (
-    admin, admin_monitor, alerts, auth, citra, data, datasets, diagram, excel, disasters, health, hydromet, lineage,
-    live, lokasi, logs, pipeline,
-    products, public, quality, regions, report, reports, scenes, storage,
+    admin, admin_monitor, alerts, auth, citra, data, datasets, diagram, disasters, excel, health, hydromet,
+    lineage, live, lokasi, logs, pipeline, products, public, quality, regions, report, reports, scenes, storage,
 )
+from api.security import jwt_secret
+from etl.database_client import DatabaseClient
 
+mimetypes.add_type("image/webp", ".webp")
 logger = logging.getLogger(__name__)
-_app_client: DatabaseClient | None = None
-_etl_client: DatabaseClient | None = None
-_scheduler = None
+
+
+def _env_flag(name: str) -> bool:
+    return os.getenv(name, "true").lower() in ("1", "true", "yes")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    global _app_client, _etl_client, _scheduler
-    jwt_secret()  # gagal keras di startup bila JWT_SECRET kosong/pendek
-    # Request API: monitor_app (NOINHERIT, SET LOCAL ROLE per request).
-    # Kerja latar (job dataset, Live, penghapusan): monitor_etl.
-    # Tidak ada koneksi superuser dari aplikasi (DATABASE.md §8.1).
-    logger.info("[API] startup: initializing DatabaseClients (monitor_app, monitor_etl)")
-    _app_client = DatabaseClient.from_env("app")
-    _etl_client = DatabaseClient.from_env("etl")
-    set_clients(_app_client, _etl_client)
-    health_info = _app_client.check_health()
+    jwt_secret()
+    app_client = DatabaseClient.from_env("app")
+    etl_client = DatabaseClient.from_env("etl")
+    set_clients(app_client, etl_client)
+    health_info = app_client.check_health()
     if not health_info.get("connected"):
         logger.error("[API] DB health check FAILED: %s", health_info)
-    else:
-        logger.info("[API] DB connected. Pool: %s", health_info)
-        if os.getenv("AUTO_RESUME_JOBS", "true").lower() in ("1", "true", "yes"):
-            try:
-                from etl.dataset_manager import DatasetManager
-                resumed = DatasetManager(_etl_client).recover_interrupted_jobs()
-                if resumed:
-                    logger.warning("[API] %d job terputus dilanjutkan: %s", len(resumed), resumed)
-            except Exception:
-                logger.exception("[API] gagal memulihkan job yang terputus")
+    elif _env_flag("AUTO_RESUME_JOBS"):
+        try:
+            from etl.dataset_manager import DatasetManager
+            resumed = DatasetManager(etl_client).recover_interrupted_jobs()
+            if resumed:
+                logger.warning("[API] %d job terputus dilanjutkan: %s", len(resumed), resumed)
+        except Exception:
+            logger.exception("[API] gagal memulihkan job yang terputus")
 
-    # Scheduler tunggal (PIPELINE §7): hidromet, Live, laporan, masing-masing
-    # di bawah advisory lock PostgreSQL. Bisa dimatikan untuk worker API
-    # tambahan (SCHEDULER_ENABLED=false); advisory lock tetap menjaga bila tidak.
-    if os.getenv("SCHEDULER_ENABLED", "true").lower() in ("1", "true", "yes"):
+    scheduler = None
+    if _env_flag("SCHEDULER_ENABLED"):
         try:
             from etl.scheduler import Scheduler
-            _scheduler = Scheduler(_etl_client)
-            _scheduler.start()
-            logger.info("[API] Scheduler started")
+            scheduler = Scheduler(etl_client)
+            scheduler.start()
         except Exception:
-            logger.exception(
-                "[API] Scheduler gagal dimulai (cek instalasi rasterio/apscheduler). "
-                "API tetap jalan, tapi job terjadwal tidak akan berjalan."
-            )
-            _scheduler = None
+            logger.exception("[API] Scheduler gagal dimulai; job terjadwal tidak berjalan")
+            scheduler = None
+    app.state.scheduler = scheduler
 
     yield
 
-    logger.info("[API] shutdown: stopping Scheduler")
-    if _scheduler:
-        _scheduler.shutdown()
-
-    logger.info("[API] shutdown: disposing DatabaseClients")
+    if scheduler:
+        scheduler.shutdown()
     set_clients(None, None)
-    for client in (_app_client, _etl_client):
-        if client:
-            client.dispose()
+    app_client.dispose()
+    etl_client.dispose()
 
 
 app = FastAPI(
@@ -99,81 +83,51 @@ app = FastAPI(
         'Errors use `{"detail": "...", "code": "..."}`.'
     ),
     version="2.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
     lifespan=lifespan,
 )
-
-# Tanpa CORS: frontend disajikan dari origin yang sama (INTERFACE.md §1),
-# cookie SameSite=Strict.
 app.add_middleware(ActivityLogMiddleware)
-
-
-@app.middleware("http")
-async def log_requests(request: Request, call_next) -> Response:
-    start = time.perf_counter()
-    response: Response = await call_next(request)
-    elapsed_ms = int((time.perf_counter() - start) * 1000)
-    logger.info("%s %s -> %d (%dms)", request.method, request.url.path, response.status_code, elapsed_ms)
-    return response
-
-
+app.add_middleware(GZipTextMiddleware)
 errors.install(app)
 
 
-# Info API. Dulu ada di "/", lalu tergeser waktu web UI di-mount di "/" (commit
-# 76bdcc3). Sekarang tinggal di "/api" bersama route lainnya, sedangkan "/"
-# memang milik UI.
 @app.get("/api", include_in_schema=False, dependencies=[Depends(require_role("PUBLIC"))])
 async def api_info() -> dict:
     return {"message": app.title, "docs": app.docs_url, "version": app.version}
 
 
-def _role(min_role: str) -> list:
-    return [Depends(require_role(min_role))]
-
-
-# Role minimum per kelompok (INTERFACE.md §4). Route yang butuh role lebih
-# tinggi, atau unduhan, menambah require_role(...) sendiri.
-app.include_router(health.router, prefix="/api", tags=["Health"], dependencies=_role("PUBLIC"))
-app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
-app.include_router(public.router, prefix="/api/public", tags=["Public"], dependencies=_role("PUBLIC"))
-# Pantau Lokasi di Beranda (M63): kondisi per kecamatan, batas waktu di VIEW.
-app.include_router(lokasi.router, prefix="/api/public/lokasi", tags=["Public"], dependencies=_role("PUBLIC"))
-# Susunan halaman v2 (M56): Citra per satelit, batas waktu per role di VIEW.
-app.include_router(citra.router, prefix="/api/citra", tags=["Imagery"], dependencies=_role("PUBLIC"))
-app.include_router(diagram.router, prefix="/api/diagram", tags=["Diagram"], dependencies=_role("ANALYST"))
-app.include_router(data.router, prefix="/api/data", tags=["Data"], dependencies=_role("DATA_ENGINEER"))
-# Log per halaman: role per route (DATA_ENGINEER / ANALYST), tidak bertingkat.
-app.include_router(logs.router, prefix="/api/logs", tags=["Logs"], dependencies=_role("USER"))
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"], dependencies=_role("ADMIN"))
-app.include_router(scenes.router, prefix="/api/scenes", tags=["Scenes"], dependencies=_role("DATA_ENGINEER"))
-app.include_router(products.router, prefix="/api/products", tags=["Products"], dependencies=_role("DATA_ENGINEER"))
-app.include_router(quality.router, prefix="/api/quality", tags=["Quality"], dependencies=_role("DATA_ENGINEER"))
-app.include_router(lineage.router, prefix="/api/metadata", tags=["Lineage"], dependencies=_role("DATA_ENGINEER"))
-# /api/preview/* (thumbnail on-the-fly dari COG) sudah dipensiunkan: galeri
-# membaca PNG tier PREVIEW lewat /api/datasets/{id}/preview, dan dua jalur
-# render dengan stretch/NoData berbeda berarti dua definisi "preview".
-# /api/storage/* membaca disk seluruh mesin -> ADMIN (Tahap 2, S5).
-app.include_router(storage.router, prefix="/api/storage", tags=["Storage"], dependencies=_role("ADMIN"))
-app.include_router(pipeline.router, prefix="/api/pipeline", tags=["Pipeline"], dependencies=_role("DATA_ENGINEER"))
-app.include_router(datasets.router, prefix="/api/datasets", tags=["Datasets"], dependencies=_role("DATA_ENGINEER"))
-app.include_router(report.router, prefix="/api/datasets", tags=["Report"], dependencies=_role("DATA_ENGINEER"))
-app.include_router(live.router, prefix="/api/live", tags=["Live"], dependencies=_role("USER"))
-# Peta kecamatan AOI terbuka untuk Beranda publik (M56); ROI sistem tetap USER.
-app.include_router(regions.router, prefix="/api/regions", tags=["Regions"], dependencies=_role("PUBLIC"))
-app.include_router(regions.rois_router, prefix="/api/rois", tags=["Regions"], dependencies=_role("USER"))
-# Tahap 3: monitoring (INTERFACE.md §4.4–4.6, §4.9).
-app.include_router(admin_monitor.router, prefix="/api/admin", tags=["Admin"], dependencies=_role("ADMIN"))
-app.include_router(hydromet.router, prefix="/api/hydromet", tags=["Hydromet"], dependencies=_role("USER"))
-app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"], dependencies=_role("USER"))
-app.include_router(alerts.rules_router, prefix="/api/alert-rules", tags=["Alerts"], dependencies=_role("USER"))
-app.include_router(disasters.router, prefix="/api/disasters", tags=["Disasters"], dependencies=_role("PUBLIC"))
-app.include_router(disasters.types_router, prefix="/api/disaster-types", tags=["Disasters"],
-                   dependencies=_role("PUBLIC"))
-app.include_router(reports.router, prefix="/api/reports", tags=["Reports"], dependencies=_role("USER"))
-app.include_router(excel.router, prefix="/api/excel", tags=["Excel"], dependencies=_role("USER"))
+_ROUTERS = [
+    (health.router, "/api", "Health", "PUBLIC"),
+    (auth.router, "/api/auth", "Auth", None),
+    (public.router, "/api/public", "Public", "PUBLIC"),
+    (lokasi.router, "/api/public/lokasi", "Public", "PUBLIC"),
+    (citra.router, "/api/citra", "Imagery", "PUBLIC"),
+    (diagram.router, "/api/diagram", "Diagram", "ANALYST"),
+    (data.router, "/api/data", "Data", "DATA_ENGINEER"),
+    (logs.router, "/api/logs", "Logs", "USER"),
+    (admin.router, "/api/admin", "Admin", "ADMIN"),
+    (scenes.router, "/api/scenes", "Scenes", "DATA_ENGINEER"),
+    (products.router, "/api/products", "Products", "DATA_ENGINEER"),
+    (quality.router, "/api/quality", "Quality", "DATA_ENGINEER"),
+    (lineage.router, "/api/metadata", "Lineage", "DATA_ENGINEER"),
+    (storage.router, "/api/storage", "Storage", "ADMIN"),
+    (pipeline.router, "/api/pipeline", "Pipeline", "DATA_ENGINEER"),
+    (datasets.router, "/api/datasets", "Datasets", "DATA_ENGINEER"),
+    (report.router, "/api/datasets", "Report", "DATA_ENGINEER"),
+    (live.router, "/api/live", "Live", "USER"),
+    (regions.router, "/api/regions", "Regions", "PUBLIC"),
+    (regions.rois_router, "/api/rois", "Regions", "USER"),
+    (admin_monitor.router, "/api/admin", "Admin", "ADMIN"),
+    (hydromet.router, "/api/hydromet", "Hydromet", "USER"),
+    (alerts.router, "/api/alerts", "Alerts", "USER"),
+    (alerts.rules_router, "/api/alert-rules", "Alerts", "USER"),
+    (disasters.router, "/api/disasters", "Disasters", "PUBLIC"),
+    (disasters.types_router, "/api/disaster-types", "Disasters", "PUBLIC"),
+    (reports.router, "/api/reports", "Reports", "USER"),
+    (excel.router, "/api/excel", "Excel", "USER"),
+]
+for _router, _prefix, _tag, _min_role in _ROUTERS:
+    app.include_router(_router, prefix=_prefix, tags=[_tag],
+                       dependencies=[Depends(require_role(_min_role))] if _min_role else [])
 
 
 def route_min_roles(route) -> list[tuple[str, bool]]:
@@ -195,29 +149,26 @@ _ROLE_ORDER = ("PUBLIC", "USER", "ANALYST", "DATA_ENGINEER", "ADMIN")
 
 
 def custom_openapi() -> dict:
-    """OpenAPI dengan `x-min-role`, deskripsi, contoh, dan skema error per operasi (INTERFACE.md §6.1)."""
     if app.openapi_schema:
         return app.openapi_schema
-    schema = get_openapi(title=app.title, version=app.version, description=app.description,
-                         routes=app.routes)
+    schema = get_openapi(title=app.title, version=app.version, description=app.description, routes=app.routes)
+    paths = schema.get("paths", {})
     for route in app.routes:
         roles = route_min_roles(route)
         if not roles or not getattr(route, "include_in_schema", False):
             continue
         strongest = max((r for r, _ in roles), key=_ROLE_ORDER.index)
         for method in getattr(route, "methods", ()):
-            op = schema.get("paths", {}).get(route.path_format, {}).get(method.lower())
+            op = paths.get(route.path_format, {}).get(method.lower())
             if op is not None:
                 op["x-min-role"] = strongest
                 if any(d for _, d in roles):
                     op["x-download"] = True
     schema.setdefault("components", {}).setdefault("securitySchemes", {}).update({
-        "bearerToken": {"type": "http", "scheme": "bearer",
-                        "description": "Personal API token trn_... (GET only)"},
+        "bearerToken": {"type": "http", "scheme": "bearer", "description": "Personal API token trn_... (GET only)"},
         "sessionCookie": {"type": "apiKey", "in": "cookie", "name": "orbit_u_session"},
     })
     schema["security"] = [{"bearerToken": []}, {"sessionCookie": []}]
-    # Deskripsi, contoh, dan skema error untuk developer (INTERFACE.md §6.1).
     from api.openapi_docs import enrich
     enrich(schema)
     app.openapi_schema = schema
@@ -227,42 +178,19 @@ def custom_openapi() -> dict:
 app.openapi = custom_openapi
 
 
-# Susunan halaman v2 (M56): aplikasi /app terbuka untuk pengunjung, jadi "/"
-# langsung menyajikannya (Beranda). Halaman publik lama dialihkan ke tab
-# padanannya: /kondisi -> Citra Satelit, /relief -> 3D AOI (butuh akun; router
-# mengantar pengunjung ke /masuk). Halaman HTML tidak membawa data; izin
-# disusun app.js dari /api/auth/session dan data tetap dijaga API.
-from fastapi.responses import RedirectResponse  # noqa: E402
+def _page(path: str, file: str) -> None:
+    app.add_api_route(path, lambda: FileResponse(file), include_in_schema=False)
 
 
-@app.get("/", include_in_schema=False)
-async def web_home() -> FileResponse:
-    return FileResponse("web/app.html")
+def _redirect(path: str, target: str) -> None:
+    app.add_api_route(path, lambda: RedirectResponse(target, status_code=301), include_in_schema=False)
 
 
-@app.get("/app", include_in_schema=False)
-async def web_app() -> FileResponse:
-    return FileResponse("web/app.html")
-
-
-@app.get("/kondisi", include_in_schema=False)
-async def web_conditions() -> RedirectResponse:
-    return RedirectResponse("/app#citra", status_code=301)
-
-
-@app.get("/relief", include_in_schema=False)
-async def web_relief() -> RedirectResponse:
-    return RedirectResponse("/app#aoi-3d", status_code=301)
-
-
-@app.get("/masuk", include_in_schema=False)
-async def web_login() -> FileResponse:
-    return FileResponse("web/masuk.html")
-
-
-@app.get("/daftar", include_in_schema=False)
-async def web_register() -> FileResponse:
-    return FileResponse("web/daftar.html")
-
+_page("/", "web/app.html")
+_page("/app", "web/app.html")
+_page("/masuk", "web/masuk.html")
+_page("/daftar", "web/daftar.html")
+_redirect("/kondisi", "/app#citra")
+_redirect("/relief", "/app#aoi-3d")
 
 app.mount("/", StaticFiles(directory="web", html=True), name="web")

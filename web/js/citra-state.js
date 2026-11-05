@@ -1,9 +1,4 @@
-// js/citra-state.js — status bersama tab Citra Satelit (M56): area terpilih
-// dan teks batas waktu per peran. Dimuat app.html supaya tab per satelit dan
-// laporan bisa dibuka langsung tanpa lewat Ringkasan.
 'use strict';
-// Area dan teks batas waktu dipakai bersama oleh tab Citra (ringkasan, per
-// satelit, laporan) supaya area yang dipilih ikut saat berpindah tab.
 window.CitraState = window.CitraState || (() => {
   let areaId = null;
   try { areaId = Number(sessionStorage.getItem('citra.area')) || null; } catch (e) { areaId = null; }

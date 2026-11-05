@@ -1,17 +1,4 @@
-# api/routes/excel.py
-"""Ekspor/impor Excel generik (Tahap 3; registri di ``etl/excel_io.py``).
-
-    GET  /excel                         daftar jenis data + kemampuan untuk role pemanggil
-    GET  /excel/{entity}.xlsx           ekspor (?date_from=&date_to=), dicatat DOWNLOAD_XLSX
-    GET  /excel/{entity}/template.xlsx  templat impor (kolom + petunjuk)
-    POST /excel/{entity}/import         body = isi berkas .xlsx (?dry_run=true); semua atau tidak sama sekali
-
-Router dijaga ``require_role("USER")``; role per jenis data dicek di sini
-(403 ``ENTITY_FORBIDDEN``) dan kueri tetap berjalan di bawah role pemanggil,
-jadi GRANT/RLS PostgreSQL menjadi lapis terakhir. Unggahan dikirim sebagai
-body mentah (``Content-Type: application/vnd.openxmlformats-officedocument.
-spreadsheetml.sheet``), tanpa multipart.
-"""
+"""Ekspor/impor Excel generik (Tahap 3; registri di ``etl/excel_io.py``)."""
 
 from __future__ import annotations
 
@@ -102,7 +89,6 @@ async def import_(entity: str, request: Request, sess: Session = Depends(get_ses
     except ValueError as exc:
         raise ApiError(400, str(exc), "INVALID_IMPORT_FILE")
     if summary["errors"]:
-        # Tidak ada yang ditulis (SAVEPOINT dibatalkan); semua error per baris dikembalikan.
         return JSONResponse(status_code=422, content={
             **error_body(422, f"{len(summary['errors'])} row(s) invalid; nothing was imported", "IMPORT_ROWS_INVALID"),
             "errors": summary["errors"], "rows": summary.get("rows")})

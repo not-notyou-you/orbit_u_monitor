@@ -1,19 +1,5 @@
-# etl/forecast_store.py
 """Forecast tersimpan (M62, PIPELINE.md §14): dihitung saat data baru masuk,
 dibaca halaman Forecast tanpa menghitung ulang.
-
-Deret: setiap band per kecamatan (band_catalog.REGION_BANDS) × (rerata AOI +
-setiap kecamatan AOI). Setiap band punya **cap data** = max(computed_at)
-region_observations band itu dan max(updated_at) live_scenes. refresh()
-hanya menghitung deret yang cap tersimpannya berbeda dari cap sekarang, jadi
-memanggilnya setelah setiap job murah: band yang tidak berubah dilewati.
-
-Dipanggil di akhir Job Hidromet (harian, Late->Final, backfill), siklus Live
-(Sentinel-1), dan job penjadwal ``forecast_refresh`` tiap 6 jam sebagai jaring
-pengaman. Satu pekerja sekaligus lewat advisory lock ``forecast``. Riwayat
-lebih dari 365 hari dihapus.
-
-Manual:  python -m etl.forecast_store [--force]
 """
 from __future__ import annotations
 
@@ -122,7 +108,7 @@ def latest(sess: Session, band: str, region_id: int | None) -> dict | None:
     backtest = None if row["backtest_origins"] is None else {
         "origins": row["backtest_origins"], "horizon": row["horizon"], "mae": _num(row["mae"]),
         "mae_naive": _num(row["mae_naive"]), "skill": _num(row["skill"]), "mae_by_model": scores}
-    iso = lambda d: d.isoformat() if d else None  # noqa: E731
+    iso = lambda d: d.isoformat() if d else None
     return {"band_code": band, "horizon": row["horizon"], "interval": bf.INTERVAL, "n_obs": row["n_obs"],
             "history_from": iso(row["history_from"]), "last_obs_date": iso(row["last_obs_date"]),
             "model": row["model"], "model_label": bf.MODEL_LABELS.get(row["model"]),

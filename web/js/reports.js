@@ -1,15 +1,3 @@
-// js/reports.js — Laporan (#laporan/kesehatan-data, #laporan/keadaan-aoi; INTERFACE.md §2
-// halaman 7, §4.8). Jenis laporan dari tab router (ctx.tab.kind). Daftar
-// disaring RLS per audiens; "Buat sendiri" = GET /api/reports/custom.pdf (M56).
-//
-// M68: dua kartu laporan terbaru (mingguan, bulanan) di atas; saringan satu
-// baris yang langsung berlaku saat diubah; rentang bebas dan "buat ulang
-// periode" (Administrator) lewat dialog, bukan kotak tetap di panel kiri.
-//
-// M75: setiap permintaan memeriksa bahwa halaman yang memulainya masih yang
-// tampil (st yang sama) sebelum menulis ke layar. Dulu berpindah tab
-// Laporan saat daftar masih dimuat membuat permintaan lama menulis ke tab
-// baru, atau melempar galat karena st sudah dikosongkan.
 'use strict';
 Pages['reports'] = (() => {
   const TABS = [
@@ -36,7 +24,6 @@ Pages['reports'] = (() => {
 
   const download = x => API.download('/api/reports/' + x.report_id + '/download', x.file_name || 'laporan.pdf');
 
-  // Kartu laporan terbaru per periode: yang paling sering dicari.
   async function loadLatest() {
     const my = st;
     const box = UI.$('#rpLatest', my.root);
@@ -95,7 +82,6 @@ Pages['reports'] = (() => {
     st.ctx.setStatus('Siap · ' + UI.int(r.total) + ' laporan');
   }
 
-  // Rentang bebas: PDF dibuat saat itu juga dan langsung diunduh; tidak disimpan di daftar.
   async function custom() {
     const today = UI.isoDate(new Date());
     const v = await UI.dialog({ title: 'Buat laporan rentang bebas', kind: 'question',

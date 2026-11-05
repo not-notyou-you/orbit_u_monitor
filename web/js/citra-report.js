@@ -1,8 +1,3 @@
-// js/citra-report.js — Citra Satelit › Laporan PDF (#citra/laporan, INTERFACE.md §2
-// halaman 3.5, M56). GET /api/citra/report.pdf?pages=…&date=…&compare=…
-// Halaman yang dicentang (Ringkasan, Sentinel-1, MODIS, GPM) masuk ke SATU
-// PDF dengan urutan tetap seperti menu. Tanggal yang ditawarkan hanya yang
-// terlihat untuk peran pemanggil, dan API menegakkan batas yang sama.
 'use strict';
 Pages['citra-report'] = (() => {
   const LABEL = { ringkasan: 'Ringkasan', s1: 'Sentinel-1', modis: 'MODIS', gpm: 'GPM' };
@@ -33,8 +28,6 @@ Pages['citra-report'] = (() => {
     st.area = summary.area;
     CitraState.setArea(summary.area.area_id);
     $('#crArea').innerHTML = summary.areas.map(a => '<option value="' + a.area_id + '"' + (a.area_id === summary.area.area_id ? ' selected' : '') + '>' + UI.esc(a.area_name) + '</option>').join('');
-    // Daftar GPM = semua tanggal scene + semua hari angka harian (backfill),
-    // jadi tanggal hasil backfill juga bisa dicetak (angka tanpa gambar).
     const r = await API.get('/api/citra/areas/' + summary.area.area_id + '/scenes' + API.qs({ source: 'gpm' }));
     const opt = d => '<option value="' + d.date + '">' + UI.esc(UI.date(d.date)) +
       (d.has_images ? '' : d.has_scene ? ' (tanpa gambar)' : ' (angka harian saja)') + '</option>';

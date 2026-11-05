@@ -1,14 +1,8 @@
-# etl/report_hydromet.py
-"""Laporan Hidromet mingguan/bulanan untuk ANALYST (PIPELINE.md §6.2).
-
-Sembilan bagian; semua angka dibaca dari DB pada periode itu. Bagian tanpa
-data menampilkan tabel "—" dan catatan, tidak pernah angka contoh.
-"""
+"""Laporan Hidromet mingguan/bulanan untuk ANALYST (PIPELINE.md §6.2)."""
 
 from __future__ import annotations
 
 import json
-from collections import defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -77,7 +71,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
     events = sess.execute(text("""SELECT * FROM v_kejadian_dan_hujan WHERE event_date BETWEEN :a AND :b
                                   ORDER BY event_date, region_name"""), {"a": start, "b": end}).mappings().all()
 
-    # 1 -------------------------------------------------------------------------
     doc.h1("1. Ringkasan eksekutif")
     total_aoi = _aoi_mean(list(totals.values()))
     heavy_days = [d for d in days if any(
@@ -94,7 +87,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
     doc.note("Total hujan AOI = rerata antar kecamatan AOI dari jumlah hujan 24 jam harian selama periode. "
              "Hari lebat memakai ambang BMKG hujan lebat (50 mm/hari).")
 
-    # 2 -------------------------------------------------------------------------
     doc.h1("2. Hujan per kecamatan")
     header = ["Tanggal (UTC)"] + [r["region_name"] for r in regions]
     rows = [[d.isoformat()] + [num(rain.get((r["region_id"], d), {}).get("rain_24h_mm")) for r in regions]
@@ -107,7 +99,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
     else:
         doc.note("Peta koroplet tidak dibuat: tidak ada data hujan pada periode ini.")
 
-    # 3 -------------------------------------------------------------------------
     doc.h1("3. Grafik hujan 24 jam dan 72 jam")
     thresholds = sess.execute(text("""
         SELECT b.band_code, ru.threshold_value, ru.severity FROM alert_rules ru JOIN spectral_bands b USING (band_id)
@@ -119,7 +110,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
         doc.p(DASH)
         doc.note("Grafik tidak dibuat: tidak ada data hujan pada periode ini.")
 
-    # 4 -------------------------------------------------------------------------
     doc.h1("4. Alert")
     def _resp(a):
         if a["acknowledged_at"] is None:
@@ -132,7 +122,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
                 "dibaca" if a["acknowledged_at"] else "aktif", _resp(a)] for a in alerts],
               empty="Tidak ada alert pada periode ini.")
 
-    # 5 -------------------------------------------------------------------------
     doc.h1("5. Kejadian bencana dan hujan H-0..H-2")
     doc.table(["Tanggal", "Jenis", "Kecamatan", "Desa", "Terverifikasi", "24h H-0", "24h H-1", "24h H-2", "72h H-0"],
               [[e["event_date"].isoformat(), e["disaster_type_code"], e["region_name"], txt(e["village_name"]),
@@ -140,7 +129,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
                 num(e["rain_24h_h2"]), num(e["rain_72h_h0"])] for e in events],
               empty="Tidak ada kejadian bencana tercatat pada periode ini.")
 
-    # 6 -------------------------------------------------------------------------
     doc.h1("6. Evaluasi alert")
     if is_monthly(code):
         counts = dict(sess.execute(text("""SELECT outcome, count(*) FROM v_evaluasi_alert
@@ -154,7 +142,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
     else:
         doc.p("Hanya dimuat di laporan bulanan.")
 
-    # 7 -------------------------------------------------------------------------
     doc.h1("7. Vegetasi dan genangan")
     veg = sess.execute(text("""
         SELECT o.region_id, b.band_code, avg(o.value) AS v, count(o.value) AS n
@@ -171,7 +158,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
               vrows if any(v[1] != DASH or v[2] != DASH or v[4] != DASH for v in vrows) else [])
     doc.note("Indikator kekeringan: hujan 30 hari (RAIN_30D) yang rendah bersama NDVI yang turun.")
 
-    # 8 -------------------------------------------------------------------------
     doc.h1("8. Ringkasan Live (Sentinel-1)")
     live = sess.execute(text("""
         SELECT a.name AS area_name, s.scene_date, s.status,
@@ -188,7 +174,6 @@ def build(sess, code: str, start: date, end: date, workdir: Path, notes: list[st
                 num(l["receded_km2"], 2), DASH if l["same_orbit"] is None else ("ya" if l["same_orbit"] else "tidak")]
                for l in live], empty="Tidak ada scene Sentinel-1 pada periode ini.")
 
-    # 9 -------------------------------------------------------------------------
     doc.h1("9. Catatan keterbatasan")
     doc.bullets(LIMITATIONS)
     return doc

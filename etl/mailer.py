@@ -1,28 +1,4 @@
-# etl/mailer.py
-"""Kirim email (peringatan dan konfirmasi, M64) dan cek alamat email.
-
-Pustaka standar saja (smtplib + email.message); satu-satunya tambahan adalah
-dnspython untuk membaca rekaman MX domain.
-
-Konfigurasi dari .env (nama mengikuti konvensi fastapi-mail):
-    MAIL_SERVER, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD, MAIL_FROM,
-    MAIL_STARTTLS (True/False), MAIL_SSL_TLS (True/False)
-    MAIL_BACKEND   smtp (bawaan) | file -- `file` menulis .eml ke
-                   LOGS_DIR/mail tanpa mengirim (pengembangan dan uji)
-    MAIL_MAX_PER_RUN  batas email peringatan per putaran job (bawaan 200)
-    MAIL_CHECK_DNS    false = lewati cek MX domain (pengembangan offline dan
-                   tests/conftest.py; alamat uji @example.org memakai null MX)
-    APP_BASE_URL   alamat aplikasi untuk tautan di email, mis.
-                   https://orbit-u.example.org (kosong = tanpa tautan)
-
-MAIL_PASSWORD tidak pernah ditulis ke log atau pesan galat.
-
-Pengecekan email (check_deliverable) sengaja sederhana: format, lalu domain
-punya server mail (MX; tanpa MX boleh rekaman A, RFC 5321 §5.1). Kotak surat
-yang tidak ada di domain yang valid TIDAK bisa diketahui di sini -- server
-pengirim seperti Gmail menerima dulu, lalu pantulannya masuk ke inbox
-pengirim belakangan.
-"""
+"""Kirim email (peringatan dan konfirmasi, M64) dan cek alamat email."""
 from __future__ import annotations
 
 import logging
@@ -40,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 SENDER_NAME = "Orbit-U: The Monitor"
-# Logo di pita judul email (notify_email._page merujuknya sebagai cid:orbitu-logo).
 LOGO_PNG = Path(__file__).resolve().parents[1] / "web" / "assets" / "img" / "logo.png"
 
 
@@ -73,7 +48,7 @@ class MailConfig:
     max_per_run: int
 
     @classmethod
-    def from_env(cls) -> "MailConfig":
+    def from_env(cls) -> MailConfig:
         g = os.getenv
         return cls(
             server=(g("MAIL_SERVER") or "").strip(),
@@ -102,8 +77,6 @@ class MailConfig:
 def outbox_dir() -> Path:
     return Path(os.getenv("LOGS_DIR", "logs")) / "mail"
 
-
-# ------------------------------------------------------------------- pesan
 
 def build_message(cfg: MailConfig, to: str, subject: str, text: str, html: str | None = None,
                   images: list[tuple[str, bytes]] | None = None) -> EmailMessage:
@@ -163,8 +136,6 @@ def send(cfg: MailConfig, msg: EmailMessage) -> str:
     except (smtplib.SMTPException, OSError) as exc:
         raise MailError("MAIL_SEND_FAILED", f"SMTP error: {exc.__class__.__name__}")
 
-
-# ---------------------------------------------------------------- cek alamat
 
 def normalize(email: str | None) -> str | None:
     e = (email or "").strip().lower()

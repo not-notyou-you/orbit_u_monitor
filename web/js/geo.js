@@ -1,30 +1,8 @@
-// web/js/geo.js — lokasi perangkat untuk "Lokasi saya" di Beranda (M63).
-//
-// Koordinat TIDAK pernah dikirim ke server: titik dicocokkan di browser dengan
-// poligon kecamatan AOI dari GET /api/regions (sudah publik, sudah di-cache
-// Maps.regions()), dan yang dipakai halaman hanya region_id hasilnya.
-//
-// Kompatibilitas (diuraikan di INTERFACE.md §2 halaman 1):
-// * Geolocation API hanya ada di konteks aman: HTTPS, atau localhost saat
-//   pengembangan. Lewat http://IP-LAN browser menolaknya tanpa bertanya.
-// * Permissions API untuk 'geolocation' tidak ada di Safari < 16 dan
-//   sebagian WebView; tanpa itu keadaannya dianggap 'prompt' (belum tahu),
-//   jadi halaman menampilkan tombol, bukan meminta izin sendiri.
-// * Izin TIDAK pernah diminta saat halaman dibuka. Hanya bila sudah
-//   'granted' lokasi dibaca otomatis; selain itu lewat tombol. Prompt
-//   otomatis cenderung ditolak refleks, dan di iOS penolakan per situs
-//   hanya bisa dibatalkan dari Pengaturan.
-// * enableHighAccuracy: false. Tingkat kecamatan cukup ±1 km; lokasi
-//   kasar (Wi-Fi/seluler) jauh lebih cepat dan hemat baterai daripada GPS.
-// * Desktop (Windows/macOS) tanpa GPS memperkirakan lokasi dari Wi-Fi/IP;
-//   akurasinya bisa beberapa km, jadi halaman menyebutnya "perkiraan".
 'use strict';
 
 const Geo = (() => {
-  // Di atas ini titiknya terlalu kasar untuk yakin soal kecamatan.
   const ROUGH_M = 2000;
 
-  // 'insecure' | 'unsupported' | 'granted' | 'prompt' | 'denied'
   async function state() {
     if (!window.isSecureContext) return 'insecure';
     if (!('geolocation' in navigator)) return 'unsupported';
@@ -37,8 +15,6 @@ const Geo = (() => {
     return 'prompt';
   }
 
-  // Dipanggil bila izin berubah dari luar halaman (pengguna mencabutnya di
-  // pengaturan situs). Mengembalikan fungsi untuk berhenti mendengar.
   function watchPermission(onChange) {
     let status = null, alive = true;
     const handler = () => { if (alive && status) onChange(status.state); };
@@ -57,8 +33,6 @@ const Geo = (() => {
     };
   }
 
-  // {lon, lat, accuracy} atau lempar {code, message} dengan code:
-  // 1 ditolak, 2 lokasi perangkat tidak tersedia, 3 waktu habis.
   function locate() {
     return new Promise((resolve, reject) => {
       if (!window.isSecureContext || !('geolocation' in navigator)) { reject({ code: 0 }); return; }
@@ -69,7 +43,6 @@ const Geo = (() => {
     });
   }
 
-  // Ray-casting genap-ganjil satu cincin [[lon, lat], ...].
   function inRing(x, y, ring) {
     let inside = false;
     for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -78,7 +51,6 @@ const Geo = (() => {
     }
     return inside;
   }
-  // Polygon: di dalam cincin luar dan tidak di dalam lubang mana pun.
   function inPolygon(x, y, rings) {
     if (!rings.length || !inRing(x, y, rings[0])) return false;
     for (let k = 1; k < rings.length; k++) if (inRing(x, y, rings[k])) return false;
@@ -90,12 +62,10 @@ const Geo = (() => {
     if (g.type === 'MultiPolygon') return g.coordinates.some(p => inPolygon(x, y, p));
     return false;
   }
-  // Fitur kecamatan yang memuat titik, atau null (di luar wilayah terdaftar).
   function regionAt(lon, lat, geojson) {
     return ((geojson && geojson.features) || []).find(f => inGeometry(lon, lat, f.geometry)) || null;
   }
 
-  // Penjelasan untuk orang, sesuai keadaan/kode galat.
   const REASON = {
     insecure: 'Lokasi perangkat hanya bisa dibaca lewat koneksi aman (HTTPS). Pilih kecamatan dari daftar.',
     unsupported: 'Peramban ini tidak mendukung lokasi perangkat. Pilih kecamatan dari daftar.',
@@ -106,7 +76,6 @@ const Geo = (() => {
     0: 'Lokasi perangkat tidak dapat dibaca. Pilih kecamatan dari daftar.',
   };
 
-  // Deteksi kasar platform, hanya untuk memilih teks petunjuk izin.
   function platform() {
     const ua = navigator.userAgent || '';
     if (/FBAN|FBAV|Instagram|Line\/|WhatsApp|; wv\)/i.test(ua)) return 'inapp';

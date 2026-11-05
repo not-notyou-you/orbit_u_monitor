@@ -1,18 +1,4 @@
-# etl/download_guard.py
-"""
-Pengaman bersama untuk tahap download (M1 Sentinel-1, M7 MODIS, M8 GPM).
-
-1. StallGuard — `timeout=` requests hanya membatasi jeda antar-paket, jadi
-   koneksi yang masih mengalir beberapa KB/s tidak pernah timeout dan bisa
-   menahan satu run berjam-jam. Guard ini membatalkan attempt kalau laju
-   rata-rata dalam satu jendela waktu di bawah ambang, sehingga logika retry
-   (dan resume Range di M1) yang sudah ada mengambil alih.
-
-2. find_reusable_file / adopt_file — granule MODIS/GPM dan ZIP Sentinel-1
-   identik antar-dataset (nama file = identitas produk). Sebelum mengunduh
-   ulang dari NASA/ESA, cari salinan lengkap di dataset lain lalu hardlink
-   (tanpa tambahan ruang disk; fallback copy kalau beda volume).
-"""
+"""Pengaman bersama untuk tahap download (M1 Sentinel-1, M7 MODIS, M8 GPM)."""
 from __future__ import annotations
 
 import logging
@@ -23,16 +9,11 @@ import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Iterable
+from collections.abc import Callable, Iterable
 
 logger = logging.getLogger(__name__)
 
-# Timeout (connect, read) untuk requests. 75 s: titik tengah antara 120 s lama
-# (terlalu lambat mendeteksi koneksi mati) dan 60 s yang sempat dicoba
-# (terlalu ketat begitu S1_PARALLEL_DOWNLOADS naik lagi ke 3 -- tiga transfer
-# berbagi bandwidth yang sama, jadi laju per-koneksi yang sehat pun turun).
 REQUEST_TIMEOUT = (30, 75)
-# Chunk kecil supaya StallGuard dan callback progress sering diperiksa.
 CHUNK_SIZE = 1024 * 1024
 
 
@@ -51,20 +32,10 @@ class StallGuard:
         self.min_bps = (
             min_bytes_per_sec
             if min_bytes_per_sec is not None
-            # 75 KB/s, bukan 100: dengan S1_PARALLEL_DOWNLOADS=3 tiga transfer
-            # berbagi bandwidth yang sama, jadi laju per-koneksi yang SEHAT pun
-            # ikut turun dibanding satu koneksi sendirian. Ambang 100 KB/s pas
-            # di 2 paralel sempat memicu retry pada koneksi yang sebenarnya
-            # cuma melambat karena berbagi jalur, bukan macet.
             else float(os.getenv("DOWNLOAD_MIN_KBPS", "75")) * 1024
         )
         self.window_s = (
             window_s if window_s is not None
-            # Scene S1 sehat (~2 GB) yang berhasil di log konsisten mengalir
-            # di kisaran MB/s dan selesai dalam 130-600 s total. 90 s -- titik
-            # tengah antara 180 s lama (macet 3 menit sebelum ketahuan) dan
-            # 60 s yang sempat dicoba (terlalu ketat begitu paralelisme naik
-            # lagi ke 3 dan laju per-koneksi wajar ikut turun).
             else float(os.getenv("DOWNLOAD_STALL_WINDOW_S", "90"))
         )
         self._clock = clock
@@ -121,8 +92,6 @@ def find_reusable_file(
 def adopt_file(src: Path, dst: Path) -> str:
     """Hardlink `src` ke `dst` (fallback copy). Mengembalikan 'link' / 'copy'."""
     dst.parent.mkdir(parents=True, exist_ok=True)
-    # Unik per proses+thread: nama tetap membuat dua pengadopsi berbarengan
-    # saling menghapus dan menimpa berkas sementara yang sama.
     tmp = dst.with_name(f"{dst.name}.{os.getpid()}.{threading.get_ident()}.adopt")
     tmp.unlink(missing_ok=True)
     try:
@@ -151,17 +120,6 @@ def reuse_granule(out_path: Path, source: str, root: Path, log_prefix: str) -> b
     return True
 
 
-# ---------------------------------------------------------------------------
-# Batas koneksi global per sumber + prioritas Dataset Saya di atas Live
-# ---------------------------------------------------------------------------
-#
-# S1_PARALLEL_DOWNLOADS (module5_orchestrator) berlaku PER JOB: dua dataset
-# yang jalan bersamaan + satu siklus Live sudah 9 koneksi CDSE, padahal CDSE
-# cuma mengizinkan 4 unduhan paralel per akun -- sisanya dijawab 429 dan scene
-# sehat gagal setelah jatah retry habis. Semaphore di sini batas atas lintas
-# job dalam satu proses. Lintas proses tidak perlu: JobLock sudah memastikan
-# satu job/daerah hanya dikerjakan satu proses.
-
 class PrioritySemaphore:
     """Semaphore dengan dua kelas penunggu. Penunggu prioritas rendah (Live)
     baru boleh mengambil slot kalau tidak ada penunggu prioritas normal
@@ -183,8 +141,6 @@ class PrioritySemaphore:
             finally:
                 if not low:
                     self._waiting_normal -= 1
-            # Penunggu rendah yang tadi tertahan oleh penunggu normal (bukan
-            # oleh slot) harus dibangunkan begitu antrean normal kosong.
             if self._value > 0:
                 self._cond.notify_all()
 
@@ -224,7 +180,6 @@ LAADS = "LAADS"
 GESDISC = "GESDISC"
 
 _SOURCE_SLOTS = {
-    # 3, bukan 4: menyisakan satu slot akun CDSE untuk browser/sesi lain.
     CDSE: PrioritySemaphore(int(os.getenv("CDSE_MAX_CONNECTIONS", "3"))),
     LAADS: PrioritySemaphore(int(os.getenv("LAADS_MAX_CONNECTIONS", "4"))),
     GESDISC: PrioritySemaphore(int(os.getenv("GESDISC_MAX_CONNECTIONS", "4"))),
@@ -242,14 +197,7 @@ def source_slot(source: str):
         sem.release()
 
 
-# ---------------------------------------------------------------------------
-# Jeda retry bersama (M1/M7/M8)
-# ---------------------------------------------------------------------------
-
-# Batas atas Retry-After: server yang meminta menunggu berjam-jam lebih baik
-# dianggap gagal di run ini daripada menahan worker (dan slot koneksinya).
 MAX_RETRY_AFTER_S = float(os.getenv("DOWNLOAD_MAX_RETRY_AFTER_S", "300"))
-# Kode yang berarti "server sibuk / menjatah", bukan transfer rusak.
 THROTTLE_STATUSES = frozenset({429, 503})
 
 
@@ -271,11 +219,6 @@ def retry_delay(attempt: int, retry_after: str | None = None) -> float:
     return min(60.0, 2.0 ** attempt) + random.uniform(0, 1.0)
 
 
-# Koneksi yang diputus server (SSL EOF, RemoteDisconnected, IncompleteRead)
-# biasanya berarti CDSE sedang gangguan beberapa menit, bukan file rusak.
-# Jeda 2 s/4 s (retry_delay) menghabiskan jatah dalam <10 detik -- dataset 54
-# 2026-09-30: 24 scene gagal dalam 2 menit selama outage ~4 menit. Di sini
-# 5, 10, 20, 40, 80 s (maks 120 s): total ~2.5 menit sebelum menyerah.
 CONNECTION_RETRY_BASE_S = float(os.getenv("CONNECTION_RETRY_BASE_S", "2.5"))
 CONNECTION_RETRY_MAX_S = 120.0
 
@@ -285,21 +228,11 @@ def connection_retry_delay(attempt: int) -> float:
     return delay + random.uniform(0, 2.0)
 
 
-# ---------------------------------------------------------------------------
-# Circuit breaker per sumber
-# ---------------------------------------------------------------------------
-#
-# Kalau beberapa worker kehilangan koneksi ke sumber yang sama dalam waktu
-# berdekatan, masalahnya ada di server, bukan di scene. Semua worker sumber
-# itu dijeda dulu (tanpa memakan jatah retry) supaya antrean tidak habis
-# terbakar satu per satu selama server down.
-
 BREAKER_WINDOW_S = float(os.getenv("DOWNLOAD_BREAKER_WINDOW_S", "30"))
 BREAKER_THRESHOLD = int(os.getenv("DOWNLOAD_BREAKER_THRESHOLD", "2"))
 BREAKER_COOLDOWN_S = float(os.getenv("DOWNLOAD_BREAKER_COOLDOWN_S", "90"))
 
 _breaker_lock = threading.Lock()
-# source -> daftar (waktu, thread_id) kegagalan koneksi terbaru
 _breaker_failures: dict[str, list[tuple[float, int]]] = {}
 _breaker_open_until: dict[str, float] = {}
 
@@ -354,10 +287,6 @@ def sleep_or_cancel(delay: float, cancel_event: threading.Event | None = None) -
         raise DownloadCancelled("job cancelled while waiting to retry")
 
 
-# ---------------------------------------------------------------------------
-# Kegagalan otentikasi NASA Earthdata
-# ---------------------------------------------------------------------------
-
 NASA_AUTH_MESSAGE = "NASA_EARTHDATA_TOKEN is invalid or expired"
 
 
@@ -389,16 +318,6 @@ def raise_for_nasa_auth(resp, source: str, url: str) -> None:
         record_auth_failure(source, msg)
         raise NasaAuthError(f"{msg}: {url}")
 
-
-# ---------------------------------------------------------------------------
-# Hambatan yang sedang terjadi, untuk loading bar di UI
-# ---------------------------------------------------------------------------
-#
-# Jeda retry (429/503, koneksi putus, login ulang) dulu cuma terlihat di log
-# server: di UI bar diam di persen yang sama sampai 5 menit dan tampak macet.
-# Thread unduhan menandai dataset yang sedang dikerjakannya (set_context),
-# lalu setiap jeda dicatat per dataset sampai waktunya habis. API membaca
-# catatan ini; tidak ada yang perlu dibersihkan karena kedaluwarsa sendiri.
 
 _ctx = threading.local()
 _waits: dict[int, dict] = {}
@@ -465,15 +384,6 @@ def active_auth_failures() -> dict[str, str]:
     with _auth_lock:
         return {s: m for s, (_, m) in _auth_failures.items()}
 
-
-# ---------------------------------------------------------------------------
-# Detak kemajuan per dataset (durasi & "tidak ada kemajuan sejak ...")
-# ---------------------------------------------------------------------------
-#
-# Dua sumber detak: setiap event pipeline (PipelineLogger.log_event -- awal &
-# akhir tiap tahap, progres unduhan) dan setiap potongan byte yang mengalir
-# (StallGuard.update). Kalkulasi/kalibrasi panjang tanpa event tetap dianggap
-# wajar sampai PROGRESS_STALL_AFTER_S (default 30 menit).
 
 PROGRESS_STALL_AFTER_S = float(os.getenv("PROGRESS_STALL_AFTER_S", "1800"))
 _activity: dict[int, float] = {}

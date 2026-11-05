@@ -1,6 +1,3 @@
-// js/create-dataset.js — wizard Buat Dataset (INTERFACE.md §2.6) [WARIS DataLab View 1].
-// Sumber dan level dipilih per satelit; fusi wajib bila > 1 sumber; rentang ≤ 366 hari;
-// "Pakai konfigurasi sebelumnya" per pengguna (/api/datasets/last-config, created_by).
 'use strict';
 Pages['create-dataset'] = (() => {
   const SOURCES = [
@@ -47,7 +44,6 @@ Pages['create-dataset'] = (() => {
   }
   function destroy() { if (st && st.map) st.map.remove(); st = null; }
 
-  // ---------------------------------------------------------------- lokasi
   function renderRois() {
     const q = UI.$('#cdSearch', st.root).value.trim().toLowerCase();
     const rows = st.rois.filter(r => !q || r.name.toLowerCase().includes(q) || (r.region_code || '').toLowerCase().includes(q));
@@ -72,7 +68,6 @@ Pages['create-dataset'] = (() => {
     review(); err('');
   }
 
-  // ---------------------------------------------------------------- sumber
   const enabled = () => SOURCES.map(s => s.key).filter(k => UI.$('[data-enable="' + k + '"]', st.root).checked);
   const levels = k => UI.$$('[data-level="' + k + '"]:checked', st.root).map(c => c.value);
   function setSource(k, on, lv) {
@@ -106,7 +101,6 @@ Pages['create-dataset'] = (() => {
   const tol = () => { const v = parseInt(UI.$('#cdTol', st.root).value, 10); return Number.isFinite(v) ? Math.min(14, Math.max(0, v)) : 2; };
   const sources = () => Object.fromEntries(enabled().filter(k => levels(k).length).map(k => [k, { processing: levels(k) }]));
 
-  // ---------------------------------------------------------------- langkah
   function validate(step) {
     const $ = s => UI.$(s, st.root);
     if (step === 1) {
@@ -142,7 +136,6 @@ Pages['create-dataset'] = (() => {
     UI.$('#cdSubmit', st.root).classList.toggle('hidden', n !== 4);
     err(''); review();
   }
-  // Maju hanya melewati langkah yang valid; mundur selalu boleh.
   function go(n) {
     n = Math.min(4, Math.max(1, n));
     for (let s = st.step; s < n; s++) { const m = validate(s); if (m) { show(s); err(m); return; } }
@@ -167,7 +160,6 @@ Pages['create-dataset'] = (() => {
     $('#cdReview').innerHTML = rows.map(([k, v]) => '<dt>' + k + '</dt><dd>' + UI.esc(v) + '</dd>').join('');
   }
 
-  // ---------------------------------------------------------------- konfigurasi sebelumnya
   function showClone(cfg) {
     st.lastCfg = cfg;
     UI.$('#cdClone', st.root).hidden = false;
@@ -196,7 +188,6 @@ Pages['create-dataset'] = (() => {
       (cfg.region_id && !st.rois.some(r => r.region_id === cfg.region_id) ? '\n\nLokasi "' + (cfg.region_name || cfg.region_id) + '" tidak tersedia lagi — pilih lokasi lain.' : ''));
   }
 
-  // ---------------------------------------------------------------- kirim
   async function submit(ev) {
     ev.preventDefault();
     for (let s = 1; s <= 4; s++) { const m = validate(s); if (m) { show(s); err(m); return; } }

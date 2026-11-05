@@ -1,4 +1,3 @@
-/* css/monitoring.css — Pantauan Live */
 .lm-meta { margin-top: 4px; font-size: 11px; grid-template-columns: max-content 1fr; }
 .lm-meta dt { color: var(--text-mut); letter-spacing: 0; text-transform: none; font-size: 11px; }
 .lm-wc { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }

@@ -1,4 +1,3 @@
-# etl/metadata_manager.py
 from __future__ import annotations
 import logging
 import socket
@@ -30,21 +29,7 @@ logger = logging.getLogger(__name__)
 def _fit_numeric(
     value: float, precision: int, scale: int, field: str, job_id: int
 ) -> float:
-    """Batasi `value` agar muat di NUMERIC(precision, scale).
-
-    Metrik yang kebesaran pernah menggagalkan SELURUH tahap, bukan cuma
-    metriknya: UPDATE yang menulis cpu_usage_percent juga menulis status
-    SUCCESS, jadi "numeric field overflow" membuat scene yang sudah selesai
-    diproses tercatat gagal (run 2026-09-20: 9 tahap di JAWA, 5 di
-    jan_mar_2025_hybrid, setelah GDAL memakai 24 core dan puncak CPU mencapai
-    1944% di kolom NUMERIC(5,2)).
-
-    Migrasi 022 melebarkan kolomnya, tapi pembatasan ini tetap ada sebagai
-    jaring pengaman: database yang belum dimigrasi, atau mesin dengan lebih
-    banyak core lagi, tidak boleh lagi kehilangan status job hanya karena
-    angka statistik. Nilai yang dipotong dicatat sebagai peringatan supaya
-    tidak hilang diam-diam.
-    """
+    """Batasi `value` agar muat di NUMERIC(precision, scale)."""
     limit = float(10 ** (precision - scale)) - float(10 ** -scale)
     if value > limit:
         logger.warning(
@@ -54,12 +39,6 @@ def _fit_numeric(
         return limit
     return value
 
-# Job yang sudah di-start_job tapi belum di-complete_job, per THREAD. Tingkat
-# modul, bukan atribut instance: module9 membuat MetadataManager-nya sendiri,
-# dan job yang dimulai lewat instance mana pun tetap harus bisa ditutup oleh
-# penangan error worker yang sama. Per thread karena beberapa dataset berjalan
-# bersamaan atas scene yang sama (try1/try2/try3 berbagi scene 45) -- menutup
-# "semua job RUNNING scene X" akan ikut menggagalkan job dataset lain.
 _open_jobs = threading.local()
 
 
@@ -83,15 +62,7 @@ class MetadataManager:
         *,
         nasa_scene_id: int | None = None,
     ) -> int:
-        """Daftarkan satu eksekusi tahap.
-
-        Jangkar job (M30): `scene_id` untuk tahap S1, `nasa_scene_id` untuk
-        tahap MODIS/GPM, atau keduanya None untuk tahap lintas sumber
-        (FUSION). Job berjangkar didedup per (jangkar, tahap, percobaan) --
-        pemanggil yang mendaftar ulang mendapat job yang sama. Job tanpa
-        jangkar tidak punya kunci alami, jadi setiap panggilan membuat baris
-        baru.
-        """
+        """Daftarkan satu eksekusi tahap."""
         if scene_id is not None and nasa_scene_id is not None:
             raise ValueError("A processing job is anchored to scene_id OR nasa_scene_id, not both")
         if scene_id is not None:
@@ -181,14 +152,7 @@ class MetadataManager:
         logger.info("[JOB] job_id=%d -> %s", job_id, status.value)
 
     def fail_open_jobs(self, exc: BaseException) -> list[int]:
-        """Tutup sebagai FAILED setiap job yang dimulai thread ini tapi belum
-        selesai.
-
-        Tahap pipeline memanggil start_job lalu bekerja lalu complete_job; kalau
-        pekerjaannya melempar (mis. MemoryError saat kalibrasi), complete_job
-        tidak pernah terpanggil dan job tertinggal RUNNING selamanya -- 16 job
-        CROP dataset 3 masih begitu. Dipanggil penangan error worker.
-        Tidak pernah melempar: tidak boleh menutupi error aslinya."""
+        """Tutup sebagai FAILED setiap job yang dimulai thread ini tapi belum selesai."""
         closed: list[int] = []
         for job_id in sorted(_open_job_ids()):
             try:
@@ -288,47 +252,9 @@ class MetadataManager:
         supersede_same_path: bool = False,
         nasa_scene_id: int | None = None,
     ) -> int:
-        """Daftarkan satu file keluaran ke `data_products`.
-
-        Asal produk (M30, chk_dprods_single_origin): SENTINEL1 mengisi
-        `scene_id`, MODIS/GPM mengisi `nasa_scene_id` (granule asal), FUSION
-        tidak mengisi keduanya -- asal-usulnya ada di fusion_products dan
-        data_lineage. Kunci dedup is_latest produk satu sumber adalah
-        (scene_id, nasa_scene_id, band_name, tier, dataset_id). Produk FUSION
-        tidak punya jangkar scene, jadi kunci itu akan menyamakan stack semua
-        tanggal; identitasnya adalah berkasnya, sehingga FUSION selalu didedup
-        lewat `supersede_same_path` (IMPLEMENTATION_NOTES K3).
-
-        `processing_level` ("RAW" | "PROCESSED") adalah level di
-        dataset_source_config yang memproduksi artefak ini — beda dari
-        `product_tier`, yang cuma menyatakan posisinya di lineage. Nilainya
-        datang dari SourcePlan.level_for_tier() (etl/processing_plan.py).
-        None berarti "tidak dinyatakan" dan dibiarkan diisi default kolom
-        ('PROCESSED'), yaitu perilaku pipeline sebelum migrasi 017.
-
-        `supersede_same_path` menambah satu syarat usang lagi: baris lain di
-        dataset ini yang menunjuk FILE YANG SAMA ikut ditandai tidak-terbaru,
-        siapa pun scene-nya. Dipakai artefak yang identitasnya adalah berkas
-        keluarannya, bukan scene asalnya — stack FUSION.
-
-        Kenapa perlu: nama berkas fusion cuma memuat tanggal
-        (`fusion_{tanggal}_{strategi}_{level}.h5`), sementara produknya
-        didaftarkan atas nama scene "primary" tanggal itu — dan primary bisa
-        BERGANTI antar jalan, karena ia sekadar anggota pertama setelah
-        diurutkan per pid, dan himpunan anggota yang sudah selesai berbeda
-        tiap kali job terputus lalu dilanjutkan. Tanpa syarat ini, jalan kedua
-        menimpa berkasnya tapi meninggalkan baris jalan pertama tetap
-        is_latest=True, mengklaim ukuran yang sudah tidak ada di disk.
-        Terukur di dataset 26 (JAWA): dua baris menunjuk
-        fusion_20251201_cooccurrence_processed.h5, satu mengaku
-        32040x103630 padahal berkasnya 31922x103248. Dataset 25 kena juga
-        (fusion_20250204_hybrid_processed.h5), cuma tidak kelihatan karena
-        bentuknya kebetulan sama.
-        """
+        """Daftarkan satu file keluaran ke `data_products`."""
         if processing_level is not None:
             processing_level = ProcessingLevelEnum(str(processing_level).upper()).value
-        # Nama warisan tidak pernah ditulis lagi (D14): dipetakan ke nama baru
-        # di sini, satu-satunya jalur tulis data_products.
         product_tier = tn.canonical_tier(product_tier, source)
         anchored = scene_id is not None or nasa_scene_id is not None
         if not anchored:
@@ -393,14 +319,7 @@ class MetadataManager:
         return product_id
 
     def mark_products_invalid_by_paths(self, dataset_id: int | None, paths: list[str]) -> int:
-        """Tandai is_valid=False untuk produk yang file-nya baru dihapus,
-        dicocokkan lewat file_path.
-
-        Dipakai cleanup tier parsial. mark_products_invalid() di bawah
-        mencocokkan lewat scene_id, yang tidak cukup untuk produk aux
-        MODIS/GPM: file-nya ditulis saat memproses satu scene Sentinel-1,
-        tapi barisnya menempel ke granule nasa_scenes asalnya (M30), bukan ke
-        scene S1 itu."""
+        """Tandai is_valid=False untuk produk yang file-nya baru dihapus, dicocokkan lewat file_path."""
         if not paths:
             return 0
         with self._db.session() as sess:
@@ -520,7 +439,6 @@ class MetadataManager:
             "[ALERT] alert_id=%d [%s] %s: %s", alert_id, severity.value, title, message
         )
         return alert_id
-
 
     def get_scene_by_id(self, scene_id: int) -> dict | None:
         with self._db.session() as sess:

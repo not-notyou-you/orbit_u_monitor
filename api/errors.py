@@ -1,11 +1,4 @@
-# api/errors.py
-"""Format error API: {"detail": "...", "code": "..."} (INTERFACE.md §5).
-
-`detail` tetap seperti DataLab (teks Inggris) agar klien lama berfungsi;
-`code` adalah kode mesin-baca yang diterjemahkan frontend ke Bahasa
-Indonesia. HTTPException biasa dari route warisan mendapat kode bawaan
-menurut status.
-"""
+"""Format error API: {"detail": "...", "code": "..."} (INTERFACE.md §5)."""
 
 from __future__ import annotations
 
@@ -59,11 +52,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    """Ratakan error validasi Pydantic jadi satu kalimat.
-
-    Bentuk bawaan FastAPI (`detail` berisi list of dict) tidak bisa ditampilkan
-    langsung di UI; front-end (web/js/ui.js) menerjemahkan `code` ke pesan Indonesia, `detail` sebagai cadangan.
-    """
+    """Ratakan error validasi Pydantic jadi satu kalimat."""
     messages = []
     for err in exc.errors():
         msg = str(err.get("msg", "")).removeprefix("Value error, ").strip()
@@ -78,8 +67,6 @@ def _pgcode(exc: BaseException) -> str | None:
 
 
 async def db_exception_handler(request: Request, exc: DBAPIError) -> JSONResponse:
-    # 42501 insufficient_privilege: GRANT/RLS menolak kueri yang lolos lapis
-    # API (INTERFACE.md §3.2 lapis 3). Ini bukan galat server.
     if _pgcode(exc) == "42501":
         logger.warning("DB permission denied on %s %s: %s", request.method, request.url.path,
                        str(getattr(exc, "orig", exc)).splitlines()[0])
@@ -88,8 +75,6 @@ async def db_exception_handler(request: Request, exc: DBAPIError) -> JSONRespons
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    # Permission error DB yang dibungkus exception lain (mis. manager
-    # menangkap lalu melempar ulang) tetap dilaporkan sebagai 403.
     cause = exc
     while cause is not None:
         if isinstance(cause, DBAPIError) and _pgcode(cause) == "42501":

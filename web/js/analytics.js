@@ -1,16 +1,8 @@
-// js/analytics.js — "Evaluasi alert & kejadian" di Forecast › Analisa daerah (M67;
-// dulu tab Tren & evaluasi alert dengan formulirnya sendiri). Data:
-// /hydromet/observations (dipaginasi), /disasters, /alerts/evaluation,
-// /alerts, /alert-rules — untuk kecamatan dan rentang yang dipilih di
-// formulir Analisa daerah (js/diagram.js memanggil show()).
-// Grafik tren per kecamatan dihapus: Analisa daerah sudah menggambarnya per band.
-// Forecast 15 hari (M61) tetap di grafik hujan rerata vs kejadian.
 'use strict';
 Pages['analytics'] = (() => {
   const UNIT = { RAIN_24H: 'mm', RAIN_72H: 'mm', RAIN_7D: 'mm', RAIN_30D: 'mm', NDVI: '', NDWI: '', FLOOD: '%' };
   let st = null;
 
-  // f = { from, to, ids } dari formulir Analisa daerah.
   async function show(root, ctx, f) {
     if (!st || st.root !== root) {
       if (st) st.q.stop();
@@ -65,7 +57,6 @@ Pages['analytics'] = (() => {
       UI.readoutHTML('POD / FAR', (ev.pod === null ? UI.NA : UI.num(ev.pod, 2)) + ' / ' + (ev.far === null ? UI.NA : UI.num(ev.far, 2)), 'EVALUASI ALERT');
   }
 
-  // ------------------------------------------------------------ forecast
   const corrKey = band => 'c|' + band + '|' + st.f.ids.join(',') + '|' + st.f.to;
   const fcPts = f => f && f.points && f.points.length ? f.points : null;
 

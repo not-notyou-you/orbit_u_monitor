@@ -1,15 +1,4 @@
-# api/routes/logs.py
-"""Log per halaman (INTERFACE.md §4.6, M56).
-
-* ``/logs/data``     — DATA_ENGINEER: hanya log yang menyangkut halaman Data
-  (VIEW ``v_log_data``: unduhan/backfill/ubah scene + audit tabel katalog).
-* ``/logs/kejadian`` — ANALYST: hanya log halaman Kejadian
-  (VIEW ``v_log_kejadian``: audit kejadian/jenis + ekspor Excel kejadian).
-
-ADMIN membaca keduanya, ditambah log masuk/registrasi, unduhan, dan audit
-lengkap di ``/api/admin/logs/*`` dan ``/api/admin/audit``. Pembatasan per
-role ada di GRANT VIEW, jadi tes lapis 3 tetap berlaku.
-"""
+"""Log per halaman (INTERFACE.md §4.6, M56)."""
 
 from __future__ import annotations
 

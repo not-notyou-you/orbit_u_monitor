@@ -1,32 +1,4 @@
-# etl/band_forecast.py
-"""Forecast 15 hari per band untuk halaman Forecast (M61).
-
-Satu deret = satu band, rerata AOI atau satu kecamatan, SELURUH riwayat di
-database (bukan hanya 30 hari yang digambar). Lima model bersaing:
-
-    naive           nilai terakhir berlanjut
-    SES             simple exponential smoothing, alpha dipilih dari grid
-    Holt damped     level + tren teredam (phi 0,9)
-    musiman         klimatologi hari-dalam-tahun (rerata ±15 hari, semua tahun)
-    musiman+AR1     klimatologi + anomali hari terakhir yang meluruh phi^k
-                    (phi = autokorelasi lag-1 anomali)
-
-Model dipilih per deret lewat backtest rolling-origin: titik asal mundur
-tiap 30 hari sampai 12 kali (setahun penuh, semua musim), tiap asal meramal 15 hari, error dihitung hanya
-pada hari yang benar-benar teramati (hari hasil interpolasi tidak dinilai).
-Model dengan MAE rata-rata terkecil menang; skill = 1 - MAE/MAE naive.
-
-Pita 80% = kuantil 10–90% error backtest model terpilih per langkah (dikumpul
-dari langkah ±2 di sekitarnya), dibuat tidak menyempit ke depan, lalu dijepit
-ke rentang fisik band. Hujan dimodelkan di ruang log1p (miring, banyak nol).
-
-Klimatologi butuh ≥ 1 tahun riwayat, jadi Sentinel-1 (riwayat < 1 tahun)
-otomatis hanya memakai naive/SES/Holt. SES/Holt dilatih pada 365 hari terakhir:
-dengan alpha ≥ 0,05 data yang lebih tua praktis tidak berpengaruh, dan
-memangkasnya membuat satu deret selesai dalam puluhan milidetik.
-
-Modul murni numerik (numpy): tanpa DB, tanpa disk.
-"""
+"""Forecast 15 hari per band untuk halaman Forecast (M61)."""
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -59,10 +31,6 @@ MODEL_LABELS = {
     "clim_ar1": "Musiman + anomali AR(1)",
 }
 
-
-# -- model ---------------------------------------------------------------------
-# fit(y, doy) -> objek dengan predict(doy_future) dan sigma(h). `doy` = indeks
-# hari-dalam-tahun 0..365 untuk tiap titik grid harian.
 
 class _Naive:
     def __init__(self, y, doy):
@@ -176,8 +144,6 @@ _MODELS = {"naive": _Naive, "ses": _SES, "holt": _Holt, "clim": _Clim, "clim_ar1
 _SEASONAL = {"clim", "clim_ar1"}
 
 
-# -- inti ----------------------------------------------------------------------
-
 def _doy(d: date) -> int:
     return d.timetuple().tm_yday - 1
 
@@ -252,7 +218,7 @@ def forecast(points: list[tuple[date, float | None]], band_code: str, horizon: i
     lo_b, hi_b = BOUNDS.get(band_code, (None, None))
     lo_b = -np.inf if lo_b is None else lo_b
     hi_b = np.inf if hi_b is None else hi_b
-    clip = lambda a: np.clip(back(a), lo_b, hi_b)  # noqa: E731
+    clip = lambda a: np.clip(back(a), lo_b, hi_b)
     mean, lo, hi = clip(pred), clip(pred + lo_q), clip(pred + hi_q)
     out["points"] = [{"x": d.isoformat(), "mean": round(float(m), 4), "lo": round(float(a), 4), "hi": round(float(b), 4)}
                      for d, m, a, b in zip(fut_days, mean, lo, hi)]

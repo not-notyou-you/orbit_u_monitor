@@ -1,10 +1,4 @@
-# api/routes/admin.py
-"""Administrasi akun dan log (INTERFACE.md §4.9, bagian akun & log).
-
-Seluruh router dijaga require_role("ADMIN") di api/main.py dan berjalan
-sebagai monitor_admin; perubahan users tercatat audit trigger dengan
-app.user_id admin.
-"""
+"""Administrasi akun dan log (INTERFACE.md §4.9, bagian akun & log)."""
 
 from __future__ import annotations
 
@@ -83,8 +77,6 @@ def _check_password(password: str) -> None:
         raise ApiError(400, problem, "PASSWORD_POLICY")
 
 
-# --- pengguna -----------------------------------------------------------------
-
 @router.get("/users", response_model=AdminUserListResponse, summary="List user accounts")
 def list_users(sess: Session = Depends(get_session),
                q: str | None = Query(None, max_length=50, description="Username/name contains"),
@@ -135,7 +127,6 @@ def update_user(user_id: int, req: AdminUserUpdateRequest, sess: Session = Depen
     if user_id == principal.user_id and (
         (req.is_active is False) or (req.role_code is not None and req.role_code != "ADMIN")
     ):
-        # Mencegah admin terakhir mengunci dirinya sendiri keluar.
         raise ApiError(409, "Administrators cannot deactivate or demote their own account", "CANNOT_MODIFY_SELF")
     sets, params = [], {"u": user_id}
     if req.full_name is not None:
@@ -180,8 +171,6 @@ def unlock_user(user_id: int, sess: Session = Depends(get_session)) -> OkRespons
     return OkResponse(message="Account unlocked")
 
 
-# --- token --------------------------------------------------------------------
-
 @router.get("/tokens", response_model=TokenListResponse,
             summary="All API tokens (owner, prefix, scope, expiry, last use); revoke with DELETE /api/auth/tokens/{id}")
 def all_tokens(sess: Session = Depends(get_session), user_id: int | None = None,
@@ -195,8 +184,6 @@ def all_tokens(sess: Session = Depends(get_session), user_id: int | None = None,
         where.append(("" if active else "NOT ") + "(t.revoked_at IS NULL AND t.expires_at > now())")
     return list_tokens(sess, " AND ".join(where), params, limit, offset, with_owner=True)
 
-
-# --- log ----------------------------------------------------------------------
 
 def _log_query(sess: Session, view: str, where: list[str], params: dict, order: str,
                limit: int, offset: int) -> LogListResponse:

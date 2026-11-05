@@ -1,21 +1,9 @@
-# etl/report_citra.py
-"""Laporan PDF halaman Citra Satelit (M56, INTERFACE.md §4.3).
-
-Pengguna memilih halaman mana yang dicetak — Ringkasan, Sentinel-1, MODIS,
-GPM — satu, beberapa, atau semuanya, dan semuanya masuk ke SATU berkas PDF.
-Isi per satelit sama dengan halamannya di web: penjelasan satelit, gambar
-PNG, kalimat kondisi, tabel angka, dan (bila dipilih) perbandingan dua
-tanggal berdampingan.
-
-Data sudah disaring route (VIEW ``v_citra_*`` di bawah role pemanggil), jadi
-modul ini tidak membuka koneksi sendiri dan tidak pernah memuat scene di luar
-batas waktu role itu.
-"""
+"""Laporan PDF halaman Citra Satelit (M56, INTERFACE.md §4.3)."""
 from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 from reportlab.platypus import Image, KeepTogether, Table, TableStyle
 

@@ -1,31 +1,3 @@
-// js/admin.js — Sistem › Manajemen akun dan Sistem › Pengaturan aplikasi (M56). Semua bagian ADMIN.
-// Aksi yang memicu unduhan/pipeline (picu ingestion, proses ulang, periksa Live)
-// selalu lewat dialog konfirmasi yang menyebut akibatnya.
-//
-// Susunan: dulu 12 tab rata dalam satu baris; lalu (M53) lima kelompok dengan
-// tablist sendiri di dalam halaman ini. Masalahnya, kelompok yang dipilih hanya
-// hidup di memori, jadi 13 bagiannya tidak bisa dibagikan, tidak bisa
-// di-bookmark, dan hilang tiap refresh.
-//
-// Sekarang kelompoknya adalah tab router biasa (ROUTES di app.js), dan bagian
-// di dalamnya adalah segmen ketiga hash: #pengaturan/jejak/audit. Halaman ini
-// tinggal merender baris bagian + panelnya, dan mengikuti `ctx.sub`. Fungsi
-// perender tiap bagian tidak berubah; hanya cara masuknya.
-//
-// M67: bagian Pengaturan 9 → 5 dan Manajemen akun tanpa sub-tab. Beberapa
-// perender lama digabung dalam satu bagian (parts): Ringkasan = temuan +
-// status pipeline + picu job, Penyimpanan = disk + arsip, Wilayah & aturan,
-// Pengguna + token (token terlipat). Tiap perender menulis ke wadahnya
-// sendiri (box), jadi yang memuat ulang dirinya tidak menimpa tetangganya.
-// Daftar Scene dihapus: aksi per scene sudah ada di Data › Satelit.
-//
-// M74: Pengaturan 5 → 4 bagian. Ringkasan dihapus: job terakhir, progres, dan
-// backfill hidromet sudah ada di Data › Ringkasan/Satelit, laporan di halaman
-// Laporan, log di Sistem › Log, alert di Kejadian. Yang tersisa (temuan,
-// penjadwal, jalankan siklus Live) pindah ke atas Live Area. Penyimpanan:
-// bilah per tier, lalu produk per sumber (kiri) dan verifikasi + jumlah baris
-// (kanan) berdampingan. Wilayah & aturan: ROI gabungan dilipat, tiga tabel aturan jadi tab
-// kecil, satu kotak Excel.
 'use strict';
 Pages['admin'] = (() => {
   const ROLES = [['USER', 'Relawan (USER)'], ['ANALYST', 'Analis (ANALYST)'], ['DATA_ENGINEER', 'Data Engineer'], ['ADMIN', 'Administrator']];
@@ -33,11 +5,6 @@ Pages['admin'] = (() => {
   const BANDS = ['RAIN_24H', 'RAIN_72H', 'RAIN_7D', 'RAIN_30D', 'NDVI', 'NDWI', 'FLOOD'];
   const OPS = { I: 'INSERT', U: 'UPDATE', D: 'DELETE' };
 
-  // Bagian per kelompok. Kuncinya sekaligus segmen ketiga hash, jadi namanya
-  // Indonesia dan sejalan dengan judulnya. Judul & keterangan kelompoknya
-  // sendiri ada di ROUTES (app.js) sebagai title + lede.
-  // M56: dua kelompok di bawah Sistem. Log (masuk, unduhan, audit) pindah ke
-  // Sistem › Log (js/logs.js); kelompok `jejak` tetap ada untuk hash lama.
   const SECTIONS = {
     pengaturan: [{ key: 'live', title: 'Live Area & penjadwal' }, { key: 'penyimpanan', title: 'Penyimpanan' },
                  { key: 'wilayah', title: 'Wilayah & aturan' }, { key: 'aplikasi', title: 'Aplikasi' }],
@@ -45,7 +12,6 @@ Pages['admin'] = (() => {
     jejak: [{ key: 'masuk', title: 'Log Masuk' }, { key: 'unduhan', title: 'Log Unduhan' },
             { key: 'audit', title: 'Audit' }],
   };
-  // Kelompok → tab router di bawah #sistem.
   const GROUP_TAB = { pengaturan: 'pengaturan', akses: 'pengguna', jejak: 'log' };
   const TABS = {
     live: () => parts([['attn', tabAttention], ['live', tabLive]]), aplikasi: tabSettings,
@@ -54,15 +20,10 @@ Pages['admin'] = (() => {
     pengguna: () => parts([['users', tabUsers], ['tokens', tabTokens, 'Semua token API']]),
     masuk: () => tabLog('login'), unduhan: () => tabLog('download'), audit: tabAudit,
   };
-  // Kelompok yang memuat sebuah bagian — dipakai Ringkasan untuk menyusun hash
-  // tujuan "Buka →" tanpa perlu tahu susunannya.
   const groupOf = key => Object.keys(SECTIONS).find(g => SECTIONS[g].some(t => t.key === key)) || 'pengaturan';
   const hashOf = key => '#sistem/' + GROUP_TAB[groupOf(key)] + '/' + key;
   let st = null;
 
-  // Kelompoknya datang dari router (ctx.tab), bagiannya dari segmen ketiga
-  // (ctx.sub). Sub yang tidak dikenal — mis. hash lama atau salah tulis —
-  // jatuh ke bagian pertama kelompok itu, bukan ke halaman kosong.
   async function init(root, ctx) {
     const group = (ctx.tab && (ctx.tab.group || ctx.tab.key)) || 'pengaturan';
     st = { root, ctx, group: group, tab: sectionKey(group, ctx.sub), users: null, page: {} };
@@ -71,8 +32,6 @@ Pages['admin'] = (() => {
   }
   function destroy() { if (st && st.map) st.map.remove(); st = null; }
 
-  // Dipanggil router saat hanya segmen ketiga yang berubah: panel diganti,
-  // fragmen dan baris bagiannya tetap.
   async function onSub(sub) {
     if (!st) return;
     const key = sectionKey(st.group, sub);
@@ -82,7 +41,6 @@ Pages['admin'] = (() => {
     await render();
   }
 
-  // Bagian lama yang digabung (M67) → bagian yang sekarang memuatnya.
   const MERGED = { ringkasan: 'live', pipeline: 'live', scene: 'live', arsip: 'penyimpanan', aturan: 'wilayah', token: 'pengguna' };
   function sectionKey(group, sub) {
     const list = SECTIONS[group] || SECTIONS.pengaturan;
@@ -90,9 +48,6 @@ Pages['admin'] = (() => {
     return (list.find(t => t.key === sub) || list[0]).key;
   }
 
-  // Baris bagian hanya dirender bila kelompoknya punya lebih dari satu bagian
-  // (Ringkasan tidak). Memilih bagian berarti pindah hash, bukan mengubah state
-  // internal — dengan begitu tombol Kembali peramban ikut menyusurinya.
   function renderSub() {
     const box = UI.$('#adSub', st.root);
     const list = SECTIONS[st.group] || [];
@@ -105,7 +60,6 @@ Pages['admin'] = (() => {
     UI.bindTabs(UI.$('.sub-row', box), key => { if (key !== st.tab) st.ctx.go(hashOf(key)); });
   }
 
-  // Setelah router mengganti bagian, baris tabnya perlu ikut menunjuk ke sana.
   function syncSub() {
     UI.$$('#adSub .sub-row [role=tab]', st.root).forEach(b => {
       const on = b.dataset.tab === st.tab;
@@ -114,10 +68,7 @@ Pages['admin'] = (() => {
   }
 
   const panel = () => UI.$('#adPanel', st.root);
-  // Wadah satu perender di dalam bagian gabungan; di luar itu = seluruh panel.
   const box = name => UI.$('#adPart-' + name, st.root) || panel();
-  // Bagian gabungan: [nama, perender, judul lipatan?]. Perender dijalankan
-  // berurutan, masing-masing ke wadahnya; yang berjudul dirender terlipat.
   async function parts(list) {
     panel().innerHTML = list.map(([name, , fold]) => fold
       ? '<details class="ad-fold"><summary>' + UI.esc(fold) + '</summary><div class="ad-part" id="adPart-' + name + '"></div></details>'
@@ -139,7 +90,6 @@ Pages['admin'] = (() => {
     catch (e) { panel().innerHTML = UI.screenHTML({ channel: 'SYS', body: UI.emptyHTML('GAGAL MEMUAT') }); UI.showError('Pengaturan', e); }
   }
 
-  // ---------------------------------------------------------------- pembantu formulir dialog
   function fieldsHTML(fields) {
     return fields.map(f => {
       const id = 'af_' + f.id, req = f.required ? ' required' : '';
@@ -183,7 +133,6 @@ Pages['admin'] = (() => {
     const first = win.querySelector('[aria-invalid=true]'); if (first) first.focus();
     return ok;
   }
-  // Dialog formulir; bila server menolak, dialog dibuka lagi dengan isian terakhir.
   async function formDialog(title, fields, submit, opts) {
     opts = opts || {};
     for (;;) {
@@ -203,7 +152,6 @@ Pages['admin'] = (() => {
   function bindFilter(fn, root) { const f = UI.$('form.ct-filters', root || panel()); if (f) f.addEventListener('submit', ev => { ev.preventDefault(); fn(); }); }
   function bindPager(key, fn, root) { UI.$$('[data-page]', root || panel()).forEach(b => b.addEventListener('click', () => { st.page[key] = Number(b.dataset.page); fn(); })); }
 
-  // ================================================================ 1. Pengguna
   async function tabUsers() {
     const p = box('users');
     if (!UI.$('#auQ', p)) {
@@ -218,7 +166,6 @@ Pages['admin'] = (() => {
     UI.$('#auList', p).innerHTML = UI.screenHTML({ channel: 'CH-01 · AKUN PENGGUNA', rec: UI.int(r.total) + ' AKUN', recCls: 'off', body: UI.tableHTML([
       { label: 'Pengguna', key: 'username' }, { label: 'Nama', key: 'full_name' }, { label: 'Organisasi', key: 'organization' },
       { label: 'Peran', get: u => (ROLES.find(x => x[0] === u.role_code) || [0, u.role_code])[1] },
-      // M64: email opsional; "terkonfirmasi" = lolos pengecekan dan menerima peringatan.
       { label: 'Email', html: true, get: u => !u.email ? '<span class="v-dim">—</span>'
         : UI.esc(u.email) + (u.email_verified_at ? '' : ' <span class="v-amber">BELUM DICEK</span>') +
           '<br><span class="v-dim" style="font-size:11px">' + (u.notify_regions === -1 ? 'semua kecamatan'
@@ -262,9 +209,6 @@ Pages['admin'] = (() => {
     if (r) UI.info('Reset kata sandi', 'Kata sandi "' + u.username + '" diganti.');
   }
 
-  // ================================================================ 2. Jalankan siklus Live
-  // Backfill hidromet per rentang ada di Data › Satelit (M74), jadi di sini
-  // tinggal siklus Live sekarang untuk satu area.
   async function runLive(btn, areas) {
     if (!areas.length) return;
     const v = await UI.dialog({ title: 'Jalankan siklus Live sekarang', kind: 'question',
@@ -280,7 +224,6 @@ Pages['admin'] = (() => {
     });
   }
 
-  // ================================================================ 3. Live Area
   async function tabLive() {
     const [areas, maxA] = await Promise.all([API.get('/api/live/areas'), API.get('/api/admin/settings').then(s => (s.items.find(x => x.setting_key === 'live.max_areas') || {}).setting_value).catch(() => 5)]);
     box('live').innerHTML = '<div class="btn-row" style="margin-bottom:8px"><button type="button" class="default" id="alNew"' + (areas.length >= (maxA || 5) ? ' disabled' : '') + '>Tambah Live Area…</button>' +
@@ -317,7 +260,6 @@ Pages['admin'] = (() => {
     if (r) tabLive();
   }
 
-  // ================================================================ 4. Wilayah
   async function tabRegions() {
     const [r, geo] = await Promise.all([API.get('/api/admin/regions'), API.get('/api/regions?all=true').catch(() => null)]);
     const kec = r.items.filter(x => x.admin_level === 3);
@@ -361,7 +303,6 @@ Pages['admin'] = (() => {
     });
   }
 
-  // ================================================================ 5. Aturan & ambang
   async function tabRules() {
     const [rules, th, types] = await Promise.all([API.get('/api/alert-rules'), API.get('/api/admin/quality-thresholds'), API.get('/api/disaster-types?include_inactive=true')]);
     const tab = st.rulesTab || 'alert';
@@ -424,7 +365,6 @@ Pages['admin'] = (() => {
     }));
   }
 
-  // ================================================================ 7. Arsip
   async function tabArchive() {
     const s = await API.get('/api/admin/archive/stats');
     box('archive').innerHTML = '<div class="cols-2" style="margin-top:8px;align-items:start">' +
@@ -453,10 +393,6 @@ Pages['admin'] = (() => {
     });
   }
 
-  // ================================================================ 7b. Penyimpanan
-  // Ringkasan disk SELURUH mesin (semua dataset digabung), berbeda dari tab
-  // Struktur di Katalog yang hanya menghitung satu dataset. Hanya baca:
-  // berkas dihapus lewat penghapusan dataset dan retensi Live, tidak dari sini.
   async function tabStorage() {
     const s = await API.get('/api/storage/summary');
     const totalMb = ((s.total || {}).size_mb) || 0;
@@ -482,9 +418,6 @@ Pages['admin'] = (() => {
     bindStorageFiles();
   }
 
-  // Satu tier bisa tersebar di banyak folder dataset, jadi daftarnya diratakan
-  // dulu dan dibatasi 500 baris — sama seperti daftar berkas di Katalog, yang
-  // tanpa batas itu pernah membekukan tab.
   function bindStorageFiles() {
     UI.$$('[data-stier]', box('storage')).forEach(a => a.addEventListener('click', async ev => {
       ev.preventDefault();
@@ -503,7 +436,6 @@ Pages['admin'] = (() => {
     }));
   }
 
-  // ================================================================ 8–9. Log Masuk / Unduhan
   async function tabLog(kind) {
     const p = panel(), key = 'log_' + kind;
     if (!UI.$('#lgUser', p)) {
@@ -530,7 +462,6 @@ Pages['admin'] = (() => {
     bindPager(key, () => tabLog(kind));
   }
 
-  // ================================================================ 10. Audit
   async function tabAudit() {
     const p = panel();
     if (!UI.$('#adTable', p)) {
@@ -561,10 +492,8 @@ Pages['admin'] = (() => {
     bindPager('audit', tabAudit);
   }
 
-  // ================================================================ 11. Pengaturan
   async function tabSettings() {
     const [s, ns] = await Promise.all([API.get('/api/admin/settings'), API.get('/api/admin/notify/status').catch(() => null)]);
-    // M64: keadaan pengiriman email peringatan + uji kirim.
     const sent = ns && ns.last_7_days.EMAIL_ALERT_SENT, fail = ns && ns.last_7_days.EMAIL_ALERT_FAILED;
     const mail = !ns ? '' : UI.screenHTML({ channel: 'EMAIL PERINGATAN', rec: ns.configured ? '● SIAP' : '● BELUM DIATUR',
       recCls: ns.configured ? 'live' : 'off', body:
@@ -603,7 +532,6 @@ Pages['admin'] = (() => {
     }));
   }
 
-  // ================================================================ 12. Token API
   async function tabTokens() {
     const p = box('tokens');
     if (!UI.$('#atUser', p)) {
@@ -627,11 +555,6 @@ Pages['admin'] = (() => {
     bindPager('tokens', tabTokens, p);
   }
 
-  // ================================================================ 0. Perlu perhatian + penjadwal
-  // Bagian atas "Live Area & penjadwal" (M74; dulu bagian Ringkasan): hanya
-  // temuan yang butuh tindakan dan jadwal penjadwal. Job terakhir, progres
-  // dataset utama, laporan, dan log tidak diulang — tempatnya Data, Laporan,
-  // dan Sistem › Log. Tiap sumber gagal sendiri-sendiri.
   async function tabAttention() {
     const p = box('attn');
     const [pipe, alerts, userList] = await Promise.all([
@@ -646,7 +569,6 @@ Pages['admin'] = (() => {
     const areaBad = areas.filter(a => a.status && /FAIL|ERROR|STALE/i.test(a.status));
     const locked = (userList || []).filter(u => u.is_locked);
 
-    // Temuan: hanya hal yang butuh tindakan, paling mendesak dulu. [kelas, teks, saran, tujuan hash]
     const findings = [];
     if (!pipe) findings.push(['v-alert', 'Status pipeline tidak dapat dibaca.', 'Periksa LINK di taskbar; API atau basis data mungkin tidak terjangkau.', null]);
     if (credMissing.length) findings.push(['v-alert', 'Kredensial belum diisi: ' + credMissing.join(', ') + '.',

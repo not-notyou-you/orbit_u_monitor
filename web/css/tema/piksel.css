@@ -1,11 +1,5 @@
-/* web/css/tema/piksel.css — tema "Piksel Marun" (M57), dari DOCS/design tambahan/konsep44.
-   Abu-abu dengan aksen marun ala 8-bit: garis tepi 4px, bevel dalam + bayangan
-   keras 6px, title bar marun dengan satu kotak tutup, huruf piksel kapital,
-   lampu status berkedip, dan siluet gunung di cakrawala latar.
-   Struktur komponen ada di umum.css; berkas ini hanya nilai dan hiasan. */
 
 html[data-theme="piksel"] {
-  /* palet konsep44 */
   --x-bg: #e4e4e4; --x-ground: #c9c9c9; --x-card: #f2f2f2; --x-line: #2b2b2b;
   --x-mut: #575757; --x-acc: #7a1f2b; --x-acc-dk: #4f121b; --x-acc-lt: #a8505c;
 
@@ -14,7 +8,6 @@ html[data-theme="piksel"] {
   --text: var(--x-line); --text-mut: var(--x-mut); --field: #fafafa;
   --crt: #fafafa; --crt-grid: #d6d6d6; --phos: #2b2b2b; --phos-dim: #575757;
   --amber: #6e4700; --alert: #a3141f; --cyan: #1f4f7a;
-  /* Atkinson Hyperlegible menggantikan Pixelify Sans: huruf piksel sulit dibaca. */
   --font-ui: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
   --font-data: Consolas, "Cascadia Mono", "Courier New", monospace;
   --taskbar-h: 48px;
@@ -43,14 +36,12 @@ html[data-theme="piksel"] {
   --t-taskbar-bg: var(--x-card); --t-taskbar-shadow: inset 0 4px 0 #fafafa;
   --t-backdrop: rgba(43, 43, 43, .35);
   --t-tile-filter: grayscale(1) contrast(1.08) brightness(1.06);
-  /* scrollbar: tipis dan bersiku, pegangan abu-abu, jalur tak terlihat */
   --t-sb-size: 10px; --t-sb-r: 0; --t-sb-gap: 2px; --t-sb-ff-width: thin;
   --t-sb-track: transparent; --t-sb-track-shadow: none;
   --t-sb-thumb: #b4b4b4; --t-sb-thumb-shadow: none;
   --t-sb-thumb-hover: #8a8a8a; --t-sb-thumb-active: var(--x-mut);
 }
 html[data-theme="piksel"] body { background-attachment: fixed; image-rendering: pixelated; }
-/* Siluet gunung marun di garis cakrawala (body::before konsep). */
 html[data-theme="piksel"] body::before {
   content: ""; position: fixed; left: 6%; top: 70%; width: 220px; height: 60px; margin-top: -60px;
   background: var(--x-acc); opacity: .5; z-index: -1; pointer-events: none;
@@ -62,7 +53,6 @@ html[data-theme="piksel"] body::after {
   clip-path: polygon(0 100%, 30% 20%, 50% 55%, 70% 0, 100% 100%);
 }
 
-/* Title bar: satu kotak tutup putih bergaris hitam (min/max disembunyikan). */
 html[data-theme="piksel"] .ttl-btn, html[data-theme="piksel"] .ttl-btn:active {
   width: 20px; height: 20px; min-height: 0; padding: 0; color: var(--x-line);
   background: var(--x-card); border: 2px solid var(--x-line); box-shadow: none; transform: none;
@@ -79,7 +69,6 @@ html[data-theme="piksel"] .navcard .nc-title, html[data-theme="piksel"] .hero .h
 html[data-theme="piksel"] .hero .hero-name { font-size: 24px; }
 html[data-theme="piksel"] .hero .hero-logo { border-width: 4px; }
 
-/* Layar data: bingkai tebal hitam, label kanal di pita gelap. */
 html[data-theme="piksel"] .screen { border-width: 4px; }
 html[data-theme="piksel"] .screen-inner.flush .scr-ch, html[data-theme="piksel"] .screen-inner.flush .scr-rec {
   background: var(--x-line); color: var(--x-card); border: 0;
@@ -89,7 +78,6 @@ html[data-theme="piksel"] .readout .r-lbl, html[data-theme="piksel"] .scr-ch,
 html[data-theme="piksel"] .scr-rec { font-family: var(--font-ui); }
 html[data-theme="piksel"] .scr-table th { font-family: var(--font-ui); }
 
-/* Lampu tautan berkedip seperti ".dot" konsep; checkbox dan radio kotak. */
 html[data-theme="piksel"] #linkLamp .lamp { width: 12px; height: 12px; border-width: 2px; animation: pikselKedip 1s steps(2) infinite; }
 @keyframes pikselKedip { 50% { background: var(--x-card); } }
 html[data-theme="piksel"] input[type=radio]:checked::after { background: var(--x-acc); }

@@ -1,7 +1,3 @@
-// js/register.js — /daftar (INTERFACE.md §2 halaman -0, M56). POST /api/auth/register
-// membuat akun Relawan (USER; peran dikunci di fungsi DB auth_register_user)
-// dan langsung menyetel cookie sesi, lalu diantar ke Beranda. Email opsional
-// (M64): bila diisi, server mengeceknya dan mengirim email konfirmasi.
 'use strict';
 Pages['register'] = {
   init(root) {

@@ -1,25 +1,5 @@
 #!/usr/bin/env python
-"""Backfill Job Hidromet per tanggal UTC, berurutan dan bisa dilanjutkan (PIPELINE.md §10 langkah 6).
-
-Pakai:
-    python scripts/backfill_hydromet.py --from 2023-01-01 --to 2025-12-31
-    python scripts/backfill_hydromet.py --from 2024-01-01 --to 2024-01-31 --no-modis
-    python scripts/backfill_hydromet.py --from 2024-01-01 --to 2024-01-31 --dry-run
-    python scripts/backfill_hydromet.py --from 2024-01-01 --to 2025-12-31 --max-consecutive-failures 0
-
-Secara default berhenti setelah 5 hari FAILED berurutan (keluar dengan kode 4),
-karena itu nyaris selalu jaringan atau kredensial, bukan data: menyapu ratusan
-tanggal saat jaringan mati hanya membuang waktu. Pakai
---max-consecutive-failures 0 untuk memaksa jalan terus sampai habis.
-
-Tanggal yang sudah COMPLETED dilewati, jadi bila proses dibunuh (Ctrl+C,
-listrik padam) cukup jalankan perintah yang sama lagi. Tanggal yang sedang
-dikerjakan saat mati diulang dari awal; semua tulisan idempoten.
-
-Skrip memegang advisory lock ``hydromet`` selama berjalan, sehingga job
-harian scheduler tidak berjalan bersamaan (job itu tercatat SKIPPED_LOCKED).
-Butuh NASA_EARTHDATA_TOKEN di .env. Terkoneksi sebagai monitor_etl.
-"""
+"""Backfill Job Hidromet per tanggal UTC, berurutan dan bisa dilanjutkan (PIPELINE.md §10 langkah 6)."""
 
 from __future__ import annotations
 
@@ -75,8 +55,6 @@ def main(argv: list[str]) -> int:
     print(f"[DONE] {summary}")
     if summary["locked"]:
         return 3
-    # Non-nol supaya pemanggil (scheduler, skrip malam) tahu rentangnya belum
-    # tuntas dan perlu dijalankan ulang setelah penyebabnya dibereskan.
     return 4 if summary.get("aborted_after") else 0
 
 

@@ -1,11 +1,3 @@
-// js/logs.js — Sistem › Log (#sistem/log, INTERFACE.md §2 halaman 8.2, M56).
-//
-// Bagian per peran (pembatasannya di GRANT VIEW, bukan hanya di menu):
-//   data      GET /api/logs/data           (logs.data: DATA_ENGINEER, ADMIN)
-//   kejadian  GET /api/logs/kejadian       (logs.disasters: ANALYST, ADMIN)
-//   masuk     GET /api/admin/logs/login    (ADMIN; termasuk registrasi akun)
-//   unduhan   GET /api/admin/logs/download (ADMIN)
-//   audit     GET /api/admin/audit         (ADMIN; seluruh audit_log)
 'use strict';
 Pages['logs'] = (() => {
   const SECTIONS = [

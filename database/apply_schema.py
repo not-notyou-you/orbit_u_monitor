@@ -1,32 +1,6 @@
 #!/usr/bin/env python
-"""
-Terapkan skema Monitor (monitor_schema.sql -> monitor_security.sql ->
+"""Terapkan skema Monitor (monitor_schema.sql -> monitor_security.sql ->
 monitor_seed.sql) ke database kosong memakai kredensial dari .env.
-
-Kenapa ada: `psql "$DATABASE_URL"` adalah sintaks bash. Di PowerShell
-`$DATABASE_URL` adalah variabel PowerShell yang kosong, jadi psql diam-diam
-jatuh ke default dan gagal autentikasi. Skrip ini memakai jalur yang sama
-dengan pipeline (etl.config -> load_dotenv), jadi kredensialnya dijamin sama
-dengan yang dipakai ETL dan API.
-
-Setara dengan:
-    psql -v ON_ERROR_STOP=1 -d themonitor -f database/monitor_schema.sql
-    psql -v ON_ERROR_STOP=1 -d themonitor -f database/monitor_security.sql
-    psql -v ON_ERROR_STOP=1 -d themonitor -f database/monitor_seed.sql
-
-Pakai:
-    python database/apply_schema.py           # terapkan ketiga berkas
-    python database/apply_schema.py --check   # cek koneksi saja
-    python database/apply_schema.py --migrate m56_susunan_halaman_v2.sql
-                                              # migrasi DB yang sudah berjalan
-
-Berkas skema mengasumsikan database kosong; skrip ini berhenti di berkas
-pertama yang gagal. tests/conftest.py memakai apply_files() yang sama untuk
-membangun database uji.
-
-Setelah ketiga berkas, sandi role login monitor_app dan monitor_etl diisi dari
-MONITOR_APP_PASSWORD / MONITOR_ETL_PASSWORD di .env (monitor_security.sql
-sengaja tidak memuat sandi; IMPLEMENTATION_NOTES Tahap 2, S3).
 """
 
 from __future__ import annotations
@@ -52,15 +26,7 @@ def _has_statements(sql: str) -> bool:
 
 
 def apply_files(dbapi_connection, files: tuple[str, ...] = SCHEMA_FILES, echo=print) -> None:
-    """Jalankan berkas SQL berurutan pada koneksi DB-API (psycopg2).
-
-    Koneksi dipakai dalam mode autocommit: tiap berkas mengatur transaksinya
-    sendiri (monitor_seed.sql memakai BEGIN/COMMIT). Isi berkas dikirim utuh;
-    psycopg2 menjalankan banyak pernyataan sekaligus, termasuk blok DO $$.
-    """
-    # Dikembalikan setelahnya: koneksi bisa milik pool SQLAlchemy, dan koneksi
-    # pool yang tertinggal autocommit membuat rollback session berikutnya
-    # tidak membatalkan apa pun.
+    """Jalankan berkas SQL berurutan pada koneksi DB-API (psycopg2)."""
     previous = dbapi_connection.autocommit
     dbapi_connection.autocommit = True
     try:
@@ -68,8 +34,6 @@ def apply_files(dbapi_connection, files: tuple[str, ...] = SCHEMA_FILES, echo=pr
             for name in files:
                 sql = (SCHEMA_DIR / name).read_text(encoding="utf-8")
                 if not _has_statements(sql):
-                    # psql menerima berkas yang isinya komentar saja; psycopg2
-                    # menolaknya ("can't execute an empty query").
                     echo(f"[SKIP] {name} (comments only)")
                     continue
                 echo(f"[RUN ] {name} ({len(sql)} bytes)")
@@ -86,12 +50,7 @@ LOGIN_ROLE_PASSWORD_ENV: dict[str, str] = {
 
 
 def set_role_passwords(dbapi_connection, echo=print) -> list[str]:
-    """ALTER ROLE ... PASSWORD untuk role login yang sandinya ada di env.
-
-    Mengembalikan nama role yang dilewati karena env-nya kosong. Sandi
-    dikirim sebagai literal yang di-quote server (format %L), tidak pernah
-    dicetak.
-    """
+    """ALTER ROLE ... PASSWORD untuk role login yang sandinya ada di env."""
     skipped = []
     previous = dbapi_connection.autocommit
     dbapi_connection.autocommit = True
@@ -118,7 +77,6 @@ def main(argv: list[str]) -> int:
     from etl.config import DatabaseConfig  # memicu load_dotenv
 
     cfg = DatabaseConfig()
-    # Password tidak pernah ikut dicetak.
     print(f"[DB] {cfg.user}@{cfg.host}:{cfg.port}/{cfg.name}")
     engine = create_engine(cfg.url)
 
@@ -128,7 +86,6 @@ def main(argv: list[str]) -> int:
         print(f"[OK] connected — {str(ver).split(',')[0]}")
         return 0
     if argv[:1] == ["--migrate"] and len(argv) == 2:
-        # Migrasi DB yang sudah berjalan (database/migrations/*.sql, idempoten).
         raw = engine.raw_connection()
         try:
             apply_files(raw.driver_connection, (f"migrations/{argv[1]}",))

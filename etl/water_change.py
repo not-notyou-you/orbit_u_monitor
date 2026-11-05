@@ -1,25 +1,4 @@
-# etl/water_change.py
-"""Peta perubahan air Sentinel-1 antar scene Live (PIPELINE.md §4.1, M19).
-
-1. VH (dB) scene sekarang dan scene pembanding dibaca pada grid scene
-   sekarang, diturunkan ke sisi terpanjang 2048 px dengan rata-rata di ruang
-   LINEAR (rata-rata dB bukan rata-rata daya).
-2. Air = ``VH < app_settings.water.vh_threshold_db`` (default −20 dB).
-3. Kelas per piksel yang valid di kedua tanggal:
-
-       PERSISTENT  air -> air      biru   #2F6FDE
-       NEW         darat -> air    merah  #E04545
-       RECEDED     air -> darat    hijau  #2FA36B
-       LAND        darat -> darat  transparan (latar VH abu)
-       NODATA      NoData salah satu tanggal -> pola kotak-kotak
-
-4. Orbit relatif berbeda -> label "orbit berbeda — perubahan bisa karena
-   geometri pencitraan" di PNG dan ``same_orbit = 0``.
-5. Luas = jumlah piksel × luas piksel geodesik (km²).
-
-Keterbatasan (ditulis di skripsi): ambang tetap (bukan Otsu), permukaan
-halus bisa terbaca air, vegetasi tergenang bisa terbaca darat.
-"""
+"""Peta perubahan air Sentinel-1 antar scene Live (PIPELINE.md §4.1, M19)."""
 
 from __future__ import annotations
 
@@ -43,10 +22,6 @@ PREVIEW_KEY = "s1_water_change"
 DEFAULT_THRESHOLD_DB = -20.0
 MAX_SIDE = 2048
 PNG_MAX_SIDE = 768
-# Tepi swath S1 (derau pita batas, piksel sangat gelap) terbaca "air" bila
-# tidak dibuang: uji nyata 27-09-2026 memberi pita merah palsu selebar ±1 km
-# di sepanjang batas data. Piksel dalam jarak ini dari NoData di masing-masing
-# scene dikeluarkan (T3-29). Batas bingkai raster (crop AOI) tidak dihitung.
 EDGE_BUFFER_M = 1000.0
 EARTH_RADIUS_KM = 6371.0088
 
@@ -56,17 +31,6 @@ LABELS = {PERSISTENT: "Air tetap", NEW: "Air baru", RECEDED: "Air surut", LAND: 
           NODATA: "Tidak ada data"}
 ORBIT_WARNING = "orbit berbeda — perubahan bisa karena geometri pencitraan"
 
-# Orbit relatif Sentinel-1 = (orbit absolut − offset) mod 175 + 1 (siklus 175
-# orbit / 12 hari). Sumber utama tetap metadata katalog CDSE (relativeOrbit,
-# disimpan di satellite_scenes.relative_orbit); rumus ini cadangan bila
-# metadata tidak ada. Offset per misi, berlaku sejak tanggal akuisisi:
-#   S1A 73, S1B 27       product specification ESA
-#   S1C 172              forum STEP ESA (S1C relative orbit number formula)
-#   S1D 42               forum STEP ESA, menunggu product specification
-# Sejak 24-06-2026 ESA mengubah pemetaan absolut -> relatif S1C (rekonfigurasi
-# konstelasi, N. Miranda, Sentinel-1 Mission Manager) tanpa menerbitkan konstanta
-# baru, jadi akuisisi S1C setelah tanggal itu HANYA memakai metadata (None bila
-# tidak ada, bukan tebakan).
 _ORBIT_OFFSETS: dict[str, list[tuple[date, int | None]]] = {
     "S1A": [(date(2014, 4, 3), 73)],
     "S1B": [(date(2016, 4, 25), 27)],
@@ -139,8 +103,6 @@ class WaterChange:
     metrics: dict = field(default_factory=dict)
 
 
-# --- pembacaan -------------------------------------------------------------------
-
 def _target_shape(width: int, height: int, max_side: int) -> tuple[int, int]:
     if max(width, height) <= max_side:
         return height, width
@@ -165,12 +127,7 @@ def _read_linear(path: Path) -> tuple[np.ndarray, object, object]:
 
 
 def read_vh_pair(cur_path: Path, prev_path: Path, max_side: int = MAX_SIDE, grid=None):
-    """(cur_lin, prev_lin, transform, crs) di grid turunan scene sekarang.
-
-    `grid` != None -> dipakai apa adanya (etl.aoi_coverage): bingkainya jadi
-    AOI, sama untuk setiap tanggal, dan PNG hasilnya setumpuk dengan preview
-    lain. Tanpa itu grid diturunkan dari raster scene sekarang seperti dulu,
-    sehingga bingkainya ikut berubah tiap kali footprint S1 berubah."""
+    """(cur_lin, prev_lin, transform, crs) di grid turunan scene sekarang."""
     cur, cur_tf, crs = _read_linear(cur_path)
     if grid is not None:
         h, w, dst_tf, crs = grid.height, grid.width, grid.transform, grid.crs
@@ -190,8 +147,6 @@ def to_db(lin: np.ndarray) -> np.ndarray:
     with np.errstate(divide="ignore", invalid="ignore"):
         return np.where(np.isfinite(lin) & (lin > 0), 10.0 * np.log10(lin), np.nan)
 
-
-# --- klasifikasi & luas -------------------------------------------------------------
 
 def classify(cur_db: np.ndarray, prev_db: np.ndarray, threshold_db: float = DEFAULT_THRESHOLD_DB) -> np.ndarray:
     valid = np.isfinite(cur_db) & np.isfinite(prev_db)
@@ -265,8 +220,6 @@ def compute(cur_vh: Path, prev_vh: Path, threshold_db: float = DEFAULT_THRESHOLD
     return WaterChange(classes, cur_db, tf, crs, metrics)
 
 
-# --- PNG --------------------------------------------------------------------------
-
 def _hex_rgb(h: str) -> tuple[int, int, int]:
     return int(h[1:3], 16), int(h[3:5], 16), int(h[5:7], 16)
 
@@ -284,20 +237,12 @@ def _label_font(size: int):
 
 def render_png(wc: WaterChange, path: Path, *, orbit_differs: bool = False, max_side: int = PNG_MAX_SIDE,
                regions=None, out_shape: tuple[int, int] | None = None) -> dict:
-    """PNG RGB: latar VH abu, kelas berwarna, NoData kotak-kotak, label orbit.
-
-    `regions` != None -> varian garis wilayah `{stem}_adm.png` ikut ditulis
-    (etl/admin_overlay.py); namanya dikembalikan di legenda sebagai "file_adm"
-    supaya live_cycle bisa mencatatnya di item preview scene."""
+    """PNG RGB: latar VH abu, kelas berwarna, NoData kotak-kotak, label orbit."""
     from affine import Affine
     from PIL import Image, ImageDraw
 
     classes, db = wc.classes, wc.vh_db
-    # Diskalakan (nearest) ke sisi terpanjang max_side, naik maupun turun,
-    # supaya tile seragam dan label orbit selalu terbaca.
     if out_shape is not None:
-        # Ukuran preview scene, diminta persis: satu piksel selisih sudah
-        # membuat PNG ini tidak setumpuk dengan tujuh PNG lainnya.
         h, w = out_shape
     else:
         s = max_side / max(classes.shape)
@@ -328,8 +273,6 @@ def render_png(wc: WaterChange, path: Path, *, orbit_differs: bool = False, max_
         draw.multiline_text((8, 8), text, fill=(180, 40, 40), font=font)
     with atomic_path(path) as tmp:
         img.save(tmp, format="PNG")
-    # Transform scene ikut diskalakan seperti gambarnya, kalau tidak garis
-    # wilayah akan tergambar di koordinat grid sebelum penskalaan nearest.
     tf = wc.transform * Affine.scale(wc.classes.shape[1] / w, wc.classes.shape[0] / h)
     file_adm = None
     if regions:
@@ -345,10 +288,6 @@ def render_png(wc: WaterChange, path: Path, *, orbit_differs: bool = False, max_
     }
 
 
-# --- metrik ke live_scene_metrics ----------------------------------------------------
-
-# valid_km2 (luas teramati di kedua tanggal) tambahan atas §4.1: penyebut
-# persen perubahan bersih untuk kategori kalimat.
 METRIC_NAMES = ("new_km2", "receded_km2", "persistent_km2", "valid_km2", "same_orbit")
 
 
@@ -403,14 +342,9 @@ def sentence(wc: dict | None) -> dict:
                f"{ref.isoformat() if hasattr(ref, 'isoformat') else ref}")
     if wc.get("same_orbit") == 0:
         because += f" ({ORBIT_WARNING})"
-    # Kategori dari pertambahan bersih air sebagai poin persen area teramati,
-    # dengan ambang yang sama dengan kalimat VH (s1_vh_*_delta_pct).
     valid = wc.get("valid_km2") or 0.0
     net_pct = (new - rec) / valid * 100 if valid > 0 else None
     cat = _delta_category(net_pct, THRESHOLDS["s1_vh_warn_delta_pct"], THRESHOLDS["s1_vh_flood_delta_pct"])
-    # Lintas orbit: backscatter dari sudut datang berbeda tidak sepenuhnya
-    # sebanding, jadi paling tinggi "alert" -- tidak pernah alarm genangan
-    # (keputusan pemilik proyek, IMPLEMENTATION_NOTES T3-29).
     if wc.get("same_orbit") == 0 and cat == GENANGAN:
         cat = WASPADA
     return _sentence(what, cat, because)

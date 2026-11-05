@@ -1,4 +1,3 @@
-# api/routes/products.py
 """
 GET /api/products              — list products with filters (tier AND source)
 GET /api/products/{id}         — product detail

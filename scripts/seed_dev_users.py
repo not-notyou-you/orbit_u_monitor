@@ -1,15 +1,5 @@
 #!/usr/bin/env python
-"""Seed akun dummy satu per role untuk DEVELOPMENT SAJA.
-
-Terkoneksi sebagai monitor_app lalu SET LOCAL ROLE monitor_admin, sama seperti
-scripts/create_admin.py. Idempoten: akun yang sudah ada dikembalikan ke role,
-sandi, dan status aktif bawaan, serta penghitung gagal-login direset.
-
-JANGAN dijalankan di produksi: sandinya tertulis di berkas ini.
-
-Pakai:
-    python scripts/seed_dev_users.py --i-know-this-is-dev
-"""
+"""Seed akun dummy satu per role untuk DEVELOPMENT SAJA."""
 
 from __future__ import annotations
 

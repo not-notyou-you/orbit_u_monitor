@@ -1,38 +1,9 @@
-// js/home.js — Beranda: Pantau Lokasi (#beranda, INTERFACE.md §2 halaman 1, M63).
-//
-// Landing singkat lalu Pantau lokasi, dengan dua keadaan:
-// * Lokasi saya: pengguna yang SUDAH MASUK, izin lokasi diberikan, dan
-//   perangkat berada di kecamatan AOI ("wilayah terdaftar"). Panel pantau
-//   kecamatan itu tampil lebih dulu, Informasi lokasi di bawahnya.
-// * Selain itu (pengunjung, di luar wilayah, izin ditolak, peramban tanpa
-//   lokasi, koneksi tidak aman): Informasi lokasi lebih dulu, lalu panel
-//   pantau kecamatan yang dipilih (atau pilihan terakhir di peramban ini).
-//
-// Izin lokasi tidak pernah diminta saat halaman dibuka: hanya dibaca
-// otomatis bila sudah 'granted', selain itu lewat tombol (js/geo.js).
-// Koordinat hanya dipakai di browser untuk mencari kecamatannya.
-//
-// Satu kecamatan tampil dalam dua bagian (M66):
-// * Pantau lokasi: tiga KPI — status, update terakhir (waktu angka kecamatan
-//   terakhir dihitung), dan luas daerah — di dalam Informasi lokasi, di bawah
-//   pilihan kecamatan dan di atas peta.
-// * Detail lokasi: SATU satelit sekaligus. Kiri pilihan satelit dan channel,
-//   kanan citra scene terbaru dipotong ke kecamatan dengan panah ‹ › untuk
-//   berganti channel (menyeberang ke satelit lain di ujungnya); angka terbaru + tren 30 hari di bawahnya hanya untuk
-//   satelit itu. Sumber: GET /api/public/lokasi[/{id}[/trend]].
-//
-// Tema tampilan (js/theme.js; M65) berada di antara Informasi lokasi dan
-// Detail lokasi.
 'use strict';
 Pages['home'] = (() => {
   const PICK_KEY = 'orbit-u.lokasi';
   const LEVEL_COLOR = { '-1': '#808080', 0: '#33ff99', 1: '#ffb000', 2: '#ff3b3b' };
-  // Indeks 3 desimal: dengan 2 desimal nilai yang sedikit di luar rentang
-  // biasa tampak sama dengan batasnya ("-0,59 · biasa s.d. -0,59").
   const DIGITS = { VV: 1, VH: 1, WATER_PCT: 1, FLOOD: 1, NDVI: 3, NDWI: 3, RAIN_24H: 1, RAIN_72H: 1, RAIN_7D: 1 };
-  // Band per lintasan (Sentinel-1): titiknya jarang, garisnya disambung.
   const SPARSE = new Set(['VV', 'VH', 'WATER_PCT']);
-  // Urutan = LiveTiles.ROWS dan kelompok stats/tren API (etl/lokasi_data.GROUPS).
   const SATS = ['s1', 'modis', 'gpm'];
   const SAT_NAME = { s1: 'Sentinel-1', modis: 'MODIS', gpm: 'GPM' };
   let st = null;
@@ -72,23 +43,16 @@ Pages['home'] = (() => {
   }
 
   function destroy() {
-    // stop(): animasi peta yang masih berjalan saat halaman ditutup melempar galat Leaflet (_leaflet_pos).
     if (st && st.map) { st.map.stop(); st.map.remove(); }
     if (st && st.stopWatch) st.stopWatch();
     if (st && st.onTheme) document.removeEventListener('orbit-u:tema', st.onTheme);
     st = null;
   }
 
-  // ---------------------------------------------------------------- landing
-  // Tanpa tombol navigasi (M66): Informasi lokasi langsung di bawahnya, dan
-  // Masuk/Daftar untuk pengunjung ada di bar lokasi serta taskbar.
   function renderHero(root, me) {
     if (me) UI.$('#hoGreeting', root).insertAdjacentHTML('afterbegin', '<b>Halo, ' + UI.esc(me.full_name || me.username) + '.</b> ');
   }
 
-  // ---------------------------------------------------------- tema tampilan
-  // Satu kartu radio per tema di js/theme.js. Memilih langsung menerapkan
-  // tema ke seluruh aplikasi (atribut data-theme di <html>), tanpa memuat ulang.
   function renderThemes(root) {
     const box = UI.$('#hoThemes', root);
     if (!box || !window.Theme) { const fs = UI.$('#hoTheme', root); if (fs) fs.hidden = true; return; }
@@ -115,14 +79,10 @@ Pages['home'] = (() => {
       const t = Theme.LIST.find(x => x.key === e.target.value);
       st && st.ctx.setStatus('Tema: ' + (t ? t.name : e.target.value));
     });
-    // Tema diganti dari tab lain → kartu yang terpilih ikut.
     st.onTheme = e => mark(e.detail);
     document.addEventListener('orbit-u:tema', st.onTheme);
   }
 
-  // ------------------------------------------------------------- geolokasi
-  // Satu pembacaan sekaligus: menekan "Gunakan lokasi saya" juga memicu event
-  // izin 'granted' (onPermission), yang tanpa ini membaca lokasi dua kali.
   function detect() {
     if (!st.detecting) st.detecting = readLocation().finally(() => { if (st) st.detecting = null; });
     return st.detecting;
@@ -140,7 +100,6 @@ Pages['home'] = (() => {
     }
     if (!st) return false;
     if (!st.geo || !(st.geo.features || []).length) {
-      // Tanpa poligon kecamatan, "di luar wilayah" bisa saja keliru.
       bar.innerHTML = '<p class="pl-geo-line">Batas kecamatan gagal dimuat, jadi lokasi Anda belum bisa dicocokkan. ' +
         'Pilih kecamatan dari daftar. <button type="button" class="small" id="hoRetry">Coba lagi</button></p>';
       bindRetry();
@@ -179,7 +138,6 @@ Pages['home'] = (() => {
     }));
   }
 
-  // Bar status lokasi untuk pengguna yang sudah masuk tetapi belum/tidak bisa dideteksi.
   function geoBar(state, code) {
     const bar = UI.$('#hoGeo', st.root);
     UI.$('#hoMine', st.root).hidden = true;
@@ -205,7 +163,6 @@ Pages['home'] = (() => {
       '<a href="/daftar">Daftar akun Relawan (gratis)</a></p>';
   }
 
-  // Izin dicabut/diberikan dari pengaturan situs selagi halaman terbuka.
   function onPermission(state) {
     if (!st) return;
     if (state === 'granted') { detect(); return; }
@@ -213,7 +170,6 @@ Pages['home'] = (() => {
     if (st.current && st.current.source === 'mine') st.current.source = 'pick';
   }
 
-  // ------------------------------------------------------- daftar + peta
   function badge(it) {
     const lv = LiveTiles.levelInfo(it.status && it.status.level);
     return '<span class="pl-badge ' + lv.cls + '">' + UI.esc(((it.status && it.status.label) || lv.label).toUpperCase()) + '</span>' +
@@ -257,7 +213,6 @@ Pages['home'] = (() => {
     setTimeout(() => { if (st && st.map) { st.map.invalidateSize(); st.map.fitBounds(st.aoiBounds, { animate: false }); } }, 100);
   }
 
-  // Titik perangkat + lingkaran akurasi, hanya di peta lokal ini.
   function markDevice(pos) {
     if (!st.map) return;
     if (st.device) st.device.forEach(l => l.remove());
@@ -282,7 +237,6 @@ Pages['home'] = (() => {
     return v && st.items.some(it => it.region_id === v) ? v : null;
   }
 
-  // ------------------------------------------------------------ panel pantau
   async function show(rid, source) {
     if (!st) return;
     const token = ++st.token;
@@ -323,7 +277,6 @@ Pages['home'] = (() => {
     }
   }
 
-  // Waktu WIB apa pun zona waktu perangkatnya: semua kecamatan ada di Lebak Selatan.
   function wib(iso) {
     const d = UI.parseDate(iso);
     if (!d) return '—';
@@ -341,8 +294,6 @@ Pages['home'] = (() => {
       UI.readoutHTML('LUAS DAERAH', UI.num(d.region.area_km2, 0) + ' km²', 'Sumber data: BPS (COD-AB)', 'v-cyan');
   }
 
-  // Peringatan email untuk kecamatan ini (M64). Hanya pengguna yang masuk;
-  // email dan pilihan kecamatan tetap diatur lengkap di Akun saya.
   async function renderSubscribe(region) {
     const box = UI.$('#hoSub', st.root);
     if (!st.ctx.me) { box.hidden = true; return; }
@@ -369,9 +320,6 @@ Pages['home'] = (() => {
     }));
   }
 
-  // ---------------------------------------------------------- detail lokasi
-  // Tingkat terburuk tiap satelit dari daftar "tidak normal" API (kunci
-  // kalimat berawalan s1_/modis_/gpm_), untuk lencana di pilihan satelit.
   function satLevel(sat) {
     return ((st.d && st.d.abnormal) || []).filter(a => (a.key || '').indexOf(sat + '_') === 0)
       .reduce((m, a) => Math.max(m, a.level || 0), 0);
@@ -415,9 +363,6 @@ Pages['home'] = (() => {
     renderTrend();
   }
 
-  // Pilihan satelit di kiri dan panah di citra memakai jalan yang sama; ch =
-  // null berarti channel pertama yang bergambar. Fokus kembali ke panah yang
-  // ditekan, karena isi layar digambar ulang.
   function pickSat(sat, step, ch) {
     st.sat = sat;
     st.ch = ch || null;
@@ -429,8 +374,6 @@ Pages['home'] = (() => {
     const d = st.d, im = d.imagery || {}, previews = im.previews || {};
     const box = UI.$('#hoView', st.root);
     const i = SATS.indexOf(st.sat), row = LiveTiles.ROWS[i];
-    // Panah menelusuri semua channel bergambar berurutan, menyeberang ke
-    // satelit berikutnya/sebelumnya di ujung channel satelit ini.
     let seq = [];
     LiveTiles.ROWS.forEach((r, ri) => r.keys.forEach(k => { if (previews[k]) seq.push({ sat: SATS[ri], ch: k }); }));
     if (!seq.some(x => x.ch === st.ch)) seq = seq.concat([{ sat: st.sat, ch: st.ch }]);
@@ -461,7 +404,6 @@ Pages['home'] = (() => {
       pickSat(to.sat, b.dataset.step, to.ch);
     }));
     if (!p) return;
-    // Lightbox hanya berisi channel satelit ini, sama dengan yang tampil.
     const own = {};
     row.keys.forEach(k => { if (previews[k]) own[k] = previews[k]; });
     const opts = Auth.can('aoi3d.view') ? { action: { label: 'Lihat 3D', onPick: item => {
@@ -506,8 +448,6 @@ Pages['home'] = (() => {
         let pts = tr.dates.map((x, i) => ({ x, y: b.values[i] }));
         if (SPARSE.has(b.band_code)) pts = pts.filter(p => p.y !== null && p.y !== undefined);
         const ys = pts.map(p => p.y).filter(v => v !== null && v !== undefined);
-        // Garis ambang hanya bila dekat dengan data; ambang yang jauh (mis.
-        // hujan 100 mm saat hari-hari 3 mm) menggencet garisnya jadi datar.
         const thr = {};
         if (ys.length) {
           const lo = Math.min(...ys), hi = Math.max(...ys), span = Math.max(hi - lo, Math.abs(hi) * 0.2, 1);

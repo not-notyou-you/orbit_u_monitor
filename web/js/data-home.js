@@ -1,11 +1,3 @@
-// js/data-home.js — Data › Ringkasan (#data/ringkasan, INTERFACE.md §2 halaman 6.1, M56, M67, M74).
-// Baris status dan bagian "sedang berjalan" diisi js/process.js (dimuat di
-// sini dengan fragmen yang sama). Halaman ini sendiri mengisi tabel dataset
-// utama per satelit dari GET /api/data/summary + /api/data/activity.
-//
-// M74: tiga kartu satelit, dua kotak dataset utama, dan tabel "backfill
-// terakhir" diganti satu tabel tiga baris. Rincian per tanggal dan per item
-// tetap di Data › Satelit (tombol Kelola →).
 'use strict';
 Pages['data-home'] = (() => {
   const TAB = { s1: 'sentinel-1', modis: 'modis', gpm: 'gpm' };
@@ -30,7 +22,6 @@ Pages['data-home'] = (() => {
     await Pages.process.init(st.root, st.ctx);
   }
 
-  // Status proses tiap satelit: Sentinel-1 dari siklus Live, MODIS/GPM dari Job Hidromet.
   function procOf(s, a) {
     if (s.backfill_running) return ['BACKFILL BERJALAN', 'v-cyan'];
     if (!a) return [UI.NA, ''];

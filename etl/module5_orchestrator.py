@@ -1,32 +1,4 @@
-# etl/module5_orchestrator.py
-"""
-Orchestrator dataset: menyusun DAG pemrosesan dari konfigurasi per-satelit.
-
-Sejak model per-satelit (PIPELINE.md §2: dataset_source_config), pipeline
-sebuah dataset bukan lagi satu rantai tetap. Setiap sumber punya cabangnya
-sendiri, dan level (RAW/PROCESSED) sumber itulah yang menentukan sampai mana
-cabangnya jalan:
-
-    SENTINEL1 RAW        DOWNLOAD -> CALIBRATE -> CROP                (BRONZE)
-    SENTINEL1 PROCESSED  ... -> LEE_FILTER -> QUALITY_ANALYTICS
-                             -> GOLD_EXPORT                   (SILVER, GOLD)
-    MODIS     RAW        peta banjir saja                             (BRONZE)
-    MODIS     PROCESSED  + NDVI + NDWI                        (SILVER, GOLD)
-    GPM       RAW        curah hujan harian                           (BRONZE)
-    GPM       PROCESSED  + window akumulasi 24h/72h/7d        (SILVER, GOLD)
-
-    FUSION jalan hanya kalau >1 sumber dikonfigurasi DAN dataset punya
-    fusion_strategy.
-
-Terjemahan konfigurasi -> keputusan ada di etl/processing_plan.py; modul ini
-cuma menjalankan keputusannya dan menandai setiap baris data_products dengan
-processing_level yang menghasilkannya.
-
-Sentinel-1 tetap jadi jangkar tanggal ketika dikonfigurasi (MODIS/GPM diambil
-untuk tanggal akuisisi tiap scene S1). Dataset tanpa Sentinel-1 tidak punya
-jangkar itu, jadi sumber aux-nya diproses per hari sepanjang rentang tanggal
-dataset — lihat _run_aux_only().
-"""
+"""Orchestrator dataset: menyusun DAG pemrosesan dari konfigurasi per-satelit."""
 from __future__ import annotations
 import json
 import logging
@@ -102,14 +74,8 @@ from etl import tier_names as tn
 logger = logging.getLogger(__name__)
 
 _MAX_CONCURRENT_SCENE_PIPELINES = int(os.getenv("PIPELINE_MAX_CONCURRENT_SCENES", "2"))
-# Berprioritas: slot pemrosesan yang kosong diberikan ke job Dataset Saya
-# lebih dulu, job Live (LIVE_INGEST) baru mendapatkannya kalau tidak ada job
-# biasa yang menunggu.
 _pipeline_semaphore = dg.PrioritySemaphore(_MAX_CONCURRENT_SCENE_PIPELINES)
 
-# Job siklus Daerah Live (etl/live_cycle.py). Tidak mendesak -- revisit S1
-# 6-12 hari, dicek tiap 6 jam -- jadi mengalah ke Dataset Saya: prioritas
-# rendah di semua slot, dan hanya satu unduhan S1 sekaligus.
 LIVE_JOB_TYPE = "LIVE_INGEST"
 
 
@@ -129,31 +95,13 @@ class _JobContext:
     required_tiers: list[str]
     skip_stages: set[str]
     base_dir: Path
-    # Rencana per-satelit dataset ini (etl/processing_plan.py). Sumber yang
-    # tidak ada di sini tidak diproses sama sekali, dan level tiap sumber
-    # menentukan tahap mana yang dilewati + nilai data_products.processing_level.
     plan: ProcessingPlan
     fusion_strategy: str | None
-    # Rencana temporal strategi fusi (etl/fusion_strategies). None kalau dataset
-    # tidak memfusikan apa pun — dataset satu sumber, atau tanpa strategi.
-    # Menyimpan rencananya di konteks, bukan menghitung ulang per scene, supaya
-    # daftar tanggal yang dipakai sumbu unduh dan sumbu rakit dijamin sama.
-    fusion_plan: "FusionPlan | None"
-    # datasets.preview_options — varian PNG yang diminta user. None berarti
-    # kolomnya tidak dinyatakan; module10 me-render ketiganya (perilaku lama).
+    fusion_plan: FusionPlan | None
     preview_options: list[str] | None
     pause_event: threading.Event
     cancel_event: threading.Event
-    # {YYYYMMDD: {product_identifier, ...}} seluruh scene S1 yang ditemukan
-    # discover_scenes untuk tanggal itu. Dipakai _pipeline_worker untuk tahu
-    # kapan sebuah tanggal sudah lengkap dan boleh masuk PREVIEW/FUSION --
-    # tanpa itu, tanggal yang tertutup dua frame akan difinalisasi dua kali
-    # dan yang kedua menimpa yang pertama.
     expected_pids_by_date: dict[str, set[str]] = field(default_factory=dict)
-    # product_identifier scene yang gagal di run ini (diisi _record_worker_failure,
-    # dibaca _sweep_scratch): scratch scene ini TIDAK disapu di akhir run supaya
-    # .part yang sudah terunduh sebagian bisa di-resume oleh retry berikutnya,
-    # bukan diunduh ulang dari nol.
     failed_scene_keys: set[str] = field(default_factory=set)
     _failed_scene_keys_lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -165,11 +113,7 @@ class _JobContext:
         if plan is None:  # pragma: no cover - dijaga run_dataset_job
             raise RuntimeError("the Sentinel-1 path was called without an S1 configuration")
         return plan
-    # Set once run_dataset_job enters its dataset_log_file(...) block; worker
-    # threads enrol themselves with it so their records reach the .txt file.
     log_path: Path | None = None
-    # True untuk job Live: thread worker masuk kelas prioritas rendah
-    # download_guard dan pool unduhan S1-nya dibatasi satu.
     low_priority: bool = False
 
 
@@ -216,17 +160,6 @@ def _run_s1_chain(
 ) -> tuple[int, list[str], dict[str, list[str]], dict[str, dict[str, str]]]:
     """Cabang Sentinel-1 untuk satu scene: DOWNLOAD -> CALIBRATE -> CROP, lalu
     (hanya untuk level PROCESSED) LEE_FILTER -> QUALITY_ANALYTICS -> GOLD_EXPORT.
-
-    Berhenti lebih awal di tahap mana pun yang ada di jc.skip_stages — untuk
-    S1 RAW-only itu berarti berhenti tepat setelah CROP, dengan BRONZE sebagai
-    artefaknya.
-
-    Returns:
-        (scene_id, produced_tiers, produced_files, s1_files_by_level).
-        `s1_files_by_level` memetakan level pemrosesan ke {band: path} raster
-        S1 terakhir pada level itu — RAW ke hasil crop, PROCESSED ke COG.
-        Kosong kalau scene berhenti sebelum CROP. Pemanggil memakainya untuk
-        PREVIEW dan untuk memosaikkan frame satu tanggal.
     """
     pid = scene_meta["product_identifier"]
     acq_date = dl_result.acquisition_datetime
@@ -253,9 +186,6 @@ def _run_s1_chain(
 
     dl_job_id = jc.meta.insert_processing_job(scene_id, "DOWNLOAD", parameters={"dataset_id": jc.dataset_id})
     jc.meta.start_job(dl_job_id)
-    # Level yang menandai artefak tiap tier untuk sumber ini. RAW/BRONZE
-    # ditandai 'RAW' hanya kalau user memang meminta level RAW; kalau S1
-    # dikonfigurasi PROCESSED saja, keduanya cuma langkah antara jalur penuh.
     s1_plan = jc.s1_plan
     raw_level = s1_plan.level_for_tier("RAW")
     bronze_level = s1_plan.level_for_tier(tn.ALIGNED)
@@ -277,13 +207,6 @@ def _run_s1_chain(
     )
     jc.meta.complete_job(dl_job_id, output_size_mb=dl_result.file_size_mb)
     produced_tiers.append("RAW")
-    # .SAFE.zip ikut didaftarkan sebagai file tier RAW. _download_worker selalu
-    # memanggil download_scene(keep_raw=True) karena module1b_calibrate membaca
-    # LUT kalibrasi dari dalam ZIP saat tahap CROP; kalau ZIP-nya tidak
-    # tercatat di sini, _cleanup_scene_tiers cuma menghapus dua TIFF hasil
-    # ekstrak dan meninggalkan ~2 GB ZIP per scene di disk selamanya untuk
-    # dataset yang tidak meminta tier RAW. Cleanup baru jalan setelah seluruh
-    # pipeline scene selesai (lewat cleanup_queue), jadi kalibrasi sudah lewat.
     produced_files["RAW"] = [dl_result.vv_tif_path, dl_result.vh_tif_path]
     if dl_result.zip_path:
         produced_files["RAW"].append(dl_result.zip_path)
@@ -345,18 +268,9 @@ def _run_s1_chain(
     jc.meta.complete_job(crop_job_id, cpu_usage_percent=st.cpu_peak_percent, memory_usage_mb=st.memory_peak_mb)
     produced_tiers.append(tn.ALIGNED)
     produced_files[tn.ALIGNED] = [crop_vv, crop_vh]
-    # Dipetakan per band di sini, bukan disimpulkan dari urutan daftar di
-    # atas: pemanggil memakainya untuk memosaikkan band yang sama dari
-    # beberapa frame, dan "elemen pertama pasti VV" adalah asumsi yang diam
-    # begitu daftarnya diubah.
     s1_files_by_level: dict[str, dict[str, str]] = {RAW: {"VV": crop_vv, "VH": crop_vh}}
     jc.dsmgr.upsert_scene_job_state(jc.job_id, pid, current_stage="CROP", stage_status="COMPLETED")
 
-    # Sentinel-1 RAW berhenti di sini: BRONZE (terkalibrasi, ter-crop, tanpa
-    # Lee filter dan tanpa QA) ADALAH artefak RAW-nya (DOCS/PIPELINE.md, "What RAW
-    # means for Sentinel-1"). jc.skip_stages sudah memuat LEE_FILTER/
-    # QUALITY_ANALYTICS/GOLD_EXPORT dari SourcePlan.s1_skip_stages(); cabang
-    # ini cuma membuat alasannya terbaca di log.
     if "LEE_FILTER" in jc.skip_stages:
         if s1_plan.raw_only:
             logger.info(
@@ -419,7 +333,6 @@ def _run_s1_chain(
         message="Running quality assurance checks",
     ) as st:
         band_metrics: dict[str, dict] = {}
-        # Ambang dari quality_thresholds (DATABASE.md §3.8), bukan konstanta.
         thresholds = load_quality_thresholds(jc.db)
         for band, path, product_id in (("VV", lee_vv, silver_vv_id), ("VH", lee_vh, silver_vh_id)):
             thr = threshold_for(thresholds, band)
@@ -495,7 +408,6 @@ def _run_s1_chain(
             file_size_mb=_file_size_mb(gold_path),
             data_hash_sha256=jc.lineage.compute_sha256(gold_path),
             file_format="COG", rows=g_rows, cols=g_cols,
-            # SILVER dan GOLD hanya pernah lahir dari jalur PROCESSED.
             processing_level=PROCESSED,
         )
         jc.lineage.record_transformation(
@@ -515,17 +427,7 @@ def _run_s1_chain(
 
 @dataclass
 class _SceneResult:
-    """Hasil satu scene sampai SEBELUM PREVIEW/FUSION.
-
-    PREVIEW dan FUSION tidak lagi jalan di dalam pipeline scene: keduanya
-    menulis berkas yang namanya cuma memuat TANGGAL (`20250123_s1_vv.png`,
-    `fusion_20250123_hybrid_processed.h5`), sementara satu tanggal bisa punya
-    beberapa scene. Dijalankan per scene, scene yang selesai belakangan
-    menimpa yang duluan -- di dataset 22_try6 frame dengan cakupan 68,7%
-    ditimpa frame 51,7% dan separuh AOI hilang dari deliverable.
-
-    Jadi scene berhenti di sini, dan _finalize_date menjalankan keduanya
-    SEKALI per tanggal di atas mosaik seluruh frame tanggal itu."""
+    """Hasil satu scene sampai SEBELUM PREVIEW/FUSION."""
 
     pid: str
     scene_id: int
@@ -537,17 +439,7 @@ class _SceneResult:
 
 
 def _process_scene(jc: _JobContext, scene_meta: dict, dl_result) -> _SceneResult:
-    """Pipeline satu scene Sentinel-1 sampai input aux tanggalnya siap.
-
-    Dua bagian yang sengaja dipisah: cabang S1 (_run_s1_chain) berhenti sesuai
-    level yang dikonfigurasi untuk SENTINEL1, sementara tahap lintas-sumber di
-    bawah (input MODIS/GPM) tetap jalan setelahnya.
-
-    Pemisahan itu bukan kosmetik: sebelumnya tahap aux menempel di ujung
-    rantai S1, jadi dataset dengan sentinel1[RAW] + modis[PROCESSED] berhenti
-    di CROP dan TIDAK PERNAH mengunduh MODIS-nya. Level satu sumber tidak
-    boleh memutus sumber lain.
-    """
+    """Pipeline satu scene Sentinel-1 sampai input aux tanggalnya siap."""
     pid = scene_meta["product_identifier"]
     acq_date = dl_result.acquisition_datetime
 
@@ -569,26 +461,10 @@ def _process_scene(jc: _JobContext, scene_meta: dict, dl_result) -> _SceneResult
     if jc.cancel_event.is_set():
         return _result()
 
-    # Input aux (MODIS + GPM) disiapkan di sini, bukan lagi di dalam blok
-    # FUSION. PREVIEW me-render dari tier GOLD, jadi kalau MODIS/GPM baru
-    # dimaterialisasi saat fusion berjalan, preview akan selalu kehabisan lima
-    # dari tujuh lapisannya. Pemanggilannya idempotent dan tetap cuma sekali
-    # per scene.
-    #
-    # Tidak lagi digantung pada "FUSION" in skip_stages: MODIS dan GPM sekarang
-    # sumber yang berdiri sendiri di dataset_source_config, bukan sekadar bahan
-    # fusi. Dataset yang meminta modis[PROCESSED] tanpa fusi tetap harus dapat
-    # NDVI/NDWI-nya.
-    #
-    # plan diteruskan supaya sumber yang tidak dikonfigurasi tidak diunduh
-    # sama sekali, dan sumber RAW-only berhenti di BRONZE.
     aux_produced, _ = ensure_aux_inputs_for_date(
         jc.db, jc.dataset_id, jc.dataset_name, jc.region_id, jc.bbox_tuple, s1_date,
         plog=jc.plog, plan=jc.plan,
     )
-    # File MODIS/GPM yang baru ditulis ikut dicatat di tier-nya masing-masing,
-    # supaya _cleanup_scene_tiers bisa menghapusnya juga kalau tier itu tidak
-    # diminta dataset ini.
     for aux_tier, aux_paths in aux_produced.items():
         produced_files.setdefault(aux_tier, []).extend(aux_paths)
         if aux_paths and aux_tier not in produced_tiers:
@@ -600,11 +476,7 @@ def _process_scene(jc: _JobContext, scene_meta: dict, dl_result) -> _SceneResult
 def _mosaic_s1_by_level(
     jc: _JobContext, date_key: str, members: list[_SceneResult]
 ) -> dict[str, dict[str, str]]:
-    """{level: {band: path}} untuk satu tanggal, gabungan SEMUA frame-nya.
-
-    Satu frame -> path aslinya dipakai langsung (lihat etl/s1_mosaic.py).
-    Level yang tidak punya satu pun raster tidak muncul di hasil, jadi
-    pemanggil bisa membedakan "tidak ada S1" dari "ada tapi kosong"."""
+    """{level: {band: path}} untuk satu tanggal, gabungan SEMUA frame-nya."""
     scratch = fm.get_scratch_dir(jc.dataset_id, jc.dataset_name, date_key)
     mosaics: dict[str, dict[str, str]] = {}
     for level in jc.plan.output_levels():
@@ -622,22 +494,13 @@ def _run_preview_for_date(
     jc: _JobContext, date_key: str, s1_date: date, members: list[_SceneResult],
     primary: _SceneResult, mosaics: dict[str, dict[str, str]],
 ) -> list[str]:
-    """PREVIEW satu tanggal. Mengembalikan daftar berkas yang ditulis.
-
-    Kegagalannya sengaja tidak menjatuhkan scene: preview adalah artefak
-    turunan, dan HDF5 fusion -- deliverable yang sebenarnya -- tidak
-    bergantung padanya. plog.stage sudah mencatat baris FAILED lengkap
-    dengan traceback, lalu pipeline lanjut ke FUSION."""
+    """PREVIEW satu tanggal. Mengembalikan daftar berkas yang ditulis."""
     for member in members:
         jc.dsmgr.upsert_scene_job_state(
             jc.job_id, member.pid, current_stage="PREVIEW", stage_status="RUNNING"
         )
     preview_files: list[str] = []
     try:
-        # Satu render per level yang dihasilkan dataset ini -- sama dengan
-        # jumlah stack fusion (ProcessingPlan.output_levels). Dataset yang
-        # meminta sebuah sumber di RAW dan PROCESSED sekaligus mendapat dua
-        # set PNG: satu dari bronze/, satu dari gold/, di folder terpisah.
         for level in jc.plan.output_levels():
             with jc.plog.stage(
                 jc.dataset_id, primary.pid, module="MODULE10_PREVIEW", stage="PREVIEW",
@@ -649,10 +512,6 @@ def _run_preview_for_date(
                 preview_result = generate_previews(
                     jc.dataset_id, jc.dataset_name, s1_date,
                     s1_scene_key=primary.pid,
-                    # Raster S1 dioper eksplisit -- mosaik tanggal ini kalau
-                    # frame-nya lebih dari satu, berkas frame tunggal kalau
-                    # tidak. Tanpa ini module10 mencari sendiri lewat glob dan
-                    # menemukan satu frame saja.
                     s1_files=mosaics.get(level),
                     processing_level=level,
                     options=jc.preview_options,
@@ -667,19 +526,12 @@ def _run_preview_for_date(
                     skipped_count=preview_result["counts"]["skipped"],
                     file_size_mb=preview_result["total_size_mb"],
                 )
-            # Dicatat per level, bukan sekali setelah loop selesai: dataset dua
-            # level yang gagal di level kedua sudah terlanjur menulis PNG level
-            # pertama ke disk, dan pencatatan di ujung loop membuat berkas itu
-            # hilang dari hitungan job.
             preview_files.extend(preview_result["files"])
         for member in members:
             jc.dsmgr.upsert_scene_job_state(
                 jc.job_id, member.pid, current_stage="PREVIEW", stage_status="COMPLETED"
             )
     except Exception:
-        # State scene sengaja tidak ditandai FAILED: scene-nya sendiri tidak
-        # gagal, dan menandainya begitu akan membuatnya terhitung di
-        # failed_count padahal FUSION masih akan berhasil.
         logger.exception(
             "[ORCH] PREVIEW gagal tanggal=%s pid=%s, lanjut ke FUSION",
             date_key, primary.pid,
@@ -693,12 +545,6 @@ def _run_fusion_for_date(
 ) -> list[str]:
     """FUSION satu tanggal. Mengembalikan daftar berkas HDF5+JSON yang ditulis
     (kosong kalau fusi memang dilewati dataset ini)."""
-    # Fusi butuh lebih dari satu sumber DAN sebuah strategi (DOCS/PIPELINE.md,
-    # "Fusion Stage"). Dataset satu-sumber tidak punya apa-apa untuk
-    # dipasangkan; menjalankannya cuma menghasilkan HDF5 berisi satu grup dan
-    # enam lapisan NaN. required_tiers biasanya sudah menutup kasus ini lewat
-    # skip_stages, tapi kondisinya diperiksa eksplisit di sini karena
-    # required_tiers dataset bersifat global sementara jumlah sumber tidak.
     if "FUSION" in jc.skip_stages or not jc.plan.fusion_eligible(jc.fusion_strategy):
         logger.info(
             "[ORCH] pid=%s FUSION dilewati: sumber=%d strategi=%r skipped=%s",
@@ -712,10 +558,6 @@ def _run_fusion_for_date(
             jc.job_id, member.pid, current_stage="FUSION", stage_status="RUNNING"
         )
 
-    # Lapisan yang akan ditulis ikut konfigurasi sumber, bukan konstanta
-    # FUSION_LAYERS: dataset selektif menghasilkan HDF5 dengan group yang lebih
-    # sedikit, dan mencatat daftar penuh di log membuat progress terlihat macet
-    # di lapisan yang memang tidak pernah dibuat.
     planned_layers = sorted({
         layer
         for level in jc.plan.output_levels()
@@ -740,10 +582,6 @@ def _run_fusion_for_date(
             db=jc.db, progress_cb=_fusion_progress,
             plan=jc.plan, fusion_strategy=jc.fusion_strategy,
             region_id=jc.region_id,
-            # Raster S1 tanggal ini, sudah termasuk frame tetangga. scene_id di
-            # atas tetap scene utama -- itu yang memegang baris DB-nya -- dan
-            # member di bawah membuat lineage menyebut semua frame yang datanya
-            # benar-benar masuk ke stack.
             s1_files_by_level=mosaics,
             s1_member_scene_ids=tuple(m.scene_id for m in members),
         )
@@ -760,26 +598,13 @@ def _run_fusion_for_date(
         jc.dsmgr.upsert_scene_job_state(
             jc.job_id, member.pid, current_stage="FUSION", stage_status="COMPLETED"
         )
-    # Path diambil dari hasil create_fusion_stack, bukan disusun ulang di sini:
-    # jumlah berkasnya (satu atau dua) dan nama berkasnya ditentukan level yang
-    # dijalankan, dan menebaknya di dua tempat adalah cara kedua tempat itu
-    # berbeda pendapat begitu salah satunya diubah.
     return [str(path) for run in runs for path in (run.h5_path, run.json_path)]
 
 
 def _finalize_date(jc: _JobContext, members: list[_SceneResult]) -> None:
-    """PREVIEW + FUSION untuk satu tanggal, sekali, di atas seluruh frame-nya.
-
-    Dijalankan setelah SEMUA scene tanggal ini selesai diproses, dan tetap di
-    thread pipeline yang sama supaya urutannya deterministik tanpa kunci.
-
-    Berkas yang dihasilkan ditempelkan ke scene utama: cleanup bekerja per
-    scene, dan berkas tanggal ini memang cuma boleh dihitung sekali.
-    """
+    """PREVIEW + FUSION untuk satu tanggal, sekali, di atas seluruh frame-nya."""
     if not members:
         return
-    # Urut pid supaya "scene utama" tidak bergantung pada urutan selesainya
-    # thread -- itu justru sumber penyakit yang sedang diperbaiki di sini.
     members = sorted(members, key=lambda m: m.pid)
     primary = members[0]
     s1_date = primary.acquisition_date
@@ -799,20 +624,12 @@ def _finalize_date(jc: _JobContext, members: list[_SceneResult]) -> None:
 
     mosaics = _mosaic_s1_by_level(jc, date_key, members)
 
-    # --- PREVIEW ---------------------------------------------------------
-    # Dijalankan sebelum FUSION dan sebelum _cleanup_scene_tiers: dataset yang
-    # cuma meminta tier FUSION akan menghapus gold/ setelah scene selesai, jadi
-    # ini satu-satunya jendela waktu ketika seluruh raster GOLD satu tanggal
-    # masih ada di disk untuk dirender.
     if "PREVIEW" not in jc.skip_stages:
         preview_files = _run_preview_for_date(
             jc, date_key, s1_date, members, primary, mosaics
         )
         if preview_files:
             primary.produced_files["PREVIEW"] = preview_files
-    # PREVIEW sengaja TIDAK masuk produced_tiers: dia bukan mata rantai lineage
-    # RAW->FUSION, jadi compute_tiers_to_delete tidak boleh menghapusnya cuma
-    # karena tidak disebut di required_tiers dataset.
 
     if jc.cancel_event.is_set():
         return
@@ -830,19 +647,7 @@ def _finalize_date(jc: _JobContext, members: list[_SceneResult]) -> None:
 def _fuse_days_without_s1(
     jc: _JobContext, s1_dates: set[date], scenes: list[dict] | None = None
 ) -> int:
-    """Rakit HDF5 untuk tanggal fusi yang tidak punya scene Sentinel-1.
-
-    Ini sumbu RAKIT dari etl/fusion_strategies untuk FULL_COVERAGE. Tanggal
-    yang PUNYA scene S1 sudah difusikan di dalam _process_scene sebagai bagian
-    dari pipeline scene; yang tersisa di sini hanyalah hari-hari yang tidak
-    pernah masuk ke pipeline itu karena memang tidak ada scene-nya.
-
-    Tidak dijalankan untuk CO_OCCURRENCE dan HYBRID: keduanya berjangkar pada
-    S1, jadi himpunan tanggal fusinya memang persis tanggal scene dan daftar
-    di bawah ini akan selalu kosong.
-
-    Returns jumlah tanggal yang berhasil ditulis.
-    """
+    """Rakit HDF5 untuk tanggal fusi yang tidak punya scene Sentinel-1."""
     plan = jc.fusion_plan
     if plan is None or plan.requires_s1:
         return 0
@@ -856,10 +661,6 @@ def _fuse_days_without_s1(
         jc.job_id, plan.strategy, len(pending),
     )
 
-    # Tanggal scene -> product_identifier, untuk meminjam scene S1 dari hari
-    # terdekat dalam toleransi. Tanpa ini, hari yang SEBENARNYA punya pasangan
-    # S1 dalam jangkauan akan ditulis dengan group sentinel1/ berisi NaN --
-    # persis kebalikan dari yang dijanjikan toleransi itu.
     pid_by_date: dict[date, str] = {}
     for meta_row in scenes or []:
         d = _scene_date(meta_row)
@@ -880,9 +681,6 @@ def _fuse_days_without_s1(
         try:
             runs = create_fusion_stack(
                 jc.dataset_id, jc.dataset_name, day, jc.bbox_tuple,
-                # scene_id milik tanggal JANGKAR, bukan tanggal fusi: inilah
-                # peminjaman S1 dalam toleransi. None kalau memang tidak ada
-                # pasangan -- stack tetap ditulis dengan sentinel1/ NaN.
                 anchor_scene["scene_id"] if anchor_scene else None,
                 db=jc.db, plan=jc.plan, fusion_strategy=jc.fusion_strategy,
                 region_id=jc.region_id, require_s1=False,
@@ -901,52 +699,19 @@ def _fuse_days_without_s1(
             )
             _record_worker_failure(jc, date_key, "FUSION", exc)
             jc.meta.fail_open_jobs(exc)
-            # Stack fusi adalah deliverable, bukan input opsional. Dulu
-            # kegagalan di sini cuma dicatat ke log, sehingga try2 selesai
-            # COMPLETED dengan 11 dari 16 hari gagal dan tanpa tombol retry.
             jc.dsmgr.increment_job_counters(jc.job_id, failed=1)
 
     return written
 
 
-# Tier yang dihapus saat fusion_output_only aktif. FUSION dan PREVIEW tidak
-# ikut: yang pertama adalah deliverable-nya, yang kedua tidak bisa dibangun
-# ulang setelah tier sumbernya hilang.
 _FUSION_ONLY_DISPOSABLE: tuple[str, ...] = (
     "raw", "aligned", "despeckled", "indices", "accumulated", "cog",
-    # Nama lama ikut supaya dataset pra-migrasi tetap ikut dibersihkan.
     "bronze", "silver", "gold",
 )
 
 
 def _sweep_scratch(jc: _JobContext) -> int:
-    """Buang _work/ di akhir job -- KECUALI folder scene yang gagal run ini.
-
-    Sejak relayout, _work/ bukan cuma scratch kalibrasi: tier antara yang
-    tidak punya laci (RAW = ZIP SAFE, SILVER = Lee pre-COG) juga mendarat di
-    sana. Tanpa sapuan ini, "artefak antara dibuang setelah selesai" -- dasar
-    keputusan menghilangkan laci ketiga -- tidak pernah benar-benar terjadi,
-    dan ZIP SAFE ~1,6 GB per scene menumpuk diam-diam.
-
-    Scene yang gagal (jc.failed_scene_keys, diisi _record_worker_failure)
-    DIKECUALIKAN dari sapuan: folder scratch-nya menyimpan .zip.part yang
-    sudah separuh terunduh, dan menghapusnya membuat retry berikutnya mulai
-    dari nol walau resume sebenarnya mungkin (M1 mengecek ukuran .part yang
-    ada). Sebelum pengecualian ini, retry SELALU mengunduh ulang dari awal
-    karena sapuan ini sudah menghapus .part-nya duluan di akhir run yang
-    gagal -- dampaknya sama seperti server menolak resume, tapi penyebabnya
-    kode kita sendiri.
-
-    Scene yang akhirnya berhasil di run manapun otomatis tersapu di run
-    berikutnya (tidak lagi masuk failed_scene_keys begitu sukses), jadi tidak
-    ada residu permanen: begitu dataset selesai tanpa scene gagal, sapuan
-    run terakhir itu penuh seperti sebelumnya -- tidak ada pengecualian.
-
-    Dijalankan untuk SEMUA job, bukan hanya fusion_output_only: isinya memang
-    scratch menurut definisinya sendiri.
-
-    Returns jumlah berkas yang dihapus.
-    """
+    """Buang _work/ di akhir job -- KECUALI folder scene yang gagal run ini."""
     scratch_root = jc.base_dir / fm.SCRATCH_DIRNAME
     if not scratch_root.is_dir():
         return 0
@@ -954,8 +719,6 @@ def _sweep_scratch(jc: _JobContext) -> int:
     with jc._failed_scene_keys_lock:
         protected_slugs = {fm.scratch_slug(key) for key in jc.failed_scene_keys}
 
-    # Lewat prefix extended-length: berkas di _work/ bisa melewati MAX_PATH
-    # Windows, dan rmtree biasa gagal WinError 3 lalu meninggalkan ZIP ~1,6 GB.
     long_root = fm.long_path(scratch_root)
     deleted = 0
     kept_dirs: list[str] = []
@@ -975,8 +738,6 @@ def _sweep_scratch(jc: _JobContext) -> int:
         deleted += len(entry_files)
 
     if not kept_dirs:
-        # Tidak ada yang dipertahankan: _work/ itu sendiri ikut dibuang
-        # persis seperti sapuan penuh yang lama, bukan cuma dikosongkan.
         try:
             long_root.rmdir()
         except OSError as exc:
@@ -995,23 +756,7 @@ def _sweep_scratch(jc: _JobContext) -> int:
 
 
 def _apply_fusion_output_only(jc: _JobContext, fusion_written: bool) -> int:
-    """Hapus artefak per-satelit setelah stack fusi selesai ditulis.
-
-    Ini BUKAN "lewati pemrosesan": fusi membaca raster GOLD/BRONZE tiap
-    sumber, jadi bahannya harus dibangun lebih dulu. Yang dihemat adalah disk
-    setelah bahan itu tidak diperlukan lagi.
-
-    Dijalankan sebagai pass AKHIR, bukan per-scene lewat _cleanup_scene_tiers,
-    karena FULL_COVERAGE merakit tanggal tanpa-S1 setelah seluruh pipeline
-    scene selesai — menghapus per-scene akan mencabut bahannya sebelum
-    perakitan itu sempat jalan.
-
-    `fusion_written=False` membatalkan penghapusan sepenuhnya. Tanpa penjaga
-    ini, job yang gagal di tahap FUSION akan menghapus satu-satunya output
-    yang berhasil dibuatnya dan menyisakan dataset kosong.
-
-    Returns jumlah berkas yang dihapus.
-    """
+    """Hapus artefak per-satelit setelah stack fusi selesai ditulis."""
     if not fusion_written:
         logger.warning(
             "[ORCH] job_id=%d fusion_output_only diminta tapi tidak ada stack "
@@ -1055,9 +800,6 @@ def _cleanup_scene_tiers(
     if not tiers_to_delete:
         return
     for tier in tiers_to_delete:
-        # Satu tier sekarang bisa berisi beberapa folder scene sekaligus
-        # ({date}/silver/sentinel1/{pid}, {date}/silver/modis, {date}/silver/gpm),
-        # jadi folder induknya dikumpulkan semua — bukan cuma yang terakhir.
         scene_dirs: set[Path] = set()
         deleted_paths: list[str] = []
         for file_path in produced_files.get(tier, []):
@@ -1076,9 +818,6 @@ def _cleanup_scene_tiers(
                 d.rmdir()
             except OSError:
                 pass  # masih ada file scene lain di tanggal yang sama
-        # Produk Sentinel-1 dicocokkan lewat scene_id (menangkap juga file
-        # yang ditulis run sebelumnya), produk aux MODIS/GPM lewat path
-        # karena barisnya menempel ke scene placeholder, bukan scene ini.
         jc.meta.mark_products_invalid(scene_id=scene_id, dataset_id=jc.dataset_id, tier=tier)
         jc.meta.mark_products_invalid_by_paths(jc.dataset_id, deleted_paths)
     logger.info("[ORCH] cleanup pid=%s tiers dihapus=%s", pid, sorted(tiers_to_delete))
@@ -1087,13 +826,7 @@ def _cleanup_scene_tiers(
 def _record_worker_failure(
     jc: _JobContext, pid: str, stage: str, exc: BaseException
 ) -> None:
-    """Persist a worker-level failure to processing_logs.
-
-    Exceptions raised outside a `plog.stage(...)` block — DB registration,
-    lineage recording, cleanup — used to be visible only as
-    dataset_scene_jobs.last_error, so neither the log file nor /logs ever
-    showed why a stage failed. Never raises: logging must not mask the
-    original error."""
+    """Persist a worker-level failure to processing_logs."""
     with jc._failed_scene_keys_lock:
         jc.failed_scene_keys.add(pid)
     try:
@@ -1114,17 +847,6 @@ class _JobCancelled(Exception):
     """Raised from a progress callback to abort work already in flight."""
 
 
-# Jumlah scene S1 yang diunduh bersamaan. CDSE membatasi ~5 MB/s per koneksi
-# (26_JAWA: 1,6 GB = 5,5 menit per scene walau jalur 84 Mbps), dan
-# mengizinkan maksimal 4 unduhan paralel per akun. 3 menyisakan satu slot
-# untuk sesi lain (browser, job kedua). 1 = perilaku lama (berurutan).
-#
-# Sempat diturunkan ke 2 untuk mengurangi kegagalan koneksi CDSE, tapi itu
-# memangkas throughput ~33% untuk masalah yang sekarang sudah ditangani dari
-# sisi lain: StallGuard mendeteksi macet jauh lebih cepat (lihat
-# download_guard.py) dan _sweep_scratch tidak lagi membuang .part scene yang
-# gagal, jadi retry bisa resume alih-alih mulai dari nol. Dengan kegagalan
-# jadi jauh lebih murah untuk dipulihkan, throughput dikembalikan ke 3.
 S1_PARALLEL_DOWNLOADS = max(1, min(4, int(os.getenv("S1_PARALLEL_DOWNLOADS", "3"))))
 
 
@@ -1146,8 +868,6 @@ def _download_worker(jc: _JobContext, scenes: list[dict], download_queue: Queue)
             if not _download_one(jc, scene_meta, download_queue):
                 stop.set()
         except Exception:
-            # _download_one sudah menangani kegagalan per scene; ini hanya
-            # jaring terakhir supaya satu scene tidak menggugurkan scene lain.
             logger.exception(
                 "[ORCH] download worker error pid=%s job_id=%d",
                 scene_meta.get("product_identifier"), jc.job_id,
@@ -1158,9 +878,6 @@ def _download_worker(jc: _JobContext, scenes: list[dict], download_queue: Queue)
         thread_name_prefix="_download_worker",
         initializer=_pool_init,
     ) as pool:
-        # Diserahkan menurut urutan `scenes`; worker mengambil berikutnya
-        # begitu satu selesai. Pipeline menunggu per TANGGAL (lihat
-        # expected_pids_by_date), jadi urutan selesai tidak memengaruhi hasil.
         for _ in pool.map(_task, scenes):
             pass
     download_queue.put(None)
@@ -1185,12 +902,6 @@ def _download_one(jc: _JobContext, scene_meta: dict, download_queue: Queue) -> b
         )
 
         def _download_progress(pct: float, detail: str) -> None:
-            # Cancel was previously only checked between scenes, so a
-            # cancel (or force-delete) landing mid-download left the
-            # worker streaming a ~2 GB scene for minutes against a job --
-            # and, after a force-delete, a dataset -- that no longer
-            # exists. Progress callbacks are the only hook into the
-            # transfer, so the abort is raised from here.
             if jc.cancel_event.is_set():
                 raise _JobCancelled(f"job_id={jc.job_id} dibatalkan")
             jc.plog.log_event(
@@ -1230,26 +941,13 @@ def _download_one(jc: _JobContext, scene_meta: dict, download_queue: Queue) -> b
     return True
 
 
-# ---------------------------------------------------------------------------
-# Rekonsiliasi frame S1 lintas run (dulu etl/refusion.py)
-# ---------------------------------------------------------------------------
-# Pembaca disk + SceneJobState ini dulu tinggal di etl/refusion.py bersama alat
-# perakit-ulang manual. Alatnya dihapus (README §5), pembacanya tetap dipakai
-# _reconcile_date_members di bawah.
-
 _RECONCILE_LOG = "ORCH"
 
-# Band yang dikenali dari nama berkas COG S1 (`..._calibrated_VV_lee.tif`).
 _BANDS = ("VV", "VH")
 
 
 def _s1_cogs_by_pid(dataset_id: int, dataset_name: str) -> dict[str, dict[str, str]]:
-    """Petakan {product_identifier_prefix: {band: path}} dari raster di disk.
-
-    Nama berkas COG memuat potongan pid, bukan pid utuh
-    (`S1A_IW_GRDH_1SDV_20251204T222544_20_calibrated_VV_lee.tif`), jadi
-    pencocokannya lewat awalan dan bukan kesamaan persis.
-    """
+    """Petakan {product_identifier_prefix: {band: path}} dari raster di disk."""
     from etl import folder_manager as fm
 
     root = fm.get_dataset_root(dataset_id, dataset_name)
@@ -1269,14 +967,6 @@ def _s1_cogs_by_pid(dataset_id: int, dataset_name: str) -> dict[str, dict[str, s
 def _s1_raw_crops_by_pid(dataset_id: int, dataset_name: str) -> dict[str, dict[str, str]]:
     """Petakan {product_identifier_prefix: {band: path}} raster S1 tier RAW
     (crop sebelum Lee filter) di disk -- sumber `fusion_<tanggal>_hybrid_raw.h5`.
-
-    Ditemukan saat memverifikasi perbaikan dataset 35:
-    `_s1_cogs_by_pid` cuma mengindeks `sentinel-1/PROCESSED/`, jadi
-    `scene_results_for_date` cuma pernah mengisi `s1_files_by_level["PROCESSED"]`.
-    Tier RAW-nya diam-diam tetap mengandalkan fallback satu-scene di
-    `module9_fusion._find_s1_products` -- `fusion_20250111_hybrid_processed.h5`
-    pulih ke valid_fraction 0.9996 sesudah perbaikan, tapi
-    `fusion_20250111_hybrid_raw.h5` tetap 0.3578 walau ditulis ulang.
     """
     from etl import folder_manager as fm
 
@@ -1302,20 +992,7 @@ def _match_cogs(pid: str, cogs: dict[str, dict[str, str]]) -> dict[str, str]:
 
 
 def scene_results_for_date(db, job_id: int, jc, date_key: str) -> list:
-    """`_SceneResult` tiap frame S1 tanggal itu, dirakit dari disk + database.
-
-    Query DB lintas SEMUA job milik dataset ini, bukan cuma `job_id` yang
-    diminta. Kalau di-scope ke satu job_id, frame yang tercatat di job lain --
-    retry/resume yang dapat job_id baru, misalnya -- ikut hilang dari daftar
-    walau COG-nya lengkap di disk. Itu persis yang menghasilkan
-    `fusion_20250111_hybrid_processed.h5` cuma memuat satu dari dua frame S1
-    (mosaik dari satu frame -- persis yang etl/s1_mosaic.py cegah). Baris dari `job_id` yang diminta tetap diutamakan kalau pid yang
-    sama tercatat di lebih dari satu job.
-
-    `produced_tiers`/`produced_files` sengaja dikosongkan: keduanya dipakai
-    pipeline untuk memutuskan tier mana yang boleh dihapus saat cleanup, dan
-    rekonsiliasi ini tidak boleh menghapus apa pun.
-    """
+    """`_SceneResult` tiap frame S1 tanggal itu, dirakit dari disk + database."""
     from sqlalchemy import select
 
     from etl.database_client import SceneJobState
@@ -1334,8 +1011,6 @@ def scene_results_for_date(db, job_id: int, jc, date_key: str) -> list:
             .where(DatasetJob.dataset_id == jc.dataset_id)
         ).all()
 
-    # pid -> (scene_id, job_id); baris dari job_id yang diminta menang kalau
-    # pid yang sama muncul di lebih dari satu job.
     by_pid: dict[str, tuple[int, int]] = {}
     for pid, scene_id, row_job_id in rows:
         if date_key not in pid:
@@ -1360,9 +1035,6 @@ def scene_results_for_date(db, job_id: int, jc, date_key: str) -> list:
         s1_files_by_level = {"PROCESSED": bands}
         raw_bands = _match_cogs(pid, raw_crops)
         if raw_bands:
-            # Tanpa ini tier RAW (fusion_<tanggal>_hybrid_raw.h5) tidak
-            # pernah dapat frame tambahan apa pun -- lihat docstring
-            # _s1_raw_crops_by_pid.
             s1_files_by_level["RAW"] = raw_bands
         out.append(
             _SceneResult(
@@ -1377,9 +1049,6 @@ def scene_results_for_date(db, job_id: int, jc, date_key: str) -> list:
             )
         )
 
-    # COG ada di disk tapi tak satu pun baris SceneJobState (di job manapun
-    # untuk dataset ini) cocok dengannya -- frame ini diam-diam tidak akan
-    # ikut fusion. Ini harus berisik, bukan silent drop.
     for stem in cogs:
         if date_key not in stem or stem in matched_stems:
             continue
@@ -1399,22 +1068,6 @@ def _reconcile_date_members(
     """Gabungkan `members` (yang lewat antrean RUN INI) dengan frame tanggal
     ini yang sudah selesai diproses di run/resume SEBELUMNYA tapi tidak
     pernah masuk `pending` run ini.
-
-    Inilah mekanisme yang menghasilkan `fusion_20250111_hybrid_processed.h5`
-    cuma memuat satu dari dua frame S1: kalau frame A sudah CLEANUP/COMPLETED
-    di run sebelumnya (mis. tanggalnya sempat di-drain parsial karena frame B
-    waktu itu gagal unduh), `_download_one` melewatkan frame A begitu job
-    di-resume (`scene_is_done` True -> tidak pernah masuk `download_queue`
-    lagi) -- jadi `pending` run BARU ini tidak pernah tahu frame A pernah
-    ada. Begitu frame B akhirnya berhasil dan sendirian sampai ke drain, ia
-    MENIMPA stack lama dengan hanya dirinya sendiri, bukan digabung dengan
-    frame A yang sebenarnya masih valid di disk.
-
-    Memakai `scene_results_for_date` (disk COG + DB SceneJobState lintas
-    job), bukan menuruti `pending` di memori, jadi
-    hasilnya lengkap tidak peduli di run mana tiap frame terakhir selesai.
-    Untuk run normal (tidak ada resume/retry) ini no-op murni: setiap pid
-    yang muncul di sini juga sudah ada di `members`.
     """
     try:
         on_disk = scene_results_for_date(jc.db, jc.job_id, jc, date_key)
@@ -1444,28 +1097,11 @@ def _reconcile_date_members(
 def _flush_date(
     jc: _JobContext, date_key: str, members: list[_SceneResult], cleanup_queue: Queue
 ) -> None:
-    """Selesaikan satu tanggal: PREVIEW + FUSION sekali, lalu antre cleanup.
-
-    Cleanup baru diantre SETELAH finalisasi. Urutan itu wajib: untuk dataset
-    fusion_output_only, _cleanup_scene_tiers menghapus gold/, dan mengantrenya
-    lebih dulu berarti raster yang mau dirender/difusikan bisa lenyap di
-    tengah jalan.
-
-    FUSION dijalankan di atas anggota yang DIREKONSILIASI
-    (`_reconcile_date_members`), bukan `members` mentah: kalau tidak, frame
-    yang sudah beres di run sebelumnya tapi tidak lewat antrean run ini akan
-    hilang dari stack. Akuntansi cleanup di bawah tetap memakai `members`
-    mentah -- frame tambahan itu sudah dibersihkan tuntas di run yang
-    memprosesnya, mengulanginya di sini cuma kerja dua kali untuk sesuatu
-    yang sudah tidak ada.
-    """
+    """Selesaikan satu tanggal: PREVIEW + FUSION sekali, lalu antre cleanup."""
     finalize_members = _reconcile_date_members(jc, date_key, members)
     try:
         _finalize_date(jc, finalize_members)
     except Exception as exc:
-        # Tanggal gagal difinalisasi tidak boleh menahan cleanup scene-nya:
-        # berkas tier sumbernya sudah ada di disk dan tetap harus dibereskan
-        # menurut required_tiers.
         logger.exception(
             "[ORCH] finalisasi tanggal=%s gagal job_id=%d", date_key, jc.job_id
         )
@@ -1494,14 +1130,10 @@ def _flush_date(
 
 
 def _pipeline_worker(jc: _JobContext, download_queue: Queue, cleanup_queue: Queue) -> None:
-    # MODIS/GPM per scene diunduh dari thread ini (ensure_aux_inputs_for_date).
     dg.set_low_priority(jc.low_priority)
     dg.set_context(jc.dataset_id)
     if jc.log_path:
         adopt_dataset_log_scope(jc.log_path)
-    # Scene yang sudah diproses tapi tanggalnya belum lengkap. Semuanya hidup
-    # di thread ini saja, jadi tidak perlu kunci: satu-satunya thread yang
-    # memfinalisasi tanggal adalah thread yang memprosesnya.
     pending: dict[str, list[_SceneResult]] = {}
     while True:
         item = download_queue.get()
@@ -1523,7 +1155,6 @@ def _pipeline_worker(jc: _JobContext, download_queue: Queue, cleanup_queue: Queu
         except Exception as exc:
             logger.exception("[ORCH] pipeline gagal pid=%s job_id=%d", pid, jc.job_id)
             _record_worker_failure(jc, pid, "SCENE_PIPELINE", exc)
-            # Tahap yang sudah start_job tapi melempar sebelum complete_job.
             jc.meta.fail_open_jobs(exc)
             jc.dsmgr.upsert_scene_job_state(
                 jc.job_id, pid, stage_status="FAILED", last_error=str(exc)[:2000], completed_at=_now()
@@ -1532,11 +1163,6 @@ def _pipeline_worker(jc: _JobContext, download_queue: Queue, cleanup_queue: Queu
         finally:
             _pipeline_semaphore.release()
 
-        # Tanggal yang seluruh scene-nya sudah lewat sini difinalisasi
-        # sekarang, supaya PREVIEW/FUSION tidak menunggu tanggal lain selesai
-        # diunduh. Sisanya disapu setelah antrean habis -- itu yang menangani
-        # scene yang gagal sebelum sampai ke thread ini (unduhan gagal), yang
-        # membuat tanggalnya tidak akan pernah "lengkap".
         for ready in [
             d for d, members in pending.items()
             if jc.expected_pids_by_date.get(d)
@@ -1545,9 +1171,6 @@ def _pipeline_worker(jc: _JobContext, download_queue: Queue, cleanup_queue: Queu
             _flush_date(jc, ready, pending.pop(ready), cleanup_queue)
 
     if jc.cancel_event.is_set():
-        # Job dibatalkan: yang tersisa sengaja tidak difinalisasi. Menulis
-        # preview dan HDF5 untuk tanggal yang scene-nya baru separuh diproses
-        # justru menghasilkan deliverable yang salah diam-diam.
         if pending:
             logger.info(
                 "[ORCH] job_id=%d dibatalkan: %d tanggal tidak difinalisasi",
@@ -1559,16 +1182,6 @@ def _pipeline_worker(jc: _JobContext, download_queue: Queue, cleanup_queue: Queu
             expected = jc.expected_pids_by_date.get(date_key)
             got = {m.pid for m in members}
             if expected and got < expected:
-                # Antrean run ini habis sebelum semua frame tanggal ini
-                # sampai sini (unduhan/scene lain gagal duluan, atau sudah
-                # selesai di run sebelumnya dan dilewati _download_one).
-                # _flush_date merekonsiliasi dengan disk+DB sebelum finalize
-                # (_reconcile_date_members) jadi frame yang sudah beres di
-                # run lain tetap ikut -- tapi kalau reknosiliasinya sendiri
-                # tidak menemukan penggantinya, tanggal ini akan tetap
-                # finalize PARSIAL. Diteriakkan di sini SEBELUM rekonsiliasi
-                # supaya kekurangan versi mentahnya (antrean run ini saja)
-                # tetap kelihatan di log.
                 logger.warning(
                     "[ORCH] job_id=%d tanggal=%s: %d/%d frame di antrean run "
                     "ini (hilang dari run ini: %s) -- mencoba rekonsiliasi "
@@ -1602,11 +1215,7 @@ def _cleanup_worker(jc: _JobContext, cleanup_queue: Queue) -> None:
 def _keep_live_target_dates(db, job_id: int, dataset_id: int, scenes: list[dict]) -> list[dict]:
     """Job LIVE_INGEST hanya untuk tanggal yang dipilih siklus Live (baris
     live_scenes PROCESSING), bukan setiap scene di rentang [awal, akhir].
-
-    Siklus Live memproses tanggal yang tidak berurutan (backfill setahun,
-    terbaru dulu, M58); tanpa saringan ini rentang job ikut menyapu tanggal
-    yang sudah READY dan lintasan yang hanya menyerempet AOI (~30%, ditolak
-    gerbang Live 90%), masing-masing ±1,6 GB unduhan sia-sia."""
+    """
     with db.session() as sess:
         job = sess.get(DatasetJob, job_id)
         if job is None or job.job_type != LIVE_JOB_TYPE:
@@ -1619,8 +1228,6 @@ def _keep_live_target_dates(db, job_id: int, dataset_id: int, scenes: list[dict]
     if len(kept) != len(scenes):
         logger.info("[ORCH] job_id=%d Live: %d -> %d scene (hanya tanggal target %s)",
                     job_id, len(scenes), len(kept), sorted(d.isoformat() for d in wanted))
-    # Frame yang COG VV+VH-nya sudah jadi (batch sebelumnya terputus setelah
-    # frame ini selesai) tidak diunduh ulang: ±1,8 GB dan ±40 menit per frame.
     done_dir = root / fm.SOURCE_DIR_NAMES["sentinel1"] / "PROCESSED" if root else None
     if done_dir is not None and done_dir.is_dir():
         names = {p.name for p in done_dir.glob("*_lee.tif")}
@@ -1641,15 +1248,7 @@ def _drop_dates_barely_covering_aoi(
     scenes: list[dict], bbox_wkt: str, job_id: int,
     min_fraction: float = MIN_S1_AOI_COVERAGE,
 ) -> list[dict]:
-    """Buang tanggal S1 yang gabungan footprint-nya menutup kurang dari
-    `min_fraction` AOI.
-
-    Diputuskan per TANGGAL, bukan per scene: satu pass bisa terpotong jadi
-    dua frame (24_try8, 11 Jan: 111502 + 111532) yang masing-masing cuma
-    menutup sebagian AOI tapi bersama-sama menutup hampir semuanya -- frame
-    seperti itu tidak boleh terbuang. Scene tanpa footprint yang bisa dibaca
-    tidak pernah dibuang: tanpa bukti, lebih aman mengunduh daripada diam-diam
-    kehilangan tanggal."""
+    """Buang tanggal S1 yang gabungan footprint-nya menutup kurang dari `min_fraction` AOI."""
     by_date: dict[date | None, list[dict]] = {}
     for scene in scenes:
         by_date.setdefault(_scene_date(scene), []).append(scene)
@@ -1674,20 +1273,7 @@ def _drop_dates_barely_covering_aoi(
 
 
 def _scene_date(scene_meta: dict) -> date | None:
-    """Tanggal akuisisi satu scene S1 hasil discover_scenes, atau None.
-
-    Dipakai menyusun kedua sumbu strategi fusi: yang dihitung adalah
-    tanggalnya, bukan jamnya — satu tanggal bisa punya dua scene (orbit
-    menaik + menurun) yang berbagi aux MODIS/GPM yang sama.
-
-    Kalau `acquisition_datetime` tidak ada, tanggalnya diambil dari
-    product_identifier, yang untuk Sentinel-1 selalu memuat stempel waktu
-    akuisisi. Fallback ini bukan kemewahan: himpunan tanggal S1 yang kosong
-    membuat plan_fusion mengira dataset tidak punya scene sama sekali,
-    sehingga SETIAP tanggal diperlakukan sebagai tanggal tanpa-S1 dan
-    difusikan ulang — menimpa stack same-day yang sudah benar dengan stack
-    berisi NaN. Gagal diam yang mahal, jadi lebih baik ditebak dari PID.
-    """
+    """Tanggal akuisisi satu scene S1 hasil discover_scenes, atau None."""
     acq = scene_meta.get("acquisition_datetime")
     if acq is not None and hasattr(acq, "date"):
         return acq.date()
@@ -1708,29 +1294,7 @@ def _scene_date(scene_meta: dict) -> date | None:
 def _ingest_aux_days(
     jc: _JobContext, days: list[date], count_as_scenes: bool = True
 ) -> tuple[int, int]:
-    """Unduh + proses MODIS/GPM untuk sekumpulan tanggal. Returns (ok, gagal).
-
-    Ini sumbu UNDUH dari etl/fusion_strategies: dipakai dua pemanggil dengan
-    daftar tanggal yang berbeda — `_run_aux_only` (dataset tanpa S1, tiap hari
-    dalam rentang) dan jalur S1 (tanggal tambahan yang diminta FULL_COVERAGE /
-    HYBRID di luar tanggal scene S1).
-
-    Tiap hari berdiri sendiri: satu hari yang gagal (granule NASA belum terbit)
-    dicatat lalu dilewati, tidak menjatuhkan hari lain. Pemanggil bertanggung
-    jawab membuka `dataset_log_file` lebih dulu.
-
-    Idempotent lewat ensure_aux_inputs_for_date: module7/module8 melewati file
-    yang sudah ada. Tapi yang dilewati cuma UNDUHANNYA — reproject/crop/COG
-    tetap dijalankan ulang (~4 detik per granule), jadi memanggil ulang satu
-    rentang penuh TIDAK murah. Karena itu tanggal yang sudah pernah selesai
-    dilewati lebih awal lewat plog.completed_aux_dates.
-
-    `count_as_scenes=False` untuk jalur S1: di sana unit counter job/dataset
-    adalah SCENE S1 (total_scenes = jumlah scene), jadi menghitung hari aux
-    tambahan di counter yang sama menghasilkan completed_scenes=16 untuk
-    total_scenes=1 (try1/try2), dan satu hari aux yang gagal akan membuat job
-    FAILED padahal fusi mentoleransi aux yang hilang dengan NaN.
-    """
+    """Unduh + proses MODIS/GPM untuk sekumpulan tanggal. Returns (ok, gagal)."""
     ok_days = 0
     failed_days = 0
 
@@ -1753,8 +1317,6 @@ def _ingest_aux_days(
             break
         date_key = day.strftime("%Y%m%d")
         if date_key in already_done:
-            # Dihitung ok persis seperti kalau diproses ulang dan berhasil,
-            # supaya akuntansi job tidak berubah oleh optimasi ini.
             ok_days += 1
             _count(processed=1)
             continue
@@ -1764,10 +1326,6 @@ def _ingest_aux_days(
                 jc.bbox_tuple, day, plog=jc.plog, plan=jc.plan,
             )
             written = sum(len(paths) for paths in produced.values())
-            # `written > 0` saja tidak berarti tanggalnya tuntas: satu sumber
-            # bisa berhasil sementara yang lain tidak menghasilkan apa pun.
-            # Hanya tanggal yang SEMUA sumbernya berhasil yang boleh dilewati
-            # run berikutnya -- kalau tidak, kekurangannya permanen.
             aux_complete = bool(written) and not missing_sources
             if written:
                 ok_days += 1
@@ -1794,18 +1352,7 @@ def _ingest_aux_days(
 
 
 def _run_aux_only(jc: _JobContext, date_from: date, date_to: date) -> None:
-    """Jalankan dataset yang TIDAK mengkonfigurasi Sentinel-1.
-
-    Tanpa S1 tidak ada scene yang bisa ditemukan CDSE dan tidak ada jangkar
-    tanggal, jadi MODIS/GPM diproses satu hari per hari sepanjang rentang
-    dataset. Tiap hari berdiri sendiri: satu hari yang gagal (granule NASA
-    belum terbit) dicatat lalu dilewati, tidak menjatuhkan hari lain.
-
-    FUSION tidak dijalankan di jalur ini: create_fusion_stack memakai raster
-    GOLD Sentinel-1 sebagai grid referensi dan melempar tanpa itu. Fusi
-    tanpa-S1 (reproyeksi ke sumber ber-extent terbesar, DOCS/PIPELINE.md) belum
-    diimplementasikan.
-    """
+    """Jalankan dataset yang TIDAK mengkonfigurasi Sentinel-1."""
     total_days = (date_to - date_from).days + 1
     jc.dsmgr.set_job_status(jc.job_id, "DOWNLOADING")
     logger.info(
@@ -1841,10 +1388,6 @@ def run_dataset_job(db: DatabaseClient, job_id: int) -> None:
         job = sess.get(DatasetJob, job_id)
         live = job is not None and job.job_type == LIVE_JOB_TYPE
         ds_id = job.dataset_id if job is not None else None
-    # Thread pemanggil ikut prioritas dan konteks jeda-nya: pra-lintasan
-    # MODIS/GPM berjalan di sini, bukan di worker.
-    # Job Live mengikuti prioritas siklus pemanggilnya: siklus rutin rendah
-    # (mengalah ke Dataset Saya), backfill S1 normal (live_cycle.backfill_s1, M58).
     low = live and dg.is_low_priority()
     prev_ctx = dg.current_context()
     dg.set_context(ds_id)
@@ -1885,7 +1428,6 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
     orbit_direction = quality_settings.get("orbit_direction")
     fusion_strategy = dataset.get("fusion_strategy")
 
-    # --- rencana per-satelit ------------------------------------------------
     plan = load_processing_plan(db, dataset_id)
     if not plan.sources:
         logger.error(
@@ -1896,12 +1438,6 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
         _write_dataset_metadata(dsmgr, dataset_id)
         return
 
-    # Dua sumber pembatas tahap, di-union:
-    #   1. required_tiers dataset (retensi tier yang diminta user);
-    #   2. level Sentinel-1 di dataset_source_config (RAW berhenti di CROP).
-    # Keduanya perlu: yang pertama bisa memangkas lebih dalam dari yang kedua
-    # (dataset yang cuma menyimpan BRONZE), yang kedua memangkas walau
-    # required_tiers memuat GOLD karena sumber LAIN yang PROCESSED.
     skip_stages = compute_skip_stages(required_tiers)
     s1_plan = plan.get(S1_SOURCE_NAME)
     if s1_plan is not None:
@@ -1911,23 +1447,12 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
         job_id, plan.summary(), fusion_strategy, sorted(skip_stages),
     )
 
-    # PREVIEW punya dua alasan bisa dilewati, dan keduanya dilipat jadi satu di
-    # sini supaya _process_scene cukup memeriksa skip_stages seperti tahap lain:
-    #   1. tier tertinggi dataset di bawah GOLD -> sudah ditangani
-    #      compute_skip_stages (tidak ada raster GOLD untuk dirender);
-    #   2. user mematikan checkbox "Buat Preview" -> kolom generate_preview.
-    # Default kolomnya TRUE, jadi dataset lama berperilaku persis seperti dulu.
     if not dataset.get("generate_preview", True):
         skip_stages.add("PREVIEW")
         logger.info(
             "[ORCH] job_id=%d PREVIEW dilewati: dimatikan di konfigurasi dataset "
             "(generate_preview=false)", job_id,
         )
-    #   3. user mencentang "Buat Preview" tapi tidak memilih satu varian pun.
-    # preview_options KOSONG berarti persis itu (PIPELINE.md §2); dibedakan
-    # dari NULL, yang berarti "tidak dinyatakan" dan tetap merender ketiganya.
-    # Migrasi 018 mem-backfill NULL jadi ketiga varian, jadi kolomnya sekarang
-    # selalu menyatakan pilihan yang sebenarnya.
     elif dataset.get("preview_options") == []:
         skip_stages.add("PREVIEW")
         logger.info(
@@ -1948,15 +1473,12 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
         required_tiers=required_tiers, skip_stages=skip_stages,
         base_dir=base_dir, pause_event=pause_event, cancel_event=cancel_event,
         plan=plan, fusion_strategy=fusion_strategy,
-        # Diisi setelah discovery: rencananya butuh tanggal scene S1 yang nyata.
         fusion_plan=None,
         preview_options=dataset.get("preview_options"),
         low_priority=dg.is_low_priority(),
     )
 
     dsmgr.set_job_status(job_id, "PREPARING", started_at=_now())
-    # Counter & last_error per eksekusi, bukan akumulasi semua retry/resume --
-    # status akhir di bawah dibaca dari failed_count.
     dsmgr.begin_job_run(job_id)
 
     date_from = (
@@ -1968,9 +1490,6 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
         if date_range_end else _now()
     )
 
-    # Dataset tanpa Sentinel-1 tidak punya scene untuk ditemukan: seluruh
-    # jalur discovery/download/pipeline di bawah ini berputar di sekitar scene
-    # S1. Sumber aux-nya diproses per hari sepanjang rentang tanggal.
     if s1_plan is None:
         _run_aux_only(jc, date_from.date(), (date_to - timedelta(days=1)).date())
         return
@@ -2000,9 +1519,6 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
             _write_dataset_metadata(dsmgr, dataset_id)
             return
 
-    # Satu arah orbit saja agar jumlah scene sebanding antar-dataset periode
-    # lain. Difilter setelah discovery (bukan di query) karena resume menjalankan
-    # discovery ulang dan harus menghasilkan himpunan scene yang sama.
     if orbit_direction:
         before = len(scenes)
         scenes = [s for s in scenes if (s.get("orbit_direction") or "").upper() == orbit_direction.upper()]
@@ -2024,22 +1540,7 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
     dsmgr.create_scene_job_states(job_id, [s["product_identifier"] for s in scenes])
     dsmgr.set_job_status(job_id, "DOWNLOADING")
 
-    # --- sumbu unduh strategi fusi -----------------------------------------
-    # Sampai sini pipeline selalu berjangkar pada scene S1: MODIS/GPM cuma
-    # diambil untuk tanggal yang punya scene, yang secara efektif memaksa
-    # CO_OCCURRENCE apa pun strategi yang dipilih user. FULL_COVERAGE dan
-    # HYBRID butuh aux harian, jadi tanggal di luar tanggal scene diunduh di
-    # sini sebagai pra-lintasan sebelum pipeline scene berjalan.
-    #
-    # Pra-lintasan, bukan disisipkan ke dalam worker: ensure_aux_inputs_for_date
-    # idempotent dan melewati file yang sudah ada, jadi panggilan per-scene di
-    # _process_scene nanti otomatis jadi no-op untuk tanggal yang sudah terisi
-    # di sini. Dengan begitu jalur scene tidak perlu tahu apa-apa soal strategi.
     s1_dates = {d for d in (_scene_date(s) for s in scenes) if d is not None}
-    # Peta tanggal -> scene, dipakai _pipeline_worker untuk tahu kapan sebuah
-    # tanggal sudah lengkap. Disusun dari hasil discover_scenes, bukan dari
-    # scene yang sudah selesai, karena yang perlu diketahui justru berapa yang
-    # masih ditunggu.
     for scene_meta in scenes:
         scene_day = _scene_date(scene_meta)
         if scene_day is None:
@@ -2047,9 +1548,6 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
         jc.expected_pids_by_date.setdefault(
             scene_day.strftime("%Y%m%d"), set()
         ).add(scene_meta["product_identifier"])
-    # Syaratnya sama persis dengan gerbang FUSION di _process_scene. Diperiksa
-    # di sini juga supaya dataset yang tidak memfusikan apa pun tidak ikut
-    # membayar unduhan aux harian: sumbu unduh cuma ada untuk melayani fusi.
     if "FUSION" not in skip_stages and jc.plan.fusion_eligible(jc.fusion_strategy):
         jc.fusion_plan = plan_fusion(
             jc.fusion_strategy, s1_dates,
@@ -2074,7 +1572,6 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
     cleanup_queue: Queue = Queue()
 
     with dataset_log_file(dataset_id, dataset["name"]) as run_log_path:
-        # Worker threads read this to enrol in the run's log scope.
         jc.log_path = run_log_path
         logger.info(
             "[ORCH] job_id=%d start dataset=%r scenes=%d tiers=%s log=%s",
@@ -2091,19 +1588,10 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
         t_pipeline.join()
         t_cleanup.join()
 
-        # Sumbu rakit dijalankan SETELAH pipeline scene: hari tanpa S1 tetap
-        # membaca MODIS/GPM dari disk, dan pra-lintasan unduh di atas sudah
-        # memastikan berkasnya ada. Sekuensial, bukan di dalam worker, karena
-        # tidak ada scene yang jadi unit kerjanya.
         extra_fused = _fuse_days_without_s1(jc, s1_dates, scenes)
 
-        # Artefak antara dibuang lebih dulu, sebelum keputusan penghematan
-        # lain: isinya scratch menurut definisinya sendiri, jadi tidak
-        # bergantung pada konfigurasi apa pun.
         _sweep_scratch(jc)
 
-        # Penghematan disk dijalankan paling akhir, setelah SEMUA stack fusi
-        # (baik dari jalur scene maupun jalur tanpa-S1) selesai ditulis.
         if dataset.get("fusion_output_only"):
             _apply_fusion_output_only(
                 jc,
@@ -2116,9 +1604,6 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
     total_size = _dir_size_bytes(base_dir)
     dsmgr.set_dataset_size(dataset_id, total_size)
 
-    # metadata.json ditulis SETELAH status akhir diset di setiap jalur keluar.
-    # Dulu ditulis sebelumnya, sehingga ringkasan di disk selalu membawa status
-    # "DOWNLOADING" walau database sudah COMPLETED (try1/try2/try3).
     if cancel_event.is_set():
         dsmgr.set_job_status(job_id, "CANCELLED", completed_at=_now())
         _write_dataset_metadata(dsmgr, dataset_id, total_size)
@@ -2135,11 +1620,6 @@ def _run_dataset_job(db: DatabaseClient, job_id: int) -> None:
         logger.info("[ORCH] job_id=%d berhenti dalam status PAUSED", job_id)
         return
 
-    # failed_count is incremented per-scene on stage failure (see _download_worker /
-    # _pipeline_worker above) but was never consulted here, so a job with failed
-    # scenes still ended up "COMPLETED" — hiding the FAILED-only retry button/endpoint
-    # (web/index.html canRetry, api/routes/pipeline.py trigger) from the scenes that
-    # actually need a retry.
     final_status = "FAILED" if failed_count > 0 else "COMPLETED"
     dsmgr.set_job_status(job_id, final_status, completed_at=_now())
     _write_dataset_metadata(dsmgr, dataset_id, total_size)

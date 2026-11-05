@@ -1,16 +1,4 @@
-# api/backfill_progress.py
-"""Progres backfill Sentinel-1 dataset utama untuk halaman Proses berjalan (M58).
-
-Semua angka dibaca dari basis data, jadi sama saja apakah backfill dijalankan
-dari halaman Data, penjadwal, atau scripts/backfill_s1.py di proses lain:
-
-* rencana siklus      live_events DISCOVER terakhir (details.targets)
-* tanggal selesai     live_scenes target yang sudah bukan PROCESSING sejak siklus mulai
-* frame (produk S1)   scene_job_state job LIVE_INGEST sejak siklus mulai
-* posisi sekarang     processing_logs terbaru dataset Live ("Downloading: x / y MB")
-* perkiraan selesai   rata-rata detik per frame yang sudah selesai x sisa frame;
-                      sebelum ada frame selesai, dari kecepatan unduh terakhir.
-"""
+"""Progres backfill Sentinel-1 dataset utama untuk halaman Proses berjalan (M58)."""
 
 from __future__ import annotations
 
@@ -74,7 +62,6 @@ def s1_progress(sess, area_id: int, dataset_id: int) -> dict | None:
         current = {"product": pid.replace(".SAFE", ""), "date": f"{pid[17:21]}-{pid[21:23]}-{pid[23:25]}" if len(pid) > 25 else None,
                    "stage": cur["stage"], "message": cur["message"], "at": cur["created_at"],
                    "percent": (cur["details"] or {}).get("progress_percent")}
-        # Kecepatan unduh dari dua titik progres frame yang sama (15 menit terakhir).
         pts = sess.execute(text("""
             SELECT message, created_at FROM processing_logs
             WHERE dataset_id = :d AND scene_id = :s AND stage = 'DOWNLOAD' AND message LIKE 'Downloading:%'
@@ -84,7 +71,6 @@ def s1_progress(sess, area_id: int, dataset_id: int) -> dict | None:
         if len(mb) >= 2 and mb[-1][1] > mb[0][1]:
             speed = (mb[-1][0] - mb[0][0]) / ((mb[-1][1] - mb[0][1]).total_seconds() / 60)
 
-    # Perkiraan: per frame selesai bila sudah ada, kalau belum dari kecepatan unduh.
     elapsed = ((finished or _now()) - cycle).total_seconds()
     sec_per_frame = elapsed / len(frames_done) if frames_done else (
         DEFAULT_FRAME_MB / speed * 60 if speed and speed > 0 else None)

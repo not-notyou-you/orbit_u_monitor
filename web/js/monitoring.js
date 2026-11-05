@@ -1,5 +1,3 @@
-// js/monitoring.js — Pantauan Live (INTERFACE.md §2.2, §4.3).
-// USER: scene ≤ 30 hari + scene terbaru (disaring API); ADMIN: semua + aksi.
 'use strict';
 Pages['monitoring'] = (() => {
   const AREA_STATUS = { DRAFT: 'Draf', BACKFILLING: 'Mengisi scene awal', ACTIVE: 'Aktif', WAITING: 'Menunggu scene baru',
@@ -59,12 +57,10 @@ Pages['monitoring'] = (() => {
       deck.innerHTML = UI.screenHTML({ channel: 'SYS', body: UI.emptyHTML('GAGAL MEMUAT KARTU') });
       UI.showError('Pantauan Live', e); return;
     }
-    // Area hasil kartu lebih baru dari daftar.
     const i = st.areas.findIndex(a => a.area_id === st.areaId);
     if (i >= 0) st.areas[i] = Object.assign({}, st.areas[i], st.card.area);
     renderSide(); renderDeck();
     st.ctx.setStatus('Siap · ' + st.card.area.name + (st.card.scene ? ' · scene ' + UI.date(st.card.scene.date) : ''));
-    // Muat ulang otomatis hanya saat siklus berjalan.
     if (st.timer) { clearInterval(st.timer); st.timer = null; }
     if (st.card.area.running) st.timer = setInterval(() => { if (st) loadCard(); }, 20000);
   }
@@ -140,10 +136,6 @@ Pages['monitoring'] = (() => {
     html += UI.screenHTML({ channel: 'CATATAN PRAKIRAAN', body: '<p class="scr-text v-amber" style="margin:0">GARIS PUTUS-PUTUS DAN PITA = PRAKIRAAN STATISTIK, BUKAN PERINGATAN' +
       (method ? ' (' + UI.esc(method.toUpperCase()) + ', ' + UI.int(forecast.n_scenes) + ' SCENE)' : '') + '. NILAI AKTUAL = GARIS/BATANG HIJAU.</p>' });
     deck.innerHTML = html;
-    // "Lihat 3D" di lightbox: pilihan area/tanggal/lapisan dititipkan ke tab
-    // Relief 3D lewat sessionStorage, bukan parameter hash -- router
-    // menormalkan hash (history.replaceState) sehingga query akan terhapus
-    // sebelum halaman tujuan init.
     LiveTiles.bindLightbox(deck, sc.previews || {}, sc.interpretations || {}, sc.date, {
       action: { label: 'Lihat 3D', onPick: item => {
         Terrain3DHandoff.set({ area_id: st.areaId, date: sc.date, key: item.key });

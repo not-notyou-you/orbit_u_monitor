@@ -1,21 +1,4 @@
-# etl/excel_io.py
-"""Ekspor/impor Excel (.xlsx) generik untuk hampir semua data Monitor (Tahap 3).
-
-Satu registri ``ENTITIES`` menentukan, per jenis data:
-
-* ``export_role``  role minimum untuk mengunduh (sama dengan endpoint baca
-  yang setara); kueri berjalan di bawah role pemanggil, jadi GRANT/RLS
-  PostgreSQL tetap berlaku.
-* ``import_role`` + ``importer``  bila data itu boleh dimasukkan lewat Excel.
-  Impor selalu semua-atau-tidak-sama-sekali (pemanggil membungkusnya dalam
-  SAVEPOINT) dan melaporkan kesalahan per nomor baris; ``dry_run`` hanya
-  memvalidasi.
-
-Berkas berisi sheet ``Data`` (baris 1 = kode kolom) dan sheet ``Petunjuk``
-(arti kolom, wajib/tidak, nilai yang diizinkan, filter ekspor). Templat impor
-= sheet Data kosong + Petunjuk. Waktu (timestamptz) ditulis dalam WIB tanpa
-zona karena Excel tidak menyimpan zona waktu; tanggal hidromet = hari UTC.
-"""
+"""Ekspor/impor Excel (.xlsx) generik untuk hampir semua data Monitor (Tahap 3)."""
 
 from __future__ import annotations
 
@@ -24,7 +7,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Callable
+from collections.abc import Callable
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
@@ -57,8 +40,6 @@ class Entity:
     import_columns: list[Col] = field(default_factory=list)
     importer: Callable | None = None   # (sess, header, rows, user_id, dry_run) -> summary
 
-
-# --- importer -----------------------------------------------------------------------
 
 def _summary(inserted=0, updated=0, duplicates=0, errors=None) -> dict:
     return {"inserted": inserted, "updated": updated, "duplicates": duplicates, "errors": errors or []}
@@ -225,8 +206,6 @@ def import_app_settings(sess, header, rows, user_id, dry_run):
     return _summary(0, upd, 0, errors)
 
 
-# --- registri -----------------------------------------------------------------------
-
 def _disaster_cols() -> list[Col]:
     from etl.disasters import INFO_SOURCES
     return [
@@ -347,8 +326,6 @@ ENTITIES: dict[str, Entity] = {e.code: e for e in [
 ]}
 
 
-# --- ekspor -------------------------------------------------------------------------
-
 def _cell(v):
     if isinstance(v, Decimal):
         return float(v)
@@ -375,7 +352,6 @@ def query_rows(sess, entity: Entity, date_from: date | None, date_to: date | Non
         conds.append(f"{entity.date_column} <= :b")
         params["b"] = date_to
     if conds:
-        # SQL registri tidak memakai subquery ber-WHERE, jadi cukup cek WHERE di level atas.
         joiner = " AND " if " where " in " ".join(sql.lower().split()) else " WHERE "
         sql = sql + joiner + " AND ".join(conds)
     res = sess.execute(text(f"{sql} ORDER BY {entity.order_by} LIMIT {MAX_EXPORT_ROWS + 1}"), params)
@@ -458,8 +434,6 @@ def template_xlsx(code: str) -> bytes:
     wb.save(buf)
     return buf.getvalue()
 
-
-# --- impor --------------------------------------------------------------------------
 
 def _plain(v):
     """Nilai sel -> teks seperti CSV (tanggal ISO, angka tanpa .0 berlebih)."""

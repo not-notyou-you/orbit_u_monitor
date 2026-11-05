@@ -1,4 +1,3 @@
-# etl/location_resolver.py
 from __future__ import annotations
 import logging
 from geoalchemy2.shape import to_shape
@@ -9,11 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def resolve_region_id(db: DatabaseClient, region_id: int) -> tuple[str, int, str]:
-    """Ambil bbox/label dari lokasi yang dipilih pengguna di UI.
-
-    Jalur utama sejak lokasi dikelola di tabel: UI mengirim region_id, jadi tidak
-    ada lagi pencocokan nama yang ambigu kalau ada dua lokasi bernama mirip.
-    """
+    """Ambil bbox/label dari lokasi yang dipilih pengguna di UI."""
     with db.session() as sess:
         region = sess.get(RegionOfInterest, region_id)
         if region is None or not region.is_active or region.deleted_at is not None:
@@ -38,11 +33,7 @@ def _match_known_region(db: DatabaseClient, location: str) -> tuple[str, int, st
 
 
 def resolve_location(db: DatabaseClient, location: str) -> tuple[str, int, str]:
-    """Cocokkan nama/kode lokasi ke ROI sistem yang sudah ada.
-
-    Tidak ada lagi fallback geocoding: ROI hanya lahir dari kecamatan COD-AB
-    (DATABASE.md §3.6), jadi nama yang tidak dikenal adalah kesalahan input.
-    """
+    """Cocokkan nama/kode lokasi ke ROI sistem yang sudah ada."""
     known = _match_known_region(db, location)
     if not known:
         raise ValueError(f"Location not found: {location}")

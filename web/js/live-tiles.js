@@ -1,9 +1,6 @@
-// web/js/live-tiles.js — tile preview Live (9 kunci), legenda, dan kalimat kondisi.
-// Dipakai Beranda (Pantau Lokasi, /api/public/lokasi), Citra Satelit, dan Pantauan Live.
 'use strict';
 
 const LiveTiles = (() => {
-  // Urutan per INTERFACE §2.1: S1 [VV][VH][Perubahan air] · MODIS [Banjir][NDVI][NDWI] · GPM [24][72][7 hari]
   const ROWS = [
     { src: 'sentinel1', title: 'Sentinel-1 (radar)', ch: 'S1 SAR', keys: ['s1_vv', 's1_vh', 's1_water_change'] },
     { src: 'modis', title: 'MODIS (optik)', ch: 'MODIS', keys: ['modis_flood', 'modis_ndvi', 'modis_ndwi'] },
@@ -19,7 +16,6 @@ const LiveTiles = (() => {
     modis_flood: 'Peta genangan MODIS', modis_ndvi: 'MODIS NDVI', modis_ndwi: 'MODIS NDWI',
     gpm_rain_24h: 'GPM hujan 24 jam', gpm_rain_72h: 'GPM hujan 72 jam', gpm_rain_7d: 'GPM hujan 7 hari',
   };
-  // Kategori kalimat (bahasa kode) → label Indonesia + kelas warna. Teks selalu ditulis.
   const CAT = {
     normal: ['NORMAL', ''], alert: ['WASPADA', 'v-amber'], waspada: ['WASPADA', 'v-amber'],
     high: ['TINGGI', 'v-alert'], tinggi: ['TINGGI', 'v-alert'],
@@ -59,7 +55,6 @@ const LiveTiles = (() => {
     return h;
   }
 
-  // previews: {key: {url, label, legend, source_date?}}; sourceStatus opsional (kartu Live).
   function rowsHTML(previews, interpretations, opts) {
     opts = opts || {};
     return ROWS.map(row => {
@@ -83,9 +78,6 @@ const LiveTiles = (() => {
     }).join('');
   }
 
-  // opts.action = {label, onPick(item)} menambah tombol aksi di lightbox, mis.
-  // "Lihat 3D" di Pantauan Live. Beranda Publik tidak mengopernya, jadi
-  // tombolnya tidak muncul di sana -- halaman 3D butuh sesi masuk.
   function bindLightbox(root, previews, interpretations, sceneDate, opts) {
     opts = opts || {};
     const keys = ROWS.flatMap(r => r.keys).filter(k => previews[k]);
@@ -98,8 +90,6 @@ const LiveTiles = (() => {
     const action = opts.action ? { label: opts.action.label } : null;
     UI.$$('button.thumb[data-key]', root).forEach(b => b.addEventListener('click', async () => {
       const picked = await UI.lightbox(items, keys.indexOf(b.dataset.key), { action: action });
-      // Dialog resolve dengan item yang sedang dilihat kalau tombol aksi
-      // ditekan; nilai lain (true/'cancel') berarti dialog cuma ditutup.
       if (picked && picked.key && opts.action && opts.action.onPick) opts.action.onPick(picked);
     }));
   }
@@ -108,18 +98,6 @@ const LiveTiles = (() => {
 })();
 window.LiveTiles = LiveTiles;
 
-// Titipan sekali-pakai dari lightbox Pantauan Live ke tab Relief 3D: area,
-// tanggal, dan lapisan yang sedang dilihat.
-//
-// Tinggal di sini, bukan di terrain3d.js, karena penulis (monitoring.js) dan
-// pembacanya (terrain3d.js) tidak pernah dimuat bersamaan -- router memuat
-// skrip halaman satu per satu. live-tiles.js sendiri dimuat app.html untuk
-// seluruh sesi, dan isi titipannya memang "tile preview mana yang dipilih".
-//
-// sessionStorage, bukan variabel modul: pengguna bisa saja mendarat di tab 3D
-// lewat muat-ulang halaman, dan pilihannya harus tetap terbawa. Dibaca SEKALI
-// lalu dihapus -- tanpa itu, membuka tab 3D langsung dari menu beberapa menit
-// kemudian akan melompat ke lapisan yang sudah tidak diminta siapa pun.
 const Terrain3DHandoff = (() => {
   const KEY = 'orbit-u.relief3d';
   function set(sel) {

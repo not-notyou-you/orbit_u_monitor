@@ -1,28 +1,4 @@
-# etl/live_forecast.py
-"""Forecast ringan per Daerah Live (PIPELINE.md §4, prakiraan).
-
-Deret sangat pendek (1-12 scene), tanpa training:
-
-    1 titik    persistence (nilai terakhir), pita lebar, label "not enough data"
-    2-3 titik  simple exponential smoothing (alpha tetap)
-    >= 4 titik Holt (level + tren) dengan tren teredam (phi) supaya 4 titik
-               tidak diekstrapolasi jadi garis lurus tak terbatas
-
-Parameter smoothing TETAP (bukan dioptimasi): dengan deret sependek ini,
-optimasi alpha/beta hanya menghafal derau. Jumlah langkah = ceil(n/3)
-(tabel 5.1), maksimal MAX_FORECAST_STEPS.
-
-Pita ketidakpastian (80%): z * sigma * sqrt(h) * inflasi, di mana sigma =
-RMSE galat satu-langkah (in-sample) dan inflasi = 1 + 2/n (deret pendek =>
-pita lebih lebar). Tanpa galat yang bisa dihitung (1-2 titik) sigma diambil
-dari FALLBACK_SIGMA variabel itu. Hasil dijepit ke rentang fisik (hujan >= 0,
-persen 0..100).
-
-Tanggal langkah ke-k = tanggal terakhir + k * rata-rata interval antar scene
-(12 hari kalau baru ada 1 scene, revisit S1 yang umum).
-
-Modul murni: tanpa DB, tanpa disk.
-"""
+"""Forecast ringan per Daerah Live (PIPELINE.md §4, prakiraan)."""
 from __future__ import annotations
 
 import math
@@ -36,17 +12,12 @@ PHI = 0.8
 Z80 = 1.2816
 DEFAULT_INTERVAL_DAYS = 12
 
-# Deret yang digrafikkan: satu per satelit (4.4). key -> cara mengambil nilai
-# dari dict metrik scene (live_metrics.load_scene_metrics, dari tabel
-# live_scene_metrics -- M31).
 SERIES: dict[str, dict] = {
     "sentinel1": {
         "label": "Mean VH", "unit": "dB",
         "path": ("sentinel1", "vh_mean_db"), "bounds": (-40.0, 10.0),
         "fallback_sigma": 1.5, "chart": "line",
     },
-    # MODIS: % area air NDWI. LST tidak ada di pipeline (lihat catatan di
-    # etl/live_interpret.py); indeks air adalah konfirmasi optik genangan.
     "modis": {
         "label": "Water area (NDWI > 0)", "unit": "%",
         "path": ("modis", "ndwi", "water_pct"), "bounds": (0.0, 100.0),
@@ -60,10 +31,6 @@ SERIES: dict[str, dict] = {
 }
 
 
-# Horizon maksimum (langkah). ceil(n/3) dari tabel 5.1 dirancang untuk
-# retensi <= 12 (maks. 4 langkah); dengan retensi sampai 60 (M11) rumus itu
-# akan meramal ~20 lintasan (~8 bulan) ke depan -- tidak bermakna untuk
-# SES/Holt. Dibatasi ke maksimum lama.
 MAX_FORECAST_STEPS = 4
 
 
@@ -165,7 +132,6 @@ def forecast_series(points: list[tuple[date, float]], bounds=(None, None),
 def _rmse(actual, preds, fallback):
     errs = [a - p for a, p in zip(actual, preds)]
     if len(errs) < 2:
-        # Satu galat bukan perkiraan sebaran; jangan lebih sempit dari fallback.
         return max(fallback, abs(errs[0]) if errs else 0.0)
     rmse = math.sqrt(sum(e * e for e in errs) / len(errs))
     return max(rmse, fallback * 0.25)
@@ -185,8 +151,6 @@ def build_area_forecast(scenes: list[tuple[date, dict]]) -> dict:
             "actual": [{"date": d.isoformat(), "value": v} for d, v in actual],
             "forecast": fc,
         }
-    # Garis ambang grafik GPM (4.4) dari tempat ambang yang sama dengan
-    # kalimat kondisi.
     result["series"]["gpm"]["thresholds"] = {
         "alert": THRESHOLDS["rain_72h_warn_mm"],
         "high": THRESHOLDS["rain_72h_high_mm"],

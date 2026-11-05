@@ -1,7 +1,3 @@
-// web/js/api.js — klien API (INTERFACE.md §4–6).
-// Sesi = cookie HttpOnly `orbit_u_session` yang dikirim browser otomatis
-// (satu origin, SameSite=Strict). JWT tidak pernah disentuh JavaScript.
-// Setiap request non-GET wajib membawa X-Requested-With: orbit-u (§6, CSRF).
 'use strict';
 
 const API = (() => {
@@ -61,7 +57,6 @@ const API = (() => {
     return s ? '?' + s : '';
   }
 
-  // Unduh berkas lewat fetch (agar error JSON bisa diterjemahkan) lalu simpan.
   async function download(path, fallbackName) {
     const res = await request(path, { raw: true });
     const cd = res.headers.get('content-disposition') || '';

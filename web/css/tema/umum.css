@@ -1,19 +1,4 @@
-/* web/css/tema/umum.css — struktur bersama tema non-bawaan (M57): Kertas Mint,
-   Mika Pasir, Piksel Marun. Setiap aturan tercakup html.tema-alt (dipasang
-   js/theme.js), jadi Orbital 95 (main.css, DESIGN.md) tidak tersentuh.
 
-   Komponen di sini sama dengan main.css + pages.css — jendela, title bar, menu
-   bar, tombol, isian, tab, layar data, taskbar, menu Mulai, dialog, peta —
-   tetapi bentuknya diambil dari variabel --t-*. Nilai variabelnya, plus hiasan
-   yang khas satu tema (bulatan title bar, kaca mika, siluet gunung), ada di
-   mint.css / pasir.css / piksel.css.
-
-   Konsep di DOCS/design tambahan/ adalah satu dasbor contoh; yang dipakai dari
-   sana hanya bahasa visualnya. Rotasi kartu dan tata letak 12 kolom konsep
-   tidak dipakai di jendela berisi data (peta, tabel, formulir) supaya tetap
-   mudah dibaca dan diklik. */
-
-/* ------------------------------------------------------------------ dasar */
 html.tema-alt body {
   background: var(--t-bg); color: var(--t-tx); font-family: var(--font-ui);
   font-size: 13px; line-height: 1.45; -webkit-font-smoothing: auto;
@@ -22,9 +7,6 @@ html.tema-alt body {
 html.tema-alt h1, html.tema-alt h2, html.tema-alt h3, html.tema-alt h4 { font-size: 13px; }
 html.tema-alt a { color: var(--t-link); }
 html.tema-alt ::selection { background: var(--t-acc); color: var(--t-acc-tx); }
-/* Scrollbar: ukuran, jalur, dan pegangan dari --t-sb-* tiap tema. Pegangan
-   diberi jarak dari tepi lewat border transparan; garis tepinya inset
-   box-shadow. Tanpa tombol panah. Firefox hanya mengenal warna dan ketebalan. */
 html.tema-alt ::-webkit-scrollbar { width: var(--t-sb-size); height: var(--t-sb-size); background: transparent; }
 html.tema-alt ::-webkit-scrollbar-track { background: var(--t-sb-track); border-radius: var(--t-sb-r); box-shadow: var(--t-sb-track-shadow); }
 html.tema-alt ::-webkit-scrollbar-thumb {
@@ -39,7 +21,6 @@ html.tema-alt ::-webkit-scrollbar-corner { background: transparent; }
 }
 html.tema-alt .skip-link { background: var(--t-card-solid); border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2); }
 
-/* Kelas bevel dipakai langsung di markup (raised/sunken/pressed). */
 html.tema-alt .raised {
   background: var(--t-card-solid); border: var(--t-bw-ctl) solid var(--t-line);
   border-radius: var(--t-r2); box-shadow: none;
@@ -47,7 +28,6 @@ html.tema-alt .raised {
 html.tema-alt .sunken, html.tema-alt .pressed { box-shadow: none; }
 html.tema-alt .groove { border: var(--t-bw-ctl) solid var(--t-line-soft); border-radius: var(--t-r2); }
 
-/* ------------------------------------------------------------------ jendela */
 html.tema-alt .window {
   position: relative; background: var(--t-card); border: var(--t-bw) solid var(--t-line);
   border-radius: var(--t-r); box-shadow: var(--t-shadow); padding: 0; margin-bottom: 24px;
@@ -66,7 +46,6 @@ html.tema-alt .window.inactive .titlebar { background: var(--t-sub); color: var(
 html.tema-alt .ttl-btn, html.tema-alt .ttl-btn:active {
   background: transparent; box-shadow: none; color: inherit; border: 0; border-radius: var(--t-r2);
 }
-/* Ikon SVG title bar ditulis dengan fill/stroke hitam; ikut warna teks tema. */
 html.tema-alt .ttl-btn svg [fill="#000"] { fill: currentColor; }
 html.tema-alt .ttl-btn svg [stroke="#000"] { stroke: currentColor; }
 
@@ -91,7 +70,6 @@ html.tema-alt .statusbar {
 html.tema-alt .statusbar > span { box-shadow: none; padding: 0 8px 0 0; border-right: 1px solid var(--t-line-soft); }
 html.tema-alt .statusbar > span:last-child { border-right: 0; }
 
-/* ------------------------------------------------------------------ tombol */
 html.tema-alt button, html.tema-alt .btn {
   font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--t-btn-tx);
   background: var(--t-btn-bg); border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
@@ -119,7 +97,6 @@ html.tema-alt button.link {
 html.tema-alt button.small, html.tema-alt button.small:active:not(:disabled) { padding: 2px 10px; min-height: 24px; }
 html.tema-alt button[aria-busy="true"]::before { border-radius: 50%; background: currentColor; }
 
-/* ------------------------------------------------------------------ isian */
 html.tema-alt input[type=text], html.tema-alt input[type=password], html.tema-alt input[type=number],
 html.tema-alt input[type=date], html.tema-alt input[type=email], html.tema-alt input[type=search],
 html.tema-alt input[type=file], html.tema-alt select, html.tema-alt textarea {
@@ -169,10 +146,6 @@ html.tema-alt legend {
   text-transform: var(--t-head-tf); letter-spacing: var(--t-head-ls);
 }
 
-/* ------------------------------------------------------------------ layar data */
-/* Layar CRT Orbital 95 menjadi panel terang bertinta tema; warna data
-   (--phos, --amber, --alert, --cyan) diganti per tema, jadi grafik SVG,
-   tabel, readout, dan legenda ikut tanpa mengubah JavaScript. */
 html.tema-alt .screen {
   padding: 0; background: var(--crt); box-shadow: none; overflow: hidden;
   border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
@@ -184,7 +157,6 @@ html.tema-alt .screen-inner {
 html.tema-alt .screen-inner.flush { padding: 0; }
 html.tema-alt .hero-strip .screen-inner { padding: 8px 12px; min-height: 0; }
 html.tema-alt .screen-inner::after { display: none; }
-/* Label kanal di atas peta: kontrol zoom Leaflet digeser ke bawah labelnya. */
 html.tema-alt .screen-inner.flush .leaflet-top { top: 26px; }
 html.tema-alt .screen-inner.flush .scr-ch, html.tema-alt .screen-inner.flush .scr-rec {
   background: var(--t-card-solid); border: 1px solid var(--t-line); border-radius: var(--t-r2); padding: 0 6px; top: 6px;
@@ -211,7 +183,6 @@ html.tema-alt .tile button.thumb, html.tema-alt .tile button.thumb:active:not(:d
 html.tema-alt .tile .noimg { border-radius: var(--t-r2); }
 html.tema-alt .heat td { border-color: var(--crt); }
 
-/* ------------------------------------------------------------------ daftar & tab */
 html.tema-alt .listbox {
   background: var(--t-field); padding: 4px; box-shadow: none;
   border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
@@ -240,7 +211,6 @@ html.tema-alt .subtabs .sub-row [role=tab][aria-selected="true"] {
   background: var(--t-sel); color: var(--t-sel-tx); box-shadow: none; transform: none;
 }
 
-/* ------------------------------------------------------------------ taskbar */
 html.tema-alt .taskbar {
   height: var(--taskbar-h); gap: 6px; padding: 6px 10px;
   background: var(--t-taskbar-bg); box-shadow: var(--t-taskbar-shadow);
@@ -291,11 +261,9 @@ html.tema-alt .desk-icon svg {
 }
 html.tema-alt .desk-icon:focus-visible span { outline: 2px solid var(--t-focus); background: var(--t-sel); color: var(--t-sel-tx); }
 
-/* ------------------------------------------------------------------ dialog */
 html.tema-alt .dialog-backdrop { background: var(--t-backdrop); }
 html.tema-alt .dialog { background: var(--t-card-solid); }
 
-/* ------------------------------------------------------------------ progres */
 html.tema-alt .progress {
   height: 18px; background: var(--t-field); box-shadow: none;
   border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
@@ -305,7 +273,6 @@ html.tema-alt .progress > i {
   background: repeating-linear-gradient(90deg, var(--t-acc) 0 10px, var(--t-acc-soft) 10px 12px);
 }
 
-/* ------------------------------------------------------------------ peta */
 html.tema-alt .leaflet-container { font-family: var(--font-ui); }
 html.tema-alt .leaflet-container .leaflet-tile-pane { filter: var(--t-tile-filter); }
 html.tema-alt .leaflet-control-attribution { background: var(--t-card-solid) !important; color: var(--t-mut) !important; }
@@ -318,16 +285,12 @@ html.tema-alt .leaflet-tooltip, html.tema-alt .leaflet-popup-content-wrapper, ht
   background: var(--t-card-solid); color: var(--t-tx); border: var(--t-bw-ctl) solid var(--t-line);
   border-radius: var(--t-r2); font-family: var(--font-ui);
 }
-/* Garis wilayah di peta ditulis berwarna fosfor oleh JS (home.js, admin.js,
-   statistics.js, disasters*.js). Hanya stroke yang ditukar: warna isian
-   kategori hujan BMKG tetap sama dengan legendanya. */
 html.tema-alt .leaflet-overlay-pane path[stroke="#33ff99"] { stroke: var(--phos); }
 html.tema-alt .leaflet-overlay-pane path[stroke="#1a9960"] { stroke: var(--phos-dim); }
 html.tema-alt .leaflet-overlay-pane path[stroke="#ffb000"] { stroke: var(--amber); }
 html.tema-alt .leaflet-overlay-pane path[stroke="#4de1ff"] { stroke: var(--cyan); }
 html.tema-alt .chart-tip { background: var(--t-card-solid); color: var(--t-tx); border: 1px solid var(--t-line); border-radius: var(--t-r2); }
 
-/* ------------------------------------------------------------------ kartu & spanduk */
 html.tema-alt .navcard {
   color: var(--t-tx); background: var(--t-card-solid); padding: 10px 12px;
   border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2); box-shadow: var(--t-shadow-btn);
@@ -354,12 +317,9 @@ html.tema-alt .expl > summary {
   background: var(--t-card-solid); box-shadow: none; border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
 }
 html.tema-alt .chip[aria-pressed="false"] { opacity: .7; }
-/* Ikon desktop: teks putih hanya terbaca di desktop biru Orbital 95. */
 html.tema-alt .desk-icon { color: var(--t-tx); }
 html.tema-alt .desk-icon:focus-visible span { outline-color: var(--t-tx); color: var(--t-sel-tx); }
 html.tema-alt .region-row input[type=color] { border-radius: var(--t-r2); }
-/* Kontrol peta 3D (zoom, kompas): gaya tombol tema tidak boleh menimpa
-   tombol MapLibre — ukuran 29px, ikonnya ada di latar <span> di dalamnya. */
 html.tema-alt .t3-map .maplibregl-ctrl-group {
   background: #fff; border: var(--t-bw-ctl) solid var(--t-line); border-radius: var(--t-r2);
   box-shadow: var(--t-shadow-btn); overflow: hidden;

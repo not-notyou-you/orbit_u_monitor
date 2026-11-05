@@ -1,28 +1,4 @@
-# etl/scheduler.py
-"""Scheduler tunggal Orbit-U: The Monitor (PIPELINE.md §7, M22). Menggantikan live_scheduler.
-
-| Job                       | Cron (Asia/Jakarta)          | Kunci advisory |
-|---------------------------|------------------------------|----------------|
-| Hidromet harian           | 02:00 setiap hari            | hydromet       |
-| Pembaruan Late -> Final   | Minggu 04:00                 | hydromet       |
-| Siklus Live               | 01:00, 07:00, 13:00, 19:00   | live           |
-| Laporan mingguan          | Senin 03:00 / 03:15          | report         |
-| Laporan bulanan           | tanggal 1, 03:30 / 03:45     | report         |
-| Forecast tersimpan (M62)  | 00:30, 06:30, 12:30, 18:30   | forecast       |
-
-Setiap job memegang ``pg_try_advisory_lock`` selama berjalan. Gagal ->
-worker lain sedang menjalankannya -> job dilewati dan dicatat sebagai baris
-``processing_jobs`` berstatus ``SKIPPED_LOCKED`` (tahap ORCHESTRATE). Job
-laporan lebih dulu menunggu kunci ``hydromet`` maksimal
-``app_settings.report.wait_hydromet_minutes`` (60) lalu tetap jalan dengan
-catatan "data hari terakhir belum lengkap" (§6.1).
-
-Forecast tersimpan juga dihitung di akhir job hidromet dan setiap siklus Live
-(etl/forecast_store.py); job ``forecast_refresh`` hanya jaring pengaman, dan
-murah karena deret yang datanya tidak berubah dilewati.
-
-Backup ``pg_dump`` 01:30 di luar APScheduler (cron OS).
-"""
+"""Scheduler tunggal Orbit-U: The Monitor (PIPELINE.md §7, M22). Menggantikan live_scheduler."""
 
 from __future__ import annotations
 
@@ -31,7 +7,7 @@ import logging
 import os
 import socket
 from dataclasses import dataclass
-from typing import Callable
+from collections.abc import Callable
 
 from sqlalchemy import text
 
@@ -95,8 +71,6 @@ def run_locked(db, spec_id: str, lock: str, fn: Callable[[], object]) -> dict:
             return {"status": "FAILED", "error": str(exc)}
 
 
-# --- isi job -------------------------------------------------------------------------
-
 def job_hydromet_daily(db) -> dict:
     from etl import forecast_store as fs
     from etl import hydromet_job as hj
@@ -104,8 +78,6 @@ def job_hydromet_daily(db) -> dict:
     out = run_locked(db, "hydromet_daily", "hydromet",
                      lambda: [(str(r.obs_date), r.status) for r in hj.run_daily(db)])
     fs.refresh_quietly(db)
-    # M64: peringatan email setelah angka dan alert hari ini tersimpan.
-    # Backfill/proses ulang tidak lewat sini, jadi tanggal lampau tidak memicu email.
     notify.run_quietly(db, "hydromet_daily")
     return out
 
@@ -153,7 +125,6 @@ def job_live(db) -> dict:
         return done
     from etl import notify
     out = run_locked(db, "live_cycle", "live", _run)
-    # M64: lintasan Sentinel-1 baru (VV/VH/% air per kecamatan) bisa memicu email.
     notify.run_quietly(db, "live_cycle")
     return out
 
@@ -165,7 +136,6 @@ def job_report(db, code: str, wait_minutes: float | None = None) -> dict:
     if wait_minutes is None:
         wait_minutes = float(read_setting(db, "report.wait_hydromet_minutes"))
     notes: list[str] = []
-    # Tunggu job hidromet 02:00 selesai (kunci dilepas), maksimal wait_minutes.
     with advisory_lock(db, "hydromet", wait_seconds=wait_minutes * 60) as got:
         if not got:
             notes.append(INCOMPLETE_NOTE)
@@ -205,7 +175,28 @@ class Scheduler:
                                     misfire_grace_time=3600)
         self._scheduler.start()
         logger.info("[SCHED] dimulai: %s", ", ".join(s.job_id for s in JOBS))
+        self._catch_up_hydromet()
         self._recover_live_areas()
+
+    def _catch_up_hydromet(self) -> None:
+        """Proses mati saat 02:00 -> job harian terlewat. Jalankan sekali di
+        latar sekarang supaya GPM/MODIS harian tidak menunggu besok."""
+        try:
+            from etl import hydromet_job as hj
+            missed = hj.missed_dates(self._db) + [hj.target_date()]
+            with self._db.session() as sess:
+                done = sess.scalar(text("""
+                    SELECT count(*) FROM dataset_jobs
+                    WHERE job_type = :t AND date_range_start = :d"""),
+                    {"t": hj.JOB_TYPE, "d": hj.target_date()})
+            if len(missed) == 1 and done:
+                return
+            spec = next(s for s in JOBS if s.job_id == "hydromet_daily")
+            self._scheduler.add_job(func=runner_for(spec, self._db), id="hydromet_catchup",
+                                    name="Kejar Hidromet harian yang terlewat", replace_existing=True)
+            logger.warning("[SCHED] Hidromet tertinggal %d tanggal, dikejar sekarang", len(missed))
+        except Exception:
+            logger.exception("[SCHED] gagal memeriksa ketertinggalan Hidromet")
 
     def jobs(self) -> list[dict]:
         if not self._scheduler:

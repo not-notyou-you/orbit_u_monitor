@@ -21,7 +21,7 @@ DBMS dinilai dari apa yang benar-benar dikerjakan sistem ini. Kebutuhan itu diam
 |---|---|---|
 | K1 | Model relasional dengan FK dan constraint yang ditegakkan DBMS: 43 tabel, 12 master | RM1, prasyarat prodi "database terstruktur" |
 | K2 | Kueri spasial: irisan poligon kecamatan dan luas geodesik | AOI = gabungan kecamatan COD-AB |
-| K3 | Agregasi deret waktu per kecamatan per band (pivot, tren, rekap bulanan) | Dashboard, Diagram, laporan, alert hujan |
+| K3 | Agregasi deret waktu per kecamatan per band (pivot, tren, rekap bulanan) | Beranda, Forecast, laporan, alert hujan |
 | K4 | Kueri rekursif untuk lineage produk | RM2 |
 | K5 | Kontrol akses per peran **di dalam database**: ganti role per transaksi, pembatasan baris | RM4 |
 | K6 | Audit trail otomatis lewat trigger | RM4 |
@@ -156,7 +156,7 @@ Tabel observasi diperbesar 10× dan 30×. Waktu dalam milidetik.
 **Temuan:**
 
 - **Kueri ber-index (Q1, Q2) tetap stabil di kedua DBMS** sampai 2,3 juta baris. Dashboard harian tidak akan melambat di DBMS mana pun. (Angka MySQL ×10 yang lebih tinggi dari ×30 adalah variasi pengukuran.)
-- **Kueri rekap seluruh tabel (Q6) di MySQL anjlok di ×30**: 5,6 detik, dengan p95 9,8 detik. PostgreSQL tumbuh hampir linear (0,65 detik). Penyebabnya, data + index (312 MB) sudah melebihi buffer 128 MB, sementara PostgreSQL juga memanfaatkan cache sistem operasi dan eksekusi paralel (2 worker bawaan). Q6 mewakili laporan bulanan dan halaman Diagram untuk rentang panjang.
+- **Kueri rekap seluruh tabel (Q6) di MySQL anjlok di ×30**: 5,6 detik, dengan p95 9,8 detik. PostgreSQL tumbuh hampir linear (0,65 detik). Penyebabnya, data + index (312 MB) sudah melebihi buffer 128 MB, sementara PostgreSQL juga memanfaatkan cache sistem operasi dan eksekusi paralel (2 worker bawaan). Q6 mewakili laporan bulanan dan halaman Forecast untuk rentang panjang.
 - **Ukuran penyimpanan hampir sama** (selisih sekitar 5%). Data mentah MySQL lebih ringkas, tetapi index-nya lebih besar.
 
 ### 3.4 Konkurensi (E2): driver C untuk kedua DBMS
@@ -261,7 +261,7 @@ Karena itu PostgreSQL direkomendasikan untuk Orbit-U. MySQL tetap tepat untuk SI
 ## 6. Keterbatasan
 
 - **Disk tidak setara (§2.4):** PostgreSQL di SSD, MySQL di HDD. Keunggulan PostgreSQL di tulis/ETL (§3.6) dan Q6 ×30 (§3.3) mungkin lebih kecil kalau kedua DBMS berada di disk yang sama. Keunggulan di keamanan (F1–F3), spasial (Q3), dan evaluasi alert (Q4) tidak terpengaruh, karena data uji tersebut sudah ada di memori.
-- Data sintetis. Skala terbesar yang diuji 2,3 juta baris; data produksi saat ini berisi 68.120 baris `region_observations`.
+- Data sintetis. Skala terbesar yang diuji 2,3 juta baris; data produksi berisi 72.850 baris `region_observations` (24 Okt 2026).
 - Konfigurasi bawaan tanpa tuning. Dengan `innodb_buffer_pool_size` lebih besar, Q6 MySQL di ×30 kemungkinan membaik. Uji ini mengukur perilaku "apa adanya", sesuai kondisi GMLS yang tidak punya DBA.
 - Klien dan server di mesin yang sama. Klien Python ikut memakai CPU saat uji konkurensi.
 - Kueri inti dan E1 untuk MySQL diukur lewat pymysql. Selisih Q1/Q2 di bawah 1 ms sebagian berasal dari driver (§3.1). Q3, Q4, dan Q6 didominasi waktu server.

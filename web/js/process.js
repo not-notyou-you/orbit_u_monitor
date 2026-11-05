@@ -1,34 +1,13 @@
-// js/process.js — bagian "sedang berjalan" Data › Ringkasan (M67; dulu tab #data/proses).
-// Dimuat js/data-home.js; elemen pc* ada di pages/data-home.html.
-//
-// Katalog menjawab "apa isi dataset ini"; halaman ini menjawab "apa yang
-// sedang jalan sekarang" tanpa harus memilih dataset satu per satu. Sumber
-// datanya sama (/api/datasets + /api/datasets/{id}/status), hanya dibaca
-// lintas dataset dan hanya untuk status yang masih bergerak. Di atasnya,
-// pekerjaan dataset utama (M58) dari GET /api/data/activity: Job Hidromet
-// dan siklus Live Sentinel-1, termasuk backfill yang dijalankan skrip.
-//
-// M74: empat angka besar (berjalan/antre/dijeda/gagal) diganti satu baris
-// status; kotak dataset utama dan daftar dataset hanya tampil selama ada yang
-// bergerak (saat diam, keadaannya terbaca di tabel per satelit dan di tab
-// Dataset). Tahap scene Sentinel-1 terakhir dilipat.
-//
-// Label status dan nama satelit diambil dari UI (UI.datasetStatus,
-// UI.DATASET_ACTIVE, UI.SOURCE_LABEL) supaya tidak jadi salinan kedua dari
-// daftar yang sama di catalog.js.
 'use strict';
 Pages['process'] = (() => {
   const ACTIVE = UI.DATASET_ACTIVE;
   const PHASE = { download: 'Diunduh', processing: 'Diproses', fusion: 'Difusikan' };
-  // Status tahap pipeline: hanya tiga warna sinyal, sesuai aturan tampilan.
   const stageCls = v => /FAIL|ERROR/i.test(v || '') ? 'v-alert' : /RUN|START|WAIT|PENDING/i.test(v || '') ? 'v-amber' : '';
   let st = null;
 
   async function init(root, ctx) {
     st = { root, ctx, items: [], prog: {}, rail: null, timer: null };
     await load();
-    // Timer dipasang sekali dan memeriksa sendiri apakah masih ada yang
-    // bergerak, jadi halaman yang menganggur tidak menembaki API.
     st.timer = setInterval(() => { if (st && (st.mainRunning || st.items.some(d => ACTIVE.has(d.status)))) load(true); }, 10000);
   }
   function destroy() { if (st && st.timer) clearInterval(st.timer); st = null; }
@@ -41,8 +20,6 @@ Pages['process'] = (() => {
     st.items = list;
 
     const shown = list.filter(d => ACTIVE.has(d.status));
-    // Progres per dataset diminta hanya untuk yang ditampilkan, dan
-    // kegagalan satu dataset tidak boleh mengosongkan seluruh halaman.
     const progs = await Promise.all(shown.map(d =>
       API.get('/api/datasets/' + d.dataset_id + '/status').catch(() => null)));
     if (!st) return;
@@ -66,7 +43,6 @@ Pages['process'] = (() => {
   const LIVE_STATUS = { BACKFILLING: ['MENGISI RIWAYAT', ''], RUNNING: ['MEMERIKSA SCENE BARU', ''], WAITING: ['MENUNGGU GILIRAN', 'off'],
     ACTIVE: ['SIAGA', 'off'], ERROR: ['GALAT', 'off'] };
 
-  // Dataset utama (M58): bukan dataset Katalog, jadi tidak ada di /api/datasets.
   function renderMain(a) {
     const box = UI.$('#pcMain', st.root);
     if (!a) { box.innerHTML = ''; return; }
@@ -89,14 +65,12 @@ Pages['process'] = (() => {
     box.innerHTML = lives.map(liveHTML).concat(h.locked ? [hyd] : []).join('<div style="height:8px"></div>') + '<div style="height:8px"></div>';
   }
 
-  // Sisa waktu yang dibaca manusia: "±2 hari 19 jam".
   function remaining(iso) {
     const min = Math.max(0, Math.round((new Date(iso) - new Date()) / 60000));
     const d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60;
     return '±' + (d ? d + ' hari ' : '') + (d || h ? h + ' jam' : m + ' menit');
   }
 
-  // Backfill Sentinel-1 dataset utama: rencana, posisi sekarang, perkiraan, log.
   function liveHTML(l) {
     const s = LIVE_STATUS[l.status] || [l.status, 'off'];
     const p = l.progress;
@@ -138,7 +112,6 @@ Pages['process'] = (() => {
     });
   }
 
-  // Satu baris: yang berjalan dulu, lalu yang perlu tindakan (dengan tautan).
   function renderStatus(list) {
     const n = st2 => list.filter(d => d.status === st2).length;
     const moving = list.filter(d => ACTIVE.has(d.status)).length;
@@ -166,8 +139,6 @@ Pages['process'] = (() => {
   function cardHTML(d) {
     const p = st.prog[d.dataset_id];
     const act = ACTIVE.has(d.status);
-    // Lapisan progres (ProgressLayer) memecah satu angka persen menjadi per
-    // satelit per fase, jadi "40%" bisa dibaca sebagai bagian mana yang jalan.
     const layers = (p && p.layers) || [];
     const waiting = p && p.waiting;
     return UI.screenHTML({
@@ -195,9 +166,6 @@ Pages['process'] = (() => {
     });
   }
 
-  // Tabel per-scene bisa panjang untuk beberapa dataset sekaligus, jadi
-  // tertutup secara bawaan: yang dicari pertama biasanya "berapa persen",
-  // bukan "scene mana".
   function scenesHTML(p) {
     const rows = (p && p.scenes) || [];
     if (!rows.length) return '';
@@ -214,9 +182,6 @@ Pages['process'] = (() => {
       ], rows) + '</details>';
   }
 
-  // Tombol yang tidak berlaku untuk status sekarang dihilangkan, bukan
-  // ditampilkan mati: di daftar beberapa dataset, baris tombol mati lebih
-  // membingungkan daripada baris yang pendek.
   function actionsHTML(d) {
     const btn = [];
     if (['QUEUED', 'PREPARING', 'DOWNLOADING', 'PROCESSING'].includes(d.status)) btn.push(['pause', 'Jeda']);
@@ -251,8 +216,6 @@ Pages['process'] = (() => {
     UI.$$('#pcList [data-act]', root).forEach(b => b.addEventListener('click', () => run(b, b.dataset.act, Number(b.dataset.id))));
   }
 
-  // Aksi yang menghentikan pemrosesan selalu lewat konfirmasi yang menyebut
-  // akibatnya; jeda dan lanjut bisa dibatalkan sendiri, jadi langsung jalan.
   async function run(btn, act, id) {
     const d = st.items.find(x => x.dataset_id === id);
     if (!d) return;

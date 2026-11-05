@@ -1,9 +1,4 @@
-# api/schemas_monitor.py
-"""Model request Tahap 3: hidromet, alert, kejadian bencana, wilayah, laporan (INTERFACE.md §4.4–4.9).
-
-Respons berupa dict/list biasa (kolom VIEW apa adanya); request divalidasi di
-sini supaya kesalahan input menjadi 422 sebelum menyentuh database.
-"""
+"""Model request Tahap 3: hidromet, alert, kejadian bencana, wilayah, laporan (INTERFACE.md §4.4–4.9)."""
 
 from __future__ import annotations
 

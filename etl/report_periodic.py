@@ -1,19 +1,4 @@
-# etl/report_periodic.py
-"""Kerangka laporan periodik (PIPELINE.md §6): periode, penyimpanan, registrasi, PDF.
-
-Dua template (``etl/report_hydromet.py``, ``etl/report_datahealth.py``)
-dibangun di atas gaya/font/tabel ``etl/report_generator.py`` warisan (reportlab,
-A4, DejaVu). Modul ini mengurus hal yang sama untuk keduanya:
-
-* periode WIB: minggu lalu (Senin–Minggu) atau bulan lalu; data hidromet
-  per tanggal UTC dipetakan ke periode lewat ``obs_date`` (§6.1);
-* berkas ``data/reports/{report_code}/{YYYY}/{report_code}_{period_start}.pdf``
-  ditulis lewat ``atomic_path()``; regenerasi menulis berkas baru
-  (``…_v2.pdf``, ``…_v3.pdf``) supaya berkas lama dipertahankan (§6.4);
-* ``generated_reports``: baris READY lama -> SUPERSEDED dalam transaksi yang
-  sama dengan INSERT baris baru; kegagalan -> baris FAILED + pesan (§8);
-* tidak ada angka karangan: nilai kosong ditulis "—" (DataLab D27).
-"""
+"""Kerangka laporan periodik (PIPELINE.md §6): periode, penyimpanan, registrasi, PDF."""
 
 from __future__ import annotations
 
@@ -23,7 +8,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 from zoneinfo import ZoneInfo
 
 from reportlab.lib import colors
@@ -50,8 +35,6 @@ def reports_root() -> Path:
     env = os.getenv("REPORTS_DIR")
     return Path(env) if env else Path(__file__).resolve().parent.parent / "data" / "reports"
 
-
-# --- periode -----------------------------------------------------------------------
 
 def is_monthly(code: str) -> bool:
     return code.endswith("_MONTHLY")
@@ -80,8 +63,6 @@ def previous_period(code: str, now: datetime | None = None) -> date:
     return this_monday - timedelta(days=7)
 
 
-# --- format nilai ------------------------------------------------------------------
-
 def num(v, nd: int = 1, unit: str = "") -> str:
     """Angka gaya Indonesia, atau "—" bila kosong. Tidak pernah mengarang."""
     if v is None:
@@ -103,8 +84,6 @@ def pct(part, whole, nd: int = 1) -> str:
         return DASH
     return num(100.0 * float(part) / float(whole), nd, "%")
 
-
-# --- dokumen -----------------------------------------------------------------------
 
 @dataclass
 class Doc:
@@ -204,8 +183,6 @@ def build_pdf(doc: Doc, out_path: Path, generated_at: datetime, period_label: st
         pdf.build(head + doc.story, onFirstPage=deco, onLaterPages=deco)
 
 
-# --- registrasi --------------------------------------------------------------------
-
 def _report_type(sess, code: str) -> int:
     tid = sess.scalar(text("SELECT report_type_id FROM report_types WHERE report_code = :c"), {"c": code})
     if tid is None:
@@ -282,8 +259,6 @@ def generate_report(db, code: str, period_start: date, *, generated_by: int | No
     except Exception as exc:
         logger.exception("[REPORT] %s %s gagal", code, start)
         out.unlink(missing_ok=True)
-        # Berkas tidak ada: ukuran 0 dan checksum SHA-256 berkas kosong
-        # (kolom NOT NULL), path = path yang dituju.
         with db.session() as sess:
             rid = sess.scalar(text("""
                 INSERT INTO generated_reports (report_type_id, period_start, period_end, file_path, file_size_bytes,

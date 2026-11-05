@@ -1,4 +1,3 @@
-# etl/deletion_manager.py
 from __future__ import annotations
 import json
 import logging
@@ -34,9 +33,6 @@ class DeletionManager:
 
     def delete_all(self) -> dict:
         result = self.clear_files_only()
-        # Manifest dibuat sekali di awal. File yang ditulis sesudahnya (thread
-        # job yang telat berhenti) tidak ada di manifest dan membuat folder
-        # dataset gagal di-rmdir — sapu ulang dengan manifest baru.
         for _ in range(self.MAX_EXTRA_PASSES):
             if not self._has_leftover_files():
                 break
@@ -266,17 +262,7 @@ class DeletionManager:
             )
 
     def _delete_non_s1_products(self, sess) -> int:
-        """Produk MODIS/GPM/FUSION milik dataset ini, beserta job FUSION-nya.
-
-        Sebelum M30 baris-baris ini menempel pada scene placeholder
-        NASA_AUX_* per dataset dan ikut terhapus lewat cascade scene itu. Kini
-        produk MODIS/GPM menempel pada granule nasa_scenes yang dipakai
-        bersama antar dataset, dan produk FUSION tidak menempel pada scene
-        mana pun -- jadi dihapus langsung di sini. Produk S1 (pada scene S1
-        sungguhan yang juga dipakai bersama) diperlakukan seperti dulu. Job
-        MODIS/GPM berjangkar pada granule bersama dan tidak disentuh; job
-        FUSION tanpa jangkar milik dataset ini (parameters_json.dataset_id)
-        ikut dihapus setelah produknya."""
+        """Produk MODIS/GPM/FUSION milik dataset ini, beserta job FUSION-nya."""
         products = sess.scalars(
             select(DataProduct).where(
                 DataProduct.dataset_id == self._dataset_id,

@@ -1,4 +1,3 @@
-# etl/geo_utils.py
 """
 Utilitas bbox WGS84 (validasi dan konversi). Aturan validasi tinggal di satu
 tempat ini supaya UI, API, dan pipeline tidak pernah berbeda pendapat soal
@@ -9,11 +8,7 @@ from __future__ import annotations
 
 import re
 
-# Batas span AOI. Swath Sentinel-1 IW ~250 km (~2.25 derajat), jadi 10 derajat
-# (~1100 km) sudah sangat longgar; di atas itu hampir pasti salah input dan akan
-# menarik ratusan scene tanpa disengaja.
 MAX_SPAN_DEG = 10.0
-# Di bawah ini bbox lebih kecil dari satu piksel GRD (~10 m) dan tidak berguna.
 MIN_SPAN_DEG = 0.001
 
 
@@ -24,10 +19,7 @@ class BBoxError(ValueError):
 def validate_bbox(
     min_lon: float, min_lat: float, max_lon: float, max_lat: float
 ) -> tuple[float, float, float, float]:
-    """Validasi bbox WGS84 dan kembalikan tuple float yang sudah bersih.
-
-    Raises BBoxError dengan pesan berbahasa Indonesia bila tidak valid.
-    """
+    """Validasi bbox WGS84 dan kembalikan tuple float yang sudah bersih."""
     try:
         min_lon, min_lat = float(min_lon), float(min_lat)
         max_lon, max_lat = float(max_lon), float(max_lat)
@@ -68,11 +60,7 @@ def bbox_to_wkt(min_lon: float, min_lat: float, max_lon: float, max_lat: float) 
 
 
 def parse_bbox_string(raw: str) -> tuple[float, float, float, float]:
-    """Parse bbox yang di-paste pengguna.
-
-    Menerima 4 angka dipisah koma/spasi/titik-koma dengan urutan
-    ``min_lon, min_lat, max_lon, max_lat`` (urutan bbox standar GDAL/GeoJSON).
-    """
+    """Parse bbox yang di-paste pengguna."""
     numbers = re.findall(r"-?\d+(?:\.\d+)?", raw or "")
     if len(numbers) != 4:
         raise BBoxError(

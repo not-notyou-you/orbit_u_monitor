@@ -2,7 +2,7 @@
 
 Susunan halaman, hak akses per peran, endpoint API, dan kode galat. Berlaku
 sejak **M56** (README §7): susunan halaman mengikuti rancangan pemilik proyek
-(`DOCS/rancangan kasar.txt`, 7 Okt 2026). Dokumen ini mencatat kode yang
+(`DOCS/desain/rancangan kasar.txt`, 7 Okt 2026). Dokumen ini mencatat kode yang
 berjalan; bila berbeda, kode yang benar dan dokumen ini yang diperbaiki.
 
 ---
@@ -129,11 +129,12 @@ Isi per halaman:
     * Izin yang dicabut selagi halaman terbuka ikut terbaca (event `change`).
     * Bila batas kecamatan (`GET /api/regions`) gagal dimuat, halaman tidak menyebut "di luar wilayah".
       Ia mengatakan lokasi belum bisa dicocokkan, lalu menawarkan "Coba lagi" dan pilihan manual.
-* **3.2–3.4 per satelit**: penjelasan satelit (lintasan, resolusi, informasi
+* **3.2–3.4 per satelit** (M66): penjelasan satelit (lintasan, resolusi, informasi
   yang bisa diambil, keterbatasan), daftar tanggal dalam batas peran, gambar
-  PNG (perbesar dengan lightbox), kalimat kondisi, tabel angka per band ×
-  metrik, penjelasan + ambang tiap band, dan **perbandingan 2 tanggal**
-  (gambar berdampingan + kolom selisih). Tab GPM untuk USER+ memuat
+  PNG (CH-01), kalimat kondisi + penjelasan + ambang tiap band (CH-02), angka
+  per kecamatan (CH-03), dan **perbandingan 2 tanggal** ("Bandingkan": gambar
+  berdampingan; kolom selisih dihapus M66). Tabel angka per band × metrik
+  hanya ada di modal gambar (lightbox). Tab GPM untuk USER+ memuat
   "Hujan per kecamatan" untuk **tanggal yang dipilih** (M73): peta koroplet
   kategori BMKG dan tabel yang bisa diurutkan (24 jam, 72 jam, 7 hari, 30 hari,
   kategori), saling menyorot; Excel terlipat. Alert aktif tinggal satu baris
@@ -154,12 +155,14 @@ Isi per halaman:
 * **4.2 Analisa daerah**: pilih kecamatan + warna, rentang tanggal, band →
   satu grafik per band, termasuk band Sentinel-1 (M58). PDF memuat **semua**
   band per kecamatan.
-* **6.2–6.4 per satelit**: daftar scene/granule (termasuk nonaktif),
-  nonaktifkan dengan alasan / pulihkan / proses ulang, backfill dengan
-  progres dan log yang terlihat langsung, riwayat per tanggal.
-* **6.5 Unduh data**: wizard dataset (satelit, tanggal, tanpa fusion atau
-  fusion `FULL_COVERAGE` / co-occurrence / hybrid); ZIP diunduh dari
-  "Dataset tersimpan".
+* **6 Data › Satelit** (satu tab untuk Sentinel-1 / MODIS / GPM, M67/M74):
+  daftar scene/granule (termasuk nonaktif); klik baris membuka dialog
+  rincian dengan nonaktifkan (alasan wajib) / pulihkan / proses ulang;
+  backfill satu baris dengan progres dan log yang terlihat langsung; tab
+  Riwayat per tanggal dan Data tersimpan.
+* **6 Data › Dataset**: daftar dataset tersimpan + unduh ZIP; `#data/dataset/baru`
+  membuka wizard dataset (satelit, tanggal, tanpa fusion atau fusion
+  `FULL_COVERAGE` / co-occurrence / hybrid).
 * **6.6 EDA**: per satelit dan rentang tanggal — statistik deskriptif,
   kekosongan terhadap sel yang diharapkan, histogram, pencilan (1,5 × IQR),
   korelasi Pearson berpasangan, kelengkapan per hari, metadata.
@@ -169,7 +172,7 @@ Isi per halaman:
 
 Alamat lama tetap hidup lewat `ALIASES` (awalan terpanjang): `#kondisi/citra`
 → `#citra/sentinel-1`, `#kondisi/kecamatan` → `#citra/gpm`, `#kondisi/relief`
-→ `#aoi-3d`, `#diagram/…` → `#forecast/…` (M61), `#sistem/tentang` → `#tentang` (M63), `#riwayat/grafik` → `#forecast/evaluasi`, `#riwayat/laporan` →
+→ `#aoi-3d`, `#diagram/…` → `#forecast/…` (M61), `#sistem/tentang` → `#tentang` (M63), `#forecast/evaluasi` dan `#riwayat/grafik` → `#forecast/analisa-daerah` (M67), `#kejadian/lihat` dan `#kejadian/kelola` → `#kejadian` (M68), `#data/sentinel-1` → `#data/satelit/sentinel-1` (M67), `#riwayat/laporan` →
 `#laporan`, `#pengaturan/…` → `#sistem/pengaturan`, `#pengaturan/akses` →
 `#sistem/pengguna`, `#akun` → `#sistem/akun`, dst. Halaman publik lama
 dialihkan 301: `/kondisi` → `/app#citra`, `/relief` → `/app#aoi-3d`.
@@ -191,8 +194,8 @@ dialihkan 301: `/kondisi` → `/app#citra`, `/relief` → `/app#aoi-3d`.
 | 2 3D AOI | — | ● | ● | ● | ● |
 | 3 Citra Satelit (termasuk PDF) | ◐ 30 hari | ◐ 365 hari | ● | ● | ● |
 | 4 Forecast | — | — | ● | — | ● |
-| 5.1 Lihat kejadian | ◐ 365 hari | ● | ● | ● | ● |
-| 5.2 Kelola kejadian | — | — | ● | — | ● |
+| 5 Kejadian: lihat (satu halaman sejak M68) | ◐ 365 hari | ● | ● | ● | ● |
+| 5 Kejadian: catat / ubah / hapus, Excel, tandai alert dibaca | — | — | ● | — | ● |
 | 6 Data | — | — | — | ● | ● |
 | 7.1 Laporan Kesehatan data | — | — | — | ● | ● |
 | 7.2 Laporan Keadaan AOI | — | — | ● | — | ● |
@@ -242,6 +245,11 @@ Semua di bawah `/api`. Peran minimum tiap operasi juga tercantum di OpenAPI
 (`x-min-role`, `/docs`) dan diuji per endpoint × peran di
 `tests/test_rbac_api.py`. Bagian ini mendaftar endpoint yang ditambah atau
 diubah M56; endpoint lain tidak berubah.
+
+Kompresi (M81, `api/compression.py`): respons teks, JSON, JS, CSS, dan SVG berukuran ≥ 1 KB dikirim gzip
+level 6 bila peramban mengirim `Accept-Encoding: gzip`. PNG, TIFF, unduhan biner, dan respons 206 (Range)
+tidak dikompres. Log akses (`METHOD path -> status (ms)`, logger `api.main`) dan pencatatan
+`user_activity_logs` dikerjakan `ActivityLogMiddleware` (`api/activity.py`).
 
 ### 4.1 Autentikasi
 
@@ -294,7 +302,7 @@ Ambang dan teks band: `etl/band_catalog.py`, angka ambangnya dari
 | GET | `/disasters/{id}` | PUBLIC | `rain` (H-0..H-2) hanya untuk ANALYST+, selain itu `null` |
 | POST, PUT, DELETE | `/disasters…` | ANALYST | tidak berubah (hapus = soft delete) |
 | GET | `/disaster-types` | PUBLIC | sebelumnya USER |
-| GET | `/regions` | PUBLIC | peta kecamatan AOI (Tentang) dan poligon pencocok Lokasi saya di Beranda (M63); sebelumnya USER |
+| GET | `/regions` | PUBLIC | poligon kecamatan AOI untuk peta Beranda dan pencocok Lokasi saya (M63); `?all=true` dipakai Sistem › Pengaturan › Wilayah; sebelumnya USER |
 
 ### 4.5 Data (`api/routes/data.py`, DATA_ENGINEER)
 
@@ -305,7 +313,7 @@ Ambang dan teks band: `etl/band_catalog.py`, angka ambangnya dari
 | GET | `/data/{s1\|modis\|gpm}/items` | daftar scene/granule termasuk nonaktif |
 | PATCH | `/data/{src}/items/{id}` | `{is_valid, reason}`; alasan wajib saat menonaktifkan; dicatat `SCENE_UPDATE` |
 | POST | `/data/{src}/items/{id}/reprocess` | proses ulang (sama dengan `/admin/scenes/…/reprocess`) |
-| POST | `/data/{src}/backfill` | `{date_from, date_to}` ≤ 366 hari. S1 → siklus Live dibatasi rentang, mengisi dataset utama (M58); rentang yang seluruhnya > 1 tahun ditolak 400 `OUTSIDE_RASTER_WINDOW`; GPM → Job Hidromet tanpa MODIS; MODIS → tanggal tanpa angka MODIS (`hydromet_job.modis_missing_dates`). Satu backfill hidromet sekaligus (409 `BACKFILL_RUNNING`) |
+| POST | `/data/{src}/backfill` | `{date_from, date_to}` ≤ 366 hari (lebih dari itu atau terbalik: 422 `VALIDATION_ERROR` dari validator body). S1 → siklus Live dibatasi rentang, mengisi dataset utama (M58); rentang yang seluruhnya > 1 tahun ditolak 400 `OUTSIDE_RASTER_WINDOW`; GPM → Job Hidromet tanpa MODIS; MODIS → tanggal tanpa angka MODIS (`hydromet_job.modis_missing_dates`). Satu backfill hidromet sekaligus (409 `BACKFILL_RUNNING`) |
 | GET | `/data/{src}/backfill` | proses terakhir + riwayat per tanggal (`dataset_jobs`; S1: `live_scenes` + jumlah angka per kecamatan) |
 | GET | `/data/backfill/runs/{id}?since=` | progres + baris log baru (dipoll UI tiap 2 detik) |
 | GET | `/data/eda?source&date_from&date_to` | EDA (`etl/eda.py`) |
@@ -475,7 +483,9 @@ venv\Scripts\python -m pytest --ignore=tests/ui --ignore=tests/recovery --junitx
 
 Dijalankan 23 Oktober 2026, PostgreSQL 18.6. Sumbernya `themonitor_dev`, salinan database produksi
 (`createdb -T themonitor`) dengan 44 tabel dan 146.541 baris. Artefak: `DOCS/hasil_uji/backup_restore.txt`
-dan `kill_and_resume.txt`.
+dan `kill_and_resume.txt`. Angka di uji ini dihitung dari seluruh schema `public`, jadi ikut memuat tabel
+`spatial_ref_sys` milik PostGIS (1 PK, 1 CHECK, 1 indeks): 44 tabel = 43 tabel sistem + `spatial_ref_sys`,
+sehingga PK 44, CHECK 68, dan 163 indeks setara dengan 43, 67, dan 162 pada skema sistem.
 
 | Uji | Hasil |
 |---|---|
@@ -523,7 +533,7 @@ keinginan pemilik proyek.
 
 | # | Pertanyaan | Keputusan |
 |---|---|---|
-| Q1 | Fitur yang tidak disebut rancangan | Hujan per kecamatan masuk Citra › GPM; alert aktif di Kejadian (M73); Tren & evaluasi alert jadi tab ketiga Diagram |
+| Q1 | Fitur yang tidak disebut rancangan | Hujan per kecamatan masuk Citra › GPM; alert aktif di Kejadian (M73); Tren & evaluasi alert menjadi bagian terlipat "Evaluasi alert & kejadian" di Forecast › Analisa daerah (M67) |
 | Q2 | Dasar "30 hari / 1 tahun" | Dihitung dari hari ini; scene terbaru selalu tampil |
 | Q3 | PDF Citra untuk pengunjung | Boleh, dengan batas 30 hari yang sama |
 | Q4 | Manajemen akun | Semua peran login: akun sendiri; ADMIN: semua akun |
@@ -539,6 +549,8 @@ keinginan pemilik proyek.
 Tahap "Pemodelan Sistem" SKRIPSI.txt. Diagram ditulis dalam Mermaid (render di VS Code atau
 mermaid.live). Class diagram tidak dibuat terpisah: struktur data sudah digambarkan ERD fisik
 `DOCS/generated/erd_physical.mmd` (DATABASE.md §2.6). Diagram mengikuti kode; bila berbeda, kode yang benar.
+Versi gambar untuk naskah (use case per aktor, activity ber-swimlane, dan sequence diagram) ada di
+`DOCS/skripsi/bahan_naskah/` halaman 10–12.
 
 ### 9.1 Use case
 
@@ -562,7 +574,7 @@ flowchart LR
     M -.mewarisi.-> D
 
     subgraph Orbit-U: The Monitor
-        uc1((Pantau lokasi di Beranda<br/>& peta AOI di Tentang))
+        uc1((Pantau lokasi di Beranda))
         uc2((Lihat citra satelit<br/>dalam batas waktu peran))
         uc3((Unduh PDF citra))
         uc4((Lihat kejadian))
@@ -570,7 +582,7 @@ flowchart LR
         uc6((Lihat 3D AOI))
         uc7((Lihat hujan per kecamatan<br/>& alert aktif))
         uc8((Kelola akun & token API sendiri))
-        uc9((Lihat Diagram & analisa daerah))
+        uc9((Lihat Forecast & analisa daerah))
         uc10((Acknowledge alert))
         uc11((Kelola kejadian))
         uc12((Evaluasi alert))
@@ -637,7 +649,7 @@ flowchart TD
 flowchart TD
     a([Data Engineer membuka Data › satelit]) --> b[Isi rentang tanggal, klik Backfill]
     b --> c{Rentang ≤ 366 hari?}
-    c -- tidak --> e1[Tolak 400] --> z([selesai])
+    c -- tidak --> e1[Tolak 422 VALIDATION_ERROR] --> z([selesai])
     c -- ya --> d{Satelit?}
     d -- Sentinel-1 --> s1{Seluruh rentang di luar<br/>jendela raster 1 tahun?}
     s1 -- ya --> e2[Tolak 400 OUTSIDE_RASTER_WINDOW] --> z
@@ -658,7 +670,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    a([Analis membuka Kejadian › Kelola]) --> b{Aksi?}
+    a([Analis membuka Kejadian]) --> b{Aksi?}
     b -- Tambah / ubah --> f[Isi jenis, kecamatan, tanggal,<br/>keterangan ≥ 10 karakter, sumber]
     f --> v{Valid?}
     v -- tidak --> err[Dialog galat berbahasa Indonesia] --> f

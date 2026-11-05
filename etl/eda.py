@@ -1,13 +1,4 @@
-# etl/eda.py
-"""Exploratory Data Analysis halaman Data (M56, INTERFACE.md §4.6).
-
-Tahap *data understanding* sebelum membuat model data: per variabel —
-jumlah, kekosongan, statistik deskriptif, sebaran (histogram), pencilan
-(aturan 1,5 × IQR) — lalu korelasi antar variabel dan kelengkapan per hari.
-
-Fungsi di sini murni (list angka masuk, dict keluar) supaya mudah diuji;
-pengambilan data ada di ``api/routes/data.py``.
-"""
+"""Exploratory Data Analysis halaman Data (M56, INTERFACE.md §4.6)."""
 from __future__ import annotations
 
 import math

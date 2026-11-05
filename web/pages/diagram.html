@@ -1,11 +1,4 @@
-<!-- pages/diagram.html — Forecast (dulu Diagram; INTERFACE.md §2 halaman 4, M61, M67).
-     Satu fragmen untuk dua tab: "Keadaan terbaru" (semua band, 30 hari +
-     forecast 15 hari, satu grafik) dan "Analisa daerah" (kecamatan × tanggal ×
-     band + forecast; evaluasi alert & kejadian terlipat — dulu tab sendiri;
-     PDF + CSV dalam satu kotak Unduh). Bagian yang tidak dipakai tab aktif
-     disembunyikan oleh js/diagram.js. ANALYST & ADMIN. -->
 
-<!-- 4.1 keadaan terbaru -->
 <section id="dgLatest" hidden>
   <div class="screen"><div class="screen-inner">
     <span class="scr-ch">CH-01 · SEMUA BAND · 30 HARI + FORECAST 15 HARI</span><span class="scr-rec live" id="dgRec">● AUTO</span>
@@ -27,9 +20,6 @@
   </div>
 </section>
 
-<!-- 4.2 analisa daerah (M70): empat kartu 2×2 di atas — Kecamatan · Band /
-     Tanggal · Unduh — lalu grafik selebar halaman. Kecamatan menampilkan
-     beberapa baris; sisanya lewat dialog "Semua kecamatan". -->
 <section id="dgRegions" hidden>
   <form id="dgForm" class="dg-cards" novalidate>
     <fieldset>

@@ -1,17 +1,4 @@
-# api/routes/storage.py
-"""
-Storage API: informasi penggunaan disk per tier (hanya baca).
-
-GET  /api/storage/summary        — ringkasan penggunaan per tier
-GET  /api/storage/files/{tier}   — list file di tier tertentu
-
-Cleanup tier lintas mesin (POST /cleanup, /cleanup/partial) warisan DataLab
-sudah dihapus (README §5); berkas hanya dihapus lewat penghapusan dataset dan
-retensi Live.
-
-Author : Julius Marselinus (BRONTO) - NIM 00000111989
-Program: Sistem Informasi - Universitas Multimedia Nusantara
-"""
+"""Storage API: informasi penggunaan disk per tier (hanya baca)."""
 
 from __future__ import annotations
 
@@ -27,13 +14,7 @@ from etl import folder_manager as fm
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
-# Nama tier D14 (folder_manager.TIERS). Literal lama raw/bronze/silver/gold
-# membuat /summary gagal KeyError setelah folder_manager pindah ke nama D14
-# (IMPLEMENTATION_NOTES Tahap 2, T12).
 StorageTier = Literal["raw", "aligned", "despeckled", "indices", "accumulated", "cog",
                       "preview", "fused", "partial"]
 
@@ -103,10 +84,6 @@ def _human(mb: float) -> str:
     return f"{mb / 1024:.2f} GB" if mb >= 1024 else f"{mb:.1f} MB"
 
 
-# ---------------------------------------------------------------------------
-# ROUTES
-# ---------------------------------------------------------------------------
-
 @router.get(
     "/summary",
     summary="Storage summary",
@@ -127,9 +104,6 @@ async def storage_summary() -> JSONResponse:
             info = _dir_info(tier_dir)
             size_mb += info["size_mb"]
             count   += info["file_count"]
-            # Pecahan per source dibaca dari subfolder source di dalam tier.
-            # Tier fusion tidak punya level itu (isinya gabungan semua
-            # source), jadi dilewati -- sama seperti folder_manager.
             for src in fm.sources_for_tier(tier_name):
                 sub = _dir_info(tier_dir / src)
                 if sub["file_count"] == 0:
@@ -156,8 +130,6 @@ async def storage_summary() -> JSONResponse:
             },
         }
 
-    # Hitung file .part (download tidak selesai). Sisa download terputus bisa
-    # muncul di tier mana pun yang menulis lewat file .part, bukan cuma raw.
     partial_mb    = 0.0
     partial_count = 0
     seen_partial: set[Path] = set()

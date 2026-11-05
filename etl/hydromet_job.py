@@ -1,27 +1,4 @@
-# etl/hydromet_job.py
-"""Job Hidromet Harian (PIPELINE.md §3): GPM + MODIS AOI -> region_observations -> alert_events.
-
-Satu tanggal = satu hari UTC = satu baris ``dataset_jobs`` (``HYDROMET_DAILY``)
-pada dataset sistem ``HYDROMET_AOI``. Urutan tahap:
-
-    1  GPM_DOWNLOAD + ACCUMULATE_RAIN   COG 24h/72h/7d/30d   (fallback F -> L -> E)
-    2  HYDROMET_AGGREGATE (GPM)         RAIN_* per kecamatan
-    3  ALERT_CHECK                      alert_events
-    4  MODIS + HYDROMET_AGGREGATE        FLOOD/NDVI/NDWI per kecamatan (tidak fatal)
-
-GPM lebih dulu karena alert hanya bergantung pada GPM. Bila granule hari itu
-belum terbit di run mana pun, tanggalnya ``WAITING_UPSTREAM`` dan dicoba lagi
-pada jadwal berikutnya sampai ``app_settings.hydromet.waiting_max_days``,
-setelah itu ``FAILED`` (§8).
-
-Resume: tanggal dengan job ``COMPLETED`` dilewati (``pending_dates``), jadi
-backfill yang dibunuh di tengah cukup dijalankan ulang. Semua penulisan DB
-idempoten (upsert / ON CONFLICT), dan COG yang sudah ada dipakai ulang oleh
-module8/module7.
-
-Pengambil input (``Fetchers``) bisa diganti: tes memakai raster sintetis
-tanpa jaringan.
-"""
+"""Job Hidromet Harian (PIPELINE.md §3): GPM + MODIS AOI -> region_observations -> alert_events."""
 
 from __future__ import annotations
 
@@ -30,7 +7,7 @@ import socket
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 from sqlalchemy import text
 
@@ -42,12 +19,9 @@ logger = logging.getLogger(__name__)
 JOB_TYPE = "HYDROMET_DAILY"
 GPM_BANDS = {"24h": "RAIN_24H", "72h": "RAIN_72H", "7d": "RAIN_7D", "30d": "RAIN_30D"}
 MODIS_BANDS = ("FLOOD", "NDVI", "NDWI")
-# Late -> Final: Final IMERG terbit ±3,5 bulan setelah hari H, jadi tanggal
-# 4–5 bulan terakhir yang masih L/E diperiksa (PIPELINE §3.4).
 FINAL_REFRESH_DAYS = 153
-# Granule mentah dataset sistem disimpan 45 hari (PIPELINE §9): jendela GPM
-# 30 hari + lookback komposit MOD09A1 32 hari (+ periode 8 hari) masih muat.
 GRANULE_RETENTION_DAYS = 45
+CATCHUP_MAX_DAYS = 30
 
 
 @dataclass
@@ -83,8 +57,6 @@ class Context:
     region_id: int
     bbox: tuple[float, float, float, float]
 
-
-# Pengambil default (jaringan, module8/module7 lewat module9) ------------------
 
 def _product_id(db, path: str | Path) -> int | None:
     with db.session() as sess:
@@ -144,8 +116,6 @@ class Fetchers:
     gpm: Callable[[Context, date, bool], list[Layer]] = default_gpm_fetch
     modis: Callable[[Context, date], list[Layer]] | None = default_modis_fetch
 
-
-# Utilitas ---------------------------------------------------------------------
 
 def utc_today() -> date:
     return datetime.now(timezone.utc).date()
@@ -224,7 +194,7 @@ def _record_gpm_run(db, obs_date: date, run: str | None) -> None:
             {"r": run, "s": GPM_SOURCE, "d": obs_date})
 
 
-def prune_granule_cache(ctx: "Context", obs_date: date, keep_days: int = GRANULE_RETENTION_DAYS) -> dict:
+def prune_granule_cache(ctx: Context, obs_date: date, keep_days: int = GRANULE_RETENTION_DAYS) -> dict:
     """Hapus granule GPM/MODIS mentah di _granule_cache yang tanggalnya lebih
     tua dari ``obs_date - keep_days``. Produk turunan (COG) tidak disentuh;
     granule yang dihapus bisa diunduh ulang dari URL resminya."""
@@ -252,8 +222,6 @@ def prune_granule_cache(ctx: "Context", obs_date: date, keep_days: int = GRANULE
     return {"removed": removed, "freed_bytes": freed}
 
 
-# Inti -------------------------------------------------------------------------
-
 def run_day(db, obs_date: date, *, rebuild_non_final: bool = False,
             fetchers: Fetchers | None = None, ctx: Context | None = None) -> DayResult:
     """Kerjakan satu tanggal UTC. Tidak pernah melempar untuk kegagalan
@@ -270,7 +238,6 @@ def run_day(db, obs_date: date, *, rebuild_non_final: bool = False,
     job_id = _job_row(db, ctx, obs_date)
     result = DayResult(obs_date, "FAILED", job_id=job_id)
 
-    # 1–2: GPM ---------------------------------------------------------------
     try:
         gpm_layers = fetchers.gpm(ctx, obs_date, rebuild_non_final)
     except UpstreamNotReady as exc:
@@ -307,13 +274,11 @@ def run_day(db, obs_date: date, *, rebuild_non_final: bool = False,
                {**ha.job_parameters(gpm_run, len(regions), min_vf), "source": "GPM", "date": obs_date,
                 "bands": [l.band_code for l in gpm_layers], "job_id": job_id})
 
-    # 3: alert ---------------------------------------------------------------
     with db.session() as sess:
         result.alerts = alert_engine.check_alerts(sess, obs_date)
     _stage_job(db, "ALERT_CHECK", "SUCCESS", {"date": obs_date, "new_alerts": len(result.alerts),
                                                "job_id": job_id})
 
-    # 4: MODIS (tidak fatal, PIPELINE §1) --------------------------------------
     modis_failed = 0
     if fetchers.modis is not None:
         try:
@@ -385,12 +350,30 @@ def waiting_dates(db) -> list[date]:
             ORDER BY date_range_start"""), {"d": ctx.dataset_id, "t": JOB_TYPE}).all())
 
 
+def missed_dates(db, max_days: int = CATCHUP_MAX_DAYS) -> list[date]:
+    """Tanggal sesudah job harian terakhir s.d. sebelum kemarin yang belum
+    pernah dijalankan -- bolong karena proses mati saat 02:00 (misfire
+    APScheduler dibuang setelah 1 jam). Dibatasi ``max_days`` ke belakang;
+    lubang yang lebih tua diisi lewat backfill halaman Data."""
+    ctx = context(db)
+    with db.session() as sess:
+        last = sess.scalar(text("""
+            SELECT max(date_range_start) FROM dataset_jobs
+            WHERE dataset_id = :d AND job_type = :t"""), {"d": ctx.dataset_id, "t": JOB_TYPE})
+    end = target_date()
+    start = end - timedelta(days=max_days)
+    if last is not None:
+        start = max(start, last + timedelta(days=1))
+    return [start + timedelta(days=i) for i in range((end - start).days)]
+
+
 def run_daily(db, fetchers: Fetchers | None = None) -> list[DayResult]:
-    """Job harian 02:00 WIB: tanggal yang masih WAITING_UPSTREAM, lalu kemarin
-    (UTC), lalu buang raster yang keluar dari jendela raster (M58)."""
+    """Job harian 02:00 WIB: tanggal yang masih WAITING_UPSTREAM, tanggal yang
+    terlewat (proses mati saat 02:00), lalu kemarin (UTC), lalu buang raster
+    yang keluar dari jendela raster (M58)."""
     from etl.raster_retention import prune_main_rasters
 
-    targets = sorted(set(waiting_dates(db)) | {target_date()})
+    targets = sorted(set(waiting_dates(db)) | set(missed_dates(db)) | {target_date()})
     ctx = context(db)
     results = [run_day(db, d, fetchers=fetchers, ctx=ctx) for d in targets]
     try:
@@ -444,15 +427,7 @@ def backfill(db, date_from: date, date_to: date, *, modis: bool = True, fetchers
              pending_fn=None) -> dict:
     """Backfill berurutan dan resume-aware di bawah advisory lock ``hydromet``
     (scripts/backfill_hydromet.py, POST /admin/ingest). Mengembalikan ringkasan.
-
-    Berhenti lebih awal setelah `max_consecutive_failures` hari FAILED berurutan
-    (0 = jangan pernah berhenti). Gangguan jaringan panjang membuat setiap hari
-    gagal di tahap download, dan menyapu ratusan tanggal dalam keadaan itu hanya
-    membuang waktu tanpa menghasilkan satu baris pun -- backfill 2026-10-05
-    menggagalkan hari demi hari selama outage ISP sampai dihentikan manual.
-    Tanggal yang belum COMPLETED tidak hilang: jalankan ulang perintah yang sama
-    setelah jaringan pulih. WAITING_UPSTREAM tidak dihitung sebagai kegagalan --
-    itu granule yang memang belum dipublikasikan, bukan tanda jaringan rusak."""
+    """
     import time
 
     from etl.advisory_lock import advisory_lock
@@ -463,8 +438,6 @@ def backfill(db, date_from: date, date_to: date, *, modis: bool = True, fetchers
             summary["locked"] = True
             echo("[SKIP] another worker holds the 'hydromet' lock (scheduler or another backfill)")
             return summary
-        # pending_fn: tanggal yang dikerjakan; default yang belum COMPLETED.
-        # Backfill MODIS memakai modis_missing_dates.
         pending = (pending_fn or pending_dates)(db, date_from, date_to)
         total = (date_to - date_from).days + 1
         summary["skipped_done"] = total - len(pending)

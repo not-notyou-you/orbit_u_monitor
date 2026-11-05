@@ -1,25 +1,5 @@
 #!/usr/bin/env python
-"""Benchmark lanjutan PostgreSQL vs MySQL 8.0 — melengkapi run.py (Q1–Q5, F1–F3).
-
-Dijalankan SETELAH `run.py --engine all`, karena memakai database
-`themonitor_bench` yang sudah dimuat run.py di kedua DBMS.
-
-    E3  Tulis (beban ETL): insert batch 50.000 baris dan upsert 20.000 baris
-        (separuh konflik), keduanya INSERT multi-baris per 1.000 baris —
-        metode yang sama di kedua DBMS. 3 ulangan, median.
-    E2  Konkurensi: 1/4/8/16 klien, masing-masing koneksi sendiri, campuran
-        Q1 (tanggal acak) dan Q2 (kecamatan + jendela acak) selama 10 detik.
-        Throughput (kueri/detik) dan latensi median/p95.
-    E1  Skalabilitas: observations ×1 → ×10 → ×30 (salinan bergeser 3 tahun),
-        ANALYZE, lalu Q1, Q2, Q6 (agregasi bulanan seluruh tabel) dan ukuran
-        tabel + index.
-
-Keluaran: results/extended_write.csv, extended_concurrency.csv,
-extended_scaling.csv. E1 mengubah tabel observations di DB benchmark;
-jalankan run.py lagi untuk kembali ke ×1.
-
-Pakai:  python benchmark/extended.py   (MySQL dari BENCH_MYSQL_*, seperti run.py)
-"""
+"""Benchmark lanjutan PostgreSQL vs MySQL 8.0 — melengkapi run.py (Q1–Q5, F1–F3)."""
 
 from __future__ import annotations
 
@@ -34,7 +14,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import run as R  # noqa: E402
+import run as R
 
 DB = R.DB
 SCALES = [1, 10, 30]
@@ -43,7 +23,6 @@ CONC_SECONDS = 10
 SHIFT_DAYS = 1096  # 3 tahun: salinan ke-k bergeser k × 1096 hari, UNIQUE tetap terjaga
 
 
-# --------------------------------------------------------------------------- koneksi
 def pg_connect():
     import psycopg2
     c = psycopg2.connect(dbname=DB, **R.pg_conninfo())
@@ -75,7 +54,6 @@ ENGINES = {"PostgreSQL": pg_connect, "MySQL 8.0": my_connect}
 if os.getenv("BENCH_MYSQL_DRIVER") == "mysqlclient":
     ENGINES = {"PostgreSQL": pg_connect, "MySQL 8.0 (mysqlclient)": my_connect_c}
 
-# Kueri dengan teks yang sama di kedua dialek (tanpa skema; search_path/database sudah diatur).
 Q1 = """SELECT r.region_id, r.region_name,
        max(CASE WHEN o.band_code = 'RAIN_24H' THEN o.value END), max(CASE WHEN o.band_code = 'RAIN_72H' THEN o.value END),
        max(CASE WHEN o.band_code = 'RAIN_7D' THEN o.value END), max(CASE WHEN o.band_code = 'RAIN_30D' THEN o.value END),
@@ -108,12 +86,10 @@ def rand_params(rng: random.Random, regions: list[int], days: int) -> tuple[str,
     return Q2, {"r": rng.choice(regions), "a": a.isoformat(), "z": (a + timedelta(days=29)).isoformat()}
 
 
-# --------------------------------------------------------------------------- E3 tulis
 def ingest_rows(n: int, offset: int) -> list[tuple]:
     rng = random.Random(7 + offset)
     start = date(2030, 1, 1)
     bands = ["RAIN_24H", "RAIN_72H", "RAIN_7D", "RAIN_30D", "NDVI", "NDWI", "FLOOD"]
-    # Kunci diturunkan dari id global j: (region, band, tanggal) unik untuk setiap j
     return [(j, 1 + j % 28, bands[(j // 28) % 7], (start + timedelta(days=j // 196)).isoformat(),
              round(rng.uniform(0, 200), 4), "FINAL") for j in range(offset, offset + n)]
 
@@ -147,8 +123,6 @@ def e3_write() -> list[dict]:
                                        DO UPDATE SET value = EXCLUDED.value""", upd, page_size=1000)
             else:
                 for i in range(0, len(upd), 1000):
-                    # VALUES(col) (bukan alias "AS new"): hanya bentuk ini yang ditulis ulang
-                    # pymysql menjadi INSERT multi-baris; alias membuatnya per baris.
                     cur.executemany("""INSERT INTO ingest VALUES (%s,%s,%s,%s,%s,%s)
                                        ON DUPLICATE KEY UPDATE value = VALUES(value)""", upd[i:i + 1000])
             conn.commit()
@@ -166,7 +140,6 @@ def e3_write() -> list[dict]:
     return out
 
 
-# --------------------------------------------------------------------------- E2 konkurensi
 def e2_concurrency() -> list[dict]:
     out = []
     for eng, connect in ENGINES.items():
@@ -185,14 +158,14 @@ def e2_concurrency() -> list[dict]:
                 cur = conn.cursor()
                 rng = random.Random(seed)
                 mine = []
-                while (now := time.perf_counter()) < stop:
+                while time.perf_counter() < stop:
                     sql, params = rand_params(rng, regions, 3 * 365)
                     t = time.perf_counter()
                     try:
                         cur.execute(sql, params)
                         cur.fetchall()
                         conn.rollback()
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         errs[0] += 1
                         conn.rollback()
                         continue
@@ -214,7 +187,6 @@ def e2_concurrency() -> list[dict]:
     return out
 
 
-# --------------------------------------------------------------------------- E1 skalabilitas
 def grow(eng: str, conn, frm: int, to: int) -> float:
     cur = conn.cursor()
     t = time.perf_counter()
@@ -289,7 +261,6 @@ def e1_scaling() -> list[dict]:
 
 
 def main() -> int:
-    # BENCH_TESTS=e2,e3 membatasi uji; BENCH_SUFFIX membedakan berkas keluaran (mis. _mysqlclient)
     tests = os.getenv("BENCH_TESTS", "e1,e2,e3").split(",")
     sfx = os.getenv("BENCH_SUFFIX", "")
     R.RESULTS.mkdir(exist_ok=True)

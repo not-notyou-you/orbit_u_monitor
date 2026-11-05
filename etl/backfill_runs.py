@@ -1,24 +1,4 @@
-# etl/backfill_runs.py
-"""Proses backfill yang dimulai dari halaman Data (M56, INTERFACE.md §4.6).
-
-Backfill GPM/MODIS adalah Job Hidromet (``etl.hydromet_job``) yang berjalan
-di thread latar dengan koneksi ``monitor_etl``. Modul ini memberi setiap
-jalannya sebuah nomor, progres (hari ke-i dari n), dan baris log yang bisa
-dibaca halaman Data selagi berjalan — sebelumnya baris itu hanya masuk log
-server.
-
-Penyimpanan:
-* di memori: daftar jalan + 500 baris log terakhir per jalan (cepat dibaca
-  polling UI);
-* di disk: ``logs/backfill/backfill_<id>.log`` (utuh, bertahan setelah
-  server dimulai ulang);
-* di basis data: hasil per tanggal tetap di ``dataset_jobs``
-  (``HYDROMET_DAILY``) — itu riwayat yang awet, ditampilkan di bawah log.
-
-Satu backfill hidromet pada satu waktu: Job Hidromet memegang advisory lock
-``hydromet`` sehingga jalan kedua akan langsung berhenti dengan pesan
-"kunci sedang dipakai".
-"""
+"""Proses backfill yang dimulai dari halaman Data (M56, INTERFACE.md §4.6)."""
 from __future__ import annotations
 
 import logging
@@ -30,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from itertools import count
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +19,7 @@ MAX_RUNS = 50
 _PROGRESS = re.compile(r"^\[(\d+)/(\d+)\]")
 _ids = count(1)
 _lock = threading.Lock()
-_runs: dict[int, "Run"] = {}
+_runs: dict[int, Run] = {}
 
 
 def _log_dir() -> Path:

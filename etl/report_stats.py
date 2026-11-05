@@ -1,21 +1,4 @@
-# etl/report_stats.py
-"""Pengumpul statistik untuk etl/report_generator.py.
-
-Semua angka di laporan berasal dari sini, dan hanya dari dua sumber nyata:
-
-1. Query agregat ke database (GROUP BY bulan/band/tier/stage, AVG, STDDEV,
-   MIN/MAX, COUNT DISTINCT) -- Sentinel-1 punya statistik backscatter skalar
-   di `quality_metrics`, semua source punya jejak tier/ukuran di
-   `data_products`, dan fusi tercatat di `fusion_products`.
-2. Statistik piksel dari GeoTIFF COG MODIS/GPM milik dataset ini. Nilai
-   NDVI/NDWI/kelas banjir/curah hujan TIDAK disimpan sebagai kolom skalar di
-   DB, jadi dihitung langsung dari raster saat laporan dibuat (read-only,
-   ~10 ms per file).
-
-Modul ini murni membaca -- tidak menulis ke DB atau ke direktori data.
-Setiap bagian yang datanya tidak ada dikembalikan kosong/None, bukan diisi
-angka contoh dari spesifikasi (lihat docstring report_generator.py).
-"""
+"""Pengumpul statistik untuk etl/report_generator.py."""
 from __future__ import annotations
 
 import logging
@@ -41,7 +24,6 @@ from etl.database_client import (
 
 logger = logging.getLogger(__name__)
 
-# Musim untuk wilayah monsun Indonesia (dataset default country_code = ID).
 SEASONS: list[tuple[str, str, tuple[int, ...]]] = [
     ("DJF", "Wet season (Dec-Feb)", (12, 1, 2)),
     ("MAM", "Transition I (Mar-May)", (3, 4, 5)),
@@ -51,15 +33,12 @@ SEASONS: list[tuple[str, str, tuple[int, ...]]] = [
 MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July",
                "August", "September", "October", "November", "December"]
 
-# Urutan tier lineage per source (etl/tier_names.py) -- dipakai untuk
-# menghitung "loss" antar level pemrosesan di Section 3.
 TIER_ORDER: dict[str, list[str]] = {
     "SENTINEL1": ["RAW", "ALIGNED", "DESPECKLED", "COG"],
     "MODIS": ["ALIGNED", "INDICES", "COG"],
     "GPM": ["ALIGNED", "ACCUMULATED", "COG"],
 }
 
-# MCDWD (MODIS Global Flood Product) -- kode kelas piksel.
 FLOOD_CLASSES = {0: "No water", 1: "Surface water", 2: "Recurrent flood", 3: "Flood (anomaly)"}
 FLOOD_NODATA = 255
 
@@ -112,8 +91,6 @@ class ReportStats:
     fusion: list[dict] = field(default_factory=list)
     nasa_products: dict[str, list[str]] = field(default_factory=dict)
     queries: list[str] = field(default_factory=list)  # label query yang dipakai (Implementation Summary)
-
-    # -- turunan ---------------------------------------------------------
 
     def completeness(self, source: str) -> float | None:
         days = self.obs_dates.get(source) or []
@@ -184,8 +161,6 @@ class ReportStats:
         return rows
 
 
-# -- collection ---------------------------------------------------------------
-
 def collect(db: DatabaseClient, dataset_id: int, dataset: dict, root_path=None) -> ReportStats:
     start, end = dataset.get("date_start"), dataset.get("date_end")
     if isinstance(start, datetime):
@@ -207,8 +182,8 @@ def collect(db: DatabaseClient, dataset_id: int, dataset: dict, root_path=None) 
                 DataProduct.dataset_id == dataset_id,
                 DataProduct.source.in_(["MODIS", "GPM"]),
                 DataProduct.product_tier == "COG",
-                DataProduct.is_latest == True,  # noqa: E712
-                DataProduct.is_valid == True,  # noqa: E712
+                DataProduct.is_latest == True,
+                DataProduct.is_valid == True,
             )
         ).all()
     st.queries.append("data_products: COG MODIS/GPM (is_latest, is_valid) -> path raster")
@@ -461,7 +436,6 @@ def _collect_rasters(rows, st: ReportStats) -> None:
             classes = {c: float((valid == c).sum()) / valid.size for c in FLOOD_CLASSES} if valid.size else {}
             obs = RasterObs(
                 day=day, band=band,
-                # "mean" FLOOD = % piksel valid berkelas banjir (2 atau 3)
                 mean=float(((valid == 2) | (valid == 3)).mean() * 100) if valid.size else None,
                 std=None, min=None, max=None, valid_frac=valid.size / total if total else 0.0,
                 classes=classes, file_name=name, pixels=total,

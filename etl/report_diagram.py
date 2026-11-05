@@ -1,12 +1,4 @@
-# etl/report_diagram.py
-"""Laporan PDF "Analisa daerah" halaman Diagram (M56, INTERFACE.md §4.5).
-
-Kecamatan dan rentang tanggal mengikuti pilihan pengguna, tetapi isinya
-SEMUA band per kecamatan (hujan 24 jam/72 jam/7 hari/30 hari, genangan MODIS,
-NDVI, NDWI) — tidak hanya band yang sedang tampil di layar. Satu grafik per
-band dengan satu garis per kecamatan (warna sama dengan di layar bila
-dikirim), garis ambang dari ``etl.band_catalog``, lalu tabel ringkas.
-"""
+"""Laporan PDF "Analisa daerah" halaman Diagram (M56, INTERFACE.md §4.5)."""
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -15,7 +7,6 @@ from pathlib import Path
 from etl import report_generator as rg
 from etl.report_periodic import DASH, Doc, build_pdf, num
 
-# Warna cadangan bila UI tidak mengirim warna kecamatan (tab10, terbaca di kertas).
 _FALLBACK = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
              "#e377c2", "#7f7f7f", "#bcbd22", "#17becf", "#393b79", "#637939"]
 
@@ -27,7 +18,7 @@ def _printable(hex_color: str) -> str:
     if lum <= 0.55:
         return hex_color
     k = 0.55 / lum
-    return "#{:02x}{:02x}{:02x}".format(int(r * k), int(g * k), int(b * k))
+    return f"#{int(r * k):02x}{int(g * k):02x}{int(b * k):02x}"
 
 
 def build(out: Path, *, regions: list[dict], colours: dict[int, str | None], bands: list[dict],

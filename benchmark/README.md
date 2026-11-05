@@ -61,5 +61,6 @@ bukan diisi angka perkiraan.
 - `environment.json`: versi DBMS dan PostGIS, CPU, RAM, OS, jumlah baris yang dimuat, lama pemuatan.
 - `explain_*.txt`: rencana eksekusi aktual (`EXPLAIN ANALYZE`) untuk pembahasan index.
 
-Skor akhir kerangka acuan (DATABASE.md §1: spasial 30%, integritas 25%, keamanan 15%, biaya 15%,
-integrasi 15%) disusun di bab evaluasi skripsi dari kedua berkas ini.
+Skor terbobot akhir (tujuh kriteria: keamanan per peran & audit 25%, spasial 20%, analitik & skala 15%,
+tulis/ETL 10%, konkurensi baca 10%, integritas relasional & rekursif 10%, biaya & ekosistem 10%) dan
+rekomendasinya ada di `DOCS/PERBANDINGAN_DBMS.md` §3.8–§4 (PostgreSQL 4,90, MySQL 2,90).

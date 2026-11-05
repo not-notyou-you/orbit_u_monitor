@@ -1,18 +1,4 @@
-# api/routes/admin_monitor.py
-"""Administrasi wilayah dan ingest manual (INTERFACE.md §4.9, bagian Tahap 3).
-
-Dijaga ``require_role("ADMIN")`` di api/main.py (prefix /api/admin).
-
-    GET   /admin/regions          kecamatan Lebak + status in_aoi
-    PATCH /admin/regions/{id}     {in_aoi} -> ROI AOI + dataset HYDROMET_AOI dibangun ulang
-    POST  /admin/rois             ROI gabungan dari daftar region_id kecamatan
-    POST  /admin/ingest           {job: HYDROMET|LIVE, date_from, date_to, area_id?} -> 202
-    PATCH /admin/scenes/{source}/{id}            {is_valid, reason} (soft delete)
-    POST  /admin/scenes/{source}/{id}/reprocess  -> 202
-    GET/PUT /admin/quality-thresholds, /admin/settings
-    GET   /admin/pipeline/status, /admin/archive/stats; POST /admin/archive/verify
-    GET   /admin/notify/status; POST /admin/notify/test, /admin/notify/run  (M64)
-"""
+"""Administrasi wilayah dan ingest manual (INTERFACE.md §4.9, bagian Tahap 3)."""
 
 from __future__ import annotations
 
@@ -25,7 +11,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, model_validator
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -133,8 +119,6 @@ def ingest(req: IngestRequest, sess: Session = Depends(get_session), etl=Depends
             "note": "runs in the background under the 'hydromet' advisory lock; skipped if another worker holds it"}
 
 
-# --- scene: soft delete & proses ulang (§4.9) ----------------------------------------
-
 _SCENE_TABLES = {"S1": ("satellite_scenes", "scene_id"), "MODIS": ("nasa_scenes", "nasa_scene_id"),
                  "GPM": ("nasa_scenes", "nasa_scene_id")}
 
@@ -217,8 +201,6 @@ def reprocess_scene(source: str, scene_id: int, sess: Session = Depends(get_sess
             "started": started}
 
 
-# --- ambang kualitas & pengaturan ----------------------------------------------------
-
 class ThresholdUpdate(BaseModel):
     threshold_id: int
     warn_below: float | None = None
@@ -262,7 +244,6 @@ def update_thresholds(req: list[ThresholdUpdate], sess: Session = Depends(get_se
     return list_thresholds(sess)
 
 
-# Validasi per kunci: (tipe, min, max); untuk teks min/max = panjang.
 _SETTING_RULES = {
     "live.max_areas": (int, 1, 20), "live.retention_max": (int, 1, 60), "live.retention_default": (int, 1, 60),
     "water.vh_threshold_db": (float, -40, -5), "dataset.max_days": (int, 1, 3660),
@@ -308,8 +289,6 @@ def update_settings(req: SettingsUpdate, sess: Session = Depends(get_session),
         raise ApiError(400, "live.retention_default must not exceed live.retention_max", "INVALID_SETTING")
     return out
 
-
-# --- peringatan email (M64) ----------------------------------------------------------
 
 @router.get("/notify/status", summary="Email alerts: configuration, subscribers, recent sends")
 def notify_status(sess: Session = Depends(get_session)) -> dict:
@@ -361,10 +340,8 @@ def notify_run(etl=Depends(get_etl_db)) -> dict:
     return {"accepted": True}
 
 
-# --- status pipeline & arsip ----------------------------------------------------------
-
 @router.get("/pipeline/status", summary="Latest job per kind, credentials, queue, schedule")
-def pipeline_status(sess: Session = Depends(get_session)) -> dict:
+def pipeline_status(request: Request, sess: Session = Depends(get_session)) -> dict:
     jobs = sess.execute(text("""
         SELECT DISTINCT ON (kind) kind, job_id, status, date_range_start, started_at, completed_at FROM (
             SELECT CASE WHEN d.is_system THEN 'HYDROMET' WHEN d.dataset_kind = 'LIVE_AREA' THEN 'LIVE'
@@ -388,9 +365,9 @@ def pipeline_status(sess: Session = Depends(get_session)) -> dict:
                                 WHERE deleted_at IS NULL ORDER BY area_id""")).mappings().all()
     schedule = []
     try:
-        from api import main as api_main
-        if api_main._scheduler is not None:
-            schedule = api_main._scheduler.jobs()
+        scheduler = getattr(request.app.state, "scheduler", None)
+        if scheduler is not None:
+            schedule = scheduler.jobs()
     except Exception:
         logger.exception("[ADMIN] gagal membaca jadwal scheduler")
     return {
@@ -400,7 +377,6 @@ def pipeline_status(sess: Session = Depends(get_session)) -> dict:
         "reports": [dict(r) for r in reports],
         "skipped_locked_7d": [dict(s) for s in skipped],
         "queue": {"dataset_jobs_queued": queue},
-        # Hanya ada/tidaknya kredensial; nilainya tidak pernah dikirim.
         "credentials": {"nasa_earthdata_token": bool(os.getenv("NASA_EARTHDATA_TOKEN")),
                         "copernicus": any(os.getenv(k) for k in ("COPERNICUS_USERNAME", "COPERNICUS_USER",
                                                                  "CDSE_USERNAME"))},

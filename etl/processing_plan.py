@@ -1,23 +1,5 @@
-# etl/processing_plan.py
-"""
-Rencana pemrosesan per-satelit — terjemahan `dataset_source_config` menjadi
+"""Rencana pemrosesan per-satelit — terjemahan `dataset_source_config` menjadi
 keputusan konkret yang dipakai pipeline.
-
-Model per-satelit (PIPELINE.md §2) menyatakan setiap sumber punya
-definisi RAW/PROCESSED-nya sendiri:
-
-    SENTINEL1  RAW        calibrate + reproject + crop            -> ALIGNED
-               PROCESSED  + Lee filter + QA + COG                 -> DESPECKLED, COG
-    MODIS      RAW        flood map saja                          -> ALIGNED
-               PROCESSED  + NDVI + NDWI                           -> INDICES, COG
-    GPM        RAW        curah hujan harian (1 hari)             -> ALIGNED
-               PROCESSED  + window akumulasi 24h/72h/7d (7 hari)  -> ACCUMULATED, COG
-
-Modul ini adalah SATU-SATUNYA tempat aturan itu ditulis sebagai kode. Tanpa
-itu, tiap modul (orchestrator, module7, module8, module9) akan menafsirkan
-sendiri arti "RAW" untuk sumbernya, dan tafsiran itu pasti akan berbeda begitu
-salah satunya diubah. Modul ini sengaja tidak mengimpor apa pun dari modul ETL
-lain supaya bisa diimpor dari mana saja tanpa siklus impor.
 """
 
 from __future__ import annotations
@@ -38,30 +20,17 @@ MODIS = "MODIS"
 GPM = "GPM"
 SOURCE_ORDER: tuple[str, ...] = (SENTINEL1, MODIS, GPM)
 
-# Tahap Sentinel-1 yang jalan di level apa pun. DOWNLOAD/CALIBRATE/CROP tidak
-# bisa dilewati: nilai DN mentah tanpa LUT sigma-nought tidak punya arti fisik,
-# jadi "RAW" untuk SAR tetap berarti terkalibrasi (DOCS/PIPELINE.md).
 S1_BASE_STAGES: tuple[str, ...] = ("DOWNLOAD", "CALIBRATE", "CROP")
-# Tahap yang hanya jalan kalau PROCESSED diminta.
 S1_PROCESSED_STAGES: tuple[str, ...] = ("LEE_FILTER", "QUALITY_ANALYTICS", "GOLD_EXPORT")
 
-# Tier yang dihasilkan tiap level. Sama dengan _TIERS_BY_LEVEL di
-# database_client.derive_required_tiers — keduanya harus sepakat.
-# Tier yang boleh ditandai level RAW. Dinyatakan lewat RANK, bukan nama:
-# rank 2 bercabang per-source (D14) dan nama lama masih mungkin muncul dari
-# job yang mulai sebelum migrasi.
 _RAW_PATH_RANKS: frozenset[int] = frozenset({0, 1})
 
-# Band/window yang MERUPAKAN artefak RAW sumbernya. Sisanya turunan, jadi cuma
-# ada di jalur PROCESSED.
 MODIS_RAW_BANDS: tuple[str, ...] = ("FLOOD",)
 MODIS_PROCESSED_BANDS: tuple[str, ...] = ("FLOOD", "NDVI", "NDWI")
 
 GPM_RAW_WINDOWS: tuple[str, ...] = ("24h",)
 GPM_PROCESSED_WINDOWS: tuple[str, ...] = ("24h", "72h", "7d")
 
-# Jumlah hari granule yang perlu diunduh GPM. Window 7d menjumlahkan hari
-# target + 6 hari sebelumnya; jalur RAW cuma butuh hari itu sendiri.
 GPM_RAW_DAYS = 1
 GPM_PROCESSED_DAYS = 7
 
@@ -90,7 +59,6 @@ class SourcePlan:
     source_name: str
     levels: tuple[str, ...]
 
-    # -- pertanyaan dasar --------------------------------------------------
     @property
     def has_raw(self) -> bool:
         return RAW in self.levels
@@ -108,70 +76,39 @@ class SourcePlan:
         return tn.COG if self.has_processed else tn.ALIGNED
 
     def tiers(self) -> frozenset[str]:
-        """Tier yang boleh diproduksi sumber ini.
-
-        Tier rank 2 dinamai menurut source-nya (D14): DESPECKLED untuk S1,
-        INDICES untuk MODIS, ACCUMULATED untuk GPM.
-        """
+        """Tier yang boleh diproduksi sumber ini."""
         out: set[str] = {tn.RAW, tn.ALIGNED}
         if self.has_processed:
             out |= {tn.RANK2_BY_SOURCE[self.source_name.upper()], tn.COG}
         return frozenset(out)
 
-    # -- partisipasi di run lintas-sumber (fusion, preview) -----------------
     def level_for_run(self, run_level: str) -> str:
-        """Level yang DIPAKAI sumber ini pada run bertanda `run_level`.
-
-        Fusion dan preview menghasilkan satu set artefak per level (lihat
-        ProcessingPlan.output_levels). Sebuah run bertanda PROCESSED tidak
-        berarti setiap sumber punya PROCESSED: dataset
-        sentinel1[RAW] + modis[PROCESSED] cuma menghasilkan SATU stack, dan di
-        dalamnya S1 mau tidak mau ikut sebagai RAW.
-
-        Aturannya: pakai `run_level` kalau sumber ini memang memilikinya,
-        kalau tidak pakai level tertinggi yang dia punya. Fallback ke level
-        tertinggi, bukan ke NaN/melewatkan sumbernya, karena user memang
-        meminta sumber itu — menghilangkannya dari stack akan membuat
-        konfigurasi campuran diam-diam kehilangan satu sensor.
-        """
+        """Level yang DIPAKAI sumber ini pada run bertanda `run_level`."""
         level = str(run_level).strip().upper()
         if level in self.levels:
             return level
         return self.levels[-1]  # LEVEL_ORDER terurut, jadi ini yang tertinggi
 
     def tier_for_run(self, run_level: str) -> str:
-        """Tier yang dibaca fusion/preview untuk sumber ini pada run itu.
-
-        PROCESSED berakhir di COG (analysis-ready), RAW berhenti di ALIGNED
-        (DOCS/PIPELINE.md, "Which input tier does fusion use?").
-        """
+        """Tier yang dibaca fusion/preview untuk sumber ini pada run itu."""
         return tn.COG if self.level_for_run(run_level) == PROCESSED else tn.ALIGNED
 
     @property
     def has_both_levels(self) -> bool:
         return self.has_raw and self.has_processed
 
-    # -- penandaan data_products.processing_level --------------------------
     def level_for_tier(self, tier: str) -> str:
-        """Nilai `data_products.processing_level` untuk artefak di `tier`.
-
-        RAW/ALIGNED ditandai RAW hanya kalau user memang meminta level RAW;
-        kalau sumber ini murni PROCESSED, keduanya cuma langkah antara jalur
-        penuh dan ikut ditandai PROCESSED. Tier rank 2 dan COG selalu
-        PROCESSED — tier itu tidak pernah lahir dari jalur RAW.
-        """
+        """Nilai `data_products.processing_level` untuk artefak di `tier`."""
         if tn.rank(tier) in _RAW_PATH_RANKS and self.has_raw:
             return RAW
         return PROCESSED
 
-    # -- Sentinel-1 --------------------------------------------------------
     def s1_skip_stages(self) -> set[str]:
         """Tahap S1 yang harus dilewati untuk level sumber ini."""
         if self.has_processed:
             return set()
         return set(S1_PROCESSED_STAGES)
 
-    # -- MODIS / GPM -------------------------------------------------------
     def modis_bands(self) -> tuple[str, ...]:
         return modis_bands_for(self.levels)
 
@@ -182,14 +119,7 @@ class SourcePlan:
         return GPM_PROCESSED_DAYS if self.has_processed else GPM_RAW_DAYS
 
     def targets(self) -> dict[str, tuple[tuple[str, str], ...]]:
-        """{band: ((tier, processing_level), ...)} untuk MODIS/GPM.
-
-        Sebuah band bisa punya DUA target ketika sumbernya dikonfigurasi
-        RAW+PROCESSED: FLOOD (atau rainfall 24h) adalah deliverable RAW di
-        ALIGNED sekaligus lapisan pertama jalur PROCESSED di tier rank 2
-        (INDICES untuk MODIS, ACCUMULATED untuk GPM), dan DOCS/PIPELINE.md
-        menyatakan kedua artefak hidup berdampingan di disk.
-        """
+        """{band: ((tier, processing_level), ...)} untuk MODIS/GPM."""
         if self.source_name == MODIS:
             base_bands = MODIS_RAW_BANDS
             all_bands = MODIS_PROCESSED_BANDS
@@ -273,25 +203,7 @@ class ProcessingPlan:
         return frozenset(out)
 
     def output_levels(self) -> tuple[str, ...]:
-        """Level run lintas-sumber yang harus dihasilkan dataset ini.
-
-        Satu run = satu set artefak turunan lintas-sumber (satu HDF5 fusion,
-        satu folder preview). Bukan sekadar union level semua sumber:
-
-          * Ada sumber yang diminta RAW **dan** PROCESSED sekaligus -> dua
-            run. Itu justru inti ablation study: stack yang isinya sama persis
-            kecuali satu sensor difilter/diturunkan, jadi keduanya harus
-            berdiri sebagai berkas terpisah yang bisa dibandingkan.
-          * Selain itu -> satu run. Dataset sentinel1[RAW] + modis[PROCESSED]
-            tidak punya perbandingan untuk dibuat: dua run-nya akan berisi
-            byte yang identik (tiap sumber cuma punya satu level), jadi yang
-            kedua hanya menggandakan disk tanpa menambah informasi. Run
-            tunggal itu ditandai PROCESSED kalau ada sumber PROCESSED di
-            dalamnya, karena itu level tertinggi yang ikut.
-
-        Level tiap sumber di dalam sebuah run diselesaikan
-        SourcePlan.level_for_run().
-        """
+        """Level run lintas-sumber yang harus dihasilkan dataset ini."""
         if not self.sources:
             return ()
         if any(plan.has_both_levels for plan in self.sources.values()):
@@ -319,23 +231,11 @@ class ProcessingPlan:
         return f"<ProcessingPlan dataset={self.dataset_id} {inner}>"
 
 
-# Perilaku prototipe sebelum migrasi 017: selalu tiga sumber, selalu jalur
-# penuh. Dipakai sebagai fallback supaya dataset tanpa baris
-# dataset_source_config (mis. database uji yang dibuat lewat create_all tanpa
-# menjalankan backfill migrasi) tidak diam-diam menghasilkan nol produk.
-_LEGACY_FALLBACK: dict[str, tuple[str, ...]] = {
-    name: (PROCESSED,) for name in SOURCE_ORDER
-}
+_LEGACY_FALLBACK: dict[str, tuple[str, ...]] = dict.fromkeys(SOURCE_ORDER, (PROCESSED,))
 
 
 def plan_from_configs(dataset_id: int, configs: dict) -> ProcessingPlan:
-    """Bangun ProcessingPlan dari {SOURCE_NAME: [levels]}.
-
-    Sumber dengan daftar level kosong DIBUANG, bukan dianggap RAW: array
-    kosong berarti "dipilih tapi tidak diproses sama sekali", state yang tidak
-    punya arti (CHECK chk_source_config_levels_not_empty mencegahnya di
-    database, ini jaring pengaman untuk pemanggil in-memory).
-    """
+    """Bangun ProcessingPlan dari {SOURCE_NAME: [levels]}."""
     sources: dict[str, SourcePlan] = {}
     for raw_name, raw_levels in (configs or {}).items():
         name = str(raw_name).strip().upper()
@@ -350,12 +250,7 @@ def plan_from_configs(dataset_id: int, configs: dict) -> ProcessingPlan:
 
 
 def load_processing_plan(db, dataset_id: int) -> ProcessingPlan:
-    """Baca dataset_source_config dan ubah jadi ProcessingPlan.
-
-    Dataset tanpa satu pun baris konfigurasi jatuh ke perilaku prototipe
-    (tiga sumber, PROCESSED) dengan warning — bukan plan kosong, karena plan
-    kosong akan membuat job "berhasil" tanpa menghasilkan apa pun.
-    """
+    """Baca dataset_source_config dan ubah jadi ProcessingPlan."""
     rows = db.list_dataset_source_configs(dataset_id)
     if not rows:
         logger.warning(

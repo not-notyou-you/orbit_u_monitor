@@ -1,8 +1,3 @@
-// web/js/auth.js — sesi dan izin UI (INTERFACE.md §3, §6).
-// Izin menu diambil dari `permissions` GET /api/auth/session (sumber: backend).
-// Endpoint itu juga menjawab pengunjung yang belum masuk (peran PUBLIC), jadi
-// menu pengunjung disusun dengan cara yang sama (M56).
-// Menyembunyikan menu hanya kenyamanan; API dan DB tetap menegakkan akses.
 'use strict';
 
 const Auth = (() => {
@@ -16,7 +11,6 @@ const Auth = (() => {
   }
 
   API.setUnauthorizedHandler(err => {
-    // Hanya halaman yang butuh login yang dialihkan; Beranda/Masuk tidak.
     if (document.body.dataset.requiresAuth === 'true') {
       location.href = loginUrl(err.code === 'SESSION_EXPIRED' ? 'sesi' : 'masuk');
     }

@@ -1,17 +1,4 @@
 <!doctype html>
-<!-- web/relief.html — Relief 3D publik /relief (INTERFACE.md §2.3), tanpa login.
-     Isi panelnya dari pages/terrain3d.html + js/terrain3d.js — fragmen dan
-     skrip yang SAMA dengan /app#kondisi/relief. Yang membedakan keduanya hanya
-     data-requires-auth di <body>: terrain3d.js memakainya untuk memilih sumber
-     data (/api/public/live, scene terbaru saja) dan menyembunyikan pemilih
-     tanggal.
-
-     Chrome jendela (titlebar, pintasan, penafian, statusbar) ada DI SINI, bukan
-     di fragmen: di /app fragmen itu sudah berada di dalam jendela milik shell,
-     jadi menaruhnya di fragmen akan menghasilkan jendela di dalam jendela.
-     Shell.mountPublic mengisi #pageRoot, sehingga chrome di sekelilingnya aman.
-
-     maps.js dimuat karena basemap-nya diambil dari Maps.TILE_URL. -->
 <html lang="id">
 <head>
 <meta charset="utf-8">

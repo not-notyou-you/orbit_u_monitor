@@ -1,9 +1,4 @@
-# api/security.py
-"""Primitif kriptografi autentikasi (INTERFACE.md §6, DATABASE.md §8.6).
-
-Tidak menyentuh basis data. Pemakaiannya ada di api/deps.py (sesi per
-request) dan api/routes/auth.py.
-"""
+"""Primitif kriptografi autentikasi (INTERFACE.md §6, DATABASE.md §8.6)."""
 
 from __future__ import annotations
 
@@ -35,8 +30,6 @@ TOKEN_RATE_WINDOW_S = 60.0
 _BASE62 = string.digits + string.ascii_letters
 
 
-# --- kata sandi ---------------------------------------------------------------
-
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=BCRYPT_ROUNDS)).decode("ascii")
 
@@ -48,8 +41,6 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-# Dipakai saat username tidak dikenal, supaya waktu respons tidak membocorkan
-# apakah akun itu ada.
 _DUMMY_HASH = bcrypt.hashpw(b"timing-equalizer", bcrypt.gensalt(rounds=BCRYPT_ROUNDS)).decode("ascii")
 
 
@@ -62,12 +53,9 @@ def password_policy_error(password: str) -> str | None:
     if len(password) < PASSWORD_MIN_LENGTH:
         return f"Password must be at least {PASSWORD_MIN_LENGTH} characters"
     if len(password.encode("utf-8")) > 72:
-        # bcrypt hanya memakai 72 byte pertama.
         return "Password must be at most 72 bytes"
     return None
 
-
-# --- JWT sesi -----------------------------------------------------------------
 
 def jwt_secret() -> str:
     secret = os.getenv("JWT_SECRET", "")
@@ -96,8 +84,6 @@ def decode_session_jwt(token: str) -> int | None:
 def cookie_secure() -> bool:
     return os.getenv("COOKIE_SECURE", "true").strip().lower() not in ("0", "false", "no")
 
-
-# --- token API ----------------------------------------------------------------
 
 def generate_api_token() -> tuple[str, str, str]:
     """(token utuh, prefix 8 karakter, SHA-256 hex). Token = trn_ + base62

@@ -1,44 +1,5 @@
-# etl/module7_modis_download.py
-"""
-Downloads NASA LAADS DAAC MODIS products, reprojects/crops them to the
+"""Downloads NASA LAADS DAAC MODIS products, reprojects/crops them to the
 dataset AOI, and writes one GeoTIFF per band per day for lineage tracking.
-
-Dua produk berbeda diambil di sini:
-
-  MCDWD_L3_F2_NRT (250 m)  -> band FLOOD, langsung dari subdataset
-                              "Flood 2-Day 250m" (komposit 2 hari).
-  MOD09A1         (500 m)  -> band NDVI dan NDWI, dihitung dari surface
-                              reflectance komposit 8 hari:
-                                  NDVI = (b02_NIR   - b01_red)   / (b02 + b01)
-                                  NDWI = (b04_green - b02_NIR)   / (b04 + b02)
-                              piksel awan/bayangan/cirrus (QA state) dibuang
-                              jadi NaN. Kalau komposit periode itu belum
-                              terbit, jatuh balik ke MOD09GA_NRT harian.
-
-NDWI di sini adalah formulasi McFeeters (green/NIR) yang menyorot badan air
-terbuka — bukan NDWI Gao (NIR/SWIR) yang mengukur kelembapan vegetasi.
-Pipeline ini soal banjir, jadi indeks air permukaan yang relevan.
-
-Output ditulis ke data/datasets/{id}_{slug}/{YYYYMMDD}/silver/modis/ dan
-granule mentahnya di-cache di _granule_cache/modis/. Semuanya adalah input fusion
-(dikonsumsi module9_fusion.py lewat tier GOLD), bukan deliverable akhir.
-
-Kegagalan satu produk tidak menjatuhkan produk lain: kalau reflectance hari
-itu tidak tersedia (MOD09A1 maupun MOD09GA) tapi MCDWD ada, hari itu tetap
-menghasilkan FLOOD dan cuma kehilangan NDVI/NDWI.
-
-LEVEL PEMROSESAN (DOCS/PIPELINE.md, "MODIS Pipeline")
-    RAW        cuma peta banjir MCDWD -> reproject -> crop -> tier BRONZE.
-               Reflectance tidak diunduh sama sekali: NDVI/NDWI adalah indeks
-               turunan, dan level RAW justru didefinisikan sebagai "tanpa
-               indeks turunan".
-    PROCESSED  peta banjir + NDVI + NDWI -> tier SILVER (lalu COG GOLD lewat
-               module9_fusion._promote_aux_to_gold).
-
-Dataset yang meminta KEDUANYA mendapat kedua artefak berdampingan: FLOOD
-ditulis dua kali (bronze/ sebagai deliverable RAW, silver/ sebagai lapisan
-pertama jalur PROCESSED). Granule-nya cuma diunduh dan diproses sekali —
-salinan kedua adalah copy file, bukan build ulang.
 """
 
 from __future__ import annotations
@@ -71,89 +32,38 @@ logger = logging.getLogger(__name__)
 
 LAADS_NRT_BASE = "https://nrt3.modaps.eosdis.nasa.gov/archive/allData/61"
 
-# Standard (science-quality, reprocessed) archive. NRT collections only keep
-# a rolling retention window (days-to-weeks) before granules are pulled from
-# nrt3.modaps.eosdis.nasa.gov; backfill jobs for older dates land past that
-# window and must fall back here instead.
 LAADS_STANDARD_BASE = "https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/61"
 
-# Granule HDF gabungan (1/2/3-day + CS) versi NRT. Dulu MCDWD_L3_F2_NRT, tapi
-# NASA kini menerbitkan varian F2 itu hanya sebagai .tif satu band (tanpa
-# FloodCS_1Day pengisi celah) sehingga listing .hdf-nya selalu kosong dan FLOOD
-# gagal untuk setiap tanggal terbaru (live monitoring, Sep 2026).
 MODIS_FLOOD_PRODUCT = "MCDWD_L3_NRT"
 
-# NDVI/NDWI utamanya dari MOD09A1: komposit surface reflectance 8 hari yang
-# per piksel memilih observasi terbaik (awan & sudut pandang minimum) dalam
-# periodenya. Di musim hujan Jakarta, MOD09GA harian tertutup awan 75-100%
-# hampir setiap tanggal, sehingga setelah cloud mask indeksnya kosong total;
-# komposit 8 hari menaikkan peluang ada piksel cerah. Produk ini hanya ada di
-# arsip standar (tidak ada versi NRT) dan terbit ~1-2 minggu setelah periodenya
-# berakhir, jadi tanggal yang komposit-nya belum terbit jatuh balik ke
-# MOD09GA_NRT harian (juga dengan cloud mask).
 MODIS_REFLECTANCE_PRODUCT = "MOD09A1"
 MODIS_REFLECTANCE_FALLBACK_PRODUCT = "MOD09GA_NRT"
 MODIS_REFLECTANCE_PRODUCTS = (MODIS_REFLECTANCE_PRODUCT, MODIS_REFLECTANCE_FALLBACK_PRODUCT)
 MOD09A1_PERIOD_DAYS = 8
 
-# NRT product -> standard-archive equivalent. MCDWD's standard archive is a
-# single consolidated "MCDWD_L3" product (the 1-day/2-day/3-day composites
-# that are separate NRT products live as subdatasets inside one granule);
-# MOD09GA's standard equivalent just drops the "_NRT" suffix.
 MODIS_STANDARD_PRODUCT = {
     MODIS_FLOOD_PRODUCT: "MCDWD_L3",
     MODIS_REFLECTANCE_FALLBACK_PRODUCT: "MOD09GA",
 }
 
-# Nama produk "utama" modul ini — dipakai untuk product_id lineage dan
-# etl/constants.py:MODIS_PRODUCT_SHORT_NAME.
 MODIS_PRODUCT = MODIS_FLOOD_PRODUCT
 
 MODULE = "MODULE7_MODIS_DOWNLOAD"
 
-# Komposit 2 hari (hari itu + sehari sebelumnya), sesuai produk NRT yang
-# dipakai (MCDWD_L3_F2_NRT = 2-day). Granule standar MCDWD_L3 memuat 1/2/3-day
-# sekaligus; versi 1-day tidak dipakai karena bayangan awan dan piksel gelap
-# perkotaan lolos sebagai "Flood (unusual)" — di AOI Jakarta 20250111 ada 200
-# piksel flood 1-day yang tidak muncul di komposit multi-hari. Nama dicocokkan
-# tanpa memedulikan huruf besar/spasi/underscore/strip (_norm_name), supaya
-# varian penamaan antar koleksi ("Flood 2-Day 250m" vs "Flood_2Day_250m") cocok.
 FLOOD_SUBDATASET = "Flood_2Day_250m"
 
-# Pengisi celah FLOOD. Komposit 2 hari mensyaratkan observasi cerah di kedua
-# harinya, jadi di musim hujan hampir seluruh AOI jadi "insufficient data":
-# di 24_try8 cakupan 2-day 0-6,5% per hari, sementara komposit 1 hari dengan
-# mask bayangan awan (CS) di granule yang sama 0-33%. Piksel 2-day tetap
-# diutamakan (lebih tahan false positive); 1-day CS hanya mengisi piksel yang
-# 2-day-nya kosong, dan asal tiap piksel dicatat di band 2 (FLOOD_SOURCE_*)
-# supaya konsumen bisa menyaring label yang lebih lemah. Varian 1-day TANPA
-# CS tetap tidak dipakai (lihat catatan di atas soal bayangan awan).
 FLOOD_FILL_SUBDATASET = "FloodCS_1Day_250m"
 FLOOD_SOURCE_2DAY = 1
 FLOOD_SOURCE_1DAY_CS = 2
 FLOOD_NODATA = 255
 
-# NDVI/NDWI: komposit "observasi cerah terbaru" lintas beberapa periode
-# MOD09A1, bukan satu periode 8 hari saja. Di 24_try8 satu periode cuma
-# menyisakan 0,1-0,15% piksel cerah (QA: 91-93% AOI berawan). Tiap piksel
-# mengambil observasi cerah paling baru yang tanggalnya <= tanggal fitur dan
-# umurnya <= INDEX_LOOKBACK_DAYS; umurnya (hari) ditulis di band 2. Observasi
-# SETELAH tanggal fitur dibuang: komposit 8 hari untuk 11 Jan memuat piksel
-# yang diamati sampai 16 Jan, dan itu informasi masa depan bagi stack 11 Jan.
 INDEX_LOOKBACK_DAYS = 32
 DAY_OF_YEAR_SDS = "sur_refl_day_of_year"
 
-# Grid sinusoidal MODIS (MOD09GA dkk): tile 10 derajat = 1111950.52 m.
 MODIS_SINUSOIDAL_CRS = "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +R=6371007.181 +units=m +no_defs"
 _SIN_TILE_SIZE_M = 1111950.5196666666
-# Produk flood MCDWD memakai grid geografis 10x10 derajat, bukan sinusoidal.
 _GEOGRAPHIC_TILE_PRODUCTS = {"MCDWD_L3", "MCDWD_L3_NRT", "MCDWD_L3_F2_NRT"}
 
-# Nama SDS surface reflectance + QA state per keluarga produk (grid 500 m;
-# state MOD09GA ada di grid 1 km, state MOD09A1 di 500 m).
-#   red   = band 1, 620-670 nm
-#   nir   = band 2, 841-876 nm
-#   green = band 4, 545-565 nm
 REFLECTANCE_SDS: dict[str, dict[str, str]] = {
     "MOD09A1": {
         "red": "sur_refl_b01",
@@ -169,25 +79,16 @@ REFLECTANCE_SDS: dict[str, dict[str, str]] = {
     },
 }
 
-# MOD09: fill -28672, rentang valid -100..16000 (scale 0.0001). Skala
-# saling meniadakan di indeks ternormalisasi, jadi tidak perlu di-apply —
-# tapi fill dan nilai di luar rentang valid tetap wajib dibuang dulu.
 REFL_FILL = -28672
 REFL_VALID_MIN = -100
 REFL_VALID_MAX = 16000
 
-# QA awan. Tanpa mask ini NDVI/NDWI musim hujan dihitung dari puncak awan: di
-# AOI Jakarta Jan-Apr 2025 tutupan awan MOD09GA 75-100% per tanggal, dan
-# NDVI-nya turun ke ~0 (awan putih = reflectance merah ~ NIR). state_1km
-# (MOD09GA) dan sur_refl_state_500m (MOD09A1) memakai tata letak bit yang sama
-# (MOD09 User Guide, tabel "State QA"):
 STATE_FILL = 65535
 _STATE_CLOUD_MASK = 0b11          # bit 0-1: 00 clear, 01 cloudy, 10 mixed, 11 not set (clear)
 _STATE_CLOUD_SHADOW = 1 << 2      # bit 2
 _STATE_CIRRUS_SHIFT = 8           # bit 8-9: 00 none, 01 small, 10 average, 11 high
 _STATE_INTERNAL_CLOUD = 1 << 10   # bit 10: internal cloud algorithm flag
 
-# band_name -> (kanal A, kanal B); indeks = (A - B) / (A + B)
 MODIS_INDICES: dict[str, tuple[str, str]] = {
     "NDVI": ("nir", "red"),
     "NDWI": ("green", "nir"),
@@ -210,33 +111,19 @@ def _product_query_date(product: str, date: datetime) -> datetime:
         return date
     doy = date.timetuple().tm_yday
     start_doy = (doy - 1) // MOD09A1_PERIOD_DAYS * MOD09A1_PERIOD_DAYS + 1
-    # tzinfo ikut dibawa: orchestrator mengirim tanggal tz-aware, dan hasil
-    # fungsi ini dibandingkan lagi dengan `date` (_mod09a1_periods). Tanggal
-    # naive di sini membuat seluruh NDVI/NDWI gagal "can't compare
-    # offset-naive and offset-aware datetimes".
     return datetime(date.year, 1, 1, tzinfo=date.tzinfo) + timedelta(days=start_doy - 1)
 
-# band_name -> nilai data_products.product_type
 MODIS_PRODUCT_TYPES: dict[str, str] = {
     "FLOOD": "MODIS_FLOOD",
     "NDVI": "MODIS_NDVI",
     "NDWI": "MODIS_NDWI",
 }
 
-# Jabodetabek bounding box, WGS84 (min_lon, min_lat, max_lon, max_lat)
 JABODETABEK_BBOX = (106.4, -6.7, 107.2, -5.9)
 
 DST_CRS = "EPSG:4326"
 MAX_RETRIES = 3
-# Jatah + tangga jeda khusus download granule; alasannya sama dengan
-# DOWNLOAD_MAX_RETRIES di module8_gpm_download (dan module1 untuk CDSE):
-# SSL EOF / IncompleteRead = gangguan jaringan beberapa menit, dan 3 x 2-4 s
-# habis dalam <10 detik. Granule MODIS jauh lebih besar dari GPM, jadi resume
-# parsial di sini lebih berharga lagi.
 DOWNLOAD_MAX_RETRIES = int(os.getenv("MODIS_DOWNLOAD_MAX_RETRIES", "6"))
-# Di bawah porsi ini band dianggap degraded: file tetap ditulis (awan memang
-# data yang sah), tapi hari itu tidak boleh dilaporkan GOOD. Jakarta musim
-# hujan sering 100% tertutup awan menurut QA state MOD09.
 MIN_VALID_FRACTION = 0.05
 
 
@@ -283,13 +170,7 @@ _md5_cache_lock = threading.Lock()
 
 
 def _md5(path: Path, chunk: int = 8 * 1024 * 1024) -> str:
-    """MD5 file, dimemo per (path, ukuran, mtime).
-
-    Granule NDVI yang sama dipakai ulang window 8-harian untuk puluhan tanggal,
-    dan tiap cache hit dulunya menghitung ulang MD5 file 70 MB (~4 detik).
-    Satu granule sampai di-hash 51x dalam satu run dataset 31 -- pipeline
-    tampak "diam" di UI padahal cuma sibuk mengulang hash. Kunci memo ikut
-    ukuran+mtime, jadi file yang berubah tetap dihitung ulang."""
+    """MD5 file, dimemo per (path, ukuran, mtime)."""
     st = path.stat()
     key = (str(path.resolve()), st.st_size, st.st_mtime_ns)
     with _md5_cache_lock:
@@ -320,10 +201,6 @@ def _discover_tile_files(
     last_error: str = ""
     for attempt in range(1, MAX_RETRIES + 1):
         retry_after = None
-        # Listing dulu satu request tanpa retry, dan exception jaringannya
-        # (ReadTimeout, ConnectionError) bukan RuntimeError sehingga lolos dari
-        # fallback NRT -> arsip standar di pemanggil. Satu timeout LAADS karena
-        # itu menghapus satu band sehari penuh (try1: FLOOD 2025-01-08).
         try:
             resp = requests.get(url, headers=_auth_headers(), timeout=dg.REQUEST_TIMEOUT)
         except requests.RequestException as exc:
@@ -331,8 +208,6 @@ def _discover_tile_files(
             resp = None
         else:
             dg.raise_for_nasa_auth(resp, "LAADS", url)
-            # Hanya 5xx dan 429 yang diulang: 4xx lain (mis. 404 = direktori
-            # tanggal itu memang tidak ada) adalah jawaban final.
             if resp.status_code < 500 and resp.status_code != 429:
                 break
             last_error = f"HTTP {resp.status_code}"
@@ -363,8 +238,6 @@ def _discover_tile_files(
             href = line.split('"')[1] if '"' in line else None
             if not href:
                 continue
-            # nrt3's index uses relative hrefs ("FILE.hdf"); ladsweb's
-            # (standard archive) uses absolute ones (full "https://...").
             fname = href.rsplit("/", 1)[-1]
             download_url = href if href.startswith("http") else url + href
             found.append({"tile": tile, "file_name": fname, "download_url": download_url})
@@ -378,10 +251,7 @@ def _discover_tile_files_with_fallback(
     """Try the NRT archive first (lowest latency), then fall back to the
     standard/reprocessed archive if NRT has nothing for `date` — this is the
     normal case for backfill jobs on dates past the NRT retention window.
-
-    Produk tanpa varian NRT (mis. MOD09A1) langsung dicari di arsip standar.
-
-    Returns (items, product_used)."""
+    """
     if not product.endswith("_NRT"):
         items = _discover_tile_files(date, tiles, product, base=LAADS_STANDARD_BASE)
         if not items:
@@ -412,8 +282,6 @@ def _discover_tile_files_with_fallback(
             return items, std_product
         std_error = RuntimeError(f"no granule {std_product}")
 
-    # Celah antara retensi NRT (~7 hari di nrt3) dan terbitnya produk standar
-    # (MCDWD_L3 baru sampai 2025): ladsweb menyimpan salinan NRT jangka panjang.
     try:
         items = _discover_tile_files(date, tiles, product, base=LAADS_STANDARD_BASE)
     except RuntimeError as exc:
@@ -441,10 +309,7 @@ def _download_with_retry(
     """Download `url` to `out_path`, retrying up to MAX_RETRIES times on
     network error or truncated transfer. Returns the file's MD5 checksum.
     Skips the download entirely if `out_path` already exists on disk.
-
-    When `plog`/`dataset_id` are given, emits a RUNNING event per attempt
-    (with periodic progress ticks), a terminal FAILED event only once all
-    retries are exhausted, and a COMPLETED event on success."""
+    """
     import requests
 
     if out_path.exists() and out_path.stat().st_size > 0:
@@ -453,8 +318,6 @@ def _download_with_retry(
     if dg.reuse_granule(out_path, "modis", fm.DATA_ROOT, "[M7]"):
         return _md5(out_path)
 
-    # Nama unik per proses+thread supaya dua worker yang menuju file yang
-    # sama tidak saling tabrak menulis .part yang sama (lihat module8_gpm_download).
     tmp_path = out_path.with_suffix(
         f".{os.getpid()}.{threading.get_ident()}{out_path.suffix}.part"
     )
@@ -479,7 +342,6 @@ def _download_with_retry(
             with dg.source_slot(dg.LAADS), requests.get(
                 url, headers=headers, stream=True, timeout=dg.REQUEST_TIMEOUT
             ) as r:
-                # 401/403: token Earthdata bersama semua job -- gagal cepat.
                 dg.raise_for_nasa_auth(r, "LAADS", url)
                 if r.status_code in dg.THROTTLE_STATUSES:
                     retry_after = r.headers.get("Retry-After")
@@ -509,12 +371,10 @@ def _download_with_retry(
                             )
 
             if expected_size and downloaded != expected_size:
-                raise IOError(
+                raise OSError(
                     f"file size mismatch: got {downloaded} bytes, expected {expected_size}"
                 )
 
-            # os.replace: atomic-overwrite di Windows maupun POSIX (Path.rename
-            # gagal FileExistsError di Windows kalau proses lain menang duluan).
             os.replace(tmp_path, out_path)
             dg.clear_auth_failure("LAADS")
             dg.record_connection_success(dg.LAADS)
@@ -572,7 +432,6 @@ def _download_with_retry(
                                 delay, attempt, DOWNLOAD_MAX_RETRIES)
                     dg.sleep_or_cancel(delay, None)
                 else:
-                    # Retry-After (429/503, dibatasi) atau backoff + jitter.
                     dg.backoff_wait(
                         dg.LAADS, attempt,
                         "server rate-limiting (429/503)" if retry_after else "failed, retrying",
@@ -649,8 +508,6 @@ def _eos_grid_georef(struct_meta: str, field: str) -> dict:
         xdim, ydim = int(value("XDim")), int(value("YDim"))
         ulx, uly = (float(s) for s in value("UpperLeftPointMtrs").strip("()").split(","))
         lrx, lry = (float(s) for s in value("LowerRightMtrs").strip("()").split(","))
-        # GridOrigin opsional di HDF-EOS dan default-nya UL; granule MOD09A1
-        # memang tidak menuliskannya (MOD09GA/MCDWD menulis eksplisit).
         origin = value("GridOrigin", "HDFE_GD_UL")
         if origin != "HDFE_GD_UL":
             raise RuntimeError(f"GridOrigin {origin} is not supported yet ({field})")
@@ -685,12 +542,7 @@ def _require_hdf4_reader() -> None:
 
 
 def _read_eos_grid_field(hdf_path: Path, subdataset: str) -> tuple[np.ndarray, dict]:
-    """Baca satu field grid HDF4-EOS -> (array, georef + nodata).
-
-    Dibaca lewat pyhdf, bukan path GDAL 'HDF4_EOS:EOS_GRID:...': wheel
-    rasterio (Windows/pip) tidak menyertakan driver HDF4, sehingga path itu
-    selalu gagal "does not exist in the file system". `subdataset` boleh
-    berbentuk "Grid:field" atau "field"."""
+    """Baca satu field grid HDF4-EOS -> (array, georef + nodata)."""
     from pyhdf.SD import SD, SDC
 
     field = subdataset.rsplit(":", 1)[-1]
@@ -724,14 +576,7 @@ def _read_eos_grid_field(hdf_path: Path, subdataset: str) -> tuple[np.ndarray, d
 
 
 def _flood_tile(hdf_path: Path, output_path: Path, dst_crs: str = DST_CRS) -> dict:
-    """Peta banjir satu tile MCDWD -> GeoTIFF 2 band (EPSG:4326, nearest).
-
-    Band 1: kelas banjir (0-3, FLOOD_NODATA = data tidak cukup) dari komposit
-    2 hari, celahnya diisi komposit 1 hari CS (FLOOD_FILL_SUBDATASET).
-    Band 2: asal tiap piksel (FLOOD_SOURCE_2DAY / FLOOD_SOURCE_1DAY_CS).
-
-    Granule NRT F2 hanya memuat komposit 2 hari; di sana band 2 cuma berisi
-    FLOOD_SOURCE_2DAY dan `filled` bernilai False."""
+    """Peta banjir satu tile MCDWD -> GeoTIFF 2 band (EPSG:4326, nearest)."""
     primary, grid = _read_eos_grid_field(hdf_path, FLOOD_SUBDATASET)
     try:
         fill, _ = _read_eos_grid_field(hdf_path, FLOOD_FILL_SUBDATASET)
@@ -776,13 +621,7 @@ def _read_reflectance(hdf_path: Path, subdataset: str) -> tuple[np.ndarray, dict
 
 
 def _cloud_mask(hdf_path: Path, shape: tuple[int, int], state_sds: str) -> np.ndarray:
-    """Mask True = piksel yang tidak boleh dipakai indeks, menurut QA state.
-
-    Dibuang: cloudy/mixed, bayangan awan, cirrus average/high, flag awan
-    internal, dan fill. Grid state dan grid reflectance menutupi tile yang
-    sama, jadi state 1 km MOD09GA diperbesar ke `shape` dengan pengulangan blok
-    (1 piksel 1 km = 2x2 piksel 500 m), bukan resampling; state 500 m MOD09A1
-    sudah seukuran."""
+    """Mask True = piksel yang tidak boleh dipakai indeks, menurut QA state."""
     state, _ = _read_eos_grid_field(hdf_path, state_sds)
     fy, ry = divmod(shape[0], state.shape[0])
     fx, rx = divmod(shape[1], state.shape[1])
@@ -810,11 +649,7 @@ def _observation_ordinals(
 ) -> np.ndarray:
     """Tanggal observasi tiap piksel sebagai ordinal (date.toordinal()),
     float32, NaN kalau tidak diketahui.
-
-    MOD09A1 menyimpan hari-ke-berapa tiap piksel komposit benar-benar diamati
-    (sur_refl_day_of_year); periode yang melewati akhir tahun (DOY 361 ->
-    1-3 Januari) ditangani dengan menaikkan tahun untuk DOY < DOY awal
-    periode. MOD09GA harian: semua piksel diamati pada `obs_date`."""
+    """
     out = np.full(shape, np.nan, dtype="float32")
     if _reflectance_family(product) == "MOD09A1" and period_start is not None:
         doy, _ = _read_eos_grid_field(hdf_path, DAY_OF_YEAR_SDS)
@@ -845,11 +680,7 @@ def _normalized_index_tile(
 ) -> Path:
     """Hitung indeks ternormalisasi `band` (lihat MODIS_INDICES) dari granule
     reflectance `product` (MOD09A1 / MOD09GA), lalu reproject ke `dst_crs`.
-
-    Indeksnya dihitung dulu di grid sinusoidal asli baru direproject —
-    bukan sebaliknya. Meresample tiap band dulu lalu membagi akan
-    mencampur reflectance tetangga di pembilang dan penyebut secara
-    berbeda, yang menggeser nilai indeks di tepi tiap fitur."""
+    """
     sds = REFLECTANCE_SDS[_reflectance_family(product)]
     chan_a, chan_b = MODIS_INDICES[band]
     a, grid = _read_reflectance(hdf_path, sds[chan_a])
@@ -858,20 +689,10 @@ def _normalized_index_tile(
     denom = a + b
     with np.errstate(invalid="ignore", divide="ignore"):
         index = (a - b) / denom
-    # Penyebut nol = kedua band nol: tidak ada sinyal, bukan indeks 0.
     index[~np.isfinite(index)] = np.nan
-    # Rentang valid MOD09GA memuat reflectance negatif (artefak koreksi
-    # atmosfer). Dengan salah satu band negatif, penyebutnya bisa mendekati
-    # nol dan indeks meledak jauh di luar [-1, 1] (terukur -8..11 di AOI
-    # Jakarta). Pixel seperti itu tidak punya indeks yang bermakna.
     index[(a < 0) | (b < 0)] = np.nan
-    # Awan/bayangan dibuang SEBELUM reproject: bilinear di tahap berikut
-    # mengabaikan NaN, jadi nilai awan tidak ikut merembes ke piksel cerah.
     index[_cloud_mask(hdf_path, index.shape, sds["state"])] = np.nan
 
-    # Band 2: tanggal observasi tiap piksel. Observasi setelah `target_date`
-    # dibuang dari indeks di sini juga -- sebelum reproject, alasannya sama
-    # dengan awan di atas.
     observed = _observation_ordinals(hdf_path, product, index.shape, period_start, obs_date)
     if target_date is not None:
         index[observed > target_date.toordinal()] = np.nan
@@ -887,7 +708,6 @@ def _normalized_index_tile(
     ) as dst:
         for band_index, array, resampling in (
             (1, index, Resampling.bilinear),
-            # Tanggal itu label, bukan besaran: nearest, tidak dirata-rata.
             (2, observed, Resampling.nearest),
         ):
             dest = np.full((height, width), np.nan, dtype="float32")
@@ -925,9 +745,6 @@ def _mosaic_and_crop(
         "width": mosaic.shape[2],
         "transform": out_transform,
     })
-    # Nama mosaic antara ikut unik per proses+thread: namanya cuma diturunkan
-    # dari output_path, jadi dua penggarap tanggal yang sama akan menulis dan
-    # menghapus berkas antara yang sama persis.
     mosaic_path = output_path.with_name(
         f"{output_path.stem}_mosaic.{os.getpid()}.{threading.get_ident()}.tif"
     )
@@ -967,9 +784,7 @@ def _build_source_mosaic(
 ) -> dict:
     """Listing granule `product` untuk `query_date` -> download per tile ->
     `tile_fn(hdf_path, product_used, tile_tif)` -> mosaic -> crop ke AOI.
-
-    Melempar RuntimeError kalau tidak ada tile yang berhasil; ImportError
-    (environment) selalu diteruskan."""
+    """
     items, product_used = _discover_tile_files_with_fallback(query_date, tiles, product)
     if not items:
         raise RuntimeError(f"no granule {product} for {query_date.date().isoformat()}")
@@ -1001,10 +816,6 @@ def _build_source_mosaic(
             try:
                 info = _fetch_and_build()
             except (OSError, HDF4Error) as exc:
-                # Granule ada di disk dengan ukuran wajar tapi isinya tidak
-                # terbaca. Cache cuma dipercaya lewat exists()+size, jadi
-                # tanpa ini berkas rusak dipakai ulang selamanya dan tile itu
-                # gagal terus sampai dihapus manual.
                 logger.warning(
                     "[M7] granule cache rusak, dihapus lalu diunduh ulang: %s (%s)",
                     hdf_path.name, exc,
@@ -1015,7 +826,6 @@ def _build_source_mosaic(
             tile_info.append(info)
             tile_tifs.append(tile_tif)
         except (ImportError, dg.NasaAuthError):
-            # Masalah environment/token, bukan data: tile lain pasti gagal juga.
             raise
         except Exception as exc:
             logger.warning(
@@ -1156,9 +966,7 @@ def _build_index_for_date(
 ) -> tuple[dict, dict]:
     """NDVI/NDWI satu tanggal sebagai komposit observasi cerah terbaru
     lintas periode MOD09A1 dalam INDEX_LOOKBACK_DAYS (lihat konstanta itu).
-
-    Periode yang belum terbit dilewati; kalau periode TERBARU belum terbit,
-    MOD09GA harian untuk `date` dipakai sebagai pengganti observasi terbaru."""
+    """
     period_paths: list[Path] = []
     used: list[dict] = []
     errors: list[str] = []
@@ -1180,8 +988,6 @@ def _build_index_for_date(
             errors.append(f"{MODIS_REFLECTANCE_PRODUCT} {period_start.date().isoformat()}: {exc}")
             if position != 0:
                 continue
-            # Periode terbaru belum terbit (latensi ~1-2 minggu): observasi
-            # harian hari itu jadi pengganti "yang terbaru".
             tmp = raw_dir / f"_{band.lower()}_{date_key}_daily.tif"
             try:
                 built = _build_source_mosaic(
@@ -1257,10 +1063,7 @@ def _build_band_for_date(
     """Bangun satu band MODIS untuk satu tanggal. Hasilnya GeoTIFF 2 band:
     band 1 nilai, band 2 kualitasnya (FLOOD: asal piksel; NDVI/NDWI: umur
     observasi dalam hari).
-
-    Mengembalikan dict hasil. Melempar RuntimeError kalau band ini tidak bisa
-    dibangun sama sekali untuk tanggal tsb; pemanggil memutuskan apakah itu
-    fatal (tidak, per band) atau tidak."""
+    """
     common = dict(
         date=date, tiles=tiles, raw_dir=raw_dir, out_path=out_path,
         aoi_bbox=aoi_bbox, plog=plog, dataset_id=dataset_id, scene_label=scene_label,
@@ -1331,10 +1134,7 @@ def _band_targets(
     date_key: str,
     targets: tuple[tuple[str, str], ...],
 ) -> list[tuple[str, str, Path]]:
-    """(tier, processing_level, path) untuk satu band, tier tertinggi dulu.
-
-    Tier tertinggi jadi yang pertama karena dialah yang dibangun; target lain
-    (kalau ada) diisi dengan menyalin berkas itu."""
+    """(tier, processing_level, path) untuk satu band, tier tertinggi dulu."""
     ordered = sorted(targets, key=lambda t: 0 if tn.rank(t[0]) == 2 else 1)
     out = []
     for tier, level in ordered:
@@ -1355,32 +1155,11 @@ def download_modis_scene(
     plog: PipelineLogger | None = None,
     processing_levels=(PROCESSED,),
 ) -> tuple[str, dict]:
-    """
-    Download MODIS flood (MCDWD) + surface reflectance (MOD09GA) dari NASA
+    """Download MODIS flood (MCDWD) + surface reflectance (MOD09GA) dari NASA
     LAADS DAAC untuk setiap hari di [date_start, date_end], hitung NDVI/NDWI,
     reproject/crop tiap hari ke `aoi_bbox`, dan tulis GeoTIFF ke
     data/datasets/{id}_{slug}/{YYYYMMDD}/silver/modis/modis_{date}_{band}.tif
     (ini input fusion, dikonsumsi module9_fusion.py — bukan deliverable akhir).
-
-    `processing_levels` (dari dataset_source_config) menentukan band mana yang
-    dibangun dan ke tier mana ditulis:
-        {"RAW"}              FLOOD saja  -> bronze/modis/{date}/
-        {"PROCESSED"}        FLOOD+NDVI+NDWI -> silver/modis/{date}/
-        {"RAW","PROCESSED"}  keduanya; FLOOD ada di bronze/ DAN silver/
-
-    Kegagalan diisolasi dua lapis: satu tile yang gagal masih menyisakan
-    mosaic degraded dari tile lain, dan satu band yang gagal (mis. MOD09GA
-    belum terbit untuk hari itu) tidak menjatuhkan band lain di hari yang
-    sama. Satu hari baru dihitung gagal kalau tidak ada band sama sekali.
-    Pass `plog` untuk ikut mengirim event terstruktur per tile/hari/ringkasan
-    ke tabel `processing_logs`.
-
-    Returns:
-        (product_id, metadata_dict) — product_id mengidentifikasi produk NASA
-        sumber untuk lineage; metadata_dict membawa path output per band per
-        hari (termasuk tier & processing_level tiap salinan di
-        `outputs[i]["bands"][band]["targets"]`), checksum MD5, dan ringkasan
-        `quality`/`failed_days`.
     """
     plan = SourcePlan(
         source_name=MODIS_SOURCE_NAME,
@@ -1406,7 +1185,6 @@ def download_modis_scene(
     raw_dir = fm.get_granule_cache_dir(dataset_id, dataset_name, "modis")
     raw_dir.mkdir(parents=True, exist_ok=True)
 
-    # tiles=None -> hitung dari AOI per produk (grid MCDWD dan MOD09GA berbeda).
     tiles_by_product = {
         p: list(tiles) if tiles else modis_tiles_for_bbox(aoi_bbox, p)
         for p in (MODIS_FLOOD_PRODUCT, *MODIS_REFLECTANCE_PRODUCTS)
@@ -1424,8 +1202,6 @@ def download_modis_scene(
 
         for band, products in (
             ("FLOOD", (MODIS_FLOOD_PRODUCT,)),
-            # Fallback MOD09GA ditangani di dalam _build_index_for_date
-            # (hanya untuk periode terbaru yang belum terbit).
             ("NDVI", (MODIS_REFLECTANCE_PRODUCT,)),
             ("NDWI", (MODIS_REFLECTANCE_PRODUCT,)),
         ):
@@ -1433,8 +1209,6 @@ def download_modis_scene(
             if band not in wanted_bands:
                 continue
 
-            # Target pertama = tier tertinggi; di situlah band dibangun.
-            # Sisanya salinan (lihat _band_targets).
             targets = _band_targets(
                 dataset_id, dataset_name, band, date_key, band_targets[band]
             )
@@ -1482,8 +1256,6 @@ def download_modis_scene(
                 continue
 
             try:
-                # Produk dicoba berurutan (reflectance: MOD09A1 lalu MOD09GA);
-                # error terakhir yang dilaporkan kalau semuanya gagal.
                 attempt_errors: list[str] = []
                 for candidate in products:
                     try:
@@ -1495,7 +1267,6 @@ def download_modis_scene(
                         ))
                         break
                     except ImportError:
-                        # Jangan fallback (download produk lain) untuk error environment.
                         raise
                     except Exception as exc:
                         attempt_errors.append(f"{candidate}: {exc}")
@@ -1538,10 +1309,6 @@ def download_modis_scene(
         degraded = bool(band_errors) or any(b.get("degraded") for b in bands.values())
         daily_outputs.append({
             "date": date.date().isoformat(),
-            # `products` = path tier tertinggi per band, dipertahankan untuk
-            # pemanggil yang cuma butuh "satu file per band". Registrasi
-            # data_products memakai `bands[band]["targets"]` supaya tiap
-            # salinan tercatat dengan tier & processing_level-nya sendiri.
             "products": {band: b["path"] for band, b in bands.items()},
             "checksums": {band: b["checksum_md5"] for band, b in bands.items()},
             "bands": bands,

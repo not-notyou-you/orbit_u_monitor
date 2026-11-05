@@ -1,21 +1,4 @@
-# etl/regions.py
-"""Wilayah administratif dan ROI turunan (PIPELINE.md §10 langkah 2–4, M8/M27).
-
-Satu tempat untuk tiga aturan yang dipakai bersama oleh
-``scripts/load_regions.py`` dan endpoint ADMIN (``/admin/regions``,
-``/admin/rois``):
-
-1. Batas COD-AB adm2 + adm3 Kabupaten Lebak -> ``administrative_regions``
-   (``ST_Multi(ST_MakeValid(...))``, upsert per ``pcode``).
-2. ``in_aoi`` kecamatan -> ROI AOI GMLS (``is_monitor_aoi``) dengan bbox
-   ``ST_Envelope(ST_Union(geom))``, ROI per kecamatan AOI, dan bbox dataset
-   sistem ``HYDROMET_AOI`` yang mengikutinya.
-3. ROI gabungan dari daftar kecamatan (dibuat ADMIN).
-
-Semua fungsi menerima Session pemanggil dan tidak meng-commit sendiri, jadi
-skrip (pemilik skema) dan request ADMIN (SET LOCAL ROLE monitor_admin)
-memakai jalur yang sama.
-"""
+"""Wilayah administratif dan ROI turunan (PIPELINE.md §10 langkah 2–4, M8/M27)."""
 
 from __future__ import annotations
 
@@ -35,7 +18,6 @@ AOI_ROI_NAME = "AOI GMLS (Lebak Selatan)"
 HYDROMET_DATASET_NAME = "HYDROMET_AOI"
 HYDROMET_SOURCES = ("GPM", "MODIS")
 
-# Lokasi berkas COD-AB yang dipakai skrip bila --adm2/--adm3 tidak diberikan.
 DEFAULT_COD_AB_DIR = Path(__file__).resolve().parent.parent / "data" / "external" / "cod-ab-idn"
 
 
@@ -47,8 +29,6 @@ class RegionFeature:
     parent_pcode: str | None
     wkb_hex: str
 
-
-# --- pembacaan shapefile -------------------------------------------------------
 
 def _field(rec: dict, *names: str) -> str | None:
     """Nilai kolom pertama yang ada, tanpa peduli huruf besar/kecil (rilis
@@ -89,8 +69,6 @@ def read_cod_ab(path: Path, level: int, adm2_pcode: str = LEBAK_ADM2_PCODE) -> l
         raise ValueError(f"no level-{level} feature with ADM2_PCODE={adm2_pcode} in {path}")
     return out
 
-
-# --- administrative_regions ----------------------------------------------------
 
 _UPSERT_REGION = text("""
     INSERT INTO administrative_regions (parent_region_id, pcode, region_name, admin_level, geom, source_dataset)
@@ -153,8 +131,6 @@ def set_aoi(sess: Session, region_ids: list[int]) -> None:
         WHERE admin_level = 3 AND in_aoi IS DISTINCT FROM (region_id = ANY(:ids))
     """), {"ids": list(region_ids)})
 
-
-# --- ROI ----------------------------------------------------------------------
 
 def _upsert_roi(sess: Session, code: str, name: str, description: str, geom_sql: str,
                 params: dict, *, admin_region_id: int | None = None,
@@ -219,8 +195,6 @@ def create_union_roi(sess: Session, region_ids: list[int], name: str, code: str 
                        "(SELECT ST_Union(geom) FROM administrative_regions WHERE region_id = ANY(:ids))",
                        {"ids": ids}, admin_region_id=ids[0] if len(ids) == 1 else None)
 
-
-# --- dataset sistem HYDROMET_AOI -------------------------------------------------
 
 def ensure_hydromet_dataset(sess: Session, roi_id: int) -> int:
     """Dataset sistem HYDROMET_AOI (PIPELINE §3.1): GPM + MODIS PROCESSED,

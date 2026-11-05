@@ -1,7 +1,3 @@
-// web/js/excel.js — kotak "Excel" (INTERFACE.md §4.10) untuk halaman yang relevan.
-// Excel.mount(el, ['disasters', 'disaster_types']) menampilkan hanya jenis data yang
-// diizinkan role (GET /api/excel). Impor: uji dulu (?dry_run=true) → ringkasan →
-// konfirmasi → impor sungguhan. Semua baris atau tidak sama sekali (422 + error per baris).
 'use strict';
 
 const Excel = (() => {
@@ -40,7 +36,6 @@ const Excel = (() => {
     input.click();
   }
 
-  // opts: { title, onImported }
   async function mount(el, codes, opts) {
     opts = opts || {};
     let items;

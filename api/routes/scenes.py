@@ -1,4 +1,3 @@
-# api/routes/scenes.py
 """
 GET /api/scenes       — list scenes with filters (?source=S1|MODIS|GPM)
 GET /api/scenes/{id}  — scene detail
@@ -59,21 +58,7 @@ async def list_scenes(
     limit:           int            = Query(20,    ge=1, le=200, description="Results per page"),
     offset:          int            = Query(0,     ge=0,         description="Pagination offset"),
 ) -> SceneListResponse:
-    """
-    List scenes with filter support.
-
-    Query patterns:
-    - GET /api/scenes
-    - GET /api/scenes?region_id=1&date_from=2024-01-01
-    - GET /api/scenes?orbit_direction=ASCENDING&limit=50
-    - GET /api/scenes?only_gold=true
-    - GET /api/scenes?source=MODIS&date_from=2025-01-01
-    - GET /api/scenes?include_invalid=true   (ADMIN)
-
-    Scene yang dinonaktifkan ADMIN (is_valid = false, M23/M24) disembunyikan
-    kecuali include_invalid. orbit_direction dan only_gold hanya berlaku
-    untuk S1.
-    """
+    """List scenes with filter support."""
     if include_invalid and not principal.has_role("ADMIN"):
         raise ApiError(403, "include_invalid is available to ADMIN only", "ROLE_FORBIDDEN")
     if source != "S1":

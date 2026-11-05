@@ -1,13 +1,4 @@
-# api/routes/regions.py
-"""Wilayah (INTERFACE.md §4.4).
-
-``GET /regions``  kecamatan AOI GMLS + GeoJSON (``ST_SimplifyPreserveTopology``).
-``GET /rois``     daftar ROI sistem untuk wizard dataset dan Live Area (dulu
-                  ``GET /regions``; dipindah Tahap 3, IMPLEMENTATION_NOTES T3-5).
-
-Hanya baca. ROI dibuat oleh sistem/ADMIN dari kecamatan COD-AB (DATABASE.md
-§3.6, M27); endpoint tulis dan geocoding milik DataLab sudah dihapus.
-"""
+"""Wilayah (INTERFACE.md §4.4)."""
 from __future__ import annotations
 
 import json

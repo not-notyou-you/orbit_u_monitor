@@ -1,19 +1,5 @@
-// js/catalog.js — Data › Dataset (#data/dataset, INTERFACE.md §2.6, §4.7, M67) [WARIS DataLab View 2].
-// Daftar + aksi di Control Panel; rincian dataset terpilih di tab property sheet (screen).
-// M67: Dataset tersimpan dan Unduh data jadi satu tab. #data/dataset/baru
-// memuat wizard js/create-dataset.js di tempat yang sama. Rincian 6 → 4 tab
-// (Detail sumber masuk Ringkasan, Log masuk Produk & log); tombol aksi yang
-// tidak berlaku untuk status dataset disembunyikan, bukan hanya dinonaktifkan.
-// M74: daftar + cari di panel kiri diganti satu pemilih (select) di baris atas
-// bersama tombol aksi; Ringkasan = konfigurasi (kiri) dan detail sumber
-// (kanan) berdampingan; "per satelit" di konfigurasi dihapus karena sama
-// dengan kotak detail sumber.
 'use strict';
 Pages['catalog'] = (() => {
-  // Label status, himpunan status aktif, dan nama satelit dipakai bersama
-  // halaman "Proses berjalan" dan bagian Penyimpanan, jadi definisinya satu di
-  // ui.js (UI.datasetStatus / UI.DATASET_ACTIVE / UI.SOURCE_LABEL).
-  // PHASE dan KIND di bawah hanya dipakai Katalog.
   const ACTIVE = UI.DATASET_ACTIVE;
   const SRC = UI.SOURCE_LABEL;
   const PHASE = { download: 'Diunduh', processing: 'Diproses', fusion: 'Difusikan' };
@@ -38,8 +24,6 @@ Pages['catalog'] = (() => {
     wizard = false; st = null;
   }
 
-  // "Buat dataset baru" (dulu tab Unduh data): fragmen + skrip wizard dimuat
-  // ke panel tab ini, dengan tautan kembali ke daftar.
   let wizard = false;
   async function mountWizard(root, ctx) {
     Shell.loadCss('create-dataset');
@@ -82,15 +66,10 @@ Pages['catalog'] = (() => {
       st.ctx.setStatus('Belum ada dataset'); return;
     }
     try { st.prog[id] = await API.get('/api/datasets/' + id + '/status'); } catch (e) { st.prog[id] = null; }
-    // Penghapusan punya progresnya sendiri (cleanup_operations) dan endpointnya
-    // 404 kalau tidak ada yang sedang dihapus, jadi hanya ditanya saat relevan.
     const deleting = d.status === 'DELETING' || d.status === 'CLEANUP';
     st.del[id] = deleting ? await API.get('/api/datasets/' + id + '/deletion-progress').catch(() => null) : null;
     const p = st.prog[id];
     const del = st.del[id];
-    // Saat dataset sedang dihapus, angka pipeline tidak lagi bergerak; yang
-    // bergerak adalah jumlah berkas yang terhapus. Readout terakhir karena itu
-    // berganti isi, bukan ditambah di sebelahnya.
     UI.$('#ctReadouts', st.root).innerHTML =
       UI.readoutHTML('STATUS', UI.esc(UI.datasetStatus(d.status).toUpperCase()), UI.esc(d.status), d.status === 'FAILED' ? 'v-alert' : ACTIVE.has(d.status) ? 'v-amber' : '') +
       UI.readoutHTML('SCENE SELESAI', UI.int(d.completed_scenes) + '/' + UI.int(d.total_scenes), 'GAGAL ' + UI.int(d.failed_scenes), d.failed_scenes ? 'v-amber' : '') +
@@ -111,8 +90,6 @@ Pages['catalog'] = (() => {
 
   function syncActions() {
     const d = ds();
-    // Unduh/laporan selalu terlihat (nonaktif bila belum ada berkas); aksi
-    // proses hanya muncul bila berlaku untuk status dataset ini.
     const on = (act, ok) => {
       const b = UI.$('#ctActions [data-act="' + act + '"]', st.root);
       if (act === 'download' || act === 'report') b.disabled = !ok; else b.hidden = !ok;
@@ -155,7 +132,6 @@ Pages['catalog'] = (() => {
     });
   }
 
-  // ---------------------------------------------------------------- tab
   async function renderTab() {
     const panel = UI.$('#ctPanel', st.root), d = ds();
     if (!d) return;
@@ -164,7 +140,6 @@ Pages['catalog'] = (() => {
     if (tab !== 'ringkasan' && !panel.innerHTML.includes('data-keep')) put(UI.screenHTML({ channel: 'SYS', body: UI.loadingHTML() }));
     try {
       if (tab === 'ringkasan') {
-        // Detail sumber terakhir ditampilkan dulu supaya refresh 10 detik tidak berkedip.
         st.srcHTML = st.srcHTML || {};
         const cached = st.srcHTML[d.dataset_id] || { sat: UI.screenHTML({ channel: 'DETAIL SUMBER', body: UI.loadingHTML() }), fus: '' };
         put('<div class="ct-sum"><div class="deck">' + summaryHTML(d) + '<div id="ctFus">' + cached.fus + '</div></div>' +
@@ -214,7 +189,6 @@ Pages['catalog'] = (() => {
   function sourcesHTML(data) {
     const keys = ['sentinel1', 'modis', 'gpm'].filter(k => (data.sources || {})[k]);
     if (!keys.length && !data.fusion) return { sat: UI.screenHTML({ channel: 'DETAIL SUMBER', body: UI.emptyHTML('BELUM ADA DATA YANG DIUNDUH') }), fus: '' };
-    // Satelit ke kolom kanan, Fusion ke kolom kiri di bawah konfigurasi supaya kedua kolom seimbang.
     const sat = keys.map((k, i) => {
       const s = data.sources[k];
       return UI.screenHTML({ channel: 'CH-0' + (i + 1) + ' · ' + SRC[k], rec: UI.bytes(s.size_bytes), recCls: 'off', body: s.stages.map(stg =>
@@ -262,7 +236,6 @@ Pages['catalog'] = (() => {
     }));
   }
 
-  // ---------------------------------------------------------------- pratinjau
   function drawPreview(d) {
     const panel = UI.$('#ctPanel', st.root), data = st.pvData;
     if (!data || !data.scenes || !data.scenes.length) {
@@ -307,7 +280,6 @@ Pages['catalog'] = (() => {
     return '';
   }
 
-  // ---------------------------------------------------------------- produk & lineage
   async function drawProducts(d, page) {
     const panel = UI.$('#ctProd', st.root) || UI.$('#ctPanel', st.root), limit = 50;
     const f = st.prodFilter = st.prodFilter || { source: '', tier: '' };

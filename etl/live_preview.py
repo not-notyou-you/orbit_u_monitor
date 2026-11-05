@@ -1,21 +1,4 @@
-# etl/live_preview.py
-"""8 preview Live Monitoring per scene (PIPELINE.md §4).
-
-    Baris 1  s1_vv, s1_vh                      grayscale, tanpa overlay
-    Baris 2  modis_flood, modis_ndvi, modis_ndwi   warna di atas S1 VH, 40%
-    Baris 3  gpm_rain_24h, gpm_rain_72h, gpm_rain_7d
-
-Memakai ulang mesin module10 (grid bersama S1, pembacaan turun, colormap dan
-palet kelas PREVIEW_SPECS) supaya arti warna sama persis dengan colored
-preview dataset biasa. Yang berbeda hanya komposisinya: dasar SELALU VH
-(indikator genangan utama) dan opasitas 40% untuk SEMUA lapisan -- termasuk
-peta banjir kategorikal, yang di module10 digambar opak. module10 sendiri
-tidak diubah.
-
-Berkas ditulis ke {root dataset}/live/{YYYYMMDD}/{key}.png -- satu folder per
-scene, jadi retensi cukup menghapus foldernya (lihat live_monitor._LiveFiles).
-Metrik TIDAK dihitung dari PNG ini (live_metrics membaca raster asli).
-"""
+"""8 preview Live Monitoring per scene (PIPELINE.md §4)."""
 from __future__ import annotations
 
 import logging
@@ -32,8 +15,6 @@ from etl import module10_generate_preview as m10
 logger = logging.getLogger(__name__)
 
 OVERLAY_OPACITY = 0.40
-# Sisi terpanjang PNG kartu. Kartu menampilkan 3 gambar per baris, jadi 768 px
-# sudah tajam di layar retina tanpa membuat halaman berat (~8 PNG per scene).
 LIVE_MAX_SIDE = 768
 LEGEND_STOPS = 6
 
@@ -101,7 +82,6 @@ def _read_s1_db(path: Path, grid):
 def _gray_base(vh) -> np.ndarray:
     lo, hi = m10._stretch_range(vh, None)
     gray = (m10._normalize(vh, lo, hi) * 255).astype(np.float32)
-    # NoData S1 putih, bukan hitam: hitam adalah nilai sah untuk air tenang.
     return np.where(vh.mask, 255.0, gray)
 
 
@@ -136,10 +116,7 @@ def _render_overlay(base_gray: np.ndarray, layer, spec, path: Path) -> tuple[Pat
 def resolve_s1(frames: list[dict], scratch: Path, date_key: str) -> dict:
     """{band: path} Sentinel-1 untuk satu tanggal: frame tunggal apa adanya,
     atau mosaik kalau AOI tertutup beberapa frame hari itu.
-
-    Dipisah supaya perender DAN backfill georeferensi memakai jalan yang sama.
-    Kalau keduanya menghitung grid dengan caranya sendiri, suatu saat salah
-    satu akan menyimpang dan citra tergeser tanpa ada yang menyadarinya."""
+    """
     if len(frames) > 1:
         from etl.s1_mosaic import mosaic_frames
         scratch.mkdir(parents=True, exist_ok=True)
@@ -148,11 +125,7 @@ def resolve_s1(frames: list[dict], scratch: Path, date_key: str) -> dict:
 
 
 def grid_dict(grid) -> dict:
-    """Georeferensi grid preview sebagai JSON untuk live_scenes.previews.grid.
-
-    Empat sudut, bukan bbox -- lihat module10.grid_corners_wgs84. `width`/
-    `height` ikut supaya konsumen bisa MEMERIKSA bahwa grid ini benar milik PNG
-    yang ada di disk (dipakai scripts/backfill_preview_grid.py)."""
+    """Georeferensi grid preview sebagai JSON untuk live_scenes.previews.grid."""
     return {
         "width": grid.width, "height": grid.height,
         "crs": str(grid.crs),
@@ -163,17 +136,11 @@ def grid_dict(grid) -> dict:
 def scene_grid(files, scene_date: date, inputs: dict):
     """Grid PNG preview satu scene, dihitung ulang dari raster sumber TANPA
     me-render apa pun. -> (grid, None) atau (None, alasan).
-
-    Untuk mengisi georeferensi scene lama: jauh lebih murah daripada render
-    ulang, karena cuma membaca metadata raster. Scene berbingkai banyak tetap
-    perlu mosaiknya dibangun lagi -- grid mosaik bukan grid salah satu frame,
-    jadi memakai frame pertama akan menghasilkan georeferensi yang salah."""
+    """
     frames = [{b: str(p) for b, p in f.items()} for f in inputs.get("s1") or []]
     if not frames:
         return None, "no Sentinel-1 data"
     dk = scene_date.strftime("%Y%m%d")
-    # Nama scratch sengaja beda dari milik render_scene_previews: backfill bisa
-    # berjalan sementara siklus lain me-render scene yang sama.
     scratch = files.root / "_work" / f"grid_{dk}"
     try:
         s1 = resolve_s1(frames, scratch, dk)
@@ -189,27 +156,12 @@ def render_scene_previews(files, scene_date: date, inputs: dict, regions=None,
     """Render 8 PNG untuk satu scene. `files` = live_monitor._LiveFiles,
     `inputs` = live_metrics.scene_inputs(). Lapisan yang berkasnya tidak ada
     dilewati (tercatat di "skipped"), bukan menggagalkan scene.
-
-    `bbox_wkt` = AOI daerahnya. Kalau ada, SEMUA PNG dirender di grid tetap
-    seluas AOI (etl.aoi_coverage.preview_grid): extent, ukuran, dan keempat
-    sudutnya sama persis untuk setiap tanggal, jadi citra antar tanggal bisa
-    ditumpuk dan tidak bergeser saat pengguna berpindah tanggal. Tanpa
-    `bbox_wkt` grid diturunkan dari footprint S1 seperti dulu -- jalur itu
-    masih dipakai pemanggil lama dan oleh scene yang AOI-nya tidak diketahui.
-
-    `regions` = batas kecamatan (etl.admin_overlay.load_regions). Kalau ada,
-    setiap PNG ditulis sekali lagi sebagai varian garis wilayah `{key}_adm.png`
-    dan namanya dicatat di item sebagai "file_adm" -- itu yang dipakai UI saat
-    checkbox "Garis wilayah" aktif."""
+    """
     out_dir = files.preview_dir(scene_date)
     out_dir.mkdir(parents=True, exist_ok=True)
     dk = scene_date.strftime("%Y%m%d")
     items: dict[str, dict] = {}
     skipped: dict[str, str] = {}
-    # Georeferensi grid bersama. Satu entri per scene, bukan per lapisan:
-    # semua PNG scene ini dirender di grid S1 yang sama (lihat "GRID BERSAMA"
-    # di module10), jadi keempat sudutnya identik untuk kedelapan berkas.
-    # Tetap None kalau S1 tidak ada -- tanpa S1 tidak ada PNG sama sekali.
     grid_info: dict | None = None
 
     frames = [{b: str(p) for b, p in f.items()} for f in inputs.get("s1") or []]

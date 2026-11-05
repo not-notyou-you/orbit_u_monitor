@@ -1,27 +1,5 @@
 #!/usr/bin/env python
-"""Impor catatan kejadian bencana dari CSV terstruktur (PIPELINE.md §10 langkah 7).
-
-Pakai:
-    python scripts/import_disasters.py kejadian.csv --username analis1
-    python scripts/import_disasters.py kejadian.csv --username analis1 --dry-run
-
-Format (UTF-8, baris pertama header; urutan kolom bebas):
-
-    tanggal,tanggal_selesai,jenis,kecamatan,desa,lat,lon,keterangan,dampak,sumber,referensi,terverifikasi
-    2024-01-12,,BANJIR,Bayah,Bayah Barat,-6.928,106.226,Luapan Sungai Cimadur merendam permukiman,± 40 rumah,GMLS,,ya
-
-Wajib: tanggal (YYYY-MM-DD), jenis (type_code master, mis. BANJIR), kecamatan
-(nama atau P-code COD-AB), keterangan (>= 10 karakter), sumber (GMLS |
-BPBD_LEBAK | BNPB_DIBI | MEDIA | LAINNYA). Tanpa data pribadi.
-
-Satu berkas = satu transaksi: bila ada baris yang salah tidak ada yang
-ditulis, dan setiap kesalahan dilaporkan dengan nomor barisnya. Baris yang
-sudah ada (jenis + kecamatan + tanggal + keterangan sama) dilewati, jadi
-berkas yang sama aman diimpor ulang.
-
-Terkoneksi sebagai monitor_app lalu SET LOCAL ROLE sesuai role pengguna
-(ANALYST/ADMIN), sehingga GRANT/RLS dan audit_log sama dengan input lewat UI.
-"""
+"""Impor catatan kejadian bencana dari CSV terstruktur (PIPELINE.md §10 langkah 7)."""
 
 from __future__ import annotations
 
@@ -45,8 +23,6 @@ def run(client, csv_path: Path, username: str, dry_run: bool = False) -> dict:
 
     try:
         with client.session() as sess:
-            # Seperti alur login: monitor_app tanpa SET ROLE tidak punya hak;
-            # auth_get_user (SECURITY DEFINER) boleh dipanggil monitor_public.
             sess.execute(text("SET LOCAL ROLE " + ROLE_TO_DB["PUBLIC"]))
             row = sess.execute(text("SELECT user_id, role_code, is_active FROM auth_get_user(:u)"),
                                {"u": username}).first()

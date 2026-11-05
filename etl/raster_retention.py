@@ -1,17 +1,4 @@
-# etl/raster_retention.py
-"""Jendela berkas raster bergulir dataset utama HYDROMET_AOI (M58).
-
-Berkas raster GPM/MODIS (COG PROCESSED + antara ``_work/YYYYMMDD``) yang
-tanggalnya lebih tua dari ``storage.raster_retention_days`` (365 hari) dihapus.
-Yang TIDAK pernah dihapus: angka per kecamatan (``region_observations``),
-baris ``nasa_scenes``/``data_products`` (produk ditandai ``is_valid = false``
-supaya lineage tetap terbaca), dan dataset buatan pengguna. Scene S1 Live
-memakai jendela yang sama lewat ``LiveMonitor.enforce_retention``.
-
-Aman bagi job harian: akumulasi 30 hari dan komposit MODIS membaca granule
-mentah (``_granule_cache``, 45 hari), bukan COG lama; pembaruan Late -> Final
-hanya menyentuh 153 hari terakhir.
-"""
+"""Jendela berkas raster bergulir dataset utama HYDROMET_AOI (M58)."""
 
 from __future__ import annotations
 
@@ -19,7 +6,6 @@ import logging
 import re
 import shutil
 from datetime import date, datetime, timedelta, timezone
-from pathlib import Path
 
 from sqlalchemy import text
 

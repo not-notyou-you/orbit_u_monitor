@@ -1,10 +1,4 @@
-# etl/disasters.py
-"""Tulis/baca ``disaster_events`` (INTERFACE.md §4.6, PIPELINE.md §10 langkah 7).
-
-Dipakai bersama endpoint ``/api/disasters`` dan ``scripts/import_disasters.py``
-supaya aturan validasinya satu: jenis dari master ``disaster_types``, wilayah
-harus kecamatan (level 3) ``administrative_regions``, tanpa data pribadi.
-"""
+"""Tulis/baca ``disaster_events`` (INTERFACE.md §4.6, PIPELINE.md §10 langkah 7)."""
 
 from __future__ import annotations
 
@@ -117,8 +111,6 @@ def update_event(sess, event_id: int, fields: dict, user_id: int) -> None:
         return
     sess.execute(text(f"UPDATE disaster_events SET {', '.join(sets)}, updated_at = now() WHERE event_id = :e"), params)
 
-
-# --- impor CSV ------------------------------------------------------------------
 
 CSV_COLUMNS = ("tanggal", "tanggal_selesai", "jenis", "kecamatan", "desa", "lat", "lon",
                "keterangan", "dampak", "sumber", "referensi", "terverifikasi")

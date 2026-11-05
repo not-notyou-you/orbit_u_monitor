@@ -1,12 +1,4 @@
-# etl/constants.py
-"""
-Shared dedup-key constants for `nasa_scenes` rows.
-
-The unique key is (source, tile_id, product_short_name, acquisition_date).
-etl/live_cycle.py (live ingest) and module9_fusion.py (fusion build) must
-both use these exact values, or they silently create duplicate/orphaned
-rows for the same underlying scene instead of reusing one.
-"""
+"""Shared dedup-key constants for `nasa_scenes` rows."""
 
 MODIS_SOURCE = "MODIS"
 MODIS_PRODUCT_SHORT_NAME = "MCDWD_L3_F2_NRT"

@@ -1,10 +1,4 @@
-# api/routes/alerts.py
-"""Alert hujan dan aturan alert (INTERFACE.md §4.5).
-
-``/alerts`` dibaca USER; acknowledge dan evaluasi ANALYST (GRANT kolom
-``alert_events``: analyst hanya boleh mengisi kolom acknowledge). Aturan alert
-tidak pernah dihapus: dinonaktifkan dengan ``is_active = false``.
-"""
+"""Alert hujan dan aturan alert (INTERFACE.md §4.5)."""
 
 from __future__ import annotations
 
@@ -91,8 +85,6 @@ def evaluation(sess: Session = Depends(get_session), date_from: date | None = No
     counts = dict(sess.execute(text(f"SELECT outcome, count(*) FROM v_evaluasi_alert WHERE {' AND '.join(where)} "
                                     "GROUP BY outcome"), params).all())
     hit, miss, fa = (int(counts.get(k, 0)) for k in ("HIT", "MISS", "FALSE_ALARM"))
-    # Rincian per aturan (INTERFACE §2.4 "tabel per aturan"). MISS tidak punya
-    # alert, jadi tidak punya aturan: dikelompokkan dengan rule_code NULL.
     by_rule: dict = {}
     for code, outcome, n in sess.execute(text(f"""
             SELECT ru.rule_code, v.outcome, count(*)
@@ -106,8 +98,6 @@ def evaluation(sess: Session = Depends(get_session), date_from: date | None = No
     pod = hit / (hit + miss) if hit + miss else None
     far = fa / (hit + fa) if hit + fa else None
     return {"hit": hit, "miss": miss, "false_alarm": fa,
-            # Probability of detection & false alarm ratio; None bila penyebut nol
-            # (tidak ada angka karangan).
             "pod": None if pod is None else round(pod, 4), "far": None if far is None else round(far, 4),
             "by_rule": list(by_rule.values()),
             "definition": "WARNING+ alerts vs verified events of the same type in the same kecamatan, "
@@ -128,8 +118,6 @@ def acknowledge(alert_id: int, req: AcknowledgeRequest, sess: Session = Depends(
                  {"u": principal.user_id, "n": (req.note or "").strip() or None, "a": alert_id})
     return _alert(sess.execute(text(_ALERT_SELECT + " WHERE a.alert_id = :a"), {"a": alert_id}).mappings().one())
 
-
-# --- aturan alert -----------------------------------------------------------
 
 _RULE_SELECT = """
     SELECT ru.rule_id, ru.rule_code, dt.type_code AS disaster_type_code, b.band_code, ru.comparator,

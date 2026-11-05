@@ -1,16 +1,9 @@
-<!-- pages/account.html — Akun Saya (INTERFACE.md §2.9): profil, email & peringatan (M64),
-     ubah sandi, token API.
-     M74: kisi dua kolom — Profil · Email & peringatan / Kecamatan · Kata sandi —
-     lalu token API selebar halaman (dulu satu kolom kiri yang panjang dengan
-     ruang kosong besar di kanan). Contoh curl/Python dihapus: /docs memuatnya. -->
 <div class="ac-grid">
     <fieldset>
       <legend>Profil</legend>
       <div class="screen"><div class="screen-inner"><span class="scr-ch">PROFIL</span><dl class="kv" id="profile"></dl></div></div>
       <p class="mut" style="margin:4px 0 0;font-size:11px">Nama, organisasi, dan peran diatur Administrator.</p>
     </fieldset>
-    <!-- Email & peringatan (M64): keduanya opsional. Tanpa email atau tanpa
-         kecamatan, pengguna tidak menerima peringatan -- dan itu tidak masalah. -->
     <form id="mailForm" novalidate>
       <fieldset id="mailBox">
         <legend>Email &amp; peringatan</legend>

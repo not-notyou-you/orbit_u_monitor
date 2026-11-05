@@ -1,4 +1,3 @@
-# api/routes/auth.py
 """Autentikasi, sesi, dan token API pribadi (INTERFACE.md §4.1, §6; M20, M33)."""
 
 from __future__ import annotations
@@ -44,9 +43,6 @@ from api.security import (
 
 router = APIRouter()
 
-# Kunci fitur untuk UI (menu per role). Bukan penegak akses: API dan DB
-# tetap memeriksa sendiri (INTERFACE.md §3.2). Susunan halaman v2 (M56):
-# Beranda, Citra, Kejadian (lihat), dan Tentang terbuka untuk pengunjung.
 PERMISSIONS: dict[str, str] = {
     "home.view": "PUBLIC",
     "citra.view": "PUBLIC",
@@ -73,15 +69,9 @@ PERMISSIONS: dict[str, str] = {
     "logs.all": "ADMIN",
 }
 
-# Registrasi mandiri: 5 akun per alamat IP per jam (in-process, seperti
-# token_rate_limiter). Cukup untuk menahan skrip pendaftaran massal tanpa
-# CAPTCHA; organisasi pengguna < 100 akun.
 register_rate_limiter = RateLimiter(limit=5, window_s=3600)
-# Pengecekan email mengirim email konfirmasi ke alamat yang diketik; batasnya
-# mencegah fitur ini dipakai mengirimi alamat orang lain berulang-ulang (M64).
 email_rate_limiter = RateLimiter(limit=5, window_s=3600)
 
-# Kode galat etl.mailer -> (HTTP, pesan).
 _MAIL_HTTP = {
     "EMAIL_INVALID": (422, "Email address is not valid or its domain does not exist"),
     "EMAIL_UNREACHABLE": (422, "Email address cannot receive mail; it was not saved"),
@@ -177,7 +167,6 @@ def login(req: LoginRequest, request: Request, sess: Session = Depends(get_sessi
     token, _exp = create_session_jwt(row["user_id"], row["role_code"])
     principal = Principal(role_code=row["role_code"], user_id=row["user_id"], username=row["username"],
                           full_name=row["full_name"], auth="session")
-    # organization tidak dikembalikan auth_get_user; /me memuatnya lengkap.
     response = JSONResponse(_me(principal).model_dump())
     _set_session_cookie(response, token)
     return response
@@ -202,8 +191,6 @@ def register(req: RegisterRequest, request: Request, sess: Session = Depends(get
         raise ApiError(429, "Too many registrations from this address; try again later", "RATE_LIMITED",
                        headers={"Retry-After": "3600"})
     username = req.username.strip().lower()
-    # Username diperiksa SEBELUM email dicek, karena pengecekan email
-    # mengirim email konfirmasi -- jangan kirim untuk akun yang lalu ditolak.
     if sess.execute(text("SELECT 1 FROM auth_get_user(:u)"), {"u": username}).first():
         raise ApiError(409, f"Username {username} already exists", "USERNAME_TAKEN")
     email = verify_email(sess, req.email, username)
@@ -266,8 +253,6 @@ def change_password(req: ChangePasswordRequest, sess: Session = Depends(get_sess
     return OkResponse(message="Password changed")
 
 
-# --- email dan peringatan (M64) -----------------------------------------------
-
 def _notify_prefs(sess: Session) -> NotifyPrefsResponse:
     from etl.mailer import MailConfig
     row = sess.execute(text("SELECT * FROM auth_get_own_notify()")).mappings().first() or {}
@@ -303,8 +288,6 @@ def put_email(req: EmailUpdateRequest, request: Request, sess: Session = Depends
     try:
         email = verify_email(sess, req.email, principal.full_name or principal.username)
     except ApiError as exc:
-        # Dikembalikan, bukan dilempar, supaya baris log penolakan ikut
-        # ter-commit (pola yang sama dengan login gagal).
         log_activity(sess, "EMAIL_REJECTED", user_id=principal.user_id, target_type="users",
                      target_id=principal.user_id, detail={"code": exc.code}, **meta)
         return error_response(exc.status_code, exc.detail, exc.code, headers=exc.headers)
@@ -327,8 +310,6 @@ def put_notify(req: NotifyPrefsRequest, sess: Session = Depends(get_session),
                  {"a": req.all_regions, "r": sorted(set(req.region_ids))})
     return _notify_prefs(sess)
 
-
-# --- token API ----------------------------------------------------------------
 
 _TOKEN_COLUMNS = """
     t.token_id, t.user_id, t.token_name AS name, t.token_prefix AS prefix, t.scopes AS scope,
@@ -381,8 +362,6 @@ def create_token(req: TokenCreateRequest, sess: Session = Depends(get_session),
                summary="Revoke an API token (owner, or ADMIN for any token)")
 def revoke_token(token_id: int, sess: Session = Depends(get_session),
                  principal: Principal = Depends(require_role("USER"))) -> OkResponse:
-    # RLS tok_owner: non-admin hanya melihat/mengubah tokennya sendiri, jadi
-    # token orang lain tampak tidak ada (404, tidak membocorkan keberadaan).
     row = sess.execute(text("SELECT revoked_at FROM api_tokens WHERE token_id = :t"),
                        {"t": token_id}).mappings().first()
     if row is None:

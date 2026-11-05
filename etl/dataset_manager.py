@@ -1,4 +1,3 @@
-# etl/dataset_manager.py
 from __future__ import annotations
 import logging
 import os
@@ -29,22 +28,7 @@ from etl.job_lock import JobLock
 
 logger = logging.getLogger(__name__)
 
-# Tier yang bisa diminta user dan ikut aturan retensi. PREVIEW sengaja tidak
-# ada di sini: dia tier turunan (PNG hasil render dari GOLD, lihat
-# folder_manager.TIERS) yang tidak pernah diminta eksplisit dan tidak pernah
-# ikut dihapus compute_tiers_to_delete.
-# Peringkat tier dipegang etl/tier_names.rank(): sejak rank 2 bercabang
-# per-source (DESPECKLED/INDICES/ACCUMULATED, D14), list datar tidak lagi bisa
-# mewakilinya. rank() menerima kedua kosakata, jadi job yang mulai sebelum
-# migrasi tetap terbandingkan dengan benar.
 
-# Tahap pipeline -> RANK tier tertinggi yang dibutuhkan tahap itu. Angkanya
-# tidak berubah: sejak dulu ini memang peringkat, bukan indeks ke sebuah list.
-# QUALITY_ANALYTICS membaca hasil rank 2 (bukan menghasilkan tier baru), jadi
-# peringkatnya sama dengan LEE_FILTER. PREVIEW membaca COG, jadi sama dengan
-# COG_EXPORT: dataset yang berhenti di rank 2 melewatinya, dataset yang sampai
-# COG atau FUSED menjalankannya. Karena PREVIEW (3) <= FUSED (4), FUSED tidak
-# pernah jalan tanpa PREVIEW ikut jalan.
 STAGE_TIER_INDEX = {
     "DOWNLOAD": 0,
     "CROP": 1,
@@ -58,12 +42,6 @@ STAGE_TIER_INDEX = {
 _active_threads: dict[str, threading.Thread] = {}
 _threads_lock = threading.Lock()
 
-# Antrean job Dataset Saya. Dulu setiap job langsung mendapat thread sendiri:
-# lima dataset = 15 unduhan S1 sekaligus, dan status QUEUED cuma label. Kini
-# paling banyak MAX_ACTIVE_JOBS job berjalan; sisanya benar-benar menunggu di
-# _pending (FIFO) dan dimulai begitu satu job selesai. Job Daerah Live tidak
-# lewat sini (live_cycle memanggil run_dataset_job langsung, diserialkan
-# _CYCLE_LOCK) dan tidak memakan slot ini.
 MAX_ACTIVE_JOBS = max(1, int(os.getenv("MAX_ACTIVE_JOBS", "2")))
 _running_jobs: set[int] = set()
 _pending_jobs: list[int] = []
@@ -90,9 +68,6 @@ def _wait_thread_exit(key: str, timeout_s: float) -> bool:
     return not t.is_alive()
 
 
-# Batas tunggu job berhenti sebelum file dataset dihapus. Cancel hanya dicek
-# di antara tahap, dan satu tahap (ekstrak/kalibrasi GRD, download 1.7 GB)
-# bisa berjalan belasan menit.
 JOB_STOP_TIMEOUT_S = 30 * 60
 
 
@@ -189,16 +164,7 @@ def compute_skip_stages(required_tiers: list[str]) -> set[str]:
 
 
 def compute_tiers_to_delete(produced_tiers: list[str], required_tiers: list[str]) -> set[str]:
-    """Tier yang dihasilkan tapi tidak diminta.
-
-    Dibandingkan lewat RANK, bukan NAMA: sebuah job yang mulai sebelum migrasi
-    D14 memegang nama lama di memori sementara required_tiers-nya sudah
-    dihitung ulang dengan nama baru. Set difference atas nama akan menganggap
-    SEMUA yang dihasilkan job itu tidak diminta, lalu menghapusnya.
-
-    Nilai baliknya memakai nama seperti yang ADA di produced_tiers, karena
-    itulah yang dipakai pemanggil untuk menemukan berkasnya.
-    """
+    """Tier yang dihasilkan tapi tidak diminta."""
     keep = {tn.rank(t) for t in required_tiers}
     return {t for t in produced_tiers if tn.rank(t) not in keep}
 
@@ -206,13 +172,9 @@ def compute_tiers_to_delete(produced_tiers: list[str], required_tiers: list[str]
 class DatasetManager:
     def __init__(self, db: DatabaseClient, runner_db: DatabaseClient | None = None) -> None:
         self._db = db
-        # Klien untuk kerja latar (thread job dan penghapusan). Saat dipanggil
-        # dari request API, `db` adalah sesi request (role pengguna, ditutup
-        # setelah respons) dan `runner_db` adalah koneksi monitor_etl
-        # (DATABASE.md §8.1). Di luar API keduanya sama.
         self._runner_db = runner_db or db
 
-    def _runner(self) -> "DatasetManager":
+    def _runner(self) -> DatasetManager:
         return self if self._runner_db is self._db else DatasetManager(self._runner_db)
 
     def _after_commit(self, fn) -> None:
@@ -243,21 +205,9 @@ class DatasetManager:
         generate_preview: bool = True,
         created_by: int | None = None,
     ) -> dict:
-        """Buat dataset + job pertamanya.
-
-        Jalur utama sekarang lewat `sources` (konfigurasi per-satelit).
-        `tiers` dipertahankan sebagai jalur lama untuk pemanggil yang belum
-        pindah; kalau `sources` diisi, `required_tiers` diturunkan darinya dan
-        `tiers` diabaikan (DOCS/DECISIONS.md: "`tiers` is no longer
-        user-facing -- derived internally").
-
-        Returns:
-            dict berisi dataset_id, job_id, status, dan source_configs.
-        """
+        """Buat dataset + job pertamanya."""
         if sources is None and not tiers:
             raise ValueError("Provide sources (per-satellite configuration) or tiers")
-        # region_id = lokasi dipilih dari tabel (jalur UI). location = nama/kode
-        # ROI yang sudah ada (pemanggil CLI/tes); tidak ada geocoding.
         if region_id is not None:
             bbox_wkt, region_id, location_label = resolve_region_id(self._db, region_id)
         elif location and location.strip():
@@ -278,22 +228,13 @@ class DatasetManager:
             generate_preview=generate_preview,
             dataset_kind="STANDARD",
             status="QUEUED",
-            # Pengguna pembuat (INTERFACE.md §4.7): dasar "hapus oleh pembuat
-            # atau ADMIN" dan "Reuse Previous Config" per pengguna.
             created_by=created_by,
         )
 
         if sources is not None:
-            # Dataset + baris dataset_source_config ditulis dalam SATU
-            # transaksi oleh database_client: dataset tanpa config adalah
-            # dataset yang tidak bisa diproses ETL, jadi keduanya harus jadi
-            # atau tidak sama sekali.
             configs = normalize_source_configs(sources)
             dataset_fields["fusion_strategy"] = fusion_strategy
             dataset_fields["fusion_output_only"] = fusion_output_only
-            # Hanya diteruskan kalau user benar-benar menyatakannya: None di
-            # sini berarti "pakai default kolom", dan menuliskannya eksplisit
-            # akan menghilangkan server_default.
             if s1_match_tolerance_days is not None:
                 dataset_fields["s1_match_tolerance_days"] = s1_match_tolerance_days
             dataset_fields["preview_options"] = preview_options
@@ -328,10 +269,6 @@ class DatasetManager:
             "[DATASET] created dataset_id=%d job_id=%d name=%s tiers=%s sources=%s",
             dataset_id, job_id, name, normalized_tiers, source_configs,
         )
-        # metadata.json ditulis sejak dataset dibuat, bukan menunggu job
-        # pertama selesai: sebuah dataset yang masih mengunduh (berjam-jam
-        # untuk scene S1) atau yang discovery-nya nol scene tidak boleh
-        # membuat /api/datasets/{id}/metadata membalas 404.
         try:
             self.write_metadata_file(dataset_id, total_size_bytes=0)
         except OSError:
@@ -360,24 +297,15 @@ class DatasetManager:
             if not include_deleted:
                 stmt = stmt.where(Dataset.status != "DELETED")
             if not include_system:
-                # Dataset sistem (HYDROMET_AOI, PIPELINE.md §3.1) bukan milik
-                # Katalog (INTERFACE.md §4.7).
                 stmt = stmt.where(Dataset.is_system.is_(False))
             if dataset_kind:
                 stmt = stmt.where(Dataset.dataset_kind == dataset_kind)
             else:
-                # Dataset milik Daerah Live dikelola halaman Live
-                # (etl/live_monitor.py), bukan "Dataset Saya": retensinya
-                # sendiri yang menghapus scene, jadi tombol hapus/pause di
-                # kartu dataset biasa tidak boleh menyentuhnya.
                 stmt = stmt.where(Dataset.dataset_kind != "LIVE_AREA")
             total = sess.scalar(select(func.count()).select_from(stmt.subquery()))
             rows = sess.scalars(
                 stmt.order_by(Dataset.created_at.desc()).limit(limit).offset(offset)
             ).all()
-            # Satu query agregat untuk SELURUH halaman, bukan satu per kartu:
-            # kartu dirender ulang tiap polling, jadi fan-out per dataset akan
-            # mengalikan beban database dengan jumlah kartu di layar.
             per_source = self._per_source_stats([d.dataset_id for d in rows], sess)
             creator_ids = sorted({d.created_by for d in rows if d.created_by is not None})
             creators = dict(sess.execute(
@@ -400,20 +328,7 @@ class DatasetManager:
 
     @staticmethod
     def _per_source_stats(dataset_ids: list[int], sess) -> dict[int, dict[str, dict]]:
-        """{dataset_id: {source_api_key: {"scenes": n, "bytes": n}}}.
-
-        Dihitung dari `data_products`, bukan dari disk: storage_breakdown()
-        menyusuri folder, dan melakukannya untuk tiap kartu pada tiap polling
-        akan membaca ribuan entri direktori hanya untuk menampilkan dua angka.
-
-        Hanya baris `is_latest` yang dihitung — baris lama masih ada di tabel
-        untuk keperluan lineage, tapi berkasnya sudah digantikan, jadi
-        menjumlahkannya akan melaporkan disk yang tidak terpakai.
-
-        Scene dihitung DISTINCT: satu scene menghasilkan banyak produk (VV, VH,
-        beberapa tier), dan menghitung barisnya akan melaporkan angka berkali
-        lipat dari jumlah scene yang sebenarnya.
-        """
+        """{dataset_id: {source_api_key: {"scenes": n, "bytes": n}}}."""
         if not dataset_ids:
             return {}
 
@@ -452,10 +367,7 @@ class DatasetManager:
         untuk dataset ini — dipakai untuk ringkasan metadata.json, karena
         layout on-disk (tier-first) tidak lagi punya folder tanggal di
         level teratas untuk dijelajahi langsung.
-
-        Tiga asal tanggal (M30): scene S1 produk, granule nasa_scenes produk
-        MODIS/GPM, dan feature_date stack fusion (hari tanpa S1 tidak punya
-        scene). Dulu ketiganya terjaring lewat scene placeholder NASA_AUX_*."""
+        """
         with self._db.session() as sess:
             s1 = sess.scalars(
                 select(SatelliteScene.acquisition_datetime)
@@ -512,9 +424,6 @@ class DatasetManager:
             layers = self._progress_layers(sess, dataset, job_dict, scenes)
         total = job_dict["total_scenes"] or 0
         if layers:
-            # Counter job mencampur hari aux dengan scene S1 sehingga bisa
-            # melampaui total_scenes; rata-rata lapisan mengikuti sumbu yang
-            # benar-benar dikerjakan.
             progress_percent = int(sum(l["ratio"] for l in layers) / len(layers) * 100)
         elif total > 0:
             progress_percent = int(
@@ -535,8 +444,6 @@ class DatasetManager:
             "progress_percent": min(progress_percent, 100),
             "paused": job_dict["status"] == "PAUSED",
             "pause_reason": job_dict["pause_reason"],
-            # Posisi di antrean MAX_ACTIVE_JOBS (1 = berikutnya), None kalau
-            # job tidak sedang mengantre.
             "queue_position": self.queue_position(job_dict["job_id"]),
             **_obstacles(dataset_id, job_dict["status"]),
             "timing": _job_timing(dataset_id, job_dict),
@@ -544,26 +451,13 @@ class DatasetManager:
             "layers": layers,
         }
 
-    # Urutan tahap per scene S1, sama dengan orchestrator. Scene yang sudah
-    # melewati sebuah tahap dianggap menyelesaikannya.
     _S1_STAGE_ORDER = (
         "DOWNLOAD", "CROP", "LEE_FILTER", "QUALITY_ANALYTICS",
         "GOLD_EXPORT", "PREVIEW", "FUSION", "CLEANUP",
     )
 
     def _progress_layers(self, sess, dataset, job_dict: dict, scenes: list[dict]) -> list[dict]:
-        """Lapisan radar progres di kartu dataset: unduh/proses per satelit + fusi.
-
-        Hanya lapisan yang benar-benar dikerjakan dataset ini yang dikembalikan:
-        satelit yang tidak dikonfigurasi tidak punya lapisan, "processing"
-        hanya ada kalau level PROCESSED diminta, dan "fusion" hanya ada kalau
-        strategi fusi dipilih dengan >= 2 satelit.
-
-        S1 dihitung dari scene_job_state (tahap per scene). MODIS/GPM tidak
-        punya baris scene_job_state -- mereka ditarik per tanggal -- jadi
-        progresnya dihitung dari data_products: scene berbeda yang sudah punya
-        produk apa pun (unduh) atau produk rank >= 2 (proses).
-        """
+        """Lapisan radar progres di kartu dataset: unduh/proses per satelit + fusi."""
         configs = {c.source_name: list(c.processing_levels or []) for c in dataset.source_configs}
         if not configs:
             return []
@@ -580,8 +474,6 @@ class DatasetManager:
             counts[(str(source).upper(), tn._upper(tier))] = int(n or 0)
 
         def n_scenes(source: str, min_rank: int) -> int:
-            # Distinct per tier lalu diambil maksimum: satu scene punya banyak
-            # tier, jadi menjumlahkan antar-tier akan menghitungnya berkali-kali.
             best = 0
             for (src, tier), n in counts.items():
                 if src != source:
@@ -599,9 +491,6 @@ class DatasetManager:
         has_s1 = "SENTINEL1" in configs
         range_days = (dataset.date_end - dataset.date_start).days + 1
         strategy = str(dataset.fusion_strategy or "").strip().upper()
-        # Sumbu unduh aux mengikuti plan_fusion: HYBRID dan FULL_COVERAGE
-        # menarik MODIS/GPM tiap hari di rentang, bukan per scene S1. Membagi
-        # dengan jumlah scene membuat cincin aux penuh setelah hari pertama.
         if has_s1 and strategy not in (HYBRID, FULL_COVERAGE):
             expected_aux = total
         else:
@@ -696,16 +585,8 @@ class DatasetManager:
             if job.status != "PAUSED":
                 raise ValueError(f"Job has status {job.status}, not PAUSED")
             job_id = job.job_id
-            # Pause tidak mematikan thread job: thread-nya cuma menunggu
-            # pause_event dan tetap memegang slot. Kalau masih hidup, resume
-            # melanjutkan thread itu (bukan memulai run baru), jadi tidak ada
-            # yang akan menimpa QUEUED -- kartu terlihat mengantre padahal
-            # sedang mengunduh. Thread hanya pernah sampai di DOWNLOADING
-            # setelah discovery, jadi status itulah yang dipulihkan.
             with _threads_lock:
                 in_place = job_id in _running_jobs
-            # Tanpa thread hidup: antrekan dan biarkan run_dataset_job yang
-            # mengisi status sesuai tahapnya.
             new_status = "DOWNLOADING" if in_place else "QUEUED"
             job.status = new_status
             job.resumed_at = datetime.now(timezone.utc)
@@ -718,16 +599,7 @@ class DatasetManager:
         return {"status": new_status, "resume_count": resume_count}
 
     def recover_interrupted_jobs(self) -> list[int]:
-        """Lanjutkan job yang terputus karena proses server mati/restart.
-
-        Thread job hidup di dalam proses API. Kalau proses berhenti, job tetap
-        berstatus QUEUED/PREPARING/DOWNLOADING/PROCESSING di database padahal
-        tidak ada yang mengerjakannya lagi (kasus try2/try3). Dipanggil sekali
-        saat startup: tiap job aktif terbaru per dataset STANDARD di-queue ulang.
-        run_dataset_job idempoten — scene yang selesai dilewati, file yang ada
-        di disk tidak diunduh ulang, dan download S1 melanjutkan .part.
-
-        Returns: job_id yang dilanjutkan."""
+        """Lanjutkan job yang terputus karena proses server mati/restart."""
         active = {"QUEUED", "PREPARING", "DOWNLOADING", "PROCESSING"}
         to_resume: list[int] = []
         with self._db.session() as sess:
@@ -745,11 +617,7 @@ class DatasetManager:
                 if (
                     dataset is None
                     or dataset.deleted_at is not None
-                    # Job Daerah Live dilanjutkan LiveMonitor.recover(): selain
-                    # run_dataset_job, siklusnya masih perlu metrik/preview.
                     or dataset.dataset_kind == "LIVE_AREA"
-                    # Dataset sistem HYDROMET_AOI: tanggal yang terputus
-                    # diulang job hidromet/backfill sendiri (resume-aware).
                     or dataset.is_system
                     or dataset.status == "DELETING"
                 ):
@@ -761,7 +629,6 @@ class DatasetManager:
                 job.resume_count = (job.resume_count or 0) + 1
                 dataset.status = "QUEUED"
                 to_resume.append(job.job_id)
-        # Terlama dulu: antreannya FIFO, dan query di atas urut terbaru dulu.
         for job_id in reversed(to_resume):
             logger.warning("[DATASET] job_id=%d terputus oleh restart, dilanjutkan", job_id)
             self._spawn_job_runner(job_id)
@@ -817,10 +684,6 @@ class DatasetManager:
         deleted_files = 0
         if cascade_delete:
             from etl.deletion_manager import DeletionManager
-            # Sisakan COG + FUSED (rank >= 3): keduanya deliverable, sisanya
-            # antara. Kedua kosakata disapu supaya baris pra-D14 ikut terhapus.
-            # Menghapus baris data_products: hak pipeline (monitor_etl), bukan
-            # role pengguna. Baris yang disentuh tidak diubah transaksi ini.
             tier_result = DeletionManager(self._runner_db, dataset_id, dataset_name).delete_tiers(
                 list(tn.tiers_up_to_rank(2))
             )
@@ -853,12 +716,8 @@ class DatasetManager:
             if job and job.status in active_statuses:
                 job.status = "CANCELLED"
         if job_id is not None and (force or job_was_paused):
-            # A paused job's thread is parked on pause_event.wait(); wake it
-            # (with cancel set) so it exits instead of leaking forever.
             get_cancel_event(job_id).set()
             get_pause_event(job_id).set()
-        # Penghapusan fisik dikerjakan pipeline (monitor_etl) setelah status
-        # DELETING ter-commit (IMPLEMENTATION_NOTES Tahap 2, S1).
         self._after_commit(lambda: self._runner()._spawn_deletion_runner(dataset_id, job_id=job_id))
         logger.info("[DATASET] dataset_id=%d deletion triggered force=%s", dataset_id, force)
         return {"status": "DELETING", "dataset_id": dataset_id}
@@ -944,16 +803,7 @@ class DatasetManager:
         return current_stage == "CLEANUP" and stage_status == "COMPLETED"
 
     def begin_job_run(self, job_id: int) -> int:
-        """Siapkan counter & state untuk satu eksekusi run_dataset_job.
-
-        Counter job/dataset dulu hanya bertambah dan tidak pernah di-reset saat
-        retry/resume, sehingga kegagalan eksekusi lama (mis. MemoryError)
-        terbawa selamanya: status akhir tetap FAILED walau semua scene sudah
-        berhasil, dan UI menampilkan "4 gagal" untuk dataset 2 scene. Counter
-        diturunkan ulang dari scene yang sudah selesai dan error lama
-        dibersihkan; kegagalan di eksekusi ini menambah counter seperti biasa.
-
-        Returns: jumlah scene yang sudah selesai."""
+        """Siapkan counter & state untuk satu eksekusi run_dataset_job."""
         with self._db.session() as sess:
             job = sess.get(DatasetJob, job_id)
             if job is None:
@@ -982,10 +832,6 @@ class DatasetManager:
         failed: int = 0,
         cleaned: int = 0,
     ) -> None:
-        # UPDATE x = x + n di database, bukan baca-tambah-tulis di Python:
-        # thread download (paralel), pipeline, dan cleanup memanggil ini
-        # bersamaan, dan versi baca-tulis kehilangan hitungan saat dua
-        # transaksi membaca nilai yang sama.
         with self._db.session() as sess:
             dataset_id = sess.scalar(
                 select(DatasetJob.dataset_id).where(DatasetJob.job_id == job_id)
@@ -1035,25 +881,13 @@ class DatasetManager:
                 dataset.status = status
 
     def write_metadata_file(self, dataset_id: int, total_size_bytes: int | None = None) -> None:
-        """Tulis ulang metadata.json level-dataset.
-
-        Ringkasan read-only turunan tabel `datasets` + isi disk — kalau isinya
-        berbeda dari API, database yang benar. `storage_usage` dipecah per tier
-        lalu per source lewat folder_manager.storage_breakdown, sumber angka
-        yang sama dengan endpoint /api/datasets/{id}/storage/summary.
-
-        Dipanggil saat dataset dibuat (supaya file-nya ada sejak awal, bukan
-        cuma setelah job pertama selesai) dan tiap kali job berhenti — termasuk
-        di jalur berhenti-awal seperti discovery gagal atau nol scene, yang
-        dulu keluar tanpa pernah menulis file ini sama sekali sehingga
-        /api/datasets/{id}/metadata membalas 404 selamanya."""
+        """Tulis ulang metadata.json level-dataset."""
         dataset = self.get_dataset(dataset_id)
         if dataset is None:
             return
         breakdown = fm.storage_breakdown(dataset_id, dataset["name"])
         if total_size_bytes is None:
             total_size_bytes = breakdown["total_size_bytes"]
-        quality_settings = dataset.get("quality_settings") or {}
         fm.write_dataset_metadata(dataset_id, dataset["name"], {
             "dataset_id": dataset_id,
             "name": dataset["name"],
@@ -1157,12 +991,6 @@ class DatasetManager:
         key = f"job-{job_id}"
         if _is_thread_alive(key):
             return True
-        # _is_thread_alive cuma melihat proses ini. Saat `uvicorn --reload`
-        # menjalankan proses baru sementara yang lama belum selesai menutup,
-        # recover_interrupted_jobs() di proses baru akan me-resume job yang
-        # masih dikerjakan proses lama -- keduanya lalu menulis berkas yang
-        # sama. Lock berkas tingkat OS yang memutus itu, dan lepas sendiri
-        # kalau proses pemegangnya mati.
         lock = JobLock.acquire(job_id, fm.DATA_ROOT.parent / JOB_LOCK_DIRNAME)
         if lock is None:
             logger.warning(
@@ -1220,12 +1048,6 @@ class DatasetManager:
             return
 
         def _runner() -> None:
-            # Hapus file hanya setelah thread job berhenti. Cancel cuma sinyal:
-            # tahap yang sedang jalan tetap menulis sampai selesai, dan file
-            # yang lahir sesudah manifest penghapusan dibuat akan tertinggal
-            # sebagai folder yatim tanpa baris dataset (kasus jakarta_part2:
-            # 3.5 GB raw/_work tersisa setelah dataset dihapus di tengah
-            # kalibrasi).
             if job_id is not None and not _wait_thread_exit(f"job-{job_id}", JOB_STOP_TIMEOUT_S):
                 logger.warning(
                     "[DATASET] job_id=%d belum berhenti setelah %ds; penghapusan "
@@ -1258,15 +1080,7 @@ class DatasetManager:
             "total_size_bytes": d.total_size_bytes,
             "is_deletable": d.is_deletable,
             "created_by": d.created_by,
-            # Ikut di `base`, bukan cuma di `detail`: kartu dataset memakainya
-            # untuk membedakan "preview sengaja dimatikan" dari "preview belum
-            # sempat dibuat", dan daftar kartu tidak mengambil detail.
             "generate_preview": d.generate_preview,
-            # Ikut di `base`: kartu dataset (Tab 2) menampilkan satelit,
-            # level pemrosesan, dan strategi fusi, dan kartu itu dirender
-            # dari listing tanpa menarik detail per dataset. Dimuat lewat
-            # relasi lazy="selectin", jadi tetap satu query tambahan untuk
-            # seluruh halaman, bukan satu per baris.
             "source_configs": [
                 {"source": SOURCE_NAME_TO_API_KEY.get(c.source_name, c.source_name.lower()),
                  "processing": list(c.processing_levels or [])}
@@ -1277,9 +1091,6 @@ class DatasetManager:
                 )
             ],
             "fusion_strategy": d.fusion_strategy,
-            # Ikut di `base` bersama fusion_strategy: keduanya menjelaskan
-            # bentuk output dataset, dan orchestrator membaca dict ini (bukan
-            # objek ORM-nya) untuk memutuskan penghematan disk.
             "fusion_output_only": d.fusion_output_only,
             "s1_match_tolerance_days": d.s1_match_tolerance_days,
             "s1_orbit_direction": (d.quality_settings or {}).get("orbit_direction"),
@@ -1293,10 +1104,6 @@ class DatasetManager:
                 "region_id": d.region_id,
                 "quality_settings": d.quality_settings or {},
                 "deleted_at": d.deleted_at,
-                # Konfigurasi per-satelit + strategi fusi ikut di detail karena
-                # orchestrator memutuskan cabang pipeline dari keduanya
-                # (DOCS/PIPELINE.md, "Pipeline Branching Logic"). Dimuat lewat
-                # relasi lazy="selectin", jadi tidak menambah query per baris.
                 "sources": {
                     c.source_name: list(c.processing_levels or [])
                     for c in d.source_configs

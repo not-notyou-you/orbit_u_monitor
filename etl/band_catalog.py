@@ -1,22 +1,8 @@
-# etl/band_catalog.py
-"""Penjelasan satelit dan band untuk halaman Citra dan Diagram (M56).
-
-Satu tempat untuk teks yang dibaca pengguna awam: satelit ini mengukur apa,
-band ini berarti apa, dan garis ambang mana yang digambar di grafik. Nama
-band, satuan, dan sumbernya tetap dari tabel ``spectral_bands``; modul ini
-hanya menambah teks, warna garis, dan ambang.
-
-Ambang TIDAK ditulis ulang di sini: semuanya dibaca dari
-``etl.live_interpret.THRESHOLDS``, satu-satunya tempat ambang kalimat kondisi
-Live (dan, lewat ``sync_bmkg_thresholds``, ambang hujan BMKG dari
-``alert_rules``). Jadi garis ambang di Diagram selalu sama dengan angka yang
-dipakai kalimat kondisi dan alert.
-"""
+"""Penjelasan satelit dan band untuk halaman Citra dan Diagram (M56)."""
 from __future__ import annotations
 
 from etl.live_interpret import THRESHOLDS
 
-# Kunci halaman Citra (hash #citra/<kunci>) -> source_code + awalan preview.
 SOURCES: dict[str, dict] = {
     "s1": {
         "source_code": "SENTINEL1",
@@ -71,8 +57,6 @@ SOURCES: dict[str, dict] = {
     },
 }
 
-# Satu warna per band, dipakai sama di semua grafik supaya band yang sama
-# selalu dikenali dari warnanya. Kontras diuji terhadap layar CRT gelap.
 BANDS: dict[str, dict] = {
     "VV": {"color": "#4de1ff", "about": "Pantulan radar polarisasi VV. Turun bila permukaan menjadi lebih basah atau halus "
                                        "(genangan, tanah jenuh). Penurunan rata-rata ≥ {s1_vv_drop_db} dB antar scene ditandai."},
@@ -92,8 +76,6 @@ BANDS: dict[str, dict] = {
     "RAIN_30D": {"color": "#d9d9d9", "about": "Akumulasi hujan tiga puluh hari, untuk melihat musim basah/kering."},
 }
 
-# Garis ambang per band: (label, kunci THRESHOLDS). Band tanpa ambang mutlak
-# (VV, NDVI: ambangnya berupa PERUBAHAN antar scene) tidak diberi garis.
 _THRESHOLD_KEYS: dict[str, list[tuple[str, str]]] = {
     "VH": [("air", "s1_vh_water_db")],
     "WATER_PCT": [("waspada", "s1_vh_first_scene_warn_pct")],
@@ -104,8 +86,6 @@ _THRESHOLD_KEYS: dict[str, list[tuple[str, str]]] = {
     "RAIN_7D": [("waspada", "rain_7d_warn_mm"), ("tinggi", "rain_7d_high_mm")],
 }
 
-# Label + satuan metrik live_scene_metrics untuk tabel "angka" halaman Citra.
-# Satuan None = pakai satuan band (spectral_bands.unit).
 METRICS: dict[str, tuple[str, str | None]] = {
     "mean": ("rata-rata", None),
     "max": ("maksimum", None),
@@ -125,7 +105,6 @@ METRICS: dict[str, tuple[str, str | None]] = {
     "persistent_km2": ("air tetap", "km²"),
     "valid_km2": ("luas teramati", "km²"),
     "same_orbit": ("orbit sama dengan pembanding (1 = ya)", ""),
-    # Angka harian Job Hidromet (v_citra_obs_aoi), lintas kecamatan AOI.
     "aoi_mean": ("rata-rata kecamatan AOI", None),
     "aoi_max": ("tertinggi antar kecamatan", None),
     "aoi_min": ("terendah antar kecamatan", None),
@@ -139,9 +118,6 @@ def metric_unit(metric_name: str, band_unit: str | None) -> str:
     return (band_unit or "") if unit is None else unit
 
 
-# Band per kecamatan di region_observations: GPM/MODIS harian (Job Hidromet)
-# dan Sentinel-1 per lintasan (etl/s1_observations.py, M58). AOI_BANDS = band
-# yang hanya ada pada tanggal lintasan S1 (titik jarang, garis disambung).
 REGION_BANDS = ("RAIN_24H", "RAIN_72H", "RAIN_7D", "RAIN_30D", "FLOOD", "NDVI", "NDWI",
                 "VV", "VH", "WATER_PCT")
 AOI_BANDS = ("VV", "VH", "WATER_PCT")
@@ -171,10 +147,6 @@ def band_info(row) -> dict:
             "source_code": row["source_code"], "color": color(code), "about": about(code),
             "thresholds": thresholds(code),
             "per_region": code in REGION_BANDS}
-
-
-def source_key(source_code: str) -> str | None:
-    return next((k for k, v in SOURCES.items() if v["source_code"] == source_code), None)
 
 
 def _fmt(v: float) -> str:

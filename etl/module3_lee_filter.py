@@ -1,4 +1,3 @@
-# etl/module3_lee_filter.py
 from __future__ import annotations
 
 import logging
@@ -16,9 +15,6 @@ logger = logging.getLogger(__name__)
 def lee_filter(img: np.ndarray, window_size: int = 7, looks: int = 1) -> np.ndarray:
     original_dtype = img.dtype
     img = img.astype(np.float64)
-    # Hasil kalibrasi punya nodata=NaN di luar footprint scene. uniform_filter
-    # memakai jumlah kumulatif, jadi satu NaN merambat ke seluruh citra.
-    # Hitung mean hanya dari pixel valid (normalized convolution), NaN dikembalikan di akhir.
     valid = np.isfinite(img)
     img = np.where(valid, img, 0.0)
     count = uniform_filter(valid.astype(np.float64), size=window_size)

@@ -1,4 +1,3 @@
-# api/schemas.py
 from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
@@ -68,7 +67,6 @@ class SceneListResponse(BaseModel):
 class ProductItem(BaseModel):
     product_id: int
     product_uuid: str
-    # M30: S1 -> scene_id, MODIS/GPM -> nasa_scene_id, FUSION -> keduanya None.
     scene_id: int | None
     nasa_scene_id: int | None = None
     job_id: int
@@ -151,9 +149,6 @@ class LineageStep(BaseModel):
     input_checksum: str | None
     output_checksum: str | None
     created_at: datetime
-    # Sejak layout tier-source, satu dataset punya rantai paralel per sensor;
-    # ketiga field ini yang membuat langkah rantai bisa dibaca per source
-    # tanpa menarik tiap product satu per satu.
     source: str | None = None
     parent_tier: str | None = None
     child_tier: str | None = None
@@ -196,17 +191,11 @@ class HealthResponse(BaseModel):
 class DatasetQualitySettings(BaseModel):
     min_cloud_cover: float | None = None
     resolution_m: int | None = None
-    # Satu arah orbit S1 saja; None = keduanya. Dibaca orkestrator setelah discovery.
     orbit_direction: str | None = Field(None, pattern="^(ASCENDING|DESCENDING)$")
 
 
 class DatasetSourceConfigResponse(BaseModel):
-    """Satu baris dataset_source_config seperti yang dilihat API.
-
-    `source` memakai key huruf kecil gaya API ("sentinel1"), bukan nama kolom
-    database ("SENTINEL1") -- pemetaannya milik database_client, lihat
-    SOURCE_NAME_TO_API_KEY di sana.
-    """
+    """Satu baris dataset_source_config seperti yang dilihat API."""
     source: str
     processing: list[str]
 
@@ -215,30 +204,16 @@ MAX_DATASET_DAYS = 366
 
 
 class CreateDatasetRequest(BaseModel):
-    """Payload POST /api/datasets (DOCS/INTERFACE.md, "Create Dataset").
-
-    Menggantikan model prototipe yang memakai `tiers` + satu processing level
-    global. `tiers` sekarang diturunkan internal dari `sources`
-    (DOCS/DECISIONS.md, "Changed: Dataset Creation API"), jadi tidak
-    lagi diterima di sini.
-    """
-    # Jalur utama UI: region_id dari tabel lokasi. `location` tetap diterima
-    # untuk pemanggil lama/CLI -- di-resolve lewat nama lalu geocoding.
+    """Payload POST /api/datasets (DOCS/INTERFACE.md, "Create Dataset")."""
     region_id: int | None = None
     location: str | None = None
     date_start: date
     date_end: date
     name: str
     description: str | None = None
-    # {"sentinel1": {"processing": ["RAW", "PROCESSED"]}, ...}
     sources: dict[str, dict[str, list[str]]]
     fusion_strategy: str | None = None
-    # Simpan HDF5 fusi saja; artefak per-satelit dihapus SETELAH stack tanggal
-    # itu ditulis. Bukan "lewati pemrosesan" -- fusi tetap butuh bahannya.
     fusion_output_only: bool = False
-    # Hanya dipakai FULL_COVERAGE, yang merakit satu berkas per hari termasuk
-    # hari tanpa scene S1 dan karena itu harus tahu seberapa jauh boleh
-    # meminjam scene dari hari lain. None = pakai default kolom (2 hari).
     s1_match_tolerance_days: int | None = Field(default=None, ge=0, le=14)
     preview_options: list[str] | None = None
     quality_settings: DatasetQualitySettings | None = None
@@ -249,10 +224,6 @@ class CreateDatasetRequest(BaseModel):
     def _validate_sources(
         cls, v: dict[str, dict[str, list[str]]]
     ) -> dict[str, dict[str, list[str]]]:
-        # Aturan sumber/level hidup di normalize_source_configs(): satu-satunya
-        # definisi "sources yang sah", dipakai juga oleh ETL dan penulis
-        # langsung ke database. Menyalinnya ke sini akan membuat dua definisi
-        # yang bisa berbeda diam-diam.
         from etl.database_client import normalize_source_configs, SOURCE_NAME_TO_API_KEY
 
         normalized = normalize_source_configs(v)
@@ -264,8 +235,6 @@ class CreateDatasetRequest(BaseModel):
     @field_validator("preview_options")
     @classmethod
     def _validate_preview_options(cls, v: list[str] | None) -> list[str] | None:
-        # None diteruskan apa adanya: "tidak disebutkan" berbeda dari "[] =
-        # sengaja tanpa preview", dan pembedaan itu ditangani di layer database.
         if v is None:
             return None
         from etl.database_client import _validate_preview_options
@@ -273,27 +242,21 @@ class CreateDatasetRequest(BaseModel):
         return _validate_preview_options(v)
 
     @model_validator(mode="after")
-    def _validate_date_range(self) -> "CreateDatasetRequest":
+    def _validate_date_range(self) -> CreateDatasetRequest:
         if self.date_end < self.date_start:
             raise ValueError("date_end must be >= date_start")
-        # INTERFACE §2.6: wizard dibatasi 366 hari; ditegakkan juga di API agar
-        # klien lain (skrip, Swagger) tidak memicu unduhan bertahun-tahun.
         if (self.date_end - self.date_start).days + 1 > MAX_DATASET_DAYS:
             raise ValueError(f"date range must be at most {MAX_DATASET_DAYS} days")
         return self
 
     @model_validator(mode="after")
-    def _require_location(self) -> "CreateDatasetRequest":
+    def _require_location(self) -> CreateDatasetRequest:
         if self.region_id is None and not (self.location or "").strip():
             raise ValueError("Provide region_id or location")
         return self
 
     @model_validator(mode="after")
-    def _validate_fusion_strategy(self) -> "CreateDatasetRequest":
-        # Wajib kalau sumbernya >1, harus null kalau cuma 1 (DOCS/INTERFACE.md,
-        # bagian Validation). Aturan ini tidak bisa jadi CHECK constraint --
-        # jumlah sumber ada di tabel lain -- jadi ditegakkan di sini dan lagi
-        # di database_client untuk penulis non-API.
+    def _validate_fusion_strategy(self) -> CreateDatasetRequest:
         from etl.database_client import _validate_fusion_strategy
 
         self.fusion_strategy = _validate_fusion_strategy(
@@ -310,14 +273,7 @@ class DatasetCreateResponse(BaseModel):
 
 
 class DatasetLastConfigResponse(BaseModel):
-    """GET /api/datasets/last-config.
-
-    Sengaja tanpa `name`: harus diisi ulang user supaya "Pakai Config
-    Sebelumnya" tidak diam-diam menduplikasi dataset (DOCS/DECISIONS.md D13).
-    Rentang tanggal DIIKUTSERTAKAN (sebagai preset, bukan kunci) supaya user
-    tidak perlu mengetik ulang tanggal yang sama setiap kali; field-nya tetap
-    bisa diedit di wizard sebelum submit.
-    """
+    """GET /api/datasets/last-config."""
     region_id: int | None
     region_name: str | None
     sources: dict[str, dict[str, list[str]]]
@@ -350,37 +306,20 @@ class DatasetItem(BaseModel):
     generate_preview: bool
     created_by: int | None = None
     created_by_name: str | None = None
-    # Konfigurasi per-satelit ikut di listing, bukan cuma di detail: kartu
-    # dataset (Tab 2) menampilkan satelit + level pemrosesan + strategi fusi
-    # (DOCS/DECISIONS.md, "Changed: Dataset Cards"), dan kartu itu
-    # dirender dari GET /api/datasets tanpa menarik detail satu per satu.
-    # Model lama -- selected_satellites + satu processing_level global --
-    # digantikan seluruhnya oleh source_configs.
     source_configs: list[DatasetSourceConfigResponse] = Field(default_factory=list)
-    # Hitungan scene dan byte per satelit, untuk kartu dataset. Dihitung dari
-    # data_products lewat SATU query agregat untuk seluruh halaman -- kartu
-    # dirender ulang tiap polling, jadi tidak boleh fan-out per dataset.
-    # Hanya berisi source yang benar-benar punya produk; source yang
-    # dikonfigurasi tapi belum menghasilkan apa pun tidak muncul.
     scenes_by_source: dict[str, int] = Field(default_factory=dict)
     bytes_by_source: dict[str, int] = Field(default_factory=dict)
     fusion_strategy: str | None = None
     fusion_output_only: bool = False
     s1_match_tolerance_days: int = 2
-    # Arah orbit S1 dari quality_settings; None = keduanya. Ditampilkan di kartu.
     s1_orbit_direction: str | None = None
     preview_options: list[str] = Field(default_factory=list)
-    # Diisi hanya kalau dataset ini dibuat lewat "Pakai Config Sebelumnya":
-    # dataset_id yang config-nya disalin. None untuk dataset yang dikonfigurasi
-    # dari nol -- tidak ada kolomnya di database, jadi nilainya berasal dari
-    # payload pembuatan.
     last_config_source: int | None = None
     created_at: datetime
     updated_at: datetime
     model_config = {"from_attributes": True}
 
 
-# Alias eksplisit: DOCS/INTERFACE.md menyebut skema respons dataset "DatasetResponse".
 DatasetResponse = DatasetItem
 
 
@@ -434,10 +373,7 @@ class DatasetProgressResponse(BaseModel):
     paused: bool
     pause_reason: str | None
     scenes: list[SceneJobStateItem]
-    # Lapisan radar progres kartu dataset (lihat DatasetManager._progress_layers).
     layers: list[ProgressLayer] = []
-    # Dihitung DatasetManager.get_progress() untuk loading bar kartu. Harus
-    # dideklarasikan di sini: field yang tidak ada di model dibuang FastAPI.
     queue_position: int | None = None
     timing: dict[str, Any] | None = None
     waiting: dict[str, Any] | None = None
@@ -508,11 +444,7 @@ class SourceStorageItem(BaseModel):
 
 
 class TierStorageItem(BaseModel):
-    """Pemakaian disk satu tier, dipecah per source.
-
-    `sources` kosong untuk tier fusion: isinya gabungan semua source, jadi
-    tidak ada pecahan per-source yang bermakna di sana.
-    """
+    """Pemakaian disk satu tier, dipecah per source."""
     size_bytes: int
     size_mb: float
     file_count: int
@@ -526,10 +458,6 @@ class DatasetStorageSummary(BaseModel):
     sources: dict[str, SourceStorageItem]
     total_size_bytes: int
     total_size_mb: float
-    # True kalau dataset ini memakai struktur folder sebelum relayout
-    # (folder tanggal + tier di jalur). Berkasnya masih utuh dan tetap bisa
-    # diunduh, tapi pohon penyimpanan tidak dirender dengan kosakata yang
-    # sudah tidak berlaku -- UI menampilkan pesan "format lama" sebagai gantinya.
     legacy_layout: bool = False
 
 
@@ -553,14 +481,7 @@ class DatasetTierFilesResponse(BaseModel):
 
 
 class SourceQualityItem(BaseModel):
-    """Kualitas satu source untuk satu dataset.
-
-    Cuma SENTINEL1 yang punya metrik radiometrik sungguhan (quality_metrics,
-    dihitung module6_analytics atas band VV/VH). Untuk MODIS/GPM yang
-    dilaporkan adalah *coverage*: berapa band/hari yang benar-benar mendarat
-    di disk dibanding yang diharapkan — bukan skor radiometrik, dan sengaja
-    dibedakan namanya supaya tidak dibaca sebagai hal yang sama.
-    """
+    """Kualitas satu source untuk satu dataset."""
     source: str
     kind: str                       # "RADIOMETRIC" | "COVERAGE"
     product_count: int
@@ -591,12 +512,9 @@ class RegionListResponse(BaseModel):
     total: int = 0
 
 
-# --- Live Monitoring (PIPELINE.md §4) -----------------------------------
-
 class LiveAreaCreateRequest(BaseModel):
     region_id: int
     name: str | None = Field(default=None, max_length=200)
-    # None = app_settings.live.retention_default
     retention: int | None = Field(default=None, ge=1, le=60)
 
 
@@ -605,8 +523,6 @@ class LiveAreaUpdateRequest(BaseModel):
     retention: int | None = Field(default=None, ge=1, le=60)
     enabled: bool | None = None
 
-
-# --- Autentikasi & token API (INTERFACE.md §4.1) ----------------------------
 
 USERNAME_PATTERN = r"^[a-z0-9_.]{3,50}$"
 ASSIGNABLE_ROLES = ("USER", "ANALYST", "DATA_ENGINEER", "ADMIN")
@@ -705,8 +621,6 @@ class TokenListResponse(BaseModel):
     limit: int
     offset: int
 
-
-# --- Administrasi akun & log (INTERFACE.md §4.9) ----------------------------
 
 class AdminUserItem(BaseModel):
     user_id: int

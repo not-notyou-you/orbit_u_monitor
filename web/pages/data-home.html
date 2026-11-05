@@ -1,13 +1,3 @@
-<!-- pages/data-home.html — Data › Ringkasan (INTERFACE.md §2 halaman 6.1, M67, M74).
-     Susunan dari atas (M74):
-     * satu baris status: apa yang berjalan dan apa yang perlu tindakan
-       (menggantikan empat angka besar yang hampir selalu 0);
-     * tabel dataset utama per satelit (rentang, jumlah, masuk terakhir,
-       status proses, Kelola →) — menggantikan dua kotak dataset utama dan tiga
-       kartu satelit yang mengulang isi tab Satelit;
-     * "Sedang berjalan": hanya tampil bila ada yang bergerak (backfill
-       dataset utama, dataset Katalog). Elemen pc* diisi js/process.js.
-     DATA_ENGINEER & ADMIN. -->
 <div class="dh-status" id="pcStatus" role="status" aria-live="polite"></div>
 <div class="screen"><div class="screen-inner"><span class="scr-ch">CH-01 · DATASET UTAMA PER SATELIT</span><span class="scr-rec off" id="dhRec"></span>
   <div id="dhTable"></div></div></div>

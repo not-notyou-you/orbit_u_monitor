@@ -1,11 +1,4 @@
-# api/routes/report.py
-"""GET /api/datasets/{id}/report - laporan PDF komprehensif (report.md).
-
-Generasinya sinkron, bukan job/job_id + polling: laporan hanya membaca
-statistik dan chart agregat yang sudah murah dihitung (query DB + PNG kecil
-lewat matplotlib), beda dari job ETL yang bisa berjam-jam. Pola ini konsisten
-dengan download_dataset() di datasets.py (ZIP dataset), bukan pola job
-background di dataset_manager.py yang dipakai untuk pipeline ingesti."""
+"""GET /api/datasets/{id}/report - laporan PDF komprehensif (report.md)."""
 
 from __future__ import annotations
 

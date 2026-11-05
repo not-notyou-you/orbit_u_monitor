@@ -1,15 +1,4 @@
-<!-- pages/home.html — Beranda: Pantau Lokasi (INTERFACE.md §2 halaman 1, M63, M66).
-     Untuk SEMUA peran. Urutan: landing singkat → [Lokasi saya] → Informasi
-     lokasi (pilih kecamatan → KPI Pantau lokasi → peta) → Tema tampilan →
-     Detail lokasi.
-     * Lokasi saya (#hoMine): hanya pengguna yang sudah masuk, izin lokasi
-       diberikan, dan perangkat berada di kecamatan AOI; KPI dan Detail lalu
-       menampilkan kecamatan itu.
-     * Selain itu (pengunjung, di luar wilayah, izin ditolak/tidak didukung)
-       KPI dan Detail menampilkan kecamatan yang dipilih.
-     Isi beranda sebelum M63 ada di Tentang (#tentang). -->
 
-<!-- landing -->
 <div class="hero">
   <img class="hero-logo" src="assets/img/logo.svg" alt="Logo Orbit-U: The Monitor" width="112" height="112">
   <div class="hero-text">
@@ -27,24 +16,20 @@
   </div>
 </div>
 
-<!-- Lokasi saya -->
 <fieldset class="pl-sec" id="hoMine" hidden>
   <legend><span data-icon="pin" class="pl-ic"></span> Lokasi saya</legend>
   <p class="pl-where" id="hoMineWhere" role="status"></p>
 </fieldset>
 
-<!-- Informasi lokasi: pilihan kecamatan, KPI kecamatan terpilih, lalu peta -->
 <fieldset class="pl-sec" id="hoInfo">
   <legend><span data-icon="globe" class="pl-ic"></span> Informasi lokasi</legend>
   <div class="pl-geo" id="hoGeo" role="status" aria-live="polite"></div>
   <p class="mut pl-sub">Pilih kecamatan di bawah atau klik wilayahnya di peta untuk menampilkan kondisinya.</p>
   <div class="listbox pl-list" id="hoList" role="listbox" aria-label="Kecamatan yang dipantau"></div>
   <p class="mut pl-sub" id="hoListSum" style="margin-top:6px"></p>
-  <!-- Pantau lokasi: KPI satu kecamatan (M66) -->
   <div class="pl-kpi" id="hoPantau" hidden>
     <h2 class="pl-h" id="hoPantauTitle">Pantau lokasi</h2>
     <div class="readouts" id="hoKpi" aria-live="polite"></div>
-    <!-- M64: langganan peringatan email kecamatan ini (pengguna yang masuk). -->
     <p class="pl-sub-note" id="hoSub" hidden></p>
   </div>
   <div class="screen"><div class="screen-inner flush"><span class="scr-ch">CH-00 · KECAMATAN TERPANTAU</span><span class="scr-rec off" id="hoMapRec"></span>
@@ -55,7 +40,6 @@
   </div>
 </fieldset>
 
-<!-- tema tampilan (M57): empat pilihan, Kertas Mint bawaan -->
 <fieldset class="pl-sec" id="hoTheme">
   <legend id="hoThemeLegend">Tema tampilan</legend>
   <div class="tema-pick" id="hoThemes" role="radiogroup" aria-labelledby="hoThemeLegend"></div>
@@ -63,7 +47,6 @@
     Pilihan disimpan di peramban ini dan berlaku di semua halaman.</p>
 </fieldset>
 
-<!-- Detail lokasi: citra + statistik satu satelit -->
 <fieldset class="pl-sec" id="hoDetail" hidden>
   <legend id="hoDetailTitle">Detail lokasi</legend>
   <div class="pl-detail">

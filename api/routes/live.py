@@ -1,15 +1,4 @@
-# api/routes/live.py
-"""Live Monitoring (INTERFACE.md §4.3).
-
-Baca: USER (router dijaga require_role("USER") di api/main.py). Batas waktu
-sama dengan halaman Citra (M56, VIEW v_citra_scenes): USER 365 hari terakhir
-(plus scene terbaru, yang toh terlihat publik); ANALYST, DATA_ENGINEER, ADMIN
-tanpa batas. Tulis dan log: ADMIN.
-
-Perubahan baris (buat/ubah daerah) berjalan di sesi request ADMIN; siklus,
-retensi, dan penghapusan berkas dikerjakan LiveMonitor dengan koneksi
-monitor_etl (DATABASE.md §8.1).
-"""
+"""Live Monitoring (INTERFACE.md §4.3)."""
 from __future__ import annotations
 import logging
 from datetime import date, timedelta
@@ -95,9 +84,6 @@ async def delete_area(area_id: int, db: DatabaseClient = Depends(get_db),
     import asyncio
     try:
         _monitor(db).get_area(area_id)
-        # Menghapus berkas + baris dataset/produk adalah kerja pipeline
-        # (monitor_etl), seperti penghapusan dataset (Tahap 2, S1). Bisa lama;
-        # jangan blokir event loop.
         return await asyncio.to_thread(LiveMonitor(etl).delete_area, area_id)
     except LookupError as exc:
         raise HTTPException(404, str(exc))
@@ -145,9 +131,6 @@ async def area_preview(area_id: int, scene_date: str, key: str,
     if cutoff is not None and d < cutoff and d != _latest_scene_date(db, area_id):
         raise ApiError(403, f"Scenes older than {USER_WINDOW_DAYS} days are available to ANALYST, DATA_ENGINEER and ADMIN only",
                        "SCENE_OUT_OF_RANGE")
-    # Scene harus terlihat oleh role pemanggil (live_scenes: S untuk USER+). Folder
-    # berkasnya ada di `datasets`, yang tidak boleh dibaca USER/ANALYST (§8.3), jadi
-    # path dicari dengan koneksi etl SETELAH pemeriksaan ini (pola /public, T3-18).
     with db.session() as sess:
         visible = sess.scalar(select(func.count()).select_from(LiveScene).where(
             LiveScene.area_id == area_id, LiveScene.scene_date == d, LiveScene.deleted_at.is_(None)))
@@ -156,7 +139,6 @@ async def area_preview(area_id: int, scene_date: str, key: str,
     path = LiveMonitor(etl).preview_path(area_id, d, key, boundaries=boundaries)
     if path is None:
         raise HTTPException(404, "Preview not found")
-    # private: gambar hanya untuk pengguna login, jangan disimpan cache bersama.
     return FileResponse(path, media_type="image/png",
                         headers={"Cache-Control": "private, max-age=86400"})
 

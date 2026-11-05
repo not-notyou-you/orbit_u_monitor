@@ -1,21 +1,3 @@
-// js/data-source.js — Data › Satelit (#data/satelit/<sentinel-1|modis|gpm>, INTERFACE.md §2
-// halaman 6.2, M56, M67). Satu tab untuk ketiga satelit: pemilih di atas
-// mengganti segmen ketiga hash, router memanggil onSub, dan isi dimuat ulang
-// tanpa membuang fragmen. Dulu tiga tab terpisah (#data/sentinel-1, …).
-//
-// * Daftar: GET /api/data/{src}/items (termasuk yang dinonaktifkan).
-// * Ubah/hapus: PATCH .../items/{id} {is_valid, reason} (soft delete, alasan
-//   wajib, bisa dipulihkan) dan POST .../items/{id}/reprocess. Tidak ada
-//   "tambah manual" (M24).
-// * Backfill: POST /api/data/{src}/backfill.
-//   GPM/MODIS = Job Hidromet, Sentinel-1 = siklus Live dibatasi rentang (M58);
-//   keduanya di thread latar, progres + log dibaca dari
-//   GET /api/data/backfill/runs/{id}?since=n tiap 2 detik selama berjalan.
-//
-// M74: backfill satu baris di atas, kotak proses backfill hanya tampil bila
-// ada run atau backfill dari proses lain; riwayat dan data tersimpan jadi dua
-// tab. Kolom Aksi (dua tombol per baris × 50 baris) diganti klik baris →
-// dialog rincian dengan Proses ulang dan Nonaktifkan/Pulihkan.
 'use strict';
 Pages['data-source'] = (() => {
   const LABEL = { s1: 'Sentinel-1', gpm: 'GPM', modis: 'MODIS' };
@@ -26,7 +8,6 @@ Pages['data-source'] = (() => {
   };
   const RUN_STATUS = { RUNNING: ['BERJALAN', 'v-cyan'], COMPLETED: ['SELESAI', ''], FAILED: ['GAGAL', 'v-alert'], SKIPPED: ['DILEWATI', 'v-amber'] };
   const LIMIT = 50;
-  // Segmen hash → kunci API. Urutan = urutan pemilih.
   const SUB = { 'sentinel-1': 's1', modis: 'modis', gpm: 'gpm' };
   let st = null;
 
@@ -43,7 +24,6 @@ Pages['data-source'] = (() => {
     await refresh();
   }
 
-  // Satelit lain dipilih: hanya isi yang dimuat ulang.
   async function onSub(sub) {
     if (!st) return;
     const src = SUB[sub] || 's1';
@@ -63,7 +43,6 @@ Pages['data-source'] = (() => {
 
   function destroy() { if (st && st.poll) clearTimeout(st.poll); st = null; }
 
-  // ------------------------------------------------------------------ daftar
   async function loadItems() {
     const $ = s => UI.$(s, st.root);
     const from = $('#dsFrom').value, to = $('#dsTo').value;
@@ -98,7 +77,6 @@ Pages['data-source'] = (() => {
     st.ctx.setStatus('Siap · ' + UI.int(r.total) + ' item');
   }
 
-  // Rincian satu item + aksinya (dulu dua tombol di setiap baris tabel).
   async function openItem(id) {
     const x = (st.items || []).find(i => i.id === id);
     if (!x) return;
@@ -142,7 +120,6 @@ Pages['data-source'] = (() => {
     catch (e) { UI.showError('Proses ulang', e); }
   }
 
-  // ---------------------------------------------------------------- backfill
   async function startBackfill() {
     const $ = s => UI.$(s, st.root);
     const from = $('#dsBfFrom').value, to = $('#dsBfTo').value;
@@ -171,8 +148,6 @@ Pages['data-source'] = (() => {
     if (!st.run && r.runs.length) st.run = r.runs[0];
     st.hydromet = r.hydromet || null;
     if (st.src === 's1') {
-      // Siklus Live/backfill S1 dari proses lain (skrip, penjadwal): progresnya
-      // dibaca dari live_areas lewat /api/data/activity, sama seperti hidromet.
       const a = await API.get('/api/data/activity').catch(() => null);
       if (!st || st.src !== src) return;
       const live = a && (a.live || []).find(l => l.running);
@@ -180,14 +155,11 @@ Pages['data-source'] = (() => {
     }
     renderHydrometHistory(r.days || [], r.stale_dates || []);
     await pollRun();
-    // Backfill dari proses lain (skrip, scheduler, worker lain) tidak punya
-    // log di sini; perbarui progresnya dari DB tiap 10 detik.
     if (st && st.hydromet && st.hydromet.external && !(st.run && st.run.status === 'RUNNING')) {
       st.poll = setTimeout(() => { loadBackfill(); loadItems(); }, 10000);
     }
   }
 
-  // GPM/MODIS: baris log baru diambil sejak indeks terakhir (since).
   async function pollRun() {
     if (!st) return;
     if (st.poll) { clearTimeout(st.poll); st.poll = null; }

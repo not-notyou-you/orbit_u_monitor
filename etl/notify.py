@@ -1,29 +1,4 @@
-# etl/notify.py
-"""Peringatan email kondisi tidak normal per kecamatan (M64).
-
-Dipanggil di akhir job Hidromet harian dan siklus Live (etl/scheduler.py),
-setelah data barunya tersimpan. Satu putaran:
-
-1. penerima = notify_recipients(): akun aktif dengan email yang lolos
-   pengecekan dan minimal satu kecamatan langganan;
-2. kondisi tiap kecamatan langganan dihitung dengan aturan yang SAMA dengan
-   Beranda (etl/lokasi_data.py + etl/lokasi_interpret.py);
-3. butir "tidak normal" dikirim bila tanggal datanya baru (paling lama
-   app_settings notify.max_age_days, supaya backfill tanggal lampau tidak
-   memicu email) dan belum ada di notify_sent untuk pengguna itu. Kondisi
-   yang sama pada data baru tetap dikirim; data yang sama tidak pernah dua kali;
-4. satu email per pengguna, semua kecamatan pilihannya digabung, maksimal
-   MAIL_MAX_PER_RUN email per putaran.
-
-Kegagalan mengirim ke satu pengguna dicatat (EMAIL_ALERT_FAILED) dan tidak
-menghentikan yang lain; butirnya tidak dicatat terkirim sehingga dicoba lagi
-di putaran berikutnya selama datanya masih dalam jendela.
-
-CLI:
-    python -m etl.notify --once            # satu putaran sekarang
-    python -m etl.notify --once --to-file  # tulis .eml ke logs/mail, tanpa mengirim
-    python -m etl.notify --test you@example.org
-"""
+"""Peringatan email kondisi tidak normal per kecamatan (M64)."""
 from __future__ import annotations
 
 import argparse
@@ -143,7 +118,6 @@ def _run(db, *, source, cfg, today) -> dict:
                 if rid not in image_cache:
                     image_cache[rid] = _images(db, s, rid, fresh[rid], scenes)
                 imgs, scene_date = image_cache[rid]
-                # Hanya gambar yang menjelaskan butir untuk pengguna ini.
                 own = {k for it in items for k in IMAGE_KEYS.get(it["key"], ())}
                 blocks.append({"region": c["region"], "status": c["status"], "items": items,
                                "latest": c["latest"], "prev": c["prev"], "ranges": c["ranges"],

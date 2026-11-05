@@ -1,24 +1,4 @@
-# etl/report_forecast.py
-"""Prakiraan jangka pendek per dataset untuk laporan (etl/report_generator.py).
-
-Prinsip -- sengaja konservatif karena satu dataset hanya berisi beberapa bulan:
-
-* Horizon = sepertiga panjang periode dataset (10 hari -> 3 hari, 90 hari ->
-  30 hari). Hanya data dataset ini yang dipakai; tidak ada data luar.
-* Beberapa model sederhana bersaing: naif (nilai terakhir), rata-rata periode,
-  exponential smoothing (SES) dan Holt damped-trend. Model dipilih lewat
-  **backtest**: dilatih pada 2/3 awal, diuji pada 1/3 akhir -- panjang uji
-  sama dengan horizon prakiraan yang sesungguhnya, jadi error-nya jujur
-  mewakili apa yang akan terjadi.
-* Skill = 1 - MAE(model) / MAE(naif). Model yang tidak mengalahkan metode
-  naif tidak dipakai: yang dilaporkan adalah pilihan terbaik termasuk naif
-  itu sendiri, dengan tingkat keyakinan rendah.
-* Pita ketidakpastian 80%/95% dikalibrasi dari error backtest (bukan hanya
-  asumsi normal), lalu dipotong ke rentang fisik variabel.
-* Curah hujan dimodelkan di ruang log1p (distribusinya miring dan banyak nol).
-
-Modul ini murni numerik (numpy saja) -- tidak menyentuh DB atau disk.
-"""
+"""Prakiraan jangka pendek per dataset untuk laporan (etl/report_generator.py)."""
 from __future__ import annotations
 
 import math
@@ -59,9 +39,6 @@ class Forecast:
     notes: list[str] = field(default_factory=list)
 
 
-# -- variabel ------------------------------------------------------------------
-
-# key, label, satuan, source, (batas bawah, batas atas), log-transform
 _VARIABLES = [
     ("vv", "Sentinel-1 VV", "dB", "SENTINEL1", (-40.0, 5.0), False),
     ("vh", "Sentinel-1 VH", "dB", "SENTINEL1", (-40.0, 5.0), False),
@@ -111,8 +88,6 @@ def build_forecasts(st: rs.ReportStats) -> list[Forecast]:
     return out
 
 
-# -- inti ------------------------------------------------------------------------
-
 def _daily_grid(pts: list[tuple[date, float]]) -> tuple[list[date], np.ndarray, int]:
     """Observasi tak beraturan -> grid harian dengan interpolasi linier.
     Mengembalikan juga celah terpanjang (hari) untuk dicatat."""
@@ -140,7 +115,6 @@ def _forecast_one(key, label, unit, source, pts, bounds, log, period_end, h) -> 
     recent = [v for d, v in pts if d > last - timedelta(days=recent_n)]
     fc.recent_mean, fc.recent_days = (mean(recent) if recent else vals[-1]), recent_n
 
-    # Backtest: latih 2/3 awal, uji 1/3 akhir (panjang uji ~ horizon sungguhan).
     n_test = max(1, min(h, n // 3))
     n_train = n - n_test
     results = {}
@@ -171,7 +145,6 @@ def _forecast_one(key, label, unit, source, pts, bounds, log, period_end, h) -> 
     pred = final.predict(steps)
     base_sigma = final.sigma(steps)
 
-    # Kalibrasi pita dari error backtest: z = kuantil |error| / sigma model.
     z80, z95 = 1.2816, 1.96
     coverage = None
     if best in results:
@@ -194,7 +167,6 @@ def _forecast_one(key, label, unit, source, pts, bounds, log, period_end, h) -> 
     fc.lo95, fc.hi95 = clip(pred - z95 * base_sigma).tolist(), clip(pred + z95 * base_sigma).tolist()
     fc.model = best
 
-    # Rata-rata prakiraan hanya di jendela horizon (setelah period_end).
     horizon_vals = [v for d, v in zip(fc.days, fc.mean) if d > period_end]
     fc.forecast_mean = mean(horizon_vals) if horizon_vals else fc.mean[-1]
 
@@ -212,8 +184,6 @@ def _forecast_one(key, label, unit, source, pts, bounds, log, period_end, h) -> 
     if last < period_end:
         fc.notes.append(f"Last observation {last}; the forecast starts from that date.")
 
-    # Arah: bandingkan rata-rata prakiraan dengan kondisi terkini; perubahan
-    # di bawah 0,25 sigma periode dianggap tidak bermakna (stabil).
     diff = fc.forecast_mean - fc.recent_mean
     thr = 0.25 * (fc.period_std or 0)
     fc.direction = "stable" if abs(diff) <= thr else ("up" if diff > 0 else "down")
@@ -223,8 +193,6 @@ def _forecast_one(key, label, unit, source, pts, bounds, log, period_end, h) -> 
 def _back(a, log):
     return np.expm1(a) if log else a
 
-
-# -- model --------------------------------------------------------------------
 
 class _Model:
     def predict(self, h: int) -> np.ndarray: ...
@@ -322,8 +290,6 @@ _MODELS = {
 }
 
 
-# -- analisis turunan ---------------------------------------------------------
-
 def rain_outlook(st: rs.ReportStats, h: int) -> dict | None:
     """Prospek hujan berbasis distribusi empiris dataset: peluang hari hujan
     lebat dan rentang akumulasi h-hari dari jendela bergulir historis."""
@@ -363,7 +329,7 @@ def flood_scenario(st: rs.ReportStats, rain_fc: Forecast | None) -> dict | None:
     resid = float(np.std(y - (slope * x + intercept)))
     rain7_fc = 7 * (rain_fc.forecast_mean or 0)
     rain7_now = float(np.mean([r7[d] for d in sorted(r7)[-7:]]))
-    pred = lambda v: float(np.clip(slope * v + intercept, 0, 100))  # noqa: E731
+    pred = lambda v: float(np.clip(slope * v + intercept, 0, 100))
     return {
         "usable": True, "r": r, "n": len(common), "slope": float(slope), "intercept": float(intercept),
         "resid_std": resid, "rain7_forecast": rain7_fc, "rain7_recent": rain7_now,

@@ -1,21 +1,4 @@
-# etl/report_generator.py
-"""Pembuat laporan PDF + JSON per dataset (report/report-detailed.md, 10 section).
-
-Modul ini sengaja diisolasi dari pipeline ETL: dia hanya MEMBACA dataset yang
-sudah ada (DB + file di disk) dan tidak pernah menulis balik ke schema/produk
-data. Kegagalan generate laporan tidak boleh mengganggu ETL atau API lain --
-pemanggil (api/routes/report.py) menangkap ReportGenerationError dan
-mengembalikannya sebagai error HTTP biasa, bukan crash proses.
-
-Semua angka berasal dari etl/report_stats.py: query agregat ke DB (GROUP BY
-bulan/musim/tier/stage, STDDEV, persentil) dan statistik piksel dari raster
-COG MODIS/GPM milik dataset. Spesifikasi mencontohkan beberapa besaran yang
-TIDAK diukur oleh pipeline ini (validasi ground-truth per stasiun, akurasi
-geolokasi, phase coherence, LST -- produk MODIS di sini adalah MCDWD flood +
-indeks NDVI/NDWI, bukan MOD11A2). Modul ini secara sengaja TIDAK memalsukan
-angka tersebut: bagian terkait diisi dengan proksi yang benar-benar terukur
-(mis. uji konsistensi silang antar-sensor) dan diberi catatan eksplisit.
-"""
+"""Pembuat laporan PDF + JSON per dataset (report/report-detailed.md, 10 section)."""
 from __future__ import annotations
 
 import json
@@ -59,7 +42,6 @@ logger = logging.getLogger(__name__)
 
 REPORT_VERSION = "2.0"
 
-# Kategorikal, urutan tetap (colorblind-friendly). Entitas -> warna tetap.
 _CHART_COLORS = ["#4C72B0", "#DD8452", "#55A868", "#C44E52"]
 _SOURCE_COLORS = {"SENTINEL1": "#4C72B0", "MODIS": "#DD8452", "GPM": "#55A868", "FUSION": "#8172B3"}
 _INK = "#333333"
@@ -74,8 +56,6 @@ _TEXT_W = A4[0] - 1.5 * inch
 class ReportGenerationError(Exception):
     """Data dataset tidak cukup untuk membuat laporan, atau assembly PDF gagal."""
 
-
-# -- fonts --------------------------------------------------------------------
 
 _FONTS = {"body": "Helvetica", "bold": "Helvetica-Bold", "italic": "Helvetica-Oblique", "mono": "Courier"}
 
@@ -121,8 +101,6 @@ class _Styles:
 
 
 def _styles() -> _Styles:
-    # report.md "PDF Format Standards": Title 24pt, H1 16pt, H2 14pt, body 11pt,
-    # caption/footer 9pt, spasi 1.5.
     b, bd, it, mo = _FONTS["body"], _FONTS["bold"], _FONTS["italic"], _FONTS["mono"]
     body = ParagraphStyle("Body11", fontName=b, fontSize=10.5, leading=15.5, spaceAfter=4)
     return _Styles(
@@ -174,7 +152,6 @@ class _ReportDocTemplate(SimpleDocTemplate):
         self.canv.addOutlineEntry(text, key, level=level, closed=False)
 
     def handle_documentBegin(self):
-        # multiBuild menjalankan beberapa pass; catatan halaman hanya dari pass terakhir.
         self.section_pages = []
         self._toc_seq = 0
         super().handle_documentBegin()
@@ -241,8 +218,6 @@ class ReportGenerator:
 
         return out_path
 
-    # -- caching ------------------------------------------------------------
-
     def _find_cached(self, reports_dir: Path, info: dict) -> Path | None:
         """Laporan lama dipakai ulang kalau tidak ada perubahan dataset sejak
         dibuat (report.md, "Cache chart PNGs, regen only on dataset update").
@@ -260,8 +235,6 @@ class ReportGenerator:
             updated_at = updated_at.replace(tzinfo=timezone.utc)
         mtime = datetime.fromtimestamp(latest.stat().st_mtime, tz=timezone.utc)
         return latest if mtime >= updated_at else None
-
-    # -- data gathering -------------------------------------------------------
 
     def _quality_dicts(self) -> list[dict]:
         from api.routes.quality import compute_quality_by_source
@@ -281,7 +254,7 @@ class ReportGenerator:
 
         try:
             audit = audit_dataset_coverage(self.db, self.dataset_id, dataset_name)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.exception("[report] audit cakupan dilewati untuk dataset %s", self.dataset_id)
             return []
         issues = []
@@ -309,15 +282,12 @@ class ReportGenerator:
             })
         return issues
 
-
     def _preview_images_for_source(self, ctx: _ReportContext, source: str) -> list[tuple[Path, str]]:
         """Preview berwarna milik satu source (Section 6/7/8): SEMUA band source
         itu pada satu tanggal representatif dari folder `colored/`, ditambah
         overlay `composite/` ({band}_on_s1) kalau ada. `grayscale/` hanya
         dipakai kalau tidak ada preview berwarna sama sekali.
-
-        module10_generate_preview.py menamai {tanggal}_{s1|modis|gpm}_{band}.png;
-        tidak ada tabel preview di DB, jadi daftarnya dibaca dari disk."""
+        """
         token = _SOURCE_PREVIEW_TOKENS.get(source)
         if token is None:
             return []
@@ -339,8 +309,6 @@ class ReportGenerator:
                     day = max(by_date, key=lambda d: (len(by_date[d]), _preview_date_score(ctx.stats, source, d)))
                     return by_date[day]
         return []
-
-    # -- charts -----------------------------------------------------------
 
     def _save(self, ctx: _ReportContext, fig, name: str) -> Path:
         path = ctx.root / "reports" / "_charts" / name
@@ -652,8 +620,6 @@ class ReportGenerator:
         ax.set_axisbelow(True)
         return self._save(ctx, fig, "chart_scorecard.png")
 
-    # -- PDF assembly -------------------------------------------------------
-
     def _build_pdf(self, ctx: _ReportContext, out_path: Path) -> dict:
         S = _styles()
         ds = ctx.dataset
@@ -713,8 +679,6 @@ class ReportGenerator:
             "queries": st.queries,
             "charts": ctx.charts,
         }
-
-    # -- Section 1 ------------------------------------------------------------
 
     def _section_cover(self, story, ctx, S, generated_at) -> None:
         ds, st = ctx.dataset, ctx.stats
@@ -776,8 +740,6 @@ class ReportGenerator:
         ])
         story.append(toc)
         story.append(PageBreak())
-
-    # -- Section 2 ------------------------------------------------------------
 
     def _section_config(self, story, ctx, S) -> None:
         ds, st = ctx.dataset, ctx.stats
@@ -900,8 +862,6 @@ class ReportGenerator:
                 S.note)]))
         story.extend(_section_break())
 
-    # -- Section 3 ------------------------------------------------------------
-
     def _section_ablation(self, story, ctx, S, chart_dir) -> None:
         st = ctx.stats
         story.append(Paragraph("3. Processing Level Comparison &amp; Ablation Study", S.section))
@@ -976,8 +936,6 @@ class ReportGenerator:
         if not any_src and not eff and not abl:
             story.append(Paragraph("No products have been recorded yet to compare across levels.", S.body))
         story.extend(_section_break())
-
-    # -- Section 4 ------------------------------------------------------------
 
     def _section_fusion(self, story, ctx, S) -> None:
         ds, st = ctx.dataset, ctx.stats
@@ -1057,8 +1015,6 @@ class ReportGenerator:
                 story.append(_table(rows, [1.3 * inch, 0.8 * inch, 1.5 * inch, 1.5 * inch, 1.6 * inch], S))
         story.extend(_section_break())
 
-    # -- Section 5 ------------------------------------------------------------
-
     def _section_trends(self, story, ctx, S) -> None:
         st = ctx.stats
         story.append(Paragraph("5. Overall Trends &amp; Patterns", S.section))
@@ -1127,8 +1083,6 @@ class ReportGenerator:
         for i, (title, text) in enumerate(_key_findings(ctx, table), 1):
             story.append(Paragraph(f"<b>{i}. {title}</b> — {text}", S.bullet))
         story.extend(_section_break())
-
-    # -- Section 6 ------------------------------------------------------------
 
     def _section_s1(self, story, ctx, S) -> None:
         st = ctx.stats
@@ -1277,8 +1231,6 @@ class ReportGenerator:
         self._previews(story, ctx, S, "SENTINEL1")
         story.extend(_section_break())
 
-    # -- Section 7 ------------------------------------------------------------
-
     def _section_modis(self, story, ctx, S) -> None:
         st = ctx.stats
         story.append(Paragraph("7. MODIS Deep Dive", S.section))
@@ -1308,7 +1260,7 @@ class ReportGenerator:
             srows = [r for r in st.seasonal_raster("MODIS", band) if r["n"]]
             if srows:
                 story.append(Paragraph(
-                    f"Per season: " + "; ".join(f"{r['label']} mean {r['mean']:.3f} (n={r['n']})" for r in srows if r["mean"] is not None)
+                    "Per season: " + "; ".join(f"{r['label']} mean {r['mean']:.3f} (n={r['n']})" for r in srows if r["mean"] is not None)
                     + ".", S.body))
 
         story.append(CondPageBreak(3.5 * inch))
@@ -1358,8 +1310,6 @@ class ReportGenerator:
         story.append(_table(rows, [2.4 * inch, 0.7 * inch, 0.9 * inch, 1.2 * inch, 1.4 * inch], S))
         self._previews(story, ctx, S, "MODIS")
         story.extend(_section_break())
-
-    # -- Section 8 ------------------------------------------------------------
 
     def _section_gpm(self, story, ctx, S) -> None:
         st = ctx.stats
@@ -1431,7 +1381,7 @@ class ReportGenerator:
             flood_by_day = {o.day: o for o in st.raster_band("MODIS", "FLOOD")}
             resp = []
             for e in events:
-                after = [flood_by_day.get(e["day"] + timedelta(days=k)) for k in range(0, 4)]
+                after = [flood_by_day.get(e["day"] + timedelta(days=k)) for k in range(4)]
                 after = [o for o in after if o and o.mean is not None and o.valid_frac >= .3]
                 if after:
                     resp.append(f"{e['day']:%d %b}: MODIS flood max {max(o.mean for o in after):.2f}% of pixels within 0–3 days")
@@ -1454,8 +1404,6 @@ class ReportGenerator:
         story.append(_table(rows, [1.7 * inch, 0.5 * inch, 1.0 * inch, 0.8 * inch, 0.9 * inch, 0.9 * inch, 1.0 * inch], S))
         self._previews(story, ctx, S, "GPM")
         story.extend(_section_break())
-
-    # -- Section 9 ------------------------------------------------------------
 
     def _section_quality(self, story, ctx, S, chart_dir) -> None:
         story.append(Paragraph("9. Data Quality &amp; Warnings", S.section))
@@ -1526,8 +1474,6 @@ class ReportGenerator:
             story.append(Paragraph("Storage per Tier", S.sub2))
             story.append(_img(storage_chart))
         story.extend(_section_break())
-
-    # -- Section 10: kesimpulan & prakiraan ---------------------------------------
 
     def _section_outlook(self, story, ctx, S) -> None:
         st = ctx.stats
@@ -1640,8 +1586,6 @@ class ReportGenerator:
             "official forecasts (e.g. BMKG) as the primary reference.", S.note))
         story.extend(_section_break())
 
-    # -- Section 11 -----------------------------------------------------------
-
     def _section_json(self, story, ctx, S) -> None:
         story.append(Paragraph("11. JSON Summary &amp; Machine-Readable Export", S.section))
         story.append(Paragraph("11.1 Complete Metadata JSON", S.sub))
@@ -1650,9 +1594,6 @@ class ReportGenerator:
             "is available via <i>GET /api/datasets/{id}/report/json</i>. A <i>null</i> value means that quantity "
             "was not measured by the pipeline (see the notes in the relevant section).", S.body))
         payload = _json_summary(ctx)
-        # Versi PDF diringkas: rincian yang sudah tampil sebagai tabel di section lain
-        # (storage, quality, processing_levels, rekomendasi, detail backtest) hanya
-        # dirujuk. File .json di samping PDF memuat versi lengkapnya.
         full = "<see the .json file>"
         for key in ("storage", "quality", "processing_levels", "recommendations"):
             payload[key] = full
@@ -1676,7 +1617,6 @@ class ReportGenerator:
         colored = "grayscale" not in imgs[0][0].parent.name
         story.append(CondPageBreak(3.2 * inch))
         story.append(Paragraph(f"Example Preview{' (Coloured)' if colored else ''} — {day[:4]}-{day[4:6]}-{day[6:]}", S.sub2))
-        # grid 3 kolom: gambar di atas, label band di bawahnya
         per_row, size = 3, 2.05 * inch
         cells = []
         for p, label in imgs:
@@ -1693,8 +1633,6 @@ class ReportGenerator:
         story.append(grid)
         story.append(Paragraph(_PREVIEW_LEGENDS.get(src, ""), S.note))
 
-
-# -- content helpers ---------------------------------------------------------
 
 _PREVIEW_BAND_LABELS = {
     "s1_vv": "Sentinel-1 VV", "s1_vh": "Sentinel-1 VH",
@@ -2011,7 +1949,7 @@ def _ablation_narrative(src, tiers, stage_by_name, st) -> list[str]:
 def _case_studies(ctx) -> list[dict]:
     ds, st = ctx.dataset, ctx.stats
     out = []
-    raster_day = lambda src, band, d: next((o for o in st.raster_band(src, band) if o.day == d), None)  # noqa: E731
+    raster_day = lambda src, band, d: next((o for o in st.raster_band(src, band) if o.day == d), None)
     s1_by_day = {}
     for m in st.s1_metrics:
         if m["date"]:
@@ -2059,7 +1997,6 @@ def _case_studies(ctx) -> list[dict]:
         }
         return json.dumps(rec, indent=2)
 
-    # Case 1: complete, offset 0, S1 PASS, MODIS valid tertinggi
     complete = [f for f in st.fusion if f["n_sources"] == 3 and not f["s1_offset_days"]]
     if complete:
         def score(f):
@@ -2078,7 +2015,6 @@ def _case_studies(ctx) -> list[dict]:
         out.append({"title": "Case Study 1: Optimal Alignment (all three sources)",
                     "paras": ["There is no stack with all three sources in this dataset."]})
 
-    # Case 2: parsial -- 2 source, atau S1 dipinjam; fallback: stack lengkap dengan MODIS paling tertutup awan
     partial = [f for f in st.fusion if f["n_sources"] == 2 or (f["s1_offset_days"] or 0) != 0]
     if partial:
         f = partial[0]
@@ -2108,13 +2044,11 @@ def _case_studies(ctx) -> list[dict]:
         else:
             out.append({"title": "Case Study 2: Partial Alignment (2 of 3)", "paras": paras})
 
-    # Case 3: hari hanya auxiliary (tanpa S1 dan tanpa stack)
     fused_days = {f["date"] for f in st.fusion}
     s1_days = sorted(st.obs_dates.get("SENTINEL1", []))
     aux_days = sorted((set(st.obs_dates.get("MODIS", [])) | set(st.obs_dates.get("GPM", []))) - fused_days - set(s1_days))
     tol = ds.get("s1_match_tolerance_days") or 0
     if aux_days and s1_days:
-        # hari dengan jarak terjauh ke S1 terdekat -- paling informatif
         def dist(d):
             return min(abs((d - s).days) for s in s1_days)
         d = max(aux_days, key=dist)
@@ -2634,8 +2568,6 @@ def _forecast_json(ctx) -> dict | None:
     }
 
 
-# -- small helpers -----------------------------------------------------------
-
 def _fig():
     fig, ax = plt.subplots(figsize=(6.8, 3.1))
     ax.spines[["top", "right"]].set_visible(False)
@@ -2746,8 +2678,6 @@ def _kv_table(pairs: list[tuple[str, str]], S: _Styles) -> Table:
     return t
 
 
-# Logo Nusantara di kepala halaman PDF. PNG dibuat dari web/assets/img/logo.svg
-# (reportlab tidak membaca SVG); sudut di luar lingkaran transparan.
 LOGO_PNG = Path(__file__).resolve().parents[1] / "web" / "assets" / "img" / "logo.png"
 
 
@@ -2805,8 +2735,8 @@ def _ascii_bbox(b, label: str) -> str:
     W, E, S_, N = w - dx, e + dx, s - dy, n + dy
     cols, rows = 50, 13
     grid = [[" "] * cols for _ in range(rows)]
-    cx = lambda lon: int(round((lon - W) / (E - W) * (cols - 1)))  # noqa: E731
-    cy = lambda lat: int(round((N - lat) / (N - S_) * (rows - 1)))  # noqa: E731
+    cx = lambda lon: int(round((lon - W) / (E - W) * (cols - 1)))
+    cy = lambda lat: int(round((N - lat) / (N - S_) * (rows - 1)))
     x0, x1, y0, y1 = cx(w), cx(e), cy(n), cy(s)
     for x in range(x0, x1 + 1):
         grid[y0][x] = grid[y1][x] = "─"
@@ -2823,7 +2753,7 @@ def _ascii_bbox(b, label: str) -> str:
     for i, ch in enumerate(tag):
         if start + i < x1:
             grid[my][start + i] = ch
-    lat_lbl = lambda v: f"{abs(v):.2f}°{'S' if v < 0 else 'N'}"  # noqa: E731
+    lat_lbl = lambda v: f"{abs(v):.2f}°{'S' if v < 0 else 'N'}"
     out = [f"┌{'─' * (cols + 12)}┐", f"│{('CONTEXT: ' + label).center(cols + 12)[:cols + 12]}│"]
     for y in range(rows):
         lbl = lat_lbl(n) if y == y0 else lat_lbl(s) if y == y1 else lat_lbl((s + n) / 2) if y == my else ""
@@ -3091,5 +3021,4 @@ def _e(s) -> str:
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-# kompatibilitas nama lama
 _escape = _e

@@ -1,24 +1,16 @@
-"""Skema setara, pemuat data, kueri Q1–Q5, dan uji fitur F1–F3 per DBMS (DATABASE.md §1).
-
-PostgreSQL 14+ + PostGIS 3 dan MySQL 8.0 memakai skema yang setara: tipe kolom,
-PK/FK, index, dan kueri dengan makna sama. Perbedaan dialek ditulis eksplisit di
-sini agar bisa dibaca penguji, bukan disembunyikan ORM.
-"""
+"""Skema setara, pemuat data, kueri Q1–Q5, dan uji fitur F1–F3 per DBMS (DATABASE.md §1)."""
 
 from __future__ import annotations
 
 import csv
 from pathlib import Path
 
-# --------------------------------------------------------------------------- parameter kueri (tetap)
 Q_DATE = "2024-12-15"
 Q_REGION, Q_BAND, Q_FROM, Q_TO = 9, "RAIN_24H", "2024-11-16", "2024-12-15"
-# Poligon uji Q3: memotong beberapa kecamatan AOI (EPSG:4326).
 Q_POLY = "POLYGON((106.00 -6.95,106.30 -6.95,106.30 -6.80,106.00 -6.80,106.00 -6.95))"
 Q_PRODUCT_DEPTH = 6   # produk di ujung rantai 6 tingkat dicari otomatis
 
 
-# =========================================================================== PostgreSQL
 PG_SCHEMA = """
 DROP SCHEMA IF EXISTS bench CASCADE;
 CREATE SCHEMA bench;
@@ -116,16 +108,13 @@ def pg_load(conn, data: Path) -> dict:
 
 def pg_deep_product(conn) -> int:
     cur = conn.cursor()
-    # Produk pertama tanpa anak yang berada di rantai 6 tingkat (rantai ke-0, 3, 6, … dibuat 6 tingkat).
     cur.execute("""SELECT product_id FROM bench.data_products WHERE product_tier = 'DERIVED' ORDER BY product_id LIMIT 1""")
     return cur.fetchone()[0]
 
 
-# --- F1–F3 PostgreSQL --------------------------------------------------------------------------
 def pg_features(conn) -> list[dict]:
     cur = conn.cursor()
     res = []
-    # F1: SET LOCAL ROLE per transaksi — hak role hanya berlaku sampai COMMIT/ROLLBACK.
     cur.execute("""DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'bench_reader') THEN
                      CREATE ROLE bench_reader NOLOGIN; END IF; END $$;
                    GRANT USAGE ON SCHEMA bench TO bench_reader;
@@ -144,7 +133,6 @@ def pg_features(conn) -> list[dict]:
     back = cur.fetchone()[0]
     res.append({"feature": "F1", "name": "SET ROLE per transaksi", "result": "DIDUKUNG" if ok_read and denied and back != "bench_reader" else "GAGAL",
                 "evidence": f"SET LOCAL ROLE: SELECT diizinkan, DELETE ditolak={denied}, role kembali '{back}' setelah ROLLBACK"})
-    # F2: Row-level security.
     cur.execute("""ALTER TABLE bench.disaster_events ENABLE ROW LEVEL SECURITY;
                    DROP POLICY IF EXISTS only_verified ON bench.disaster_events;
                    CREATE POLICY only_verified ON bench.disaster_events FOR SELECT TO bench_reader USING (is_verified);
@@ -158,7 +146,6 @@ def pg_features(conn) -> list[dict]:
     conn.rollback()
     res.append({"feature": "F2", "name": "Row-level security", "result": "DIDUKUNG" if seen == verified < total else "GAGAL",
                 "evidence": f"CREATE POLICY: role terbatas melihat {seen} dari {total} baris (terverifikasi {verified})"})
-    # F3: trigger audit dengan OLD/NEW sebagai JSON tanpa menyebut kolom.
     cur.execute("""CREATE TABLE IF NOT EXISTS bench.audit (id bigserial PRIMARY KEY, tbl text, op text, old_data jsonb, new_data jsonb);
                    CREATE OR REPLACE FUNCTION bench.audit_row() RETURNS trigger LANGUAGE plpgsql AS $f$
                    BEGIN INSERT INTO bench.audit (tbl, op, old_data, new_data)
@@ -174,7 +161,6 @@ def pg_features(conn) -> list[dict]:
     return res
 
 
-# =========================================================================== MySQL 8.0
 MYSQL_SCHEMA = [
     "DROP TABLE IF EXISTS data_lineage, data_products, alert_events, disaster_events, observations, regions, audit",
     """CREATE TABLE regions (region_id int PRIMARY KEY, pcode varchar(20) UNIQUE NOT NULL, region_name varchar(100) NOT NULL,
@@ -209,11 +195,6 @@ MYSQL_QUERIES = {
         WHERE r.in_aoi GROUP BY r.region_id, r.region_name ORDER BY r.region_name"""),
     "Q2": ("""SELECT obs_date, value FROM observations
         WHERE region_id = %(r)s AND band_code = %(b)s AND obs_date BETWEEN %(a)s AND %(z)s ORDER BY obs_date"""),
-    # MySQL 8: ST_Area pada SRID geografis (4326) mengembalikan m² geodesik sejak 8.0.13.
-    # ST_Intersection geografis MySQL menyisakan POINT presisi di tepi irisan
-    # (GEOMETRYCOLLECTION), dan ST_Area menolak collection (galat 3516). Luas
-    # dijumlah dari anggota poligon saja — setara PostGIS, yang memberi luas 0
-    # untuk titik. Tanpa ST_CollectionExtract di MySQL 8.0, pakai deret 1..10.
     "Q3": ("""WITH RECURSIVE t AS (
             SELECT region_id, region_name,
                    ST_Intersection(geom, ST_GeomFromText(%(p)s, 4326, 'axis-order=long-lat')) AS i
@@ -279,9 +260,6 @@ def mysql_features(conn, schema: str) -> list[dict]:
     """F1–F3 di MySQL 8.0, dinilai dengan kriteria yang sama."""
     cur = conn.cursor()
     res = []
-    # F1: SET ROLE ada (8.0) tetapi berlaku per sesi, bukan per transaksi; ROLLBACK tidak memulihkannya.
-    # Kriteria sama dengan PostgreSQL: setelah SET ROLE, apakah DELETE ditolak?
-    # Di MySQL hak role DITAMBAHKAN ke hak akun koneksi, tidak menggantikannya.
     try:
         cur.execute("CREATE ROLE IF NOT EXISTS bench_reader")
         cur.execute(f"GRANT SELECT ON {schema}.observations TO bench_reader")
@@ -291,7 +269,7 @@ def mysql_features(conn, schema: str) -> list[dict]:
         try:
             cur.execute("DELETE FROM observations WHERE obs_id = -1")
             denied = False
-        except Exception:  # noqa: BLE001
+        except Exception:
             denied = True
         cur.execute("ROLLBACK")
         cur.execute("SELECT CURRENT_ROLE()")
@@ -300,12 +278,10 @@ def mysql_features(conn, schema: str) -> list[dict]:
         res.append({"feature": "F1", "name": "SET ROLE per transaksi", "result": "SEBAGIAN",
                     "evidence": f"SET ROLE per sesi; DELETE ditolak={denied} (hak akun tetap berlaku); "
                                 f"setelah ROLLBACK CURRENT_ROLE() masih {still} — aplikasi harus mereset manual"})
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         res.append({"feature": "F1", "name": "SET ROLE per transaksi", "result": "GAGAL", "evidence": str(e)[:200]})
-    # F2: tidak ada row-level security bawaan; hanya emulasi dengan VIEW + DEFINER.
     res.append({"feature": "F2", "name": "Row-level security", "result": "TIDAK DIDUKUNG",
                 "evidence": "MySQL 8.0 tidak punya CREATE POLICY; emulasi lewat VIEW SQL SECURITY DEFINER + GRANT pada VIEW"})
-    # F3: trigger bisa, tetapi tidak ada konversi baris→JSON generik; kolom harus disebut satu per satu.
     try:
         cur.execute("CREATE TABLE IF NOT EXISTS audit (id bigint AUTO_INCREMENT PRIMARY KEY, tbl varchar(64), op varchar(10), old_data json, new_data json)")
         cur.execute("DROP TRIGGER IF EXISTS t_audit")
@@ -320,12 +296,11 @@ def mysql_features(conn, schema: str) -> list[dict]:
         cur.execute("ROLLBACK")
         res.append({"feature": "F3", "name": "Trigger audit OLD/NEW sebagai JSON", "result": "SEBAGIAN" if ok else "GAGAL",
                     "evidence": "JSON_OBJECT harus menyebut setiap kolom per tabel; tidak ada padanan to_jsonb(OLD)"})
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         res.append({"feature": "F3", "name": "Trigger audit OLD/NEW sebagai JSON", "result": "GAGAL", "evidence": str(e)[:200]})
     return res
 
 
-# =========================================================================== MongoDB 7 (fitur saja, tanpa benchmark)
 MONGODB_FEATURES = [
     {"feature": "F1", "name": "SET ROLE per transaksi", "result": "TIDAK DIDUKUNG",
      "evidence": "Hak akses per pengguna koneksi; tidak ada pergantian role di dalam transaksi"},

@@ -1,32 +1,4 @@
-# etl/live_monitor.py
-"""Live Monitoring: pemantauan otomatis per Daerah Live (PIPELINE.md §4).
-
-BENTUK DATA
-    Satu Daerah Live = satu baris `datasets` (dataset_kind='LIVE_AREA') + satu
-    baris `live_areas`. Dataset-nya diproses pipeline biasa
-    (module5_orchestrator.run_dataset_job) dengan konfigurasi tetap:
-
-        sumber      : Sentinel-1, MODIS, GPM -- semuanya PROCESSED
-        tier simpan : COG saja (rank 3). FUSION otomatis dilewati karena
-                      compute_skip_stages() memangkas tahap di atas tier
-                      tertinggi yang diminta; tidak ada HDF5 yang ditulis.
-        strategi    : CO_OCCURRENCE. Validasi multi-sumber mewajibkan strategi,
-                      dan CO_OCCURRENCE berjangkar pada tanggal S1 -- persis
-                      definisi "scene" di dokumen -- sehingga MODIS/GPM hanya
-                      diunduh untuk tanggal S1, tanpa hari tambahan.
-        preview     : tahap PREVIEW pipeline dimatikan; Live merender 8 PNG-nya
-                      sendiri (etl/live_preview.py) dari COG yang tersisa.
-
-    Scene = tanggal akuisisi S1. Log per scene ada di `live_scenes` (tidak
-    pernah dihapus, hanya ditandai deleted_at) dan log langkah di `live_events`.
-
-PENGHAPUSAN
-    Retensi melakukan hard delete berkas satu scene. Berkas hanya dihapus kalau
-    path-nya (setelah resolve) berada di dalam root dataset LIVE_AREA milik
-    daerah itu -- lihat _LiveFiles. Semua berkas dataset biasa tinggal di root
-    dataset-nya sendiri (data/datasets/{id}_{slug}/), jadi tidak pernah bisa
-    tersentuh.
-"""
+"""Live Monitoring: pemantauan otomatis per Daerah Live (PIPELINE.md §4)."""
 from __future__ import annotations
 
 import logging
@@ -54,9 +26,6 @@ from etl.database_client import (
 
 logger = logging.getLogger(__name__)
 
-# Batas jumlah daerah aktif sekaligus. Tiap daerah mengunduh scene S1 (~1 GB
-# sebelum crop) + granule MODIS/GPM tiap siklus, jadi angka ini menjaga
-# storage dan kuota API NASA/Copernicus.
 MAX_AREAS = 5
 MIN_RETENTION = 1
 MAX_RETENTION = 60  # M11: batas atas retensi (app_settings.live.retention_max)
@@ -66,8 +35,6 @@ LIVE_SOURCES = {"SENTINEL1": ["PROCESSED"], "MODIS": ["PROCESSED"], "GPM": ["PRO
 LIVE_REQUIRED_TIERS = ["COG"]
 LIVE_FUSION_STRATEGY = "CO_OCCURRENCE"
 
-# Revisit S1 ~6-12 hari. Siklus masih dianggap backfill selama scene tertua
-# lebih muda dari awal jendela raster + cadangan ini (M58).
 S1_REVISIT_DAYS = 12
 BACKFILL_MARGIN_DAYS = 14
 
@@ -108,8 +75,6 @@ class _CycleGate:
                 self._cond.notify_all()
 
 
-# Satu siklus pada satu waktu, lintas daerah: kuota unduhan dan disk lebih
-# penting daripada kecepatan, dan run_dataset_job sendiri sudah multi-thread.
 _CYCLE_LOCK = _CycleGate()
 _area_threads: dict[int, threading.Thread] = {}
 _threads_guard = threading.Lock()
@@ -127,20 +92,12 @@ def forecast_steps(n_scenes: int) -> int:
     return min(MAX_FORECAST_STEPS, max(1, math.ceil(n_scenes / 3))) if n_scenes > 0 else 0
 
 
-# ---------------------------------------------------------------------------
-# Berkas milik satu Daerah Live
-# ---------------------------------------------------------------------------
-
 class UnsafeDeletion(RuntimeError):
     """Penghapusan ditolak karena target di luar root dataset LIVE_AREA."""
 
 
 class _LiveFiles:
-    """Pencari & penghapus berkas satu dataset LIVE_AREA.
-
-    Semua operasi disaring lewat _inside(): path di-resolve dulu (symlink,
-    '..') lalu wajib berada di bawah root dataset ini. Kalau dataset-nya bukan
-    LIVE_AREA, konstruktor menolak -- penjaga kedua selain filter path."""
+    """Pencari & penghapus berkas satu dataset LIVE_AREA."""
 
     def __init__(self, dataset_id: int, dataset_name: str, dataset_kind: str) -> None:
         if dataset_kind != "LIVE_AREA":
@@ -169,7 +126,6 @@ class _LiveFiles:
         dk = scene_date.strftime("%Y%m%d")
         found: set[Path] = set()
         patterns = (
-            # S1: product_identifier memuat stempel akuisisi YYYYMMDDTHHMMSS.
             (fm.SOURCE_DIR_NAMES["sentinel1"], f"*_{dk}T*"),
             (fm.SOURCE_DIR_NAMES["modis"], f"*_{dk}_*"),
             (fm.SOURCE_DIR_NAMES["gpm"], f"*_{dk}.*"),
@@ -185,10 +141,7 @@ class _LiveFiles:
         return sorted(p for p in found if self._inside(p))
 
     def stale_granules(self, keep_from: date) -> list[Path]:
-        """Granule mentah di cache yang tidak lagi dibutuhkan scene mana pun.
-
-        Window GPM 7 hari scene tertua masih membaca granule 6 hari sebelum
-        tanggalnya, jadi batasnya keep_from - 7 hari."""
+        """Granule mentah di cache yang tidak lagi dibutuhkan scene mana pun."""
         cutoff = keep_from - timedelta(days=7)
         cache = fm.get_granule_cache_root(self.root)
         if not cache.is_dir():
@@ -252,19 +205,12 @@ def _preview_urls(item: dict, url: str) -> dict:
     return out
 
 
-# ---------------------------------------------------------------------------
-# LiveMonitor
-# ---------------------------------------------------------------------------
-
 class LiveMonitor:
     def __init__(self, db: DatabaseClient, runner_db: DatabaseClient | None = None) -> None:
         self._db = db
-        # Klien untuk kerja latar/berkas (siklus, retensi, hapus daerah).
-        # Dari request API: `db` = sesi request ADMIN, `runner_db` =
-        # monitor_etl (DATABASE.md §8.1). Di luar API keduanya sama.
         self._runner_db = runner_db or db
 
-    def _runner(self) -> "LiveMonitor":
+    def _runner(self) -> LiveMonitor:
         return self if self._runner_db is self._db else LiveMonitor(self._runner_db)
 
     def _after_commit(self, fn) -> None:
@@ -282,8 +228,6 @@ class LiveMonitor:
             upper = int(get_setting(sess, "live.retention_max", MAX_RETENTION))
         return _check_retention(value, min(upper, MAX_RETENTION))
 
-    # --- log --------------------------------------------------------------
-
     def log(self, area_id: int, step: str, status: str, message: str,
             scene_date: date | None = None, **details) -> None:
         level = logging.WARNING if status in ("FAILED", "WARNING") else logging.INFO
@@ -296,8 +240,6 @@ class LiveMonitor:
                 ))
         except Exception:
             logger.exception("[LIVE] gagal menulis live_events")
-
-    # --- manajemen daerah -------------------------------------------------
 
     def create_area(self, region_id: int, name: str | None = None,
                     retention: int | None = None, start: bool = True) -> dict:
@@ -419,15 +361,11 @@ class LiveMonitor:
         for d in dates:
             total_freed += self.delete_scene(area_id, d, reason="area deleted")
 
-        # Sisa berkas (cache granule, metadata.json, scratch) + baris dataset.
-        # DeletionManager bekerja di root dataset ini saja.
         leftover = {"deleted_count": 0, "freed_bytes": 0}
         info = self._dataset_info(dataset_id)
         if info is not None:
             _LiveFiles(*info)  # penjaga: menolak kalau bukan LIVE_AREA
             from etl.deletion_manager import DeletionManager
-            # is_deletable=False hanya menutup jalur "Dataset Saya"; penghapus
-            # yang sah untuk dataset ini adalah LiveMonitor sendiri.
             with self._db.session() as sess:
                 sess.get(Dataset, dataset_id).is_deletable = True
             try:
@@ -447,8 +385,6 @@ class LiveMonitor:
                  leftover_files=leftover.get("deleted_count"))
         return {"area_id": area_id, "status": "DELETED", "freed_bytes": total_freed,
                 "deleted_scenes": len(dates)}
-
-    # --- retensi ------------------------------------------------------------
 
     def window_start(self) -> date:
         """Tanggal tertua yang berkas rasternya masih disimpan (M58)."""
@@ -474,8 +410,6 @@ class LiveMonitor:
             ).all()]
         for d in old:
             self.delete_scene(area_id, d, reason=reason)
-        # Granule cache: hanya yang dibutuhkan scene paling baru. Scene lama
-        # sudah selesai diproses; granulenya bisa diunduh ulang bila perlu.
         with self._db.session() as sess:
             newest = sess.scalar(select(LiveScene.scene_date).where(
                 LiveScene.area_id == area_id, LiveScene.deleted_at.is_(None),
@@ -542,8 +476,6 @@ class LiveMonitor:
         except Exception:
             logger.exception("[LIVE] gagal menandai data_products dataset=%s", dataset_id)
 
-    # --- siklus (etl/live_cycle.py) -----------------------------------------
-
     def start_cycle(self, area_id: int) -> bool:
         """Jalankan siklus satu daerah di thread latar. False kalau sudah jalan."""
         with _threads_guard:
@@ -574,8 +506,6 @@ class LiveMonitor:
         from etl.live_cycle import refresh_forecast
         refresh_forecast(self, area_id)
 
-    # --- kartu & log ---------------------------------------------------------
-
     def get_card(self, area_id: int, scene_date: date | None = None) -> dict:
         """Isi kartu daerah: scene terpilih (default terbaru) + daftar tanggal
         + forecast tersimpan. Tidak menghitung apa pun -- semua sudah disimpan
@@ -583,8 +513,6 @@ class LiveMonitor:
         area = self.get_area(area_id)
         with self._db.session() as sess:
             a = sess.get(LiveArea, area_id)
-            # Kartu menampilkan N scene terbaru (live_areas.retention, M58);
-            # riwayat lengkap ada di halaman Citra dan deret kecamatan.
             rows = sess.scalars(select(LiveScene).where(
                 LiveScene.area_id == area_id, LiveScene.deleted_at.is_(None),
                 LiveScene.status.in_(("READY", "PARTIAL")),
@@ -611,7 +539,6 @@ class LiveMonitor:
                     "status": sel.status,
                     "source_status": sel.source_status or {},
                     "metrics": load_scene_metrics(sess, [sel])[sel.live_scene_id],
-                    # Ringkasan "air baru · surut · tetap" Pantauan Live (INTERFACE §2.2).
                     "water_change": wc,
                     "interpretations": sel.interpretations or {},
                     "area_status": sel.area_status or {},
@@ -620,9 +547,6 @@ class LiveMonitor:
                         for k, v in items.items()
                     },
                     "previews_skipped": (sel.previews or {}).get("skipped") or {},
-                    # Georeferensi grid PNG (empat sudut lon/lat). None untuk
-                    # scene yang dirender sebelum ini dicatat -- konsumennya
-                    # harus punya jalan mundur, mis. bbox daerah.
                     "preview_grid": (sel.previews or {}).get("grid"),
                     "updated_at": sel.updated_at,
                 }
@@ -663,8 +587,6 @@ class LiveMonitor:
                      "scene_date": r.scene_date.isoformat() if r.scene_date else None}
                     for r in rows]
 
-    # Status live_events -> kosakata status processing_logs, supaya panel log
-    # UI (renderLogPanel, sama dengan Dataset Saya) mewarnainya konsisten.
     _EVENT_STATUS = {"OK": "COMPLETED", "STARTED": "RUNNING"}
 
     def activity(self, area_id: int, limit: int = 5) -> list[dict]:
@@ -737,19 +659,11 @@ class LiveMonitor:
                 except Exception:
                     logger.exception("[LIVE] retry area=%d %s gagal", area_id, scene_date)
 
-            # Didaftarkan di registry yang sama dengan siklus: is_running()
-            # jadi True (kartu menampilkan "Memproses") dan start_cycle
-            # menolak siklus baru selama retry berjalan.
             t = threading.Thread(target=_run, name=f"live-retry-{area_id}", daemon=True)
             _area_threads[area_id] = t
             t.start()
             return True
 
-    # --- progres siklus (loading bar di kartu) -------------------------------
-
-    # Tahap siklus dibaca dari event live_events terakhir. Persen hanya ada di
-    # tahap unduh+proses (counter job LIVE_INGEST); tahap lain tidak punya
-    # ukuran yang jujur, jadi bar-nya indeterminate (percent None).
     _PHASES = {
         "RECOVER": "Checking for new scenes",
         "CYCLE": "Checking for new scenes",
@@ -799,7 +713,6 @@ class LiveMonitor:
             t["stalled"] = False  # mengantre di belakang daerah lain bukan macet
         return t
 
-    # Ringkasan hasil siklus terakhir tampil sekian detik setelah selesai.
     RESULT_SHOW_S = int(os.getenv("LIVE_RESULT_SHOW_S", "900"))
 
     def _last_result(self, area_id: int) -> dict | None:
@@ -834,8 +747,6 @@ class LiveMonitor:
             try:
                 prog = DatasetManager(self._db).get_progress(a.dataset_id) or {}
             except Exception as exc:
-                # USER/ANALYST tidak punya SELECT pada dataset_jobs (§8.3): progres
-                # rinci memang bukan untuk mereka, jadi bukan kesalahan yang dicatat.
                 if getattr(getattr(exc, "orig", None), "pgcode", None) != "42501":
                     logger.exception("[LIVE] progres area=%d gagal dibaca", a.area_id)
                 prog = {}
@@ -847,8 +758,6 @@ class LiveMonitor:
             return {"phase": phase, "percent": prog.get("progress_percent"),
                     "ok": ok, "failed": failed, "total": total}
         return {"phase": phase, "percent": None}
-
-    # --- util ---------------------------------------------------------------
 
     def _dataset_info(self, dataset_id: int | None) -> tuple[int, str, str] | None:
         if dataset_id is None:
@@ -885,8 +794,6 @@ class LiveMonitor:
             dates = [s.scene_date.isoformat() for s in scenes]
             latest = scenes[0] if scenes else None
             size = 0
-            # USER/ANALYST tidak punya SELECT pada `datasets` (DATABASE §8.3):
-            # ukuran berkas hanya untuk role yang boleh membacanya.
             if a.dataset_id is not None and _can_select(sess, "datasets"):
                 d = sess.get(Dataset, a.dataset_id)
                 size = int(d.total_size_bytes or 0) if d else 0
@@ -903,8 +810,6 @@ class LiveMonitor:
             "status_message": a.status_message,
             "running": self.is_running(a.area_id),
             "progress": self._progress(a),
-            # Token NASA yang ditolak tetap ditampilkan walau siklus sudah
-            # selesai: sampai token diganti, setiap siklus akan gagal sama.
             "alerts": self._alerts(),
             "last_result": None if self.is_running(a.area_id) else self._last_result(a.area_id),
             "last_checked_at": a.last_checked_at,

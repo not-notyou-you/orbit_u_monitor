@@ -1,32 +1,9 @@
-// js/terrain3d.js — Relief 3D: pratinjau Live ditempel (drape) di atas DEM.
-//
-// APA YANG 3D DI SINI, DAN APA YANG TIDAK
-// Sentinel-1 GRD tidak memuat tinggi. GeoTIFF-nya memang array tiga dimensi,
-// tapi dimensi ketiganya BAND (VV, VH, turunan), bukan elevasi — semuanya
-// nilai hambur-balik di permukaan yang sama. Jadi relief di halaman ini datang
-// dari DEM terpisah; citra satelitnya cuma tekstur yang ditempel di atasnya.
-// Tinggi yang terlihat adalah topografi tanah, BUKAN hasil ukur radar. Tinggi
-// dari Sentinel-1 sendiri butuh InSAR (produk SLC, pasangan orbit,
-// interferogram) — jalur pemrosesan terpisah yang tidak ada di pipeline ini.
-//
-// Georeferensi citra diambil dari scene.preview_grid.corners_wgs84 (empat
-// sudut; lihat module10.grid_corners_wgs84). Scene lama yang dirender sebelum
-// itu dicatat jatuh kembali ke bbox daerah — citranya tetap tampil, posisinya
-// kurang presisi, dan itu dikatakan di layar alih-alih didiamkan.
-//
-// Leaflet tidak dipakai di halaman ini: ia tidak punya kamera 3D sama sekali.
-// MapLibre GL dimuat dari CDN saat halaman ini dibuka saja, bukan di app.html,
-// supaya halaman lain tidak menanggung ~800 KB yang tidak mereka pakai.
 'use strict';
 Pages['terrain3d'] = (() => {
   const MAPLIBRE_VERSION = '4.7.1';
   const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@' + MAPLIBRE_VERSION + '/dist/maplibre-gl.js';
   const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@' + MAPLIBRE_VERSION + '/dist/maplibre-gl.css';
 
-  // DEM: AWS Terrain Tiles (data Mapzen/Nextzen, AWS Open Data) — terbuka,
-  // tanpa kunci API, encoding "terrarium". Resolusinya ~30 m dan berhenti di
-  // zoom 15; zoom lebih dalam memakai ubin 15 yang diregangkan, jadi relief
-  // tidak bertambah detail walau citranya iya.
   const DEM_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
   const DEM_MAXZOOM = 15;
   const DEM_ATTR = 'DEM: <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">AWS Terrain Tiles</a> (SRTM/NED)';
@@ -38,7 +15,6 @@ Pages['terrain3d'] = (() => {
 
   let st = null;
 
-  // ------------------------------------------------------------------ pemuat
   let libPromise = null;
   function loadMapLibre() {
     if (libPromise) return libPromise;
@@ -56,15 +32,6 @@ Pages['terrain3d'] = (() => {
     return libPromise;
   }
 
-  // -------------------------------------------------------------- geometri
-  // "POLYGON((x y,x y,...))" -> [[lon,lat],...]. Dipakai hanya sebagai jalan
-  // mundur, dan jalan mundur yang KASAR: bbox itu milik daerah, sedangkan
-  // extent tiap scene berbeda-beda. Scene Sentinel-1 yang cuma satu frame
-  // menutupi AOI jauh lebih sempit daripada scene mosaik dua frame, jadi
-  // merentangkannya ke bbox daerah bisa menggeser citra puluhan kilometer --
-  // bukan sekadar beberapa meter. Karena itu halaman menuliskan bahwa
-  // posisinya perkiraan, dan backfill (scripts/backfill_preview_grid.py) ada
-  // supaya jalan mundur ini hampir tidak pernah terpakai.
   function wktRing(wkt) {
     const m = /\(\(([^)]*)\)\)/.exec(wkt || '');
     if (!m) return null;
@@ -73,8 +40,6 @@ Pages['terrain3d'] = (() => {
     return pts.length >= 4 ? pts : null;
   }
 
-  // Empat sudut penempatan citra, urut kiri-atas -> kanan-atas -> kanan-bawah
-  // -> kiri-bawah (urutan `coordinates` image source MapLibre).
   function cornersFor(card) {
     const g = card.scene && card.scene.preview_grid;
     if (g && g.corners_wgs84 && g.corners_wgs84.length === 4) return { corners: g.corners_wgs84, exact: true };
@@ -92,22 +57,6 @@ Pages['terrain3d'] = (() => {
             [Math.max.apply(null, lons), Math.max.apply(null, lats)]];
   }
 
-  // ------------------------------------------------- penyelarasan batas tile
-  // MapLibre menggambar SATU image source di dalam SATU tile. Tile itu dipilih
-  // ImageSource.getCoordinatesCenterTileID(): zoom = floor(-log2(sisi terpanjang
-  // citra)), lalu tile yang memuat TITIK TENGAH citra. Tile sebesar citra tidak
-  // berarti memuat citra: begitu citra melewati batas tile, bagian yang
-  // menyeberang DIPOTONG. Untuk AOI ini potongannya 46,6% lebar -- persis gejala
-  // "AOI hilang setengah saat di-zoom", dan selalu di sisi barat.
-  //
-  // Ini bukan bug yang bisa ditunggu: MapLibre `main` masih memakai cara yang
-  // sama dan loadTile() hanya menerima satu tile itu.
-  //
-  // Jalan keluarnya: JANGAN beri MapLibre extent citra. Citra digambar dulu ke
-  // kanvas yang extent-nya PERSIS satu tile Mercator yang memuatnya (sisanya
-  // transparan), lalu kanvas itulah yang dipasang. Karena extent-nya kini sama
-  // dengan tile, rumus di atas memilih tile itu sendiri -- tidak ada yang
-  // menyeberang, apa pun zoom kameranya.
   const MAX_CANVAS_SIDE = 4096;
 
   const mercX = lon => (lon + 180) / 360;
@@ -115,9 +64,6 @@ Pages['terrain3d'] = (() => {
   const lonOf = x => x * 360 - 180;
   const latOf = y => (Math.atan(Math.exp((180 - y * 360) * Math.PI / 180)) - Math.PI / 4) * 360 / Math.PI;
 
-  // Replikasi getCoordinatesCenterTileID() supaya pilihan tile bisa DIPERIKSA,
-  // bukan diandaikan. Kalau rumus di hulu berubah, pemeriksaan di bawah yang
-  // menangkapnya -- bukan pengguna yang melihat citranya terpotong lagi.
   function maplibreTile(minX, minY, maxX, maxY) {
     const dMax = Math.max(maxX - minX, maxY - minY);
     const z = Math.max(0, Math.floor(-Math.log(dMax) / Math.LN2));
@@ -127,8 +73,6 @@ Pages['terrain3d'] = (() => {
              y: Math.floor((minY + maxY) / 2 * n) };
   }
 
-  // Tile Mercator terkecil yang memuat seluruh kotak citra, lalu dinaikkan ke
-  // induknya sampai pilihan MapLibre sendiri benar-benar memuatnya.
   function containingTile(minX, minY, maxX, maxY) {
     let z = 24;
     while (z > 0) {
@@ -142,16 +86,10 @@ Pages['terrain3d'] = (() => {
       const t = { z: z, n: n, x: Math.floor(minX * n), y: Math.floor(minY * n) };
       const pick = maplibreTile(t.x / n, t.y / n, (t.x + 1) / n, (t.y + 1) / n);
       if (pick.z === z && pick.x === t.x && pick.y === t.y) return t;
-      // Pilihan MapLibre untuk extent tile ini bukan tile ini sendiri
-      // (pembulatan float di tepi pangkat dua); induknya tetap memuat citra.
     }
     return null;
   }
 
-  // Gambar PNG ke kanvas se-tile, kembalikan {canvas, coordinates}.
-  // Pemetaan piksel -> Mercator dibuat AFIN dari tiga sudut (kiri-atas,
-  // kanan-atas, kiri-bawah), jadi grid yang sudutnya miring (raster sumber
-  // ber-CRS proyeksi) ikut benar, bukan hanya yang sejajar sumbu.
   function tileAlignedCanvas(img, corners) {
     const m = corners.map(c => ({ x: mercX(c[0]), y: mercY(c[1]) }));
     const minX = Math.min.apply(null, m.map(q => q.x));
@@ -163,8 +101,6 @@ Pages['terrain3d'] = (() => {
 
     const size = 1 / t.n;                       // sisi tile dalam satuan Mercator
     const x0 = t.x / t.n, y0 = t.y / t.n;
-    // Kanvas dibuat cukup besar agar citra tidak kehilangan resolusi: piksel
-    // citra per satuan Mercator dipertahankan, lalu dibatasi MAX_CANVAS_SIDE.
     const spanX = Math.max(maxX - minX, 1e-12), spanY = Math.max(maxY - minY, 1e-12);
     let cw = Math.ceil(img.naturalWidth * size / spanX);
     let ch = Math.ceil(img.naturalHeight * size / spanY);
@@ -175,7 +111,6 @@ Pages['terrain3d'] = (() => {
     const canvas = document.createElement('canvas');
     canvas.width = cw; canvas.height = ch;
     const ctx = canvas.getContext('2d');
-    // Nearest, sama alasannya dengan raster-resampling di layernya.
     ctx.imageSmoothingEnabled = false;
     const sx = cw / size, sy = ch / size;
     const [tl, tr, , bl] = m;
@@ -192,23 +127,10 @@ Pages['terrain3d'] = (() => {
              coordinates: [[west, north], [east, north], [east, south], [west, south]] };
   }
 
-  // Kunci lapisan yang punya PNG, diurut seperti tile di Kondisi > Citra.
   function layerKeys(previews) {
     return LiveTiles.ROWS.reduce((acc, r) => acc.concat(r.keys.filter(k => previews[k])), []);
   }
 
-  // ------------------------------------------------------------- sumber data
-  // Halaman ini melayani DUA jalan masuk dengan satu mesin peta:
-  //
-  //   live   /app#aoi-3d          — perlu masuk; semua scene tersimpan yang
-  //                                 boleh dilihat peran itu (USER 30 hari).
-  //   public /relief              — tanpa masuk; HANYA scene terbaru per area,
-  //                                 batas yang sama dengan /api/public/live.
-  //
-  // Keduanya dinormalkan ke bentuk kartu yang sama supaya sisa modul tidak
-  // perlu tahu dari mana datanya: {area, dates, scene}. Mode ditentukan oleh
-  // body[data-requires-auth] -- penanda yang sudah dipakai app.html vs
-  // kondisi.html, bukan tebakan baru.
   const SOURCES = {
     live: {
       async areas() {
@@ -222,9 +144,6 @@ Pages['terrain3d'] = (() => {
       noGeo: 'GEOREFERENSI SCENE TIDAK DIKETAHUI — CITRA TIDAK BISA DITEMPATKAN DI PETA',
     },
     public: {
-      // Satu permintaan memuat scene terbaru SEMUA area, jadi hasilnya
-      // disimpan dan scene() membacanya dari situ -- berganti area tidak
-      // memanggil API lagi.
       async areas() {
         const r = await API.get('/api/public/live');
         this._items = (r && r.items) || [];
@@ -241,16 +160,11 @@ Pages['terrain3d'] = (() => {
         };
       },
       empty: 'BELUM ADA AREA PANTAUAN YANG TERBUKA UNTUK PUBLIK.',
-      // Publik hanya melihat scene TERBARU, jadi begitu siklus berikutnya
-      // berjalan georeferensinya ada. Itu yang dikatakan, bukan "gagal".
       noGeo: 'SCENE PUBLIK TERBARU BELUM MEMUAT GEOREFERENSI PRATINJAU — RELIEF 3D AKAN TERSEDIA SETELAH SCENE BERIKUTNYA DIRENDER. PRATINJAU 2D-NYA TETAP BISA DILIHAT DI KONDISI TERKINI.',
     },
   };
 
-  // ------------------------------------------------------------------- init
   function init(root, ctx) {
-    // Titipan dari tombol "Lihat 3D" di lightbox Pantauan Live, kalau pengguna
-    // datang dari sana. Dibaca sekali lalu hangus (lihat Terrain3DHandoff).
     const pick = (window.Terrain3DHandoff && Terrain3DHandoff.take()) || null;
     const pub = document.body.dataset.requiresAuth === 'false';
     st = { root, ctx, pub: pub, src: pub ? SOURCES.public : SOURCES.live,
@@ -264,9 +178,6 @@ Pages['terrain3d'] = (() => {
     }
     const $ = s => UI.$(s, root);
     if (pub) {
-      // Tidak ada yang bisa dipilih: publik hanya melihat scene terbaru.
-      // Pemilihnya disembunyikan, bukan dinonaktifkan -- select berisi satu
-      // pilihan yang tidak bisa diubah cuma menimbulkan pertanyaan.
       $('#t3DateField').hidden = true;
       const note = $('#t3ScopeNote');
       note.hidden = false;
@@ -289,7 +200,6 @@ Pages['terrain3d'] = (() => {
     });
     $('#t3Reset').addEventListener('click', fitArea);
     $('#t3North').addEventListener('click', () => { if (st.map) st.map.easeTo({ bearing: 0, duration: 400 }); });
-    // Checkbox "Garis wilayah" di taskbar berlaku untuk tekstur ini juga.
     st.onAdm = () => applyImage();
     document.addEventListener('orbit-u:garis-wilayah', st.onAdm);
     return loadAreas();
@@ -321,8 +231,6 @@ Pages['terrain3d'] = (() => {
     $('#t3Area').innerHTML = st.areas.map(a =>
       '<option value="' + a.area_id + '">' + UI.esc(a.name) + (a.enabled ? '' : ' (nonaktif)') + '</option>').join('');
     $('#t3Area').disabled = st.areas.length < 2;
-    // Titipan bisa menyebut area yang sudah dihapus; jatuh ke area pertama
-    // alih-alih meminta kartu untuk id yang tidak ada lagi.
     if (!st.areas.some(a => a.area_id === st.areaId)) { st.areaId = st.areas[0].area_id; st.date = null; }
     $('#t3Area').value = st.areaId;
     await loadCard();
@@ -374,7 +282,6 @@ Pages['terrain3d'] = (() => {
       (geo.exact ? '' : ' · posisi perkiraan'));
   }
 
-  // ------------------------------------------------------------------- peta
   async function ensureMap() {
     if (st.map) return;
     const deck = UI.$('#t3Deck', st.root);
@@ -388,7 +295,6 @@ Pages['terrain3d'] = (() => {
       throw e;
     }
     if (!st) return;                      // halaman sudah ditinggalkan
-    // supported() dihapus di MapLibre v4; hanya diperiksa kalau memang ada.
     if (typeof maplibre.supported === 'function' && !maplibre.supported()) {
       deckMessage('PERAMBAN INI TIDAK MENDUKUNG WEBGL — RELIEF 3D TIDAK BISA DIGAMBAR. PAKAI KONDISI › CITRA UNTUK PRATINJAU 2D.', 'off');
       throw new Error('WebGL tidak didukung');
@@ -405,8 +311,6 @@ Pages['terrain3d'] = (() => {
         sources: sources,
         layers: [
           { id: LYR_BASE, type: 'raster', source: SRC_BASE },
-          // Hillshade di BAWAH citra: saat opasitas citra diturunkan, bentuk
-          // lerengnya tetap terbaca walau DEM-nya sendiri tak berwarna.
           { id: LYR_HILL, type: 'hillshade', source: SRC_DEM,
             paint: { 'hillshade-exaggeration': 0.4 } },
         ],
@@ -427,7 +331,6 @@ Pages['terrain3d'] = (() => {
     applyTerrain();
     const rec = UI.$('#t3Deck .scr-rec', st.root);
     if (rec) rec.textContent = '● 3D';
-    // Panel kiri bisa berubah lebar setelah fragmen dirender.
     if (window.ResizeObserver) {
       st.ro = new ResizeObserver(() => { if (st && st.map) st.map.resize(); });
       st.ro.observe(UI.$('#t3Map', st.root));
@@ -437,17 +340,9 @@ Pages['terrain3d'] = (() => {
   function applyTerrain() {
     if (!st.map) return;
     const ex = Number(UI.$('#t3Exag', st.root).value);
-    // 0 = matikan terrain sama sekali, bukan exaggeration 0: dengan terrain
-    // aktif MapLibre tetap menyampel DEM tiap frame tanpa ada yang terlihat.
     st.map.setTerrain(ex > 0 ? { source: SRC_DEM, exaggeration: ex } : null);
   }
 
-  // Tekstur = PNG lapisan terpilih, varian bergaris kalau checkbox taskbar aktif.
-  // Tekstur = PNG lapisan terpilih, di-pad ke batas tile (lihat
-  // tileAlignedCanvas) lalu dipasang sebagai image source. Asinkron karena PNG
-  // harus benar-benar termuat dulu: ukuran pikselnya yang menentukan ukuran
-  // kanvas. `seq` menjaga agar hasil pemuatan yang datang terlambat tidak
-  // menimpa lapisan yang sudah dipilih sesudahnya.
   function applyImage() {
     if (!st || !st.map || !st.card || !st.card.scene || !st.key || !st.geo) return;
     const p = (st.card.scene.previews || {})[st.key];
@@ -464,8 +359,6 @@ Pages['terrain3d'] = (() => {
         if (!st || st.imgSeq !== mySeq || !st.map || !blob) return;
         const objUrl = URL.createObjectURL(blob);
         setImageSource(objUrl, out.coordinates);
-        // Object URL sebelumnya baru dilepas SETELAH yang baru dipasang:
-        // melepasnya lebih awal bisa membatalkan pemuatan yang sedang jalan.
         if (st.imgUrl) URL.revokeObjectURL(st.imgUrl);
         st.imgUrl = objUrl;
         renderCaption();
@@ -487,8 +380,6 @@ Pages['terrain3d'] = (() => {
     st.map.addSource(SRC_IMG, { type: 'image', url: url, coordinates: coordinates });
     st.map.addLayer({ id: LYR_IMG, type: 'raster', source: SRC_IMG,
       paint: { 'raster-opacity': Number(UI.$('#t3Opacity', st.root).value) / 100,
-               // Nearest: satu piksel preview mewakili puluhan meter sensor.
-               // Interpolasi akan mengarang gradien halus yang tidak diukur.
                'raster-resampling': 'nearest', 'raster-fade-duration': 0 } });
   }
 
@@ -523,10 +414,6 @@ Pages['terrain3d'] = (() => {
       { padding: 24, pitch: Number(UI.$('#t3Pitch', st.root).value), duration: 600 });
   }
 
-  // Kait uji: geometri penyelarasan tile dihitung di sini dan pernah menjadi
-  // sebab citra tampil separuh, jadi harus bisa diuji langsung (tests/ui/
-  // tile_alignment.html lewat Chrome headless) alih-alih diuji lewat replika
-  // yang bisa menyimpang dari kode yang benar-benar jalan.
   const _geo = { mercX, mercY, lonOf, latOf, maplibreTile, containingTile, tileAlignedCanvas };
 
   return { init, destroy, _geo };

@@ -40,10 +40,10 @@ Hasil lengkapnya ada di [PERBANDINGAN_DBMS.md](PERBANDINGAN_DBMS.md), dengan kod
 
 | Langkah | Isi |
 |---|---|
-| a. Kerangka acuan | Bobot kriteria: **spasial 30%**, **integritas 25%**, keamanan 15%, biaya 15%, integrasi 15% |
+| a. Kerangka acuan | Tujuh kriteria berbobot (PERBANDINGAN_DBMS.md §3.8): **keamanan per peran & audit 25%**, **spasial 20%**, analitik & skala 15%, tulis/ETL 10%, konkurensi baca 10%, integritas relasional & rekursif 10%, biaya & ekosistem 10% |
 | b. Daftar pendek | PostgreSQL 18 + PostGIS dan MySQL 8.0 (alasan pemilihan: PERBANDINGAN_DBMS.md §1) |
-| c. Evaluasi produk | Skema setara, data sintetis deterministik (`benchmark/generate.py`), kueri Q1–Q5 (`timing.csv`), uji fitur F1–F3 (`features.csv`) |
-| d. Rekomendasi | **PostgreSQL + PostGIS** |
+| c. Evaluasi produk | Skema setara, data sintetis deterministik (`benchmark/generate.py`), kueri Q1–Q5 (`timing.csv`), uji fitur F1–F3 (`features.csv`), skalabilitas/konkurensi/tulis (`extended_*.csv`) |
+| d. Rekomendasi | **PostgreSQL + PostGIS**, skor terbobot 4,90 vs 2,90 |
 
 Penentunya bukan selisih milidetik. Ada tiga kebutuhan yang di MySQL tidak terpenuhi atau perlu disiasati:
 kontrol akses per peran di dalam basis data (RM4), kueri spasial, dan kueri analitik ketika data membesar.
@@ -88,8 +88,8 @@ peringatan, kejadian, laporan, akun, dan log. Di luar sistem:
 
 | Peran | Label UI | Data yang dilihat | Data yang ditulis |
 |---|---|---|---|
-| PUBLIC | Pengunjung | Scene 30 hari, kejadian 365 hari, master rujukan | Log login gagal, registrasi akun USER |
-| USER | Relawan | + scene 365 hari, hujan per kecamatan, alert aktif, seluruh riwayat kejadian | Token API milik sendiri, sandi sendiri |
+| PUBLIC | Pengunjung | Angka per kecamatan 30 hari (Beranda, M63), scene 30 hari, kejadian 365 hari, master rujukan | Log login gagal, registrasi akun USER |
+| USER | Relawan | + angka per kecamatan dan scene 365 hari, hujan per kecamatan, alert aktif, seluruh riwayat kejadian | Token API, sandi, email, dan kecamatan langganan peringatan milik sendiri (M64) |
 | ANALYST | Analis | + semua scene, kejadian & hujan, evaluasi alert, Laporan Hidromet | Kejadian, acknowledge alert |
 | DATA_ENGINEER | Data Engineer | + semua scene, dataset, lineage, mutu, Laporan Kesehatan Data | Dataset, ubah/nonaktifkan scene |
 | ADMIN | Administrator | Semua | Akun, aturan, ambang, wilayah, pengaturan, Live Area |
@@ -106,15 +106,15 @@ Teknik pencarian fakta yang dipakai sesuai metode di SKRIPSI.txt bagian B:
 | Penelitian | Kode dan skema Orbit-U: The DataLab (README §5) | Tabel warisan §4.1 |
 | Wawancara | 16 Okt 2026, daring (Zoom), Anis Faisal Reza ("Abah Lala"), Ketua GMLS. GMLS memperhatikan semua bencana; info cuaca dari BMKG lewat Are You In Sys belum spesifik ke lokasi warga; GMLS hanya memberi peringatan, bukan penetapan; GMLS tidak mencatat kejadian sendiri dan menilai data BNPB tidak rapi; tampilan harus mudah bagi orang awam; informasi paling berguna bila spesifik ke lokasi dan dikirim sebagai notifikasi | Lokasi saya di Beranda dan `user_notify_regions`/`notify_sent` (lokasi + notifikasi); kalimat "bukan peringatan dini resmi" dan status Waspada/Tinggi (peringatan, bukan penetapan); `disaster_events.info_source` + `is_verified` (kejadian dari sumber resmi); `band_forecasts` (prediksi); batasan: gempa, tsunami, rob, Himawari |
 
-Bukti wawancara: `DOCS/lampiran/notulensiGMLS.txt`.
+Bukti wawancara: `DOCS/skripsi/lampiran/notulensiGMLS.txt`.
 
 **Tinjauan kebutuhan oleh GMLS (requirement/user review).** Dilakukan lewat halaman web
-`DOCS/lampiran/user_review_webapp/` (Google Apps Script; jawaban tersimpan di Google Sheet dan terkirim ke
+`DOCS/skripsi/lampiran/user_review_webapp/` (Google Apps Script; jawaban tersimpan di Google Sheet dan terkirim ke
 email peneliti). Model data konseptual dan logikal ditinjau dalam bahasa awam karena pengisi bukan orang
 teknis: konseptual sebagai daftar "informasi yang dicatat", logikal sebagai "aturan pencatatan". Kolom
-*Jawaban GMLS* diisi dari Sheet setelah tinjauan selesai; ekspor CSV-nya disimpan di `DOCS/lampiran/`.
+*Jawaban GMLS* diisi dari Sheet setelah tinjauan selesai; ekspor CSV-nya disimpan di `DOCS/skripsi/lampiran/`.
 Selama jawaban asli belum masuk, Bab IV disusun dengan
-`DOCS/lampiran/user_review_webapp/CONTOH_DUMMY_jawaban_tinjauan_kebutuhan.csv` (kolom sama dengan Sheet, setiap
+`DOCS/skripsi/lampiran/user_review_webapp/CONTOH_DUMMY_jawaban_tinjauan_kebutuhan.csv` (kolom sama dengan Sheet, setiap
 baris bertanda "DATA CONTOH - BUKAN JAWABAN ASLI"). Atas arahan pembimbing (24 Okt 2026), berkas ini boleh dipakai
 di draf naskah seperti jawaban asli; begitu ekspor Sheet asli masuk, berkas ini dan angka turunannya di naskah diganti.
 Kolom *Jawaban GMLS* di bawah tetap kosong sampai jawaban asli tersedia.
@@ -203,8 +203,11 @@ erDiagram
 
 ### 2.7 Kunci dan domain
 
-Semua tabel memakai **PK surrogate** (`SERIAL`/`BIGSERIAL`/`SMALLSERIAL`). Kunci alami dipertahankan sebagai
-**alternate key** (`UNIQUE NOT NULL`), sehingga baris tetap bisa dikenali tanpa ID internal:
+Empat puluh dari 43 tabel memakai **PK surrogate** (`SERIAL`/`BIGSERIAL`/`SMALLSERIAL`). Tiga tabel memakai
+PK komposit: `band_forecast_points` (`forecast_id`, `step`) dan `band_forecast_scores` (`forecast_id`, `model`)
+sebagai entitas lemah (§5.1), serta `user_notify_regions` (`user_id`, `region_id`) sebagai tabel asosiatif.
+Kunci alami dipertahankan sebagai **alternate key** (`UNIQUE NOT NULL`), sehingga baris tetap bisa dikenali
+tanpa ID internal:
 
 | Tabel | Candidate key yang tidak jadi PK (alternate key) |
 |---|---|
@@ -220,6 +223,7 @@ Semua tabel memakai **PK surrogate** (`SERIAL`/`BIGSERIAL`/`SMALLSERIAL`). Kunci
 | `band_forecasts` | (`band_id`, `COALESCE(region_id, 0)`, `data_stamp`) (indeks unik ekspresi; `region_id` NULL = rerata AOI) |
 | `data_lineage` | (`parent_product_id`, `child_product_id`) |
 | `api_tokens` | `token_prefix` |
+| `notify_sent` | (`user_id`, `region_id`, `item_key`, `data_date`) |
 
 Domain atribut ditegakkan dengan `CHECK` dan tipe ENUM (§5.3, §6.2). Rentang nilai fisik per band
 (`spectral_bands.valid_min/max`) ditegakkan trigger `trg_obs_range`.
@@ -460,11 +464,13 @@ Dengan satu Job Hidromet per hari ditambah 4 siklus Live, angkanya tetap terbata
 
 ### 5.1 Entitas kuat/lemah dan multiplicity
 
-Semua entitas memiliki PK surrogate sendiri, jadi secara fisik tidak ada entitas lemah. Secara konseptual
-ada beberapa entitas yang **eksistensinya bergantung** pada induknya. Ketergantungan itu ditegakkan dengan
-`ON DELETE CASCADE`:
+Dua entitas **lemah**: `band_forecast_points` dan `band_forecast_scores`. PK-nya komposit dan memuat PK
+induknya (`forecast_id`), jadi barisnya tidak bisa dikenali tanpa forecast induk. Entitas lain punya PK
+surrogate sendiri (kuat), tetapi beberapa **eksistensinya bergantung** pada induknya. Ketergantungan itu
+ditegakkan dengan `ON DELETE CASCADE`. `user_notify_regions` ber-PK komposit tetapi bukan entitas lemah: ia
+tabel asosiatif M:N `users` × `administrative_regions`.
 
-| Entitas dependen | Induk | Multiplicity |
+| Entitas lemah / dependen | Induk | Multiplicity |
 |---|---|---|
 | `dataset_source_config` | `datasets` | 1 dataset : 1..3 sumber |
 | `dataset_jobs` | `datasets` | 1 : 0..* |
@@ -472,8 +478,8 @@ ada beberapa entitas yang **eksistensinya bergantung** pada induknya. Ketergantu
 | `data_lineage` | `data_products` (dua kali) | produk 1 : 0..* anak, 1 : 0..* induk |
 | `quality_metrics` | `satellite_scenes`, `data_products` | 1 : 0..* per band |
 | `live_scene_metrics` | `live_scenes` | 1 : 0..* per band × metrik |
-| `band_forecast_points` | `band_forecasts` | 1 : 0..15 |
-| `band_forecast_scores` | `band_forecasts` | 1 : 0..5 (satu per model kandidat) |
+| `band_forecast_points` (lemah) | `band_forecasts` | 1 : 0..15 |
+| `band_forecast_scores` (lemah) | `band_forecasts` | 1 : 0..5 (satu per model kandidat) |
 
 Relasi kunci lainnya:
 
@@ -538,7 +544,7 @@ di-join.
 
 | Jenis | Contoh |
 |---|---|
-| Entity integrity | PK di semua tabel |
+| Entity integrity | PK di semua tabel (43 PK; 3 di antaranya komposit, §2.7) |
 | Referential | FK dengan aksi eksplisit: `RESTRICT` untuk master & ROI, `CASCADE` untuk entitas dependen, `SET NULL` untuk rujukan opsional (pembuat, produk sumber) |
 | Domain | `CHECK` rentang (`valid_fraction` 0–1, `quality_score` 0–100, `retention` 1–60), daftar nilai (status, severity, comparator), regex (`username`, `email`) |
 | Antar kolom | `chk_dataset_date_range`, `chk_alert_ack_pair`, `chk_scene_invalidation`, `chk_rule_active_needs_threshold`, `chk_token_max_lifetime` |

@@ -1,11 +1,4 @@
-# api/routes/reports.py
-"""Laporan periodik (INTERFACE.md §4.6).
-
-Daftar dan unduhan disaring RLS ``generated_reports`` per audiens: ANALYST
-melihat Hidromet, DATA_ENGINEER Kesehatan Data, ADMIN keduanya. Laporan di
-luar audiens -> 404 (tidak membocorkan keberadaannya). Regenerasi ADMIN
-berjalan di latar dengan koneksi monitor_etl.
-"""
+"""Laporan periodik (INTERFACE.md §4.6)."""
 
 from __future__ import annotations
 
@@ -29,7 +22,6 @@ router = APIRouter()
 
 def _audience_only(principal: Principal = Depends(current_principal)) -> Principal:
     if not (principal.has_role("ANALYST") or principal.has_role("DATA_ENGINEER")):
-        # ANALYST dan DATA_ENGINEER tidak bertingkat, jadi bukan require_role.
         raise ApiError(403, "Reports are for ANALYST (Hydromet) or DATA_ENGINEER (Data Health)", "REPORT_AUDIENCE")
     return principal
 
@@ -74,7 +66,6 @@ def list_reports(sess: Session = Depends(get_session),
             dependencies=[Depends(_audience_only), Depends(require_role("USER", download=True))])
 def download_report(report_id: int, request: Request, sess: Session = Depends(get_session)):
     row = sess.execute(text(_SELECT + " WHERE g.report_id = :r"), {"r": report_id}).mappings().first()
-    # RLS menyembunyikan laporan audiens lain -> sama dengan tidak ada.
     if row is None or row["status"] == "FAILED":
         raise ApiError(404, f"Report {report_id} not found", "NOT_FOUND")
     path = Path(row["file_path"])

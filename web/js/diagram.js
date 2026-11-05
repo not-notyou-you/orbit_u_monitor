@@ -1,38 +1,6 @@
-// js/diagram.js — Forecast (dulu Diagram; #forecast/terbaru, #forecast/analisa-daerah;
-// INTERFACE.md §2 halaman 4, M56, M61). ANALYST & ADMIN.
-//
-// 4.1 Keadaan terbaru (ctx.tab.mode = 'latest'): GET /api/diagram/latest.
-//     Semua band dalam SATU grafik, satu warna per band, 30 hari terakhir.
-//     Satuan band berbeda, jadi tiap garis diskalakan ke rentangnya sendiri
-//     (0–1) — yang dibandingkan adalah arah dan waktu naik-turunnya, bukan
-//     besarnya. Nilai asli ada di tooltip dan tabel. Diperbarui otomatis:
-//     halaman memeriksa `updated_at` tiap 5 menit dan menggambar ulang bila
-//     ada data baru.
-// 4.2 Analisa daerah (mode = 'regions'): kecamatan (+ warna) × tanggal ×
-//     band → satu grafik per band (GET /api/diagram/regions). PDF memuat
-//     SEMUA band untuk kecamatan & tanggal yang sama (GET /report.pdf).
-//     M67: tab Tren & evaluasi alert digabung ke sini. Bagian terlipat
-//     "Evaluasi alert & kejadian" (js/analytics.js, dimuat saat pertama
-//     dibuka) memakai kecamatan dan rentang formulir yang sama; PDF dan CSV
-//     berada dalam satu kotak Unduh.
-//
-// Forecast 15 hari (M61): grafik data tampil lebih dulu; forecast menyusul
-// lewat GET /api/diagram/forecast, satu request per deret (band × AOI atau
-// band × kecamatan) supaya palang progres jujur. Setiap grafik punya
-// sakelar forecast di bawahnya, menyala bawaannya.
-//
-// M70: garis data selalu menyambung titik berdata (tidak diputus di hari
-// kosong); chip band di atas grafik; dua tabel berdampingan — forecast di
-// kiri, rincian band di kanan — keduanya hanya band yang dipilih, dengan
-// model/keyakinan dan penjelasan terlipat per baris. Analisa daerah: kartu
-// 2×2 di atas grafik; kecamatan di luar beberapa baris pertama lewat dialog.
-//
-// Penjelasan dan ambang tiap band dari GET /api/diagram/bands (sumbernya
-// etl/band_catalog.py — ambang yang sama dengan kalimat kondisi dan alert).
 'use strict';
 Pages['diagram'] = (() => {
   const POLL_MS = 5 * 60 * 1000;
-  // Warna awal kecamatan; pengguna bisa menggantinya.
   const REGION_COLORS = ['#ffb000', '#4de1ff', '#33ff99', '#ff6b6b', '#c08cff', '#ff8a00', '#00d1b2', '#ff5fa2',
                          '#8f9bff', '#d9d9d9', '#f4f442', '#7bd389'];
   let st = null;
@@ -61,7 +29,6 @@ Pages['diagram'] = (() => {
     st = null;
   }
 
-  // ===================================================== 4.1 keadaan terbaru
   const latestKey = code => 'aoi|' + code + '|' + st.latest.date_to;
 
   function latestForecasts() {
@@ -76,9 +43,6 @@ Pages['diagram'] = (() => {
     try { r = await API.get('/api/diagram/latest' + API.qs({ end: st.end || '' })); }
     catch (e) { UI.$('#dgChart', st.root).innerHTML = UI.emptyHTML('GAGAL MEMUAT'); UI.showError('Forecast', e); return; }
     if (!st) return;
-    // 30 hari terakhir tanpa satu pun angka harian (backfill/Job Hidromet
-    // tertinggal): tampilkan 30 hari s.d. angka harian terakhir, yang punya
-    // titik setiap hari untuk 7 band, sekali saja saat halaman dibuka.
     if (!st.end && !st.autoChecked && r.last_obs_date && r.last_obs_date < r.date_from &&
         !r.bands.some(b => b.n_daily)) {
       st.autoChecked = true; st.auto = true; st.end = r.last_obs_date;
@@ -121,9 +85,6 @@ Pages['diagram'] = (() => {
   function drawLatest() {
     const r = st.latest;
     const visible = r.bands.filter(b => !st.hidden.has(b.band_code));
-    // Penjelasan cakupan: angka harian per kecamatan bisa tertinggal dari
-    // hari ini (Job Hidromet/backfill); titik di rentang itu lalu berasal
-    // dari scene Live (±6–12 hari sekali), bukan setiap hari.
     const stale = UI.$('#dgStale', st.root);
     const dailyBands = r.bands.filter(b => b.per_region);
     const nDaily = dailyBands.reduce((s, b) => s + b.n_daily, 0);
@@ -188,9 +149,6 @@ Pages['diagram'] = (() => {
     ], visible, { empty, caption: 'Rincian band' });
   }
 
-  // Tooltip titik: tampil saat kursor di atas titik, saat titik difokus
-  // (keyboard), atau saat diklik/disentuh. Latarnya warna band; warna teksnya
-  // hitam atau putih, mana yang lebih kontras dengan warna itu.
   function inkFor(hex) {
     const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return '#fff';
     const lin = c => { c /= 255; return c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4; };
@@ -229,14 +187,6 @@ Pages['diagram'] = (() => {
 
   function lastPoint(b) { const pts = b.points.filter(p => p.y !== null); return pts[pts.length - 1] || null; }
 
-  // Grafik SVG semua band. Satuan berbeda, jadi tiap garis diskalakan ke
-  // "rentang biasa" band itu (persentil 2–98 dalam 365 hari, dari API):
-  // 0 = rendah biasa, 1 = tinggi biasa; nilai di luar rentang dijepit ke tepi.
-  // Skala tetap ini membuat garis yang datar tetap tampak datar.
-  // Satu titik per tanggal yang berdata; garis menyambung semua titik itu.
-  // `fcMap` {band_code: forecast}: sumbu waktu diperpanjang sampai hari
-  // forecast terakhir; forecast = garis putus + pita 80% berwarna band,
-  // dijepit ke 0–1 supaya pita lebar tidak memipihkan garis data.
   function normalizedChart(bands, from, to, fcMap) {
     const W = 760, H = 280, L = 34, R = 12, T = 14, B = 26;
     const t = d => (UI.parseDate(d) || new Date()).getTime();
@@ -267,8 +217,6 @@ Pages['diagram'] = (() => {
       const have = b.points.filter(p => p.y !== null);
       if (!have.length || !b.range) return;
       any = true;
-      // Rentang biasa diperluas bila data yang tampil keluar darinya, supaya
-      // titik tidak dijepit ke tepi grafik.
       const vs = have.map(p => p.y).concat(fcMap[b.band_code] ? fcMap[b.band_code].points.map(p => p.mean) : []);
       const lo = Math.min(b.range[0], ...vs), hi = Math.max(b.range[1], ...vs), span = hi - lo;
       const n = v => span > 0 ? (v - lo) / span : 0.5;
@@ -279,8 +227,6 @@ Pages['diagram'] = (() => {
           ';stroke-dasharray:4 3;stroke-width:1;opacity:.7"/>';
         hits.push({ x: W - R - 30, y: Y(y), color: b.color, tip: b.band_name + ' · ambang ' + th.label + ' ' + UI.num(th.value, 2) + (b.unit ? ' ' + b.unit : '') });
       });
-      // Garis menyambung setiap titik berdata berurutan (M70: tidak lagi
-      // diputus di hari kosong). Ruas menuju titik scene Live tetap putus-putus.
       let prev = null;
       have.forEach(p => {
         if (prev) {
@@ -291,7 +237,6 @@ Pages['diagram'] = (() => {
       });
       have.forEach(p => {
         const x = X(t(p.x)), y = Y(n(p.y));
-        // Titik dari scene Live diberi bingkai putih supaya beda dari angka harian.
         g += '<rect class="dot" style="fill:' + b.color + (p.source === 'scene' && !b.sparse ? ';stroke:#fff;stroke-width:1' : '') +
           '" x="' + (x - 2.5) + '" y="' + (y - 2.5) + '" width="5" height="5"/>';
         hits.push({ x, y, color: b.color, tip: b.band_name + ' · ' + UI.date(p.x) + ': ' + UI.num(p.y, 2) + (b.unit ? ' ' + b.unit : '') +
@@ -318,7 +263,6 @@ Pages['diagram'] = (() => {
       (Object.keys(fcMap).length ? ', dengan forecast 15 hari' : '') + '">' + g + '</svg></div>';
   }
 
-  // ======================================================= 4.2 analisa daerah
   async function initRegions() {
     const $ = s => UI.$(s, st.root);
     let geo;
@@ -334,8 +278,6 @@ Pages['diagram'] = (() => {
       (b.band_code === 'RAIN_24H' || b.band_code === 'NDVI' ? ' checked' : '') + '> <span class="swatch" style="background:' + b.color + '"></span> ' +
       UI.esc(b.band_name) + '</label>').join('') +
       '<p class="mut" style="font-size:11px;margin:4px 0 0">Sentinel-1 (VV/VH) tidak dihitung per kecamatan; lihat Keadaan terbaru atau Citra › Sentinel-1.</p>';
-    // Akhir rentang bawaan = observasi terakhir (bisa lebih tua dari hari ini
-    // bila Job Hidromet tertinggal), supaya grafik pertama tidak kosong.
     const today = UI.isoDate(new Date());
     const end = st.lastObs && st.lastObs < today ? st.lastObs : today;
     $('#dgTo').value = end; $('#dgFrom').value = UI.addDays(end, -29);
@@ -351,8 +293,6 @@ Pages['diagram'] = (() => {
     await showRegions();
   }
 
-  // Kartu Kecamatan menampilkan paling banyak REGION_ROWS baris (yang
-  // tercentang lebih dulu); bila AOI lebih banyak, sisanya lewat dialog.
   const REGION_ROWS = 8;
   const regionRow = (r, attr) => '<div class="region-row"><label class="check"><input type="checkbox" ' + attr + '="' + r.region_id + '"' +
     (st.rsel.has(r.region_id) ? ' checked' : '') + '> ' + UI.esc(r.name) + '</label><input type="color" aria-label="Warna ' + UI.esc(r.name) +
@@ -424,8 +364,6 @@ Pages['diagram'] = (() => {
     if (UI.$('#dgEval', st.root).open) evaluate();
   }
 
-  // Evaluasi alert & kejadian: hanya dimuat bila bagiannya dibuka (data hujan
-  // harian seluruh rentang cukup berat), dan hanya sekali per pilihan.
   async function evaluate() {
     const sel = st.sel;
     if (!sel) return;
@@ -448,8 +386,6 @@ Pages['diagram'] = (() => {
     catch (e) { UI.showError('Ekspor CSV', e); }
   }
 
-  // Forecast dihitung dari data s.d. tanggal akhir rentang terpilih, jadi
-  // rentang di masa lalu menampilkan apa yang akan diramalkan saat itu.
   const regionKey = (code, rid) => 'r|' + code + '|' + rid + '|' + st.last.date_to;
 
   function regionForecasts() {

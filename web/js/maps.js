@@ -1,5 +1,3 @@
-// web/js/maps.js — peta Leaflet di dalam screen (INTERFACE §1: Esri World Street Map
-// + poligon kecamatan AOI). Tile diberi filter fosfor lewat CSS (main.css), data tidak.
 'use strict';
 
 const Maps = (() => {
@@ -17,12 +15,10 @@ const Maps = (() => {
     const map = L.map(el, Object.assign({ zoomControl: true, attributionControl: true, scrollWheelZoom: false, preferCanvas: false }, opts || {}));
     L.tileLayer(TILE_URL, { maxZoom: 18, attribution: TILE_ATTR }).addTo(map);
     map.setView([-6.75, 106.2], 10);
-    // Ukuran kontainer bisa berubah setelah fragmen dirender.
     setTimeout(() => map.invalidateSize(), 50);
     return map;
   }
 
-  // Pola arsir SVG untuk kategori BMKG tertinggi (warna bukan satu-satunya pembawa makna).
   function ensurePatterns(map) {
     const svg = map.getPanes().overlayPane.querySelector('svg');
     if (!svg || svg.querySelector('#hatch-a')) return;

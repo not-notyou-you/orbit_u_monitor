@@ -1,14 +1,8 @@
-/* web/css/tema/mint.css — tema "Kertas Mint" (M57), dari DOCS/design tambahan/konsep38.
-   Kertas berpetak mint, garis navy 2px, sudut membulat 12px, bayangan keras
-   dua lapis (sian lalu navy), title bar sian dengan tiga bulatan di kanan.
-   Struktur komponen ada di umum.css; berkas ini hanya nilai dan hiasan. */
 
 html[data-theme="mint"] {
-  /* palet konsep38 */
   --m-bg: #eef7f0; --m-grid: #dbeee0; --m-card: #fafdfb; --m-line: #1f2a5a;
   --m-mut: #4a5388; --m-acc: #7fe0ea; --m-acc-soft: #d3f2f6;
 
-  /* token Orbital 95 yang dibaca komponen lain */
   --desk: var(--m-bg); --face: var(--m-card); --hilite: #ffffff; --light: var(--m-acc-soft);
   --shadow: #9fb0c9; --dark: var(--m-line); --select: var(--m-line);
   --text: var(--m-line); --text-mut: var(--m-mut); --field: #ffffff;
@@ -18,7 +12,6 @@ html[data-theme="mint"] {
   --font-data: "Nunito", "Segoe UI", system-ui, sans-serif;
   --taskbar-h: 46px;
 
-  /* variabel tema (umum.css) */
   --t-bg: linear-gradient(var(--m-grid) 1px, transparent 1px) 0 0 / 32px 32px,
           linear-gradient(90deg, var(--m-grid) 1px, transparent 1px) 0 0 / 32px 32px, var(--m-bg);
   --t-card: var(--m-card); --t-card-solid: var(--m-card); --t-sub: #eef7f0; --t-field: #ffffff;
@@ -43,7 +36,6 @@ html[data-theme="mint"] {
   --t-taskbar-bg: var(--m-card); --t-taskbar-shadow: 0 -4px 0 var(--m-acc);
   --t-backdrop: rgba(31, 42, 90, .25);
   --t-tile-filter: grayscale(1) sepia(.35) hue-rotate(110deg) saturate(1.3) brightness(1.04) contrast(.92);
-  /* scrollbar: tipis, pegangan abu-navy pudar, jalur tak terlihat */
   --t-sb-size: 10px; --t-sb-r: 999px; --t-sb-gap: 2px; --t-sb-ff-width: thin;
   --t-sb-track: transparent; --t-sb-track-shadow: none;
   --t-sb-thumb: #c3cddc; --t-sb-thumb-shadow: none;
@@ -51,8 +43,6 @@ html[data-theme="mint"] {
 }
 html[data-theme="mint"] body { background-attachment: fixed; }
 
-/* Title bar: tiga bulatan bergaris navy, seperti konsep. Ikon SVG min/max/
-   close disembunyikan; tombol tutup dialog tetap bisa diklik dan diberi tanda x. */
 html[data-theme="mint"] .ttl-btn, html[data-theme="mint"] .ttl-btn:active {
   width: 14px; height: 14px; min-height: 0; padding: 0;
   background: var(--m-card); border: 2px solid var(--m-line); border-radius: 50%;
@@ -62,7 +52,6 @@ html[data-theme="mint"] .ttl-btn[data-x] { width: 18px; height: 18px; font-size:
 html[data-theme="mint"] .ttl-btn[data-x] svg { display: block; width: 8px; height: 7px; }
 html[data-theme="mint"] .ttl-btn[data-x]:hover { background: var(--m-acc-soft); }
 
-/* Strip status beranda dan ringkasan: pil berbingkai seperti ".status" konsep. */
 html[data-theme="mint"] .hero-strip.screen { border-radius: 999px; }
 html[data-theme="mint"] .hero-strip .screen-inner { padding: 6px 16px; }
 html[data-theme="mint"] .readout.screen { box-shadow: 4px 4px 0 var(--m-acc), 4px 4px 0 2px var(--m-line); }
@@ -72,8 +61,6 @@ html[data-theme="mint"] .screen-inner .lbl, html[data-theme="mint"] .scr-table t
 html[data-theme="mint"] .hero .hero-logo { background: var(--m-acc); }
 html[data-theme="mint"] .page-lede { border-left-color: var(--m-line); background: var(--m-acc-soft); color: var(--m-line); }
 
-/* Sedikit kemiringan khas konsep — hanya pada kartu navigasi, bukan pada
-   jendela berisi data. */
 html[data-theme="mint"] .navcards .navcard:nth-child(odd) { transform: rotate(-.6deg); }
 html[data-theme="mint"] .navcards .navcard:nth-child(even) { transform: rotate(.5deg); }
 html[data-theme="mint"] .navcards .navcard:hover { transform: rotate(0) translate(-1px, -1px); }

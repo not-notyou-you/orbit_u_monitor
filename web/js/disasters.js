@@ -1,21 +1,3 @@
-// js/disasters.js — Kejadian (#kejadian, INTERFACE.md §2 halaman 5, §4.6, M68).
-//
-// Satu halaman untuk semua peran (dulu tab Lihat kejadian = disasters-view.js
-// dan Kelola kejadian). GET /api/disasters: pengunjung 365 hari lewat
-// v_public_kejadian, peran yang masuk seluruh riwayat. Dengan izin
-// disasters.manage (Analis, Admin) halaman yang sama menampilkan tombol
-// "Catat kejadian baru", Ubah/Hapus di detail, dan Excel. CRUD tercatat di
-// audit_log (trigger DB); hapus = soft delete.
-//
-// Daftar diambil sekali per saringan (maks. 1000, batas API) lalu dipaginasi
-// di browser, supaya lencana ringkasan (jumlah, terverifikasi, per jenis)
-// menghitung seluruh hasil saringan, bukan satu halaman. Peta dan daftar
-// berdampingan dan saling menyorot.
-//
-// M73: alert hujan aktif (dulu di Citra › GPM) tampil sebagai satu lencana di
-// baris ringkasan; klik membuka daftar per kecamatan dengan "Tandai dibaca"
-// per baris (izin alerts.acknowledge). Tautan dari GPM membuka daftar ini
-// langsung (sessionStorage 'orbitu.openAlerts').
 'use strict';
 Pages['disasters'] = (() => {
   const SOURCES = { GMLS: 'GMLS', BPBD_LEBAK: 'BPBD Lebak', BNPB_DIBI: 'BNPB (DIBI)', MEDIA: 'Media', LAINNYA: 'Lainnya' };
@@ -24,8 +6,6 @@ Pages['disasters'] = (() => {
   const SEV_RANK = { CRITICAL: 3, WARNING: 2, INFO: 1 };
   const OPEN_ALERTS = 'orbitu.openAlerts';
   let st = null;
-  // API mengembalikan `location: {lat, lon}` (etl.disasters.event_dict);
-  // perender di bawah membaca e.lat/e.lon.
   const flat = e => Object.assign(e, { lat: e.location ? e.location.lat : null, lon: e.location ? e.location.lon : null });
   const hasPt = e => e.lat !== null && e.lat !== undefined;
 
@@ -85,8 +65,6 @@ Pages['disasters'] = (() => {
     st.ctx.setStatus('Siap · ' + UI.int(r.total) + ' kejadian');
   }
 
-  // Lencana: jumlah, status verifikasi, dan jenis — masing-masing tombol yang
-  // mengisi saringan yang sama di atas (klik lagi untuk melepas).
   function renderChips() {
     const $ = s => UI.$(s, st.root);
     const ver = st.items.filter(e => e.is_verified).length;
@@ -112,7 +90,6 @@ Pages['disasters'] = (() => {
     }));
   }
 
-  // ---------------------------------------------------- alert hujan aktif
   async function loadAlerts() {
     if (!Auth.can('alerts.view')) return;
     try {
@@ -126,7 +103,6 @@ Pages['disasters'] = (() => {
     if (want && st.alerts.length) openAlerts();
   }
 
-  // Satu baris per kecamatan: alert dengan tingkat tertinggi (lalu terbaru) di depan.
   function alertGroups() {
     const by = {};
     st.alerts.forEach(a => { (by[a.region_id] = by[a.region_id] || []).push(a); });
@@ -216,7 +192,6 @@ Pages['disasters'] = (() => {
     UI.$$('#dzTable [data-page]', st.root).forEach(b => b.addEventListener('click', () => { st.page = Number(b.dataset.page); renderTable(); }));
   }
 
-  // Sorot satu kejadian di peta dan di daftar sekaligus.
   function spot(id, on) {
     const m = st.markers[id];
     if (m) { m.setStyle({ radius: on ? 10 : 6, weight: on ? 3 : 1, color: on ? '#fff' : '#000' }); if (on) { m.bringToFront(); m.openTooltip(); } else m.closeTooltip(); }
@@ -249,7 +224,6 @@ Pages['disasters'] = (() => {
       ['KECAMATAN', e.region_name], ['DESA', e.village_name], ['TITIK', hasPt(e) ? UI.num(e.lat, 5) + ', ' + UI.num(e.lon, 5) : null],
       ['SUMBER', (SOURCES[e.info_source] || e.info_source) + (e.source_reference ? ' · ' + e.source_reference : '')],
       ['VERIFIKASI', e.is_verified ? 'Terverifikasi' : 'Belum']].concat(e.recorded_at ? [['DICATAT', UI.dateTime(e.recorded_at)]] : []);
-    // Angka hujan H-0..H-2 hanya terisi untuk Analis/Admin (v_kejadian_dan_hujan); selain itu `rain` null.
     const rain = e.rain ? UI.screenHTML({ channel: 'HUJAN KECAMATAN H-0..H-2', body: UI.tableHTML([
       { label: 'Hari', key: 'day' }, { label: 'Hujan 24 jam', cls: 'r', get: r => UI.num(r.rain_24h_mm, 1) + ' mm' },
       { label: '72 jam', cls: 'r', get: r => UI.num(r.rain_72h_mm, 1) + ' mm' }, { label: '7 hari', cls: 'r', get: r => UI.num(r.rain_7d_mm, 1) + ' mm' },

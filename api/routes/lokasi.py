@@ -1,21 +1,4 @@
-# api/routes/lokasi.py
-"""Pantau Lokasi (INTERFACE.md §4.7, M63): kondisi SATU kecamatan, tanpa login.
-
-Beranda menampilkan, untuk kecamatan yang dipilih (atau tempat perangkat
-berada): kalimat kondisi normal/tidak beserta apa yang tidak normal, citra
-satelit scene terbaru yang dipotong ke kecamatan itu, angka terbaru, dan tren.
-
-Angka dibaca lewat VIEW ``v_public_lokasi_*`` di bawah role pemanggil, jadi
-batas waktu (PUBLIC 30 hari, USER 365 hari) ditegakkan database, sama dengan
-halaman Citra. Koneksi ``monitor_etl`` hanya dipakai untuk hal yang tidak
-boleh dibaca PUBLIC dan tidak pernah dikirim ke klien: bbox Live Area (untuk
-mencari scene yang menutupi kecamatan), path berkas PNG, dan ambang BMKG di
-``alert_rules`` (supaya kalimat hujan memakai angka alert yang sama).
-Pembacanya ada di etl/lokasi_data.py, dipakai juga peringatan email (M64).
-
-Koordinat perangkat TIDAK pernah dikirim ke endpoint ini: browser sendiri
-yang mencocokkan titiknya dengan poligon ``GET /api/regions``.
-"""
+"""Pantau Lokasi (INTERFACE.md §4.7, M63): kondisi SATU kecamatan, tanpa login."""
 
 from __future__ import annotations
 
@@ -90,8 +73,6 @@ def lokasi_detail(region_id: int, sess: Session = Depends(get_session), etl=Depe
         full = f"/api/public/live/{scene['area_id']}/preview"
         imagery = {
             "area_id": scene["area_id"], "area_name": scene["area_name"], "scene_date": scene["scene_date"],
-            # Tanpa grid (scene lama) potongan tidak bisa dibuat: UI memakai tile
-            # seluruh area dan mengatakannya.
             "cropped": cropped,
             "interpretations": scene["interpretations"] or {},
             "previews": {k: {"label": v.get("label"), "legend": v.get("legend"),

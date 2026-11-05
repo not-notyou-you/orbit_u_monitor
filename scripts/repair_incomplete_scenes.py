@@ -1,28 +1,5 @@
 """Audit ulang scene Live yang sudah terlanjur diunduh, terhadap gerbang
 kelengkapan AOI (etl/aoi_coverage.py).
-
-Gerbang itu baru ada sekarang, jadi scene yang dibuat sebelumnya tidak pernah
-diuji: sebagian di antaranya hanya menutup sepotong AOI karena orbitnya cuma
-menyerempet (AOI GMLS: ~30% vs ~99% untuk orbit yang melintas penuh). Skrip ini
-memberi perlakuan yang akan diberikan gerbang itu seandainya sudah ada:
-
-  cakupan < live.min_aoi_coverage -> berkasnya dihapus, barisnya ditandai
-      INCOMPLETE. Bukan dicoba ulang: pada tanggal itu Sentinel-1 memang tidak
-      melewati sisa AOI, jadi mengunduh ulang menghasilkan potongan yang sama.
-
-  cakupan >= ambang -> preview dirender ULANG di grid tetap seluas AOI. Scene
-      lama dirender di grid turunan footprint S1, jadi ukurannya berbeda-beda
-      (768x633, 768x632, 438x768) dan tidak setumpuk antar tanggal. Isinya
-      tidak berubah -- perendernya sama persis, yang berganti cuma bingkainya.
-
-Idempoten: menjalankannya dua kali tidak mengubah apa pun pada jalan kedua.
-
-    python -m scripts.repair_incomplete_scenes [--area 1] [--dry-run]
-
-Prasyarat: batas wilayah sudah dimuat (scripts/load_regions.py), sama seperti
-scripts/backfill_admin_overlay.py -- kalau belum, varian garis wilayah tidak
-ikut ditulis dan skrip berhenti daripada diam-diam menghasilkan preview tanpa
-garis.
 """
 from __future__ import annotations
 
@@ -63,12 +40,6 @@ def main(argv: list[str] | None = None) -> int:
         min_cov = aoi_cov.min_coverage(sess)
         areas = {a.area_id: (a.dataset_id, a.bbox_wkt)
                  for a in sess.scalars(select(LiveArea)).all()}
-        # FAILED ikut diperiksa, bukan cuma READY/PARTIAL: baris FAILED tidak
-        # pernah tersapu enforce_retention (yang hanya menghitung
-        # READY/PARTIAL), jadi COG-nya menginap selamanya. Kalau cakupannya
-        # memang di bawah ambang, berkas itu tidak akan pernah berguna dan
-        # dibersihkan di sini. FAILED yang cakupannya baik tidak disentuh --
-        # gagalnya karena sebab lain dan masih dalam jatah percobaan ulang.
         q = select(LiveScene).where(LiveScene.deleted_at.is_(None),
                                     LiveScene.status.in_(("READY", "PARTIAL", "FAILED")))
         if args.area:
@@ -91,8 +62,6 @@ def main(argv: list[str] | None = None) -> int:
             inputs = lmx.scene_inputs(files.root, scene_date)
             coverage = aoi_cov.scene_coverage(inputs.get("s1"), bbox_wkt)
             if coverage is None:
-                # Raster S1 sudah kena retensi: tanpa piksel tidak ada yang
-                # bisa diukur maupun dirender ulang. Dibiarkan apa adanya.
                 print(f"  area {area_id} · {scene_date}: raster S1 sudah tidak ada — dilewati")
                 skipped += 1
                 continue
@@ -151,9 +120,6 @@ def main(argv: list[str] | None = None) -> int:
                 s1.update({"aoi_coverage": round(coverage, 4), "aoi_coverage_min": min_cov})
                 src["sentinel1"] = s1
                 row.source_status = src
-            # PNG perubahan air punya jalur sendiri dan harus ikut pindah ke
-            # grid baru, kalau tidak ia jadi satu-satunya tile yang tidak
-            # setumpuk dengan yang lain. Tahapnya idempoten.
             try:
                 water_change_stage(mon, area_id, scene_date, files, inputs)
             except Exception:

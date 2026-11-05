@@ -1,19 +1,5 @@
 #!/usr/bin/env python
-"""Data sintetis deterministik untuk benchmark DBMS (DATABASE.md §1, M29).
-
-BUKAN data produksi: bentuk dan volumenya meniru DB Monitor setelah backfill
-2023–2025 (DATABASE.md §4.3), nilainya dibangkitkan dengan seed tetap supaya
-setiap DBMS menerima baris yang persis sama dan hasil bisa diulang.
-
-Keluaran di benchmark/data/ (CSV, geometri sebagai WKT EPSG:4326):
-    regions.csv            28 kecamatan sintetis (10 AOI) — poligon grid di sekitar Lebak
-    observations.csv       3 tahun × 10 kecamatan AOI × 7 band  (≈ 76.700 baris)
-    alerts.csv             dari aturan BMKG 50/100/150 mm pada RAIN_24H
-    disasters.csv          ±150 kejadian (sebagian terverifikasi)
-    products.csv, lineage.csv  rantai produk sampai 6 tingkat (RAW → … → FUSED)
-
-Pakai:  python benchmark/generate.py [--seed 20260929] [--out benchmark/data]
-"""
+"""Data sintetis deterministik untuk benchmark DBMS (DATABASE.md §1, M29)."""
 
 from __future__ import annotations
 
@@ -40,14 +26,13 @@ def regions(rng: random.Random) -> list[dict]:
         for i in range(7):
             pts = []
             cx, cy = x0 + i * dx, y0 + j * dy
-            # 4 sisi × 6 titik dengan jitter kecil (deterministik)
             corners = [(cx, cy), (cx + dx, cy), (cx + dx, cy + dy), (cx, cy + dy)]
             for k in range(4):
                 (ax, ay), (bx, by) = corners[k], corners[(k + 1) % 4]
                 for t in range(6):
                     f = t / 6
-                    jx = rng.uniform(-0.004, 0.004) if 0 < t else 0
-                    jy = rng.uniform(-0.004, 0.004) if 0 < t else 0
+                    jx = rng.uniform(-0.004, 0.004) if t > 0 else 0
+                    jy = rng.uniform(-0.004, 0.004) if t > 0 else 0
                     pts.append((ax + (bx - ax) * f + jx, ay + (by - ay) * f + jy))
             pts.append(pts[0])
             wkt = "MULTIPOLYGON(((" + ",".join(f"{x:.5f} {y:.5f}" for x, y in pts) + ")))"
@@ -78,7 +63,7 @@ def observations(rng: random.Random, aoi: list[int]) -> list[dict]:
         day = (START + timedelta(days=d)).isoformat()
         for r in aoi:
             s = rain[r]
-            acc = lambda n: sum(s[max(0, d - n + 1):d + 1])  # noqa: E731
+            acc = lambda n: sum(s[max(0, d - n + 1):d + 1])
             vals = {"RAIN_24H": s[d], "RAIN_72H": acc(3), "RAIN_7D": acc(7), "RAIN_30D": acc(30),
                     "NDVI": round(0.55 + 0.25 * rng.random(), 4) if rng.random() > 0.35 else None,
                     "NDWI": round(-0.75 + 0.3 * rng.random(), 4) if rng.random() > 0.35 else None,
@@ -107,7 +92,6 @@ def alerts(obs: list[dict]) -> list[dict]:
 
 def disasters(rng: random.Random, aoi: list[int], al: list[dict]) -> list[dict]:
     out, eid = [], 1
-    # Sebagian kejadian mengikuti alert WARNING+ (hit), sebagian acak (miss/false alarm).
     strong = [a for a in al if a["severity"] != "INFO"]
     rng.shuffle(strong)
     for a in strong[:90]:

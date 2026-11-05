@@ -1,4 +1,3 @@
-# etl/module1b_calibrate.py
 from __future__ import annotations
 
 import logging
@@ -14,10 +13,6 @@ from etl.atomic_write import atomic_path
 
 from etl import WARP_THREADS
 
-# CRS lookups below (calculate_default_transform/reproject to EPSG:4326) hit
-# rasterio's PROJ database. If you see "Cannot find proj.db" / "unknown EPSG
-# code" here, it's a conflicting PROJ_LIB/PROJ_DATA/GDAL_DATA env var — see
-# the fix and full explanation in etl/__init__.py.
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +21,6 @@ def _find_calibration_xml(zip_path: str, polarisation: str) -> bytes:
     pol = polarisation.lower()
     from etl.folder_manager import long_path
 
-    # ZIP SAFE hidup di _work/ dengan nama produk panjang; buka lewat prefix
-    # extended-length supaya tidak jatuh di MAX_PATH Windows.
     with zipfile.ZipFile(long_path(zip_path)) as zf:
         candidates = [
             n for n in zf.namelist()
@@ -60,8 +53,6 @@ def _parse_calibration_lut(xml_bytes: bytes) -> tuple[np.ndarray, np.ndarray, np
 
 
 def _linear_weights(grid: np.ndarray, targets: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    # Index kiri + bobot interpolasi linear; di luar grid diekstrapolasi linear
-    # (setara RegularGridInterpolator(fill_value=None)).
     grid = grid.astype(np.float64)
     idx = np.clip(np.searchsorted(grid, targets, side="right") - 1, 0, len(grid) - 2)
     w = (targets - grid[idx]) / (grid[idx + 1] - grid[idx])
@@ -75,13 +66,9 @@ def apply_calibration(
     sigma_lut: np.ndarray,
     chunk_rows: int = 1024,
 ) -> np.ndarray:
-    # LUT kalibrasi berupa grid reguler, jadi interpolasi bilinear bisa dipisah per sumbu
-    # dan diproses per blok baris. Versi lama membuat meshgrid seukuran citra penuh
-    # (~430 juta titik x 2 x float64 = ~7 GiB) dan memicu MemoryError.
     rows, cols = dn.shape
     sigma_lut = sigma_lut.astype(np.float64)
 
-    # 1) interpolasi sepanjang sumbu pixel untuk tiap baris LUT -> (n_lines, cols)
     if len(pixels) >= 2:
         c_idx, c_w = _linear_weights(pixels, np.arange(cols, dtype=np.float64))
         lut_cols = (sigma_lut[:, c_idx] * (1.0 - c_w) + sigma_lut[:, c_idx + 1] * c_w).astype(np.float32)
@@ -91,7 +78,6 @@ def apply_calibration(
     sigma0 = np.empty((rows, cols), dtype=np.float32)
     for start in range(0, rows, chunk_rows):
         stop = min(start + chunk_rows, rows)
-        # 2) interpolasi sepanjang sumbu line untuk blok baris ini
         if len(lines) >= 2:
             r_idx, r_w = _linear_weights(lines, np.arange(start, stop, dtype=np.float64))
             r_w = r_w.astype(np.float32)[:, None]

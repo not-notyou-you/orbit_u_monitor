@@ -1,17 +1,5 @@
 #!/usr/bin/env python
-"""Buat akun ADMIN (admin pertama, README §9 langkah 5).
-
-Terkoneksi sebagai monitor_app lalu SET LOCAL ROLE monitor_admin, persis
-seperti request API ADMIN: tidak memakai superuser, dan pembuatan akun
-tercatat audit_log (app_user_id NULL = dibuat skrip).
-
-Pakai:
-    python scripts/create_admin.py --username admin --full-name "Admin GMLS"
-    python scripts/create_admin.py --username admin --password-stdin < pw.txt
-
-Sandi diminta lewat prompt tersembunyi (getpass) kecuali --password-stdin.
-Kebijakan sandi sama dengan API: minimal 10 karakter.
-"""
+"""Buat akun ADMIN (admin pertama, README §9 langkah 5)."""
 
 from __future__ import annotations
 

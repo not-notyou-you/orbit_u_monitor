@@ -1,28 +1,5 @@
-// js/citra-sat.js — Citra Satelit per satelit (#citra/sentinel-1|modis|gpm,
-// INTERFACE.md §2 halaman 3.2–3.4, M56).
-//
-// Satu skrip untuk tiga tab; satelitnya dari ctx.tab.source (s1|modis|gpm).
-// Sumber: /api/citra/sources/{key} (penjelasan + band), /areas/{id}/scenes
-// (daftar tanggal dalam batas peran), /areas/{id}/scenes/{tgl} (gambar,
-// kalimat, angka). "Bandingkan" memuat tanggal kedua dan menaruh gambarnya
-// berdampingan, lalu tabel angka menambah kolom selisih.
-//
-// M66: kalimat kondisi, penjelasan band, dan "informasi yang bisa diambil"
-// digabung menjadi satu layar CH-02 — tiap kalimat tampil di bawah band yang
-// dibicarakannya. Pilihan Live Area hanya untuk Administrator. Tanggal dipilih
-// dari dropdown (lima baris terlihat, sisanya digulir). Angka per band tidak
-// lagi di halaman: modal gambar memuat tabel tanggal × band yang sedang
-// dilihat, dan Sebelumnya/Berikutnya menelusuri band lalu tanggal.
-//
-// M73: di tab GPM, angka per kecamatan menjadi satu bagian "Hujan per
-// kecamatan" untuk tanggal yang dipilih — peta koroplet BMKG dan tabel yang
-// bisa diurutkan, saling menyorot. Dulu tabel CH-03 + halaman statistics
-// (tanggal data terakhir, kartu per kecamatan, daftar alert): dua tanggal dan
-// angka yang sama tiga kali. Daftar alert + "tandai dibaca" pindah ke Kejadian;
-// di sini tinggal satu baris pemberitahuan dengan tautan ke sana.
 'use strict';
 Pages['citra-sat'] = (() => {
-  // Kunci kalimat kondisi/preview → band yang dibicarakannya.
   const KEY_BAND = {
     s1_vv: 'VV', s1_vh: 'VH', s1_water_change: 'WATER_CHANGE',
     modis_flood: 'FLOOD', modis_ndvi: 'NDVI', modis_ndwi: 'NDWI',
@@ -57,7 +34,6 @@ Pages['citra-sat'] = (() => {
     st = null;
   }
 
-  // ------------------------------------------------------------- penjelasan
   function renderInfo() {
     const $ = s => UI.$(s, st.root), i = st.info;
     $('#csAboutLegend').textContent = 'Tentang ' + i.label;
@@ -66,7 +42,6 @@ Pages['citra-sat'] = (() => {
       '<dt>Keterbatasan</dt><dd>' + UI.esc(i.limits) + '</dd>';
   }
 
-  // ---------------------------------------------------------- daftar tanggal
   async function loadDates() {
     const $ = s => UI.$(s, st.root);
     let areaId = CitraState.area();
@@ -140,8 +115,6 @@ Pages['citra-sat'] = (() => {
     loadScene();
   }
 
-  // Dropdown tanggal: tertutup sampai tombolnya ditekan; daftarnya lima baris
-  // tinggi, sisanya digulir. ↑/↓ berpindah, Esc menutup.
   function openDates(on, focusBtn) {
     const box = UI.$('#csDates', st.root), btn = UI.$('#csDateBtn', st.root);
     box.hidden = !on;
@@ -167,7 +140,6 @@ Pages['citra-sat'] = (() => {
     });
   }
 
-  // ------------------------------------------------------------------ scene
   async function loadScene() {
     if (!st || !st.date || !st.area) return;
     const $ = s => UI.$(s, st.root);
@@ -183,7 +155,6 @@ Pages['citra-sat'] = (() => {
     st.ctx.setStatus('Siap · ' + st.info.label + ' · ' + UI.date(main.date) + (cmp ? ' vs ' + UI.date(cmp.date) : ''));
   }
 
-  // Scene per tanggal disimpan sesi halaman ini: modal menelusuri banyak tanggal.
   function scene(date) {
     if (!st.cache[date]) {
       st.cache[date] = API.get('/api/citra/areas/' + st.area.area_id + '/scenes/' + date + API.qs({ source: st.key }))
@@ -192,7 +163,6 @@ Pages['citra-sat'] = (() => {
     return st.cache[date];
   }
 
-  // Kunci gambar satelit ini (urutan baris LiveTiles: VV, VH, Perubahan air, …).
   const satKeys = () => (LiveTiles.ROWS[['s1', 'modis', 'gpm'].indexOf(st.key)] || { keys: [] }).keys;
 
   function tile(p, key, date) {
@@ -205,7 +175,6 @@ Pages['citra-sat'] = (() => {
 
   const unitOf = m => m.metric_unit ? ' ' + m.metric_unit : '';
 
-  // Tabel angka satu tanggal. code = band yang dilihat (null = semua band).
   function metricsHTML(s, code) {
     const pick = rows => (rows || []).filter(m => !code || m.band_code === code);
     const rows = pick(s.metrics), daily = s.has_scene ? pick(s.daily_metrics) : [];
@@ -228,7 +197,6 @@ Pages['citra-sat'] = (() => {
       ? '<p class="scr-text v-amber" style="margin:0 0 6px">TIDAK ADA SCENE (LINTASAN SENTINEL-1) PADA TANGGAL INI, JADI TIDAK ADA GAMBAR. ANGKA HARIANNYA DI BAWAH.</p>'
       : !main.files_available ? '<p class="scr-text v-amber" style="margin:0 0 6px">BERKAS GAMBAR SCENE INI SUDAH DIHAPUS RETENSI; ANGKANYA MASIH TERSEDIA DI BAWAH.</p>' : '';
     if (!keys.length) {
-      // Tanpa gambar tidak ada modal untuk dibuka, jadi angkanya tampil di sini.
       box.innerHTML = UI.screenHTML({ channel: 'CH-01 · ' + st.info.label.toUpperCase() + ' · ' + UI.date(main.date),
         body: note + UI.emptyHTML('TIDAK ADA GAMBAR UNTUK TANGGAL INI') +
           '<p class="lbl" style="margin:8px 0 4px">ANGKA ' + UI.esc(st.info.label.toUpperCase()) + '</p>' + metricsHTML(main, null) });
@@ -244,8 +212,6 @@ Pages['citra-sat'] = (() => {
     UI.$$('button.thumb', box).forEach(b => b.addEventListener('click', () => openModal(b.dataset.date, b.dataset.key)));
   }
 
-  // Modal: tanggal bergambar × band satelit ini, terbaru dulu. Scene tiap
-  // tanggal baru dimuat saat dibuka (UI.lightbox opts.resolve).
   function openModal(date, key) {
     const keys = satKeys().length ? satKeys() : [key];
     const dates = st.dates.filter(d => d.has_images).map(d => d.date);
@@ -266,9 +232,6 @@ Pages['citra-sat'] = (() => {
     } });
   }
 
-  // CH-02: tiap band satelit ini dengan penjelasan, ambang, dan kalimat
-  // kondisi tanggal terpilih (dan pembanding). Kalimat yang tidak menyebut
-  // satu band tertentu tampil paling atas.
   function renderKondisi(main, cmp) {
     const i = st.info, byBand = {}, general = [];
     [main, cmp].filter(Boolean).forEach(s => Object.entries(s.interpretations || {}).forEach(([k, v]) => {
@@ -292,7 +255,6 @@ Pages['citra-sat'] = (() => {
         '</div></div>').join('') + '</div>' });
   }
 
-  // Tabel per kecamatan lebar (satu kolom per band): selebar jendela, di bawah.
   function renderPerRegion(main) {
     if (st.key === 'gpm') return renderRain(main);
     const box = UI.$('#csPerRegion', st.root);
@@ -311,7 +273,6 @@ Pages['citra-sat'] = (() => {
       rows, { caption: 'Angka per kecamatan' });
   }
 
-  // ------------------------------------------ hujan per kecamatan (GPM, M73)
   const RAIN_COLS = [['RAIN_24H', '24 jam'], ['RAIN_72H', '72 jam'], ['RAIN_7D', '7 hari'], ['RAIN_30D', '30 hari']];
   const HATCH = { 'hatch-a': 'repeating-linear-gradient(45deg,#ff3b3b 0 4px,#000 4px 7px)', 'hatch-b': 'repeating-linear-gradient(45deg,#ff3b3b 0 2px,#fff 2px 3px)' };
   const catOf = r => UI.bmkgCategory(r.values.RAIN_24H);
@@ -351,8 +312,6 @@ Pages['citra-sat'] = (() => {
     });
     const keys = ['name'].concat(r.cols.map(c => c[0]), ['RAIN_24H']);
     const box = UI.$('#csRainTable', st.root);
-    // Di ponsel tabel jadi kartu (M72) dan judul kolom tak terlihat, jadi
-    // urutan dipilih lewat select yang hanya tampil di layar sempit.
     const opts = [['name', 1, 'Nama kecamatan']].concat(r.cols.map(([b, l]) => [b, -1, 'Hujan ' + l + ' (tertinggi dulu)']));
     box.innerHTML = '<div class="field cs-rain-sort"><label for="csRainSort">Urutkan</label><select id="csRainSort">' +
       opts.map(([k, d, l]) => '<option value="' + k + '|' + d + '"' + (k === sk && (k !== 'name' || d === dir) ? ' selected' : '') + '>' + UI.esc(l) + '</option>').join('') +
@@ -381,8 +340,6 @@ Pages['citra-sat'] = (() => {
     });
   }
 
-  // Arsir SL/E: isi path diganti pola setelah digambar (Leaflet tidak punya
-  // fill pattern); dipasang ulang tiap kali gaya lapisan berubah.
   function hatch(l) {
     const el = l.getElement && l.getElement();
     const m = el && /bmkg-(hatch-[ab])/.exec(el.getAttribute('class') || '');
@@ -429,7 +386,6 @@ Pages['citra-sat'] = (() => {
     hatch(l);
   }
 
-  // Satu baris pemberitahuan; daftar dan "tandai dibaca" ada di Kejadian.
   async function alertStrip() {
     if (!Auth.can('alerts.view')) return;
     let r;

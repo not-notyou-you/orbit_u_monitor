@@ -1,14 +1,5 @@
-# etl/config.py
-"""
-Konfigurasi koneksi database dari environment variable (+ .env lewat
+"""Konfigurasi koneksi database dari environment variable (+ .env lewat
 python-dotenv). Dipakai database/apply_schema.py.
-
-Author : Julius Marselinus (BRONTO) - NIM 00000111989
-Program: Sistem Informasi - Universitas Multimedia Nusantara
-
-Usage:
-    from etl.config import DatabaseConfig
-    print(DatabaseConfig().url)
 """
 
 from __future__ import annotations
@@ -16,7 +7,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-# Try to load .env file if python-dotenv is available
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -38,5 +28,3 @@ class DatabaseConfig:
     @property
     def url(self) -> str:
         return f"postgresql+psycopg2://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
-
-

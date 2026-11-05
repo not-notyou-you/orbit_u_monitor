@@ -300,6 +300,7 @@ dilepas oleh kernel.
 | Kejadian | Perilaku |
 |---|---|
 | Granule GPM hari itu belum terbit di run mana pun | Tanggal berstatus `WAITING_UPSTREAM` dan dicoba lagi tiap jadwal sampai `hydromet.waiting_max_days` (3), lalu `FAILED` |
+| Proses API mati saat 02:00 (job harian terlewat) | `hydromet_job.missed_dates` mengambil tanggal sesudah job harian terakhir di `dataset_jobs` s.d. kemarin (maks. `CATCHUP_MAX_DAYS` = 30 hari), dan diproses di run harian berikutnya. Saat aplikasi start, `Scheduler._catch_up_hydromet` langsung menjalankan run itu sekali bila ada yang tertinggal. Lubang lebih tua dari 30 hari diisi lewat backfill halaman Data (M82) |
 | MODIS gagal | Tidak fatal, hari itu tetap `COMPLETED` dengan GPM |
 | Unduhan macet tetapi masih mengalir | `download_guard.StallGuard` membatalkan percobaan kalau laju rata-rata di bawah ambang dalam satu jendela (`DOWNLOAD_STALL_WINDOW_S`, default 90 s). Setelah itu retry dan resume Range mengambil alih |
 | Backfill gagal beruntun | `backfill_hydromet.py` berhenti setelah 5 hari `FAILED` berurutan (kode keluar 4), karena penyebabnya hampir selalu jaringan atau kredensial |
@@ -378,6 +379,8 @@ dengan seed).
 | `report.wait_hydromet_minutes` | 60 | Lama laporan menunggu kunci hidromet |
 | `dataset.max_days` | 366 | Rentang maksimum satu dataset |
 | `storage.raster_retention_days` | 365 | Umur berkas raster dataset utama |
+| `notify.enabled` | true | Saklar peringatan email (M64); `false` = job notifikasi tidak mengirim apa pun |
+| `notify.max_age_days` | 7 | Butir tidak normal hanya diemailkan bila tanggal datanya paling lama sekian hari |
 
 ---
 
@@ -486,8 +489,8 @@ Notasi: `y_t` = nilai hari `t`, `T` = hari observasi terakhir, `h` = 1…15 lang
 - **Satu kecamatan**: `y_t` = `region_observations.value`.
 - **Rerata AOI**: `y_t = (1/|R_t|) Σ_{r ∈ R_t} y_{r,t}`, dengan `R_t` = kecamatan AOI yang punya nilai hari `t`.
   Hari tanpa angka harian diisi rerata metrik `mean` scene Live (sumber yang sama dengan grafik).
-- **Rerata beberapa kecamatan** (Tren & evaluasi alert, CH-03): rumus yang sama dengan `R_t` terbatas pada
-  kecamatan pilihan.
+- **Rerata beberapa kecamatan** (Forecast › Analisa daerah, bagian "Evaluasi alert & kejadian": grafik hujan
+  rerata vs kejadian, M67): rumus yang sama dengan `R_t` terbatas pada kecamatan pilihan.
 - Seluruh riwayat sampai `end` dipakai. Hari kosong diisi **interpolasi linier** supaya model bekerja pada
   grid harian, tetapi hari hasil interpolasi **tidak ikut dinilai** di backtest.
 - **Hujan** (`RAIN_24H`, `RAIN_72H`, `RAIN_7D`, `RAIN_30D`) dimodelkan di ruang log karena distribusinya miring

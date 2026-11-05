@@ -1,54 +1,10 @@
-# etl/live_interpret.py
-"""Kalimat kondisi Live Monitoring (PIPELINE.md §4, kalimat kondisi), rule-based.
-
-Format wajib (Bahasa Indonesia, PIPELINE §4):
-    Menampilkan [apa] dalam kondisi [kategori] karena [angka].
-Kode kategori tetap Inggris (normal, alert, high, flood-indicated,
-unavailable): UI menyorotnya di dalam kalimat dan memetakan warnanya.
-
-SATU-SATUNYA tempat ambang: THRESHOLDS di bawah. Ubah angkanya di sini; kalimat,
-status daerah, garis ambang grafik, dan metrik (live_metrics) membacanya dari
-dict ini.
-
-Sumber nilai awal:
-  s1_vh_water_db  -20 dB. Ambang air terbuka VH yang lazim untuk Sentinel-1
-                  GRD (rentang literatur -20..-24 dB; mis. UN-SPIDER
-                  Recommended Practice Flood Mapping, Twele et al. 2016).
-                  -20 dipilih yang lebih longgar: lebih cepat memberi tanda,
-                  dengan konsekuensi lebih banyak permukaan halus (jalan,
-                  lahan terbuka basah) ikut terhitung. Karena itu kategori
-                  diputuskan dari PERUBAHAN terhadap scene sebelumnya, bukan
-                  dari persen absolut -- badan air permanen di AOI (laut,
-                  sungai) konstan dan tidak memicu tanda.
-  s1_vh_*_delta   +2 / +5 poin persen antar scene: di bawah 2 poin masih
-                  dalam variasi normal antar-akuisisi (sudut, angin di
-                  permukaan air); >= 5 poin adalah pertambahan area air yang
-                  jelas.
-  s1_vv_drop_db   1,5 dB. Penurunan rata-rata VV sebesar ini untuk seluruh AOI
-                  jauh di atas derau kalibrasi S1 (~0,5 dB) dan menandakan
-                  permukaan lebih basah/halus.
-  modis_flood_*   1% / 5% area teramati berkelas "banjir" MCDWD.
-  modis_min_valid 10% piksel teramati; di bawah itu tutupan awan terlalu
-                  besar untuk dibaca.
-  ndwi_water      0,0 (ambang McFeeters 1996 untuk air terbuka).
-  ndvi_drop       0,1 turun antar komposit: tekanan vegetasi yang jelas
-                  (variasi musiman antar komposit 8 hari umumnya < 0,05).
-  rain_24h        50 / 100 mm = ambang aturan alert BMKG aktif (hujan lebat
-                  >= 50, sangat lebat >= 100 mm/hari). Nilai di sini hanya
-                  default; sync_bmkg_thresholds() menimpanya dari alert_rules
-                  sebelum kalimat dibuat, jadi kalimat Live dan alert hidromet
-                  selalu memakai angka yang sama (PIPELINE §4).
-  rain_72h        50 / 100 mm akumulasi 3 hari (100 mm = contoh di dokumen
-                  spesifikasi, ~ dua hari berturut-turut hujan sangat lebat).
-  rain_7d         75 / 150 mm akumulasi sepekan (tanah praktis jenuh).
-"""
+"""Kalimat kondisi Live Monitoring (PIPELINE.md §4, kalimat kondisi), rule-based."""
 from __future__ import annotations
 
 THRESHOLDS: dict[str, float] = {
     "s1_vh_water_db": -20.0,
     "s1_vh_warn_delta_pct": 2.0,
     "s1_vh_flood_delta_pct": 5.0,
-    # Tanpa scene pembanding: persen absolut yang sudah patut diwaspadai.
     "s1_vh_first_scene_warn_pct": 30.0,
     "s1_vv_drop_db": 1.5,
     "modis_min_valid_pct": 10.0,
@@ -66,15 +22,12 @@ THRESHOLDS: dict[str, float] = {
     "rain_7d_high_mm": 150.0,
 }
 
-# Nilai kategori ini tampil apa adanya di UI dan disorot di dalam kalimat
-# (web/js/live-tiles.js: sentenceHTML), jadi harus muncul persis seperti ditulis di `text`.
 NORMAL = "normal"
 WASPADA = "alert"
 TINGGI = "high"
 GENANGAN = "flood-indicated"
 NA = "unavailable"
 
-# Tingkat untuk warna UI dan status daerah: -1 tidak tersedia, 0..2.
 LEVEL = {NA: -1, NORMAL: 0, WASPADA: 1, TINGGI: 2, GENANGAN: 2}
 
 PREVIEW_KEYS = (
@@ -145,10 +98,6 @@ def _change_phrase(cur, prev, unit: str, nd: int = 1, what="scene sebelumnya") -
     arah = "naik" if d > 0 else "turun"
     return f"{arah} dari {fmt(prev, nd)}{unit} pada {what}"
 
-
-# ---------------------------------------------------------------------------
-# Per preview
-# ---------------------------------------------------------------------------
 
 def _s1_vv(m, p, status):
     what = "kondisi permukaan umum (radar VV)"
@@ -303,10 +252,6 @@ def interpret_scene(metrics: dict, prev_metrics: dict | None,
             out[key] = _sentence(key, NA, f"interpretasi gagal ({exc.__class__.__name__})")
     return out
 
-
-# ---------------------------------------------------------------------------
-# Status singkat daerah
-# ---------------------------------------------------------------------------
 
 def area_status(interp: dict) -> dict:
     """Gabungan S1 VH + indeks air MODIS (NDWI, cadangan peta banjir) + GPM 72 jam."""

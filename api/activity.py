@@ -1,28 +1,18 @@
-# api/activity.py
-"""Pencatatan user_activity_logs (DATABASE.md §4.2.5).
-
-Dua jalur:
-  * ``log_activity(sess, ...)`` di dalam transaksi request (login, logout,
-    aksi admin): ikut commit/rollback bersama request.
-  * ``ActivityLogMiddleware``: setelah respons SELESAI dikirim, mencatat
-    unduhan (dengan ``bytes_sent`` yang benar-benar terkirim) dan setiap
-    request bertoken API (``detail.auth = 'token'``). Transaksi request
-    sudah ditutup saat itu (exit dependency berjalan sebelum body dikirim),
-    jadi baris ditulis lewat transaksi pendek sendiri dengan SET LOCAL ROLE
-    pemilik request.
-"""
+"""Pencatatan user_activity_logs dan log akses request."""
 
 from __future__ import annotations
 
 import ipaddress
 import json
 import logging
+import time
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
+access_logger = logging.getLogger("api.main")
 
 _INSERT = text("""
     INSERT INTO user_activity_logs
@@ -34,7 +24,6 @@ _INSERT = text("""
 
 
 def _valid_ip(ip: str | None) -> str | None:
-    """Kolom ip_address bertipe INET; host non-IP (mis. "testclient") -> NULL."""
     if not ip:
         return None
     try:
@@ -93,6 +82,7 @@ class ActivityLogMiddleware:
             return
 
         sent = {"status": None, "bytes": 0, "complete": False}
+        start = time.perf_counter()
 
         async def counting_send(message):
             if message["type"] == "http.response.start":
@@ -106,6 +96,8 @@ class ActivityLogMiddleware:
         try:
             await self.app(scope, receive, counting_send)
         finally:
+            access_logger.info("%s %s -> %s (%dms)", scope.get("method"), scope.get("path"), sent["status"],
+                               (time.perf_counter() - start) * 1000)
             await self._record(scope, sent)
 
     async def _record(self, scope, sent) -> None:
@@ -113,8 +105,10 @@ class ActivityLogMiddleware:
         principal = state.get("principal")
         if principal is None:
             return
-        headers = {k.decode("latin-1"): v.decode("latin-1") for k, v in scope.get("headers", [])}
-        meta = {"ip": (scope.get("client") or (None,))[0], "user_agent": headers.get("user-agent")}
+        headers = dict(scope.get("headers", []))
+        user_agent = headers.get(b"user-agent")
+        meta = {"ip": (scope.get("client") or (None,))[0],
+                "user_agent": user_agent.decode("latin-1") if user_agent else None}
         auth = {"auth": principal.auth} if principal.auth else {}
         if principal.token_id is not None:
             auth["token_id"] = principal.token_id
@@ -123,17 +117,13 @@ class ActivityLogMiddleware:
         status = sent["status"]
         try:
             if download and status is not None and 200 <= status < 300:
-                detail = {**download.get("detail", {}), **auth, "status": status,
-                          "complete": sent["complete"]}
+                detail = {**download.get("detail", {}), **auth, "status": status, "complete": sent["complete"]}
                 await run_in_threadpool(
                     _log_standalone, principal, download["action"],
                     target_type=download["target_type"], target_id=download["target_id"],
                     bytes_sent=sent["bytes"], detail=detail, **meta)
             elif principal.auth == "token":
-                # INTERFACE §4.2.8: setiap pemakaian token tercatat (S6).
-                detail = {**auth, "method": scope.get("method"), "path": scope.get("path"),
-                          "status": status}
-                await run_in_threadpool(_log_standalone, principal, "API_REQUEST",
-                                        detail=detail, **meta)
+                detail = {**auth, "method": scope.get("method"), "path": scope.get("path"), "status": status}
+                await run_in_threadpool(_log_standalone, principal, "API_REQUEST", detail=detail, **meta)
         except Exception:
             logger.exception("activity logging failed for %s", scope.get("path"))

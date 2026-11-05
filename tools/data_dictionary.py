@@ -1,24 +1,7 @@
 #!/usr/bin/env python
-"""
-Kamus data + ERD fisik Orbit-U: The Monitor, dibangkitkan dari katalog
+"""Kamus data + ERD fisik Orbit-U: The Monitor, dibangkitkan dari katalog
 PostgreSQL (DATABASE.md §6, M34) — bukan ditulis tangan, sehingga rancangan
 database selalu sama dengan database nyata.
-
-Keluaran:
-    DOCS/generated/data_dictionary.md   tabel, kolom, tipe, null, default,
-                                        PK/FK/UNIQUE/CHECK, komentar; VIEW
-    DOCS/generated/erd_physical.mmd     Mermaid erDiagram (entitas + FK)
-
-
-Pakai:
-    python tools/data_dictionary.py                    # DB dari .env (DB_*)
-    python tools/data_dictionary.py --url postgresql://user:pw@host/db
-    python tools/data_dictionary.py --out DOCS/generated
-
-Sumber metadata: pg_class/pg_attribute (tipe lengkap lewat format_type,
-termasuk geometry(Polygon,4326)), pg_attrdef (default), pg_constraint
-(PK/FK/UNIQUE/CHECK lewat pg_get_constraintdef), dan pg_description
-(COMMENT ON).
 """
 
 from __future__ import annotations
@@ -34,8 +17,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUT = ROOT / "DOCS" / "generated"
 
-# Objek milik ekstensi (spatial_ref_sys, geometry_columns, ... dari PostGIS)
-# bukan bagian rancangan Monitor; disaring lewat pg_depend deptype 'e'.
 _NOT_EXTENSION = """NOT EXISTS (SELECT 1 FROM pg_depend dep
                         WHERE dep.classid = 'pg_class'::regclass
                           AND dep.objid = c.oid AND dep.deptype = 'e')"""
@@ -79,10 +60,7 @@ _KIND = {"p": "PK", "f": "FK", "u": "UNIQUE", "c": "CHECK"}
 
 
 def read_catalog(conn, schema: str = "public") -> tuple[list[Table], list[View]]:
-    """Baca tabel, kolom, constraint, dan VIEW skema `schema`.
-
-    `conn` adalah koneksi DB-API (psycopg2) atau SQLAlchemy Connection
-    (yang punya exec_driver_sql); keduanya dipakai lewat _rows()."""
+    """Baca tabel, kolom, constraint, dan VIEW skema `schema`."""
     tables: dict[str, Table] = {}
     views: dict[str, View] = {}
 
@@ -142,10 +120,6 @@ def _rows(conn, sql: str, schema: str):
         return cur.fetchall()
 
 
-# ---------------------------------------------------------------------------
-# Kamus data (Markdown)
-# ---------------------------------------------------------------------------
-
 def _md(text: str | None) -> str:
     return (text or "").replace("|", "\\|").replace("\n", " ")
 
@@ -192,10 +166,6 @@ def render_dictionary(tables: list[Table], views: list[View], source: str = "") 
     return "\n".join(out) + "\n"
 
 
-# ---------------------------------------------------------------------------
-# ERD fisik (Mermaid)
-# ---------------------------------------------------------------------------
-
 def _mermaid_type(typ: str) -> str:
     base = typ.split("(")[0].strip()
     short = {"character varying": "varchar", "timestamp with time zone": "timestamptz",
@@ -222,13 +192,10 @@ def render_erd(tables: list[Table]) -> str:
         for con in t.constraints:
             if con.kind != "FK" or not con.ref_table:
                 continue
-            # Anak wajib punya induk bila semua kolom FK NOT NULL.
             child = "|{" if all(c in not_null for c in con.columns) else "o{"
             out.append(f'    {con.ref_table} ||--{child} {t.name} : "{",".join(con.columns)}"')
     return "\n".join(out) + "\n"
 
-
-# ---------------------------------------------------------------------------
 
 def generate(conn, out_dir: Path = DEFAULT_OUT, source: str = "") -> tuple[Path, Path]:
     tables, views = read_catalog(conn)

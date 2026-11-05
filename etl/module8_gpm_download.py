@@ -1,31 +1,8 @@
-# etl/module8_gpm_download.py
-"""
-Downloads NASA GES DISC GPM IMERG daily rainfall product (Final Run
+"""Downloads NASA GES DISC GPM IMERG daily rainfall product (Final Run
 GPM_3IMERGDF, falling back to Late Run GPM_3IMERGDL for dates not yet
 published in Final), aggregates it into 24h/72h/7-day accumulation windows,
 reprojects/crops it to the dataset AOI at the Sentinel-1 grid resolution, and
 writes one GeoTIFF per window for lineage tracking.
-
-Output ditulis ke data/datasets/{id}_{slug}/{YYYYMMDD}/silver/gpm/ dan
-granule mentahnya di-cache di _granule_cache/gpm/. Cache-nya flat (bukan per-tanggal)
-karena satu granule harian ikut dipakai window 72h/7d tanggal-tanggal
-berikutnya — lihat folder_manager.get_granule_cache_dir.
-
-LEVEL PEMROSESAN (DOCS/PIPELINE.md, "GPM IMERG Pipeline")
-    RAW        cuma curah hujan hari itu (window 24h = 1 granule) -> BRONZE.
-               Hari-hari sebelumnya TIDAK diunduh: yang membuat sebuah window
-               "akumulasi" justru granule tetangga itu, dan level RAW
-               didefinisikan sebagai "tanpa akumulasi multi-hari".
-    PROCESSED  window 24h + 72h + 7d -> SILVER (lalu COG GOLD lewat
-               module9_fusion._promote_aux_to_gold). Butuh hari target + 6
-               hari sebelumnya.
-
-Jumlah granule yang diunduh karena itu turun dari 7 menjadi 1 untuk dataset
-GPM RAW-only — penghematan yang justru jadi alasan level RAW ada.
-
-Dataset yang meminta KEDUANYA mendapat kedua artefak berdampingan: window 24h
-ditulis dua kali (bronze/ sebagai deliverable RAW, silver/ sebagai lapisan
-pertama jalur PROCESSED), tanpa build ulang.
 """
 
 from __future__ import annotations
@@ -59,13 +36,6 @@ IMERG_VERSION = "07"
 GES_DISC_ROOT = "https://gpm1.gesdisc.eosdis.nasa.gov/data/GPM_L3"
 IMERG_SUBDATASET = "precipitation"  # mm, HDF5/NetCDF variable name
 
-# IMERG Final Run (GPM_3IMERGDF) is the primary, gauge-calibrated product but
-# is published with months of latency (per Sep 2026, V07 Final on GES DISC
-# ends at 2025-09). For dates not covered by Final, fall back to Late Run
-# (GPM_3IMERGDL, ~14h latency, satellite-only), then Early Run (GPM_3IMERGDE,
-# ~4h latency). Falling back is recorded per-day/window so downstream
-# consumers know the accumulation isn't built purely from the calibrated
-# product.
 IMERG_RUNS = {
     "F": {"product": "GPM_3IMERGDF", "file_infix": ""},
     "L": {"product": "GPM_3IMERGDL", "file_infix": "-L"},
@@ -73,31 +43,17 @@ IMERG_RUNS = {
 }
 IMERG_RUN_ORDER = ["F", "L", "E"]
 
-# Listing folder bulanan GES DISC di-cache per proses: satu window 7d
-# menyentuh folder yang sama sampai 7 hari x 3 run. TTL supaya granule yang
-# baru terbit (live scheduler harian) tetap terlihat.
 _LISTING_TTL_S = 3600
 _listing_cache: dict[tuple[str, int, int], tuple[float, frozenset[str]]] = {}
 _listing_lock = threading.Lock()
 
-# Jabodetabek bounding box, WGS84 (min_lon, min_lat, max_lon, max_lat)
 JABODETABEK_BBOX = (106.4, -6.7, 107.2, -5.9)
 
 DST_CRS = "EPSG:4326"
-# Resolusi asli IMERG. Berkas rainfall disimpan di resolusi ini (lihat
-# _crop_to_aoi), jadi inilah yang dilaporkan sidecar -- bukan lagi resolusi
-# Sentinel-1, yang dulu benar hanya karena berkasnya di-upsample ke sana.
 IMERG_RESOLUTION_DEG = 0.1
 S1_RESOLUTION_M = 10
 S1_RESOLUTION_DEG = S1_RESOLUTION_M / 111_320.0  # meters -> degrees at the equator
 MAX_RETRIES = 3
-# Download granule dapat jatah lebih banyak daripada listing, dengan tangga
-# jeda dg.connection_retry_delay (5/10/20/40/80/120 s) alih-alih retry_delay
-# (2/4 s). Alasannya sama dengan yang sudah berlaku di module1 untuk CDSE
-# (download_guard.py sekitar baris 274): SSL EOF / IncompleteRead berarti
-# jaringan sedang gangguan beberapa menit, bukan granule rusak, dan jatah
-# 3 x 2-4 s habis dalam <10 detik -- terbukti pada backfill 2026-10-05, saat
-# 2024-02-05 dan 2024-02-06 menyerah dalam ~6 detik di tengah outage ISP.
 DOWNLOAD_MAX_RETRIES = int(os.getenv("GPM_DOWNLOAD_MAX_RETRIES", "6"))
 DEFAULT_NODATA = -9999.9
 
@@ -115,13 +71,10 @@ def band_name(window_name: str) -> str:
     """Window akumulasi -> data_products.band_name, mis. "24h" -> RAIN_24H."""
     return f"RAIN_{window_name.upper()}"
 
-# window name -> number of trailing days to accumulate, ending on the target date
 WINDOWS = {
     "24h": 1,
     "72h": 3,
     "7d": 7,
-    # Hanya diminta job Hidromet (PIPELINE §3.2, indikator kekeringan
-    # RAIN_30D); dataset Katalog/Live tetap 24h/72h/7d lewat SourcePlan.
     "30d": 30,
 }
 HYDROMET_WINDOWS = ("24h", "72h", "7d", "30d")
@@ -156,12 +109,7 @@ _md5_cache_lock = threading.Lock()
 
 
 def _md5(path: Path, chunk: int = 8 * 1024 * 1024) -> str:
-    """MD5 file, dimemo per (path, ukuran, mtime).
-
-    Satu granule harian dipakai ulang window 72h/7d tanggal-tanggal berikutnya,
-    jadi tiap cache hit dulunya menghitung ulang MD5 granule yang sama
-    berkali-kali dalam satu run. Kunci memo ikut ukuran+mtime, jadi file yang
-    berubah tetap dihitung ulang."""
+    """MD5 file, dimemo per (path, ukuran, mtime)."""
     st = path.stat()
     key = (str(path.resolve()), st.st_size, st.st_mtime_ns)
     with _md5_cache_lock:
@@ -223,8 +171,6 @@ def _list_month_granules(run: str, year: int, month: int) -> frozenset[str]:
             return hit[1]
 
     url = f"{_run_base_url(run)}/{year}/{month:02d}/"
-    # Dulu satu request tanpa retry: satu 5xx/timeout GES DISC membuat
-    # tanggal itu jatuh ke nama tebakan (yang 404 sejak ganti minor versi).
     for attempt in range(1, MAX_RETRIES + 1):
         retry_after = None
         try:
@@ -259,12 +205,7 @@ def _list_month_granules(run: str, year: int, month: int) -> frozenset[str]:
 def _resolve_daily_granule(date: datetime, run: str, raw_dir: Path) -> tuple[str, str] | None:
     """(nama berkas, URL) granule harian `run` untuk `date`, atau None kalau
     run itu memang belum menerbitkannya.
-
-    Huruf minor versi TIDAK di-hardcode: GES DISC mengganti V07B -> V07C di
-    awal Maret 2026, dan nama tebakan "V07B" membuat Final maupun Late 404
-    untuk semua tanggal sesudahnya walau datanya ada. Nama dibaca dari listing
-    folder bulanannya; kalau satu hari punya beberapa minor, yang terbaru
-    dipakai. Granule yang sudah ada di cache lokal dipakai tanpa listing."""
+    """
     import requests
 
     pat = _granule_pattern(date, run)
@@ -303,10 +244,7 @@ def _download_with_retry(
     """Download `url` to `out_path`, retrying up to MAX_RETRIES times on
     network error or truncated transfer. Returns the file's MD5 checksum.
     Skips the download entirely if `out_path` already exists on disk.
-
-    When `plog`/`dataset_id` are given, emits a RUNNING event per attempt
-    (with periodic progress ticks), a terminal FAILED event only once all
-    retries are exhausted, and a COMPLETED event on success."""
+    """
     import requests
 
     if out_path.exists() and out_path.stat().st_size > 0:
@@ -315,19 +253,10 @@ def _download_with_retry(
     if dg.reuse_granule(out_path, "gpm", fm.DATA_ROOT, "[M8]"):
         return _md5(out_path)
 
-    # Nama unik per proses+thread: granule cache dipakai bersama antar tanggal
-    # (lihat docstring modul), jadi lebih dari satu worker/proses bisa menuju
-    # granule yang sama secara bersamaan. Nama .part deterministik dulunya
-    # membuat dua penulis saling tabrak (PermissionError WinError 32) dan
-    # os.rename gagal FileExistsError (WinError 183) begitu salah satu
-    # menang duluan -- lihat dataset 31/32 di logs/.
     tmp_path = out_path.with_suffix(
         f".{os.getpid()}.{threading.get_ident()}{out_path.suffix}.part"
     )
     last_exc: Exception | None = None
-    # Byte yang sudah aman di .part dari attempt sebelumnya; dikirim sebagai
-    # header Range supaya transfer yang putus di 26 dari 29 MB tidak ditarik
-    # ulang dari nol (lihat module1 baris ~405 untuk pola yang sama di CDSE).
     resume_from = 0
 
     for attempt in range(1, DOWNLOAD_MAX_RETRIES + 1):
@@ -347,21 +276,16 @@ def _download_with_retry(
             with dg.source_slot(dg.GESDISC), requests.get(
                 url, headers=headers, stream=True, timeout=dg.REQUEST_TIMEOUT
             ) as r:
-                # 401/403: token Earthdata bersama semua job -- gagal cepat.
                 dg.raise_for_nasa_auth(r, "GESDISC", url)
                 if r.status_code in dg.THROTTLE_STATUSES:
                     retry_after = r.headers.get("Retry-After")
                 r.raise_for_status()
-                # 206 = server menghormati Range, isinya sisa berkas. 200 saat
-                # kita minta Range = server mengabaikannya dan mengirim ulang
-                # dari awal, jadi .part lama harus dibuang supaya tidak dobel.
                 resumed = resume_from > 0 and r.status_code == 206
                 if resume_from and not resumed:
                     logger.info("[M8] server mengabaikan Range, mulai dari awal: %s",
                                 out_path.name)
                     resume_from = 0
                 body_size = int(r.headers.get("Content-Length", 0))
-                # Content-Length pada 206 hanya sisanya; ukuran utuh = offset + sisa.
                 expected_size = (resume_from + body_size) if body_size else 0
                 downloaded = resume_from
                 guard = dg.StallGuard()
@@ -381,13 +305,10 @@ def _download_with_retry(
                             )
 
             if expected_size and downloaded != expected_size:
-                raise IOError(
+                raise OSError(
                     f"file size mismatch: got {downloaded} bytes, expected {expected_size}"
                 )
 
-            # os.replace, bukan Path.rename: atomic-overwrite di Windows
-            # maupun POSIX. Path.rename di Windows gagal FileExistsError
-            # kalau proses lain sudah menang duluan menulis out_path.
             os.replace(tmp_path, out_path)
             dg.clear_auth_failure("GESDISC")
             dg.record_connection_success(dg.GESDISC)
@@ -414,13 +335,9 @@ def _download_with_retry(
                 attempt, DOWNLOAD_MAX_RETRIES, out_path.name, exc,
             )
             auth_failed = isinstance(exc, dg.NasaAuthError)
-            # requests.RequestException turunan OSError, jadi ConnectionError,
-            # ChunkedEncodingError (IncompleteRead) dan SSLError semua tertangkap
-            # di sini -- sama seperti predikat module1.
             conn_lost = (not auth_failed and not not_found
                          and isinstance(exc, (ConnectionError, TimeoutError, OSError)))
             if conn_lost and tmp_path.exists():
-                # Simpan yang sudah turun; attempt berikutnya lanjut lewat Range.
                 resume_from = tmp_path.stat().st_size
                 logger.info("[M8] akan resume dari %.0f MB: %s",
                             resume_from / 1e6, out_path.name)
@@ -440,15 +357,11 @@ def _download_with_retry(
                 },
             )
             if not_found:
-                # granule genuinely doesn't exist for this run/date yet (e.g. Final
-                # Run not published) — retrying the same URL won't help.
                 raise _GranuleNotFound(str(exc)) from exc
             if auth_failed:
                 raise
             if attempt < DOWNLOAD_MAX_RETRIES:
                 if conn_lost and retry_after is None:
-                    # Koneksi diputus: tangga 5/10/20/40/80/120 s, bukan 2/4 s.
-                    # Retry instan hanya menabrak kondisi yang sama lagi.
                     dg.record_connection_failure(dg.GESDISC)
                     delay = dg.connection_retry_delay(attempt)
                     dg.note_wait(dg.GESDISC, delay, "connection lost",
@@ -458,7 +371,6 @@ def _download_with_retry(
                                 delay, attempt, DOWNLOAD_MAX_RETRIES)
                     dg.sleep_or_cancel(delay, None)
                 else:
-                    # Retry-After (429/503, dibatasi) atau backoff + jitter.
                     dg.backoff_wait(
                         dg.GESDISC, attempt,
                         "server rate-limiting (429/503)" if retry_after else "failed, retrying",
@@ -472,17 +384,7 @@ def _download_with_retry(
 
 
 def _snap_resolution(res: float) -> float:
-    """Resolusi grid IMERG dari selisih koordinat, dijepit ke 0.1 derajat.
-
-    Koordinat lat/lon IMERG disimpan float32, jadi (lon[-1] - lon[0]) / (n-1)
-    menghasilkan 0.0999999983, bukan 0.1. Selisih 1.7e-9 itu terakumulasi
-    sepanjang 2.870 sel dari -180 sampai AOI, sehingga tepi sel di 107.2
-    bergeser beberapa mikroderajat -- cukup untuk membuat crop AOI 106.4-107.2
-    ikut mengambil kolom ke-9 (107.2-107.3) yang seluruhnya nodata (dataset
-    24_try8: semua berkas GPM 9x8, bukan 8x8). Kalau hasil hitungnya berbeda
-    jauh dari resolusi resmi, nilai hitungnya yang dipakai: berarti berkasnya
-    memang bukan grid 0.1 derajat, dan menjepitnya akan menggeser seluruh
-    raster."""
+    """Resolusi grid IMERG dari selisih koordinat, dijepit ke 0.1 derajat."""
     if abs(res - IMERG_RESOLUTION_DEG) < 1e-6:
         return IMERG_RESOLUTION_DEG
     return res
@@ -497,12 +399,7 @@ def _read_daily_precip(nc4_path: Path):
     """Read the daily precipitation band (mm/day) from an IMERG NetCDF granule.
     Nodata pixels are filled with 0 mm so they contribute nothing to the
     accumulation sums downstream.
-
-    Dibaca lewat h5py dari koordinat lat/lon file, bukan driver NETCDF GDAL:
-    variabel IMERG berdimensi (time, lon, lat), dan GDAL membacanya tanpa
-    geotransform (matriks identitas, CRS kosong) serta tertransposisi
-    3600x1800 — crop ke AOI lalu selalu gagal "Input shapes do not overlap
-    raster"."""
+    """
     import h5py
     import numpy as np
     from rasterio.transform import from_origin
@@ -530,14 +427,11 @@ def _read_daily_precip(nc4_path: Path):
 
     res_x = _snap_resolution(abs(lon[-1] - lon[0]) / (lon.size - 1))
     res_y = _snap_resolution(abs(lat[0] - lat[-1]) / (lat.size - 1))
-    # Tepi grid di-snap ke kelipatan resolusi: koordinat IMERG disimpan
-    # float32, jadi lon[0] - res/2 hasilnya -179.999997, bukan -180 persis.
     transform = from_origin(
         _snap_edge(lon[0] - res_x / 2, res_x), _snap_edge(lat[0] + res_y / 2, res_y),
         res_x, res_y,
     )
 
-    # _FillValue IMERG = -9999.9; curah hujan tidak pernah negatif.
     data[~np.isfinite(data) | (data < 0)] = 0.0
     return np.ascontiguousarray(data), transform, DST_CRS
 
@@ -581,12 +475,6 @@ def _fetch_daily_precip(
         try:
             data, transform, crs = _read_daily_precip(nc4_path)
         except OSError as exc:
-            # Granule ada di disk dan ukurannya wajar, tapi isinya rusak
-            # (mis. "inflate() failed" dari blok terkompresi yang cacat).
-            # Cache dipercaya hanya lewat exists()+size, jadi tanpa ini
-            # berkas rusak akan dipakai ulang selamanya dan tanggal itu
-            # gagal terus sampai seseorang menghapusnya manual -- persis
-            # yang terjadi pada dataset 32 tanggal 2025-09-25.
             logger.warning(
                 "[M8] granule cache rusak, dihapus lalu diunduh ulang: %s (%s)",
                 nc4_path.name, exc,
@@ -647,44 +535,10 @@ def _crop_to_aoi(
     output_path: Path,
     tags: dict[str, str] | None = None,
 ) -> Path:
-    """Crop akumulasi hujan ke AOI dan simpan PADA RESOLUSI ASLINYA (0.1
-    derajat IMERG).
-
-    Sebelumnya berkas ini di-resample ke grid Sentinel-1 ~10 m supaya bisa
-    ditumpuk langsung dengan S1. Itu menggandakan nilai yang sama jutaan kali:
-    AOI 0,8 derajat memuat 8x8 sel IMERG, tapi berkasnya ditulis 8906x8906
-    piksel -- 64 nilai unik dalam 2,4 MB, dan 214 MB untuk satu bulan (93
-    berkas di dataset 22_try6). Data aslinya muat di bawah 1 KB.
-
-    Penumpukan tidak hilang karena itu: kedua konsumennya mereproyeksi sendiri
-    ke grid tujuan masing-masing -- module9 lewat _reproject_to_grid ke grid
-    dataset, module10 ke grid preview -- dan keduanya memakai nearest, jadi
-    hasil akhirnya identik dengan resample dini ini. Yang hilang cuma salinan
-    perantara yang kebesaran.
-
-    Crop tetap dilakukan: akumulasi IMERG mentah jauh lebih luas dari AOI, dan
-    menyimpan seluruh globe per tanggal jauh lebih mahal daripada memotongnya.
-    Setiap sel yang tersentuh AOI ikut, termasuk sel tepi yang pusatnya di
-    luar bbox -- tanpa itu 12,5% AOI jadi nodata. Konsekuensinya berkas ini
-    bisa sedikit LEBIH LUAS dari AOI (sebatas sel IMERG yang tersentuh), dan
-    itu memang yang diinginkan: pemotongan presisi dilakukan saat reproyeksi
-    ke grid tujuan. Sel yang cuma BERSINGGUNGAN di tepi tidak ikut.
-
-    `tags` ditulis sebagai metadata GeoTIFF (lihat _window_tags): berkas
-    akumulasi tidak menyebut sendiri rentang waktu yang dijumlahkannya, dan
-    module9 menyalin tag ini ke atribut lapisan HDF5.
-
-    Disimpan float32 + DEFLATE: presisi float64 tidak bermakna untuk mm hujan.
-    """
+    """Crop akumulasi hujan ke AOI dan simpan PADA RESOLUSI ASLINYA (0.1 derajat IMERG)."""
     from rasterio.windows import Window
     from rasterio.windows import transform as window_transform
 
-    # Jendela sel dihitung langsung dari affine, bukan lewat rasterize
-    # all_touched: tepi AOI di sini jatuh TEPAT di tepi sel (106.4, 107.2, ...),
-    # dan all_touched pada garis yang berimpit dengan tepi piksel ikut
-    # mengambil sel tetangganya -- kolom nodata ekstra di 24_try8. Toleransi
-    # 1e-6 sel membuang sisa pembulatan float tanpa pernah membuang sel yang
-    # benar-benar tersentuh AOI.
     height, width = accum.shape
     min_lon, min_lat, max_lon, max_lat = aoi_bbox
     inv = ~src_transform
@@ -705,8 +559,6 @@ def _crop_to_aoi(
     dest = crop_image[0].astype("float32")
     dst_height, dst_width = dest.shape
 
-    # atomic_path: berkas akumulasi dipercaya lewat exists() oleh run
-    # berikutnya, jadi tidak boleh ada versi separuh jadi di path final.
     with atomic_path(output_path) as tmp, rasterio.open(
         tmp, "w", driver="GTiff", height=dst_height, width=dst_width,
         count=1, dtype="float32", crs=crop_crs, transform=crop_transform,
@@ -721,13 +573,7 @@ def _crop_to_aoi(
 
 
 def _window_tags(date: datetime, window_name: str, num_days: int, runs: list[str]) -> dict[str, str]:
-    """Metadata waktu satu berkas akumulasi.
-
-    Granule harian IMERG mencakup satu hari UTC penuh (00:00-24:00), jadi
-    window `num_days` yang berakhir di `date` menjumlahkan hujan dari 00:00
-    UTC hari pertama sampai 00:00 UTC hari SETELAH `date`. Ditulis eksplisit
-    karena konsumen fusion perlu tahu berapa jam hujan di window ini jatuh
-    SETELAH citra Sentinel-1 diambil."""
+    """Metadata waktu satu berkas akumulasi."""
     day = datetime(date.year, date.month, date.day)
     start = day - timedelta(days=num_days - 1)
     end = day + timedelta(days=1)
@@ -768,9 +614,7 @@ def _window_targets(
     date_key: str,
     targets: tuple[tuple[str, str], ...],
 ) -> list[tuple[str, str, Path]]:
-    """(tier, processing_level, path) untuk satu window, tier tertinggi dulu.
-
-    Tier tertinggi dibangun; target lain diisi dengan menyalin berkas itu."""
+    """(tier, processing_level, path) untuk satu window, tier tertinggi dulu."""
     ordered = sorted(targets, key=lambda t: 0 if tn.rank(t[0]) == 2 else 1)
     out = []
     for tier, level in ordered:
@@ -791,35 +635,9 @@ def download_gpm_scene(
     windows: tuple[str, ...] | None = None,
     rebuild_non_final: bool = False,
 ) -> tuple[list[str], dict]:
-    """
-    Build 24h/72h/7-day rainfall accumulation GeoTIFFs for `date` from NASA
+    """Build 24h/72h/7-day rainfall accumulation GeoTIFFs for `date` from NASA
     GES DISC GPM IMERG Final daily granules, reprojected/cropped to `aoi_bbox`
     at the Sentinel-1 grid resolution.
-
-    Writes (fusion *inputs*, consumed by module9_fusion.py — not a GOLD
-    deliverable themselves):
-        data/datasets/{id}_{slug}/{date}/silver/gpm/gpm_rain_24h_{date}.tif
-        data/datasets/{id}_{slug}/{date}/silver/gpm/gpm_rain_72h_{date}.tif
-        data/datasets/{id}_{slug}/{date}/silver/gpm/gpm_rain_7d_{date}.tif
-
-    `processing_levels` (dari dataset_source_config) menentukan window mana
-    yang dibangun — dan karena itu berapa granule harian yang diunduh:
-        {"RAW"}              24h saja (1 granule)   -> bronze/gpm/{date}/
-        {"PROCESSED"}        24h+72h+7d (7 granule) -> silver/gpm/{date}/
-        {"RAW","PROCESSED"}  keduanya; 24h ada di bronze/ DAN silver/
-
-    Each window (24h/72h/7d) is built independently: a window whose daily
-    granules fail to download (after retries) is logged and skipped rather
-    than aborting the other windows. Pass `plog` to also emit structured
-    per-window/per-day/summary events to the `processing_logs` table
-    (visible in the live UI panel).
-
-    Returns:
-        (product_ids, metadata_dict) — product_ids covers only the windows
-        that succeeded; metadata_dict carries per-window output paths (with
-        the tier & processing_level of each copy under `windows[w]["targets"]`),
-        checksums, the source daily granules each window was built from, and
-        an overall `quality`/`failed_windows` summary.
     """
     plan = SourcePlan(
         source_name=GPM_SOURCE_NAME,
@@ -828,7 +646,6 @@ def download_gpm_scene(
     window_targets = plan.targets()
     wanted_windows = plan.gpm_windows()
     if windows is not None:
-        # Window tambahan (30d) memakai target tier yang sama dengan 7d.
         base = window_targets[wanted_windows[-1]]
         window_targets = {w: window_targets.get(w, base) for w in windows}
         wanted_windows = tuple(windows)
@@ -878,14 +695,10 @@ def download_gpm_scene(
             return entry
 
         if out_path.exists() and rebuild_non_final and any(r != "F" for r in file_runs(out_path)):
-            # Pembaruan Late -> Final (PIPELINE §3.4): bangun ulang; F dicoba
-            # lebih dulu oleh _fetch_daily_precip.
             logger.info("[M8] run non-Final %s, bangun ulang: %s", file_runs(out_path), out_path.name)
             for _tier, _level, stale in targets:
                 stale.unlink(missing_ok=True)
         if out_path.exists() and not _is_current_format(out_path):
-            # Berkas dari versi sebelum snap grid 0.1 derajat (kolom nodata
-            # ekstra) dan tanpa tag jendela waktu: bangun ulang, jangan pakai.
             logger.info("[M8] format lama, bangun ulang: %s", out_path.name)
             for _tier, _level, stale in targets:
                 stale.unlink(missing_ok=True)

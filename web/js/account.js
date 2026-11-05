@@ -1,5 +1,3 @@
-// js/account.js — Akun Saya: profil (/auth/me), email & peringatan (M64), ubah sandi,
-// token API milik sendiri.
 'use strict';
 Pages['account'] = {
   async init(root, ctx) {
@@ -14,10 +12,8 @@ Pages['account'] = {
       UI.$('#' + id + 'Err', root).textContent = msg || '';
     };
 
-    // ---- email & peringatan (M64)
     await initNotify(root, setErr);
 
-    // ---- ubah sandi
     UI.$('#pwForm', root).addEventListener('submit', async ev => {
       ev.preventDefault();
       const o = UI.$('#oldPw', root).value, n = UI.$('#newPw', root).value, n2 = UI.$('#newPw2', root).value;
@@ -34,7 +30,6 @@ Pages['account'] = {
       });
     });
 
-    // ---- token
     const list = UI.$('#tokenList', root);
     async function loadTokens() {
       list.innerHTML = UI.loadingHTML();
@@ -91,9 +86,6 @@ Pages['account'] = {
   },
 };
 
-// Email dan kecamatan langganan peringatan (M64). Email disimpan server hanya
-// setelah lolos pengecekan (format, belum dipakai, domain punya server mail,
-// email konfirmasi terkirim); penolakan dijelaskan di bawah kolomnya.
 async function initNotify(root, setErr) {
   const addr = UI.$('#mailAddr', root), state = UI.$('#mailState', root), del = UI.$('#mailDel', root);
   const list = UI.$('#regList', root), all = UI.$('#regAll', root), regState = UI.$('#regState', root);

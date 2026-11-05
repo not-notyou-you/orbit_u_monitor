@@ -1,26 +1,5 @@
 #!/usr/bin/env python
-"""Benchmark DBMS Orbit-U: The Monitor (DATABASE.md §1, M29).
-
-PostgreSQL + PostGIS vs MySQL 8.0 pada data sintetis yang sama (benchmark/generate.py):
-Q1–Q5 (5 kali pemanasan, 30 kali ukur → median & p95, EXPLAIN disimpan) dan
-uji fitur keamanan F1–F3. MongoDB 7 dinilai dari fitur saja.
-
-Database yang dipakai SELALU terpisah dari produksi:
-    PostgreSQL : database `themonitor_bench` (dibuat ulang), skema `bench`
-    MySQL 8.0  : schema/database `themonitor_bench` (dibuat ulang)
-Skrip menolak nama database `themonitor`.
-
-Koneksi:
-    PostgreSQL : BENCH_PG_URL atau DB_HOST/DB_PORT/DB_USER/DB_PASSWORD dari .env (superuser, untuk CREATE DATABASE)
-    MySQL      : BENCH_MYSQL_HOST/PORT/USER/PASSWORD (driver: pymysql). Tanpa server/driver → baris
-                 MySQL ditulis status "belum dijalankan" dengan alasannya.
-
-Keluaran: benchmark/results/timing.csv, features.csv, environment.json, explain_<engine>_<Q>.txt
-
-Pakai:
-    python benchmark/generate.py
-    python benchmark/run.py --engine all       # atau pg / mysql
-"""
+"""Benchmark DBMS Orbit-U: The Monitor (DATABASE.md §1, M29)."""
 
 from __future__ import annotations
 
@@ -38,7 +17,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-import engines as E  # noqa: E402
+import engines as E
 
 DATA, RESULTS = HERE / "data", HERE / "results"
 DB = "themonitor_bench"
@@ -70,7 +49,6 @@ def time_query(cur, sql: str, params: dict) -> tuple[list[float], int]:
     return ms, n
 
 
-# --------------------------------------------------------------------------- PostgreSQL
 def pg_conninfo() -> dict:
     from dotenv import load_dotenv
     load_dotenv(HERE.parent / ".env")
@@ -116,9 +94,8 @@ def run_pg() -> tuple[list[dict], list[dict], dict]:
     return timing, features, env
 
 
-# --------------------------------------------------------------------------- MySQL
 def run_mysql() -> tuple[list[dict], list[dict], dict]:
-    not_run = lambda why: ([{"engine": "MySQL 8.0", "query": q, "description": E.PG_QUERIES[q][0], "status": "belum dijalankan",  # noqa: E731
+    not_run = lambda why: ([{"engine": "MySQL 8.0", "query": q, "description": E.PG_QUERIES[q][0], "status": "belum dijalankan",
                              "note": why} for q in E.PG_QUERIES],
                            [{"engine": "MySQL 8.0", "feature": f, "name": n, "result": "belum dijalankan", "evidence": why}
                             for f, n in [("F1", "SET ROLE per transaksi"), ("F2", "Row-level security"),
@@ -133,7 +110,7 @@ def run_mysql() -> tuple[list[dict], list[dict], dict]:
           "password": os.getenv("BENCH_MYSQL_PASSWORD", ""), "autocommit": False}
     try:
         admin = pymysql.connect(**kw)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         return not_run(f"server MySQL tidak terjangkau di {host}: {e}")
     cur = admin.cursor()
     cur.execute("SELECT VERSION()")
@@ -168,7 +145,6 @@ def run_mysql() -> tuple[list[dict], list[dict], dict]:
     return timing, features, {"version": ver, "database": DB, "load_seconds": round(load_s, 2), "row_counts": counts}
 
 
-# --------------------------------------------------------------------------- lingkungan
 def machine() -> dict:
     info = {"os": platform.platform(), "python": platform.python_version(), "cpu": platform.processor(),
             "logical_cpus": os.cpu_count()}
