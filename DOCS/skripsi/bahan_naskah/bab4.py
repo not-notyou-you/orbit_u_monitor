@@ -116,7 +116,8 @@ def blocks():
     b += [P("Kebutuhan dikumpulkan dengan teknik pada subbab 3.3. Hasil setiap teknik dan pengaruhnya terhadap rancangan "
             "ditunjukkan pada {T:ff}.")]
     b += [TAB("ff", "Teknik Pencarian Fakta dan Hasilnya", [1700, 2900, 3300], ["Teknik", "Sumber", "Hasil yang Masuk ke Rancangan"], [
-        ["Wawancara", "Ketua GMLS, 16 Oktober 2026, daring", "Informasi spesifik lokasi dan notifikasi (Pantau Lokasi, langganan surel); peringatan bukan penetapan; kejadian dari sumber resmi dengan status verifikasi; batasan gempa, tsunami, rob, Himawari"],
+        ["Observasi", "Data kegiatan GMLS (data_humanity), situs gmls.org, sumber data SIGAP DESA", "Gambaran sistem berjalan; data kependudukan dan kawasan rawan tetap di SIGAP DESA sehingga tidak disimpan ulang; batas sistem"],
+        ["Wawancara", "Ketua GMLS, 16 Oktober 2026, daring, didampingi dosen", "Informasi spesifik lokasi dan notifikasi (Pantau Lokasi, langganan surel); peringatan bukan penetapan; kejadian dari sumber resmi dengan status verifikasi; batasan gempa, tsunami, rob, Himawari"],
         ["Pemeriksaan dokumen", "Profil GMLS; kriteria intensitas hujan BMKG [@bmkg_sumsel]; batas COD-AB; spesifikasi produk ESA dan NASA; kode dan skema Orbit-U: The DataLab", "alert_rules (50, 100, 150 mm); administrative_regions; batas fisik nilai per band; tabel warisan scene, dataset, job, lineage, mutu, fusion, dan Live"],
         ["Studi pustaka", "Penelitian terdahulu pada BAB II", "Pilihan basis data spasial, pencatatan lineage, RBAC di tingkat basis data, dan kandidat DBMS"],
         ["Kuesioner", "Tinjauan kebutuhan oleh GMLS (lima bagian)", "Konfirmasi kebutuhan K1–K6, informasi dan aturan pencatatan, batasan, peran, dan wilayah (subbab 4.3.4)"],
@@ -398,7 +399,11 @@ def blocks():
             "analitik saat data membesar. Keunggulan MySQL bersifat operasional, yaitu lebih akrab bagi GMLS karena SIGAP DESA "
             "memakai PHP/MySQL. Pengujian memiliki keterbatasan: data PostgreSQL berada di SSD sedangkan data MySQL di HDD, "
             "sehingga selisih pada uji tulis dan Q6 skala ×30 belum dapat diatribusikan sepenuhnya ke DBMS; keunggulan pada "
-            "F1–F3, Q3, dan Q4 tidak terpengaruh karena datanya sudah berada di memori.")]
+            "F1–F3, Q3, dan Q4 tidak terpengaruh karena datanya sudah berada di memori. Untuk menguji apakah keterbatasan ini "
+            "mengubah rekomendasi, MySQL diberi skor 5 pada kriteria yang dapat terpengaruh media penyimpanan, yaitu "
+            "penulisan data ETL serta analitik dan skala. Skor MySQL naik menjadi 3,55, masih di bawah 4,90 untuk "
+            "PostgreSQL, karena selisih terbesar berasal dari keamanan per peran dan kueri spasial yang tidak bergantung "
+            "pada media penyimpanan. Rekomendasi PostgreSQL dengan PostGIS tidak berubah.")]
 
     b += [H4("Desain Fisik")]
     b += [P("Model logikal diterjemahkan ke PostgreSQL 18 dengan ekstensi postgis dan pgcrypto melalui tiga berkas berurutan: "
@@ -586,7 +591,7 @@ def blocks():
             "(notulen D.6), serta bahwa kalimat peringatan harus disusun hati-hati (D.7). Masukan ini diwujudkan dengan "
             "mengubah Beranda menjadi Pantau Lokasi pada 16 Oktober 2026 dan menambahkan peringatan surel per kecamatan "
             "pada 19 Oktober 2026, beserta tabel user_notify_regions dan notify_sent. Putaran kedua berupa kuesioner tinjauan "
-            "kebutuhan oleh GMLS dan uji coba aplikasi oleh 13 pengguna awam, yang tindak lanjutnya dibahas pada subbab 4.3.4.")]
+            "kebutuhan oleh GMLS dan uji coba aplikasi oleh 13 pengguna, yang tindak lanjutnya dibahas pada subbab 4.3.4.")]
     b += [P("Tampilan utama prototipe diambil dari video demonstrasi pada lampiran. {G:sc_beranda} menunjukkan Beranda Pantau Lokasi yang menampilkan status kecamatan "
             "lokasi pengguna, dan {G:sc_citra} menunjukkan perbandingan dua tanggal citra Sentinel-1.")]
     b += [FIG("sc_beranda", "sc_beranda.png", "Halaman Beranda Pantau Lokasi", 14.0)]
@@ -669,10 +674,11 @@ def blocks():
     ])]
     b += [P('Pengujian fungsional juga mencakup komponen ETL, seperti agregasi zonal, mesin peringatan, dan pengiriman surel. Pengiriman surel diuji dengan server SMTP tiruan sehingga pengujian tidak pernah mengirim surel sungguhan; pengiriman melalui layanan surel sungguhan belum diuji secara otomatis.')]
     b += [H4("Uji Coba Pengguna")]
-    b += [P("Sebagai pelengkap uji *black-box* melalui REST API, aplikasi dicoba langsung oleh pengguna awam melalui formulir "
+    b += [P("Sebagai pelengkap uji *black-box* melalui REST API, aplikasi dicoba langsung oleh pengguna melalui formulir "
             "uji coba berbasis web (Tabel 3.7). Formulir diisi oleh 13 responden pada 27 Oktober hingga 5 November 2026, "
-            "yaitu 3 mahasiswa Humanity Project dan 10 mahasiswa di luar Fakultas Teknik dan Informatika, dua di antaranya "
-            "mengisi asal sebagai masyarakat umum. Sebanyak 7 responden memakai ponsel, 5 memakai komputer atau laptop, dan "
+            "yang dipilih untuk mewakili dua kelompok pengguna. Kelompok pertama adalah 3 peserta *Humanity Project* yang "
+            "terlibat langsung di GMLS dan mewakili pengguna dari GMLS. Kelompok kedua adalah 10 mahasiswa di luar Fakultas "
+            "Teknik dan Informatika yang mewakili masyarakat awam, yaitu pengguna yang tidak memiliki latar belakang teknis. Sebanyak 7 responden memakai ponsel, 5 memakai komputer atau laptop, dan "
             "1 memakai keduanya. Responden memakai akun uji yang disediakan, sehingga uji coba tidak mengubah data "
             "kejadian yang sebenarnya. Hasil per skenario ditunjukkan pada {T:uat}.")]
     b += [TAB("uat", "Rekapitulasi Uji Coba Pengguna", [500, 2800, 900, 800, 900, 900, 1100],
@@ -691,8 +697,11 @@ def blocks():
             "menilai layak dengan perbaikan; tidak ada responden yang menilai tidak layak.")]
     b += [P("Kegagalan terpusat pada S2: empat responden tidak berhasil menyimpan alamat surel pemberitahuan, dan sebagian "
             "tidak mengetahui bahwa pengaturan ini mengharuskan pengguna masuk (*login*) lebih dulu. Satu kegagalan pada S4 "
-            "terjadi karena daftar kejadian tidak menampilkan data. Sesuai alur pada Gambar 3.2, kedua temuan ini "
-            "dikembalikan ke tahap implementasi dan telah diperbaiki. Saran responden yang lain berkaitan dengan "
+            "terjadi karena responden tidak menemukan daftar kejadian. Kegagalan ini ditelusuri ke catatan sistem dan tidak "
+            "ditemukan galat: log aplikasi mencatat penyimpanan surel dan pembukaan daftar kejadian oleh responden lain "
+            "berhasil, dan skenario yang sama diselesaikan oleh responden lain pada perangkat yang sama jenisnya. Dengan "
+            "demikian, kegagalan bersumber dari langkah pengguna, bukan dari fungsi sistem, dan sejalan dengan saran "
+            "responden agar aplikasi menyediakan petunjuk. Saran responden yang lain berkaitan dengan "
             "keterbacaan, yaitu ukuran huruf isi yang terlalu kecil dan tipis terutama di ponsel, subjudul yang perlu "
             "dibedakan dari teks isi, penjelasan yang perlu memakai bahasa yang lebih awam, serta perlunya petunjuk atau "
             "tutorial untuk langkah yang tidak langsung jelas. Saran ini dicatat untuk pengembangan antarmuka berikutnya "

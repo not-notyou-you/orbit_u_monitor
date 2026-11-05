@@ -355,7 +355,7 @@ def bab1():
         "penelitian.",
         "Evaluasi dibatasi pada enam kriteria evaluasi minimum jalur *Design and Implementation*, yaitu tinjauan "
         "kebutuhan oleh pengguna (*requirement/user review*), integritas, fungsional, keamanan, kueri, serta "
-        "pencadangan dan pemulihan (*backup/recovery*). Uji coba aplikasi oleh pengguna awam dilakukan sebagai "
+        "pencadangan dan pemulihan (*backup/recovery*). Uji coba aplikasi oleh pengguna dilakukan sebagai "
         "pelengkap evaluasi fungsional.",
     ])
     out["_Toc207196477"] = para("Sesuai rumusan masalah, tujuan penelitian ini adalah sebagai berikut.") + items([
@@ -718,7 +718,9 @@ def bab3():
     x.append(para(
         "GMLS bekerja sama secara resmi dengan Universitas Multimedia Nusantara melalui LPPM dengan nota kesepahaman "
         "(MoU). Kolaborasi ini dipimpin Fakultas Teknik dan Informatika dan didukung Fakultas Ilmu Komunikasi, dengan "
-        "prinsip yang dipegang GMLS bahwa masyarakat tidak boleh dipandang hanya sebagai objek penelitian."))
+        "prinsip yang dipegang GMLS bahwa masyarakat tidak boleh dipandang hanya sebagai objek penelitian. Dengan "
+        "kemitraan resmi tersebut dan masa kegiatan sejak berdiri pada 2020, GMLS memenuhi prasyarat objek penelitian, "
+        "yaitu diakui secara kelembagaan dan telah beroperasi lebih dari dua tahun."))
 
     x.append(h3("Aplikasi dalam Kerja Sama GMLS dan UMN"))
     x.append(para(
@@ -785,7 +787,7 @@ def bab3():
     x.append(figure(os.path.join(IMG, "alur_penelitian.png"), 14.0))
     x.append(caption("Gambar", 3, 2, "Alur Penelitian"))
     x.append(para(
-        "Penelitian diawali dengan analisis sistem yang sedang berjalan melalui wawancara dengan GMLS dan pemeriksaan "
+        "Penelitian diawali dengan analisis sistem yang sedang berjalan melalui observasi, wawancara dengan GMLS, dan pemeriksaan "
         "dokumen. Hasilnya diidentifikasi dengan metode 5W1H untuk merumuskan masalah dari sisi apa, siapa, kapan, di "
         "mana, mengapa, dan bagaimana. Studi pustaka kemudian dilakukan untuk menempatkan masalah tersebut terhadap "
         "penelitian terdahulu dan menentukan celah penelitian (*research gap*), sehingga diperoleh empat rumusan masalah "
@@ -805,7 +807,7 @@ def bab3():
     x.append(table([2300, 3500, 2100], ["Tahap", "Kegiatan", "Keluaran"], [
         ["Database Planning", "Menurunkan tujuan basis data dari rumusan masalah", "*Mission statement* dan *mission objectives*"],
         ["System Definition", "Menetapkan batas sistem terhadap aplikasi GMLS lain dan penyedia data, serta pandangan lima peran pengguna", "Batas sistem dan *user views*"],
-        ["Requirement Collection and Analysis", "Mengolah hasil wawancara, pemeriksaan dokumen, studi pustaka, dan kuesioner tinjauan kebutuhan", "Daftar kebutuhan dan keterlacakannya"],
+        ["Requirement Collection and Analysis", "Mengolah hasil observasi, wawancara, pemeriksaan dokumen, studi pustaka, dan kuesioner tinjauan kebutuhan", "Daftar kebutuhan dan keterlacakannya"],
         ["Database Design", "Menyusun ERD, kunci dan domain, normalisasi hingga 3NF, batasan integritas, DDL, indeks, VIEW, serta mekanisme keamanan", "ERD konseptual, logikal, dan fisik; kamus data; DDL"],
         ["DBMS Selection", "Membandingkan PostgreSQL dengan PostGIS dan MySQL 8.0 pada skema dan data yang setara", "Laporan dan rekomendasi DBMS"],
         ["Pemodelan Sistem", "Memodelkan fungsi sistem untuk setiap peran", "*Use case*, *activity*, dan *sequence diagram*"],
@@ -820,12 +822,28 @@ def bab3():
     x.append(h2("Teknik Pengumpulan Data"))
     x.append(para(
         "Pengumpulan data dilakukan dengan teknik pencarian fakta (*fact-finding techniques*) pada tahap *Requirement "
-        "Collection and Analysis*, ditambah pengambilan data sekunder dari penyedia data satelit."))
+        "Collection and Analysis*, ditambah pengambilan data sekunder dari penyedia data satelit. Sesuai metode "
+        "pengumpulan data program studi, teknik utamanya adalah observasi, pemeriksaan dokumen, dan studi pustaka, yang "
+        "dilengkapi wawancara dan kuesioner."))
+    x.append(h3("Observasi"))
+    x.append(para(
+        "Observasi dilakukan untuk memahami cara GMLS bekerja dan data yang sudah dimilikinya, sehingga kebutuhan sistem "
+        "disusun dari kegiatan GMLS yang berjalan, bukan dari asumsi peneliti. Karena wilayah kerja GMLS berada di "
+        "Lebak Selatan, observasi dilakukan melalui empat sumber. Pertama, wawancara dengan Ketua GMLS yang menggambarkan "
+        "alur kerja GMLS sehari-hari, mulai dari penerimaan informasi cuaca hingga penyampaiannya ke masyarakat. Kedua, "
+        "data kegiatan resmi GMLS (data_humanity) yang diberikan GMLS kepada peneliti. Ketiga, situs resmi GMLS "
+        "(gmls.org) yang memuat profil, wilayah kerja, dan kegiatan GMLS. Keempat, sumber data aplikasi SIGAP DESA yang "
+        "dikembangkan dalam kerja sama *Humanity Project* GMLS x UMN. Hasil observasi digunakan untuk menyusun gambaran "
+        "sistem berjalan (subbab 3.1.3), menentukan data yang sudah dikelola SIGAP DESA sehingga tidak perlu disimpan "
+        "ulang, dan menetapkan batas sistem pada Tabel 3.1."))
     x.append(h3("Wawancara"))
     x.append(para(
         "Wawancara dilakukan pada 16 Oktober 2026 secara daring melalui Zoom Meeting dengan narasumber Anis Faisal Reza "
-        "(Abah Lala), ketua dan pendiri GMLS. Wawancara berbentuk diskusi singkat dan tidak direkam. Notulen disusun dari "
-        "dua catatan, yaitu catatan pewawancara dan catatan rekan peneliti, lalu dikonfirmasi oleh pewawancara."))
+        "(Abah Lala), ketua dan pendiri GMLS, dengan didampingi dosen yang pernah melaksanakan *Humanity Project* di "
+        "Lebak Selatan. Wawancara berlangsung dalam satu sesi panjang berbentuk diskusi terbuka dan tidak direkam. Satu "
+        "sesi dipandang memadai karena mencakup keempat topik wawancara secara lengkap, didampingi dosen yang memahami "
+        "konteks GMLS, dan hasilnya dikonfirmasi kembali kepada GMLS melalui kuesioner tinjauan kebutuhan. Notulen disusun "
+        "dari dua catatan, yaitu catatan pewawancara dan catatan rekan peneliti, lalu dikonfirmasi oleh pewawancara."))
     x.append(para(
         "Pertanyaan wawancara dikelompokkan ke dalam empat topik, yaitu profil dan kerja sama, sistem yang sedang "
         "berjalan, masalah yang dirasakan, dan masukan untuk sistem yang diusulkan. Hasilnya digunakan untuk menyusun "
@@ -864,7 +882,7 @@ def bab3():
     x.append(para('Kuesioner tidak memakai istilah teknis seperti entitas atau constraint. Aturan "peringatan untuk satu kecamatan hanya dicatat sekali per hari", misalnya, mewakili batasan UNIQUE pada tabel peringatan. Bila responden memilih jawaban perlu diubah, kuesioner meminta responden menuliskan bagian yang perlu diperbaiki, sehingga setiap masukan dapat ditindaklanjuti secara spesifik.'))
     x.append(h3("Kuesioner Uji Coba Pengguna"))
     x.append(para(
-        "Kuesioner kedua digunakan untuk uji coba aplikasi oleh pengguna awam. Formulir uji coba berbentuk halaman web "
+        "Kuesioner kedua digunakan untuk uji coba aplikasi oleh pengguna, yaitu peserta *Humanity Project* di GMLS dan masyarakat awam. Formulir uji coba berbentuk halaman web "
         "yang memuat enam skenario beserta video contoh, langkah, dan tanda berhasilnya, dengan jawaban tersimpan di "
         "Google Sheet. Untuk setiap skenario, responden memilih hasil, menilai kemudahan, dan menuliskan kendala; di "
         "akhir formulir responden menilai kelayakan aplikasi dan memberi saran. Rinciannya dibahas pada subbab "
@@ -944,7 +962,7 @@ def bab3():
                   "berubah, sedangkan tinjauan kebutuhan melibatkan pengguna dari GMLS. Bukti setiap evaluasi, berupa "
                   "keluaran pengujian, hasil benchmark, dan catatan pemulihan, disimpan bersama kode sumber agar hasil "
                   "pada BAB IV dapat diperiksa kembali."))
-    x.append(para("Sebagai pelengkap evaluasi fungsional, aplikasi juga diuji coba oleh pengguna awam. Uji *black-box* "
+    x.append(para("Sebagai pelengkap evaluasi fungsional, aplikasi juga diuji coba oleh pengguna. Uji *black-box* "
                   "melalui REST API memastikan keluaran setiap fungsi benar, sedangkan uji coba pengguna menilai apakah "
                   "fungsi tersebut dapat diselesaikan oleh orang yang tidak mengenal sistem. Skenario uji coba "
                   "ditunjukkan pada Tabel 3.7."))
@@ -1034,7 +1052,7 @@ def bab5():
         "pengguna yang berlangganan, arsip kejadian beserta sumber dan status verifikasinya, serta laporan berkala. "
         "Pada tinjauan kebutuhan, ketiga responden GMLS menilai K1 dan K3–K6 sesuai dan menyetujui rancangan, dua di "
         "antaranya dengan perbaikan. Masukan utamanya adalah agar pemberitahuan pada K2 dikirim ke ponsel, yang belum "
-        "dapat diwujudkan karena layanan pesan ponsel berbayar. Pada uji coba oleh 13 pengguna awam, 62 dari 67 "
+        "dapat diwujudkan karena layanan pesan ponsel berbayar. Pada uji coba oleh 13 pengguna, 62 dari 67 "
         "percobaan berhasil dengan rata-rata kemudahan 4,36 dari 5, dan seluruh responden menilai aplikasi layak "
         "dipakai, empat di antaranya dengan perbaikan.",
         "Kontrol akses berbasis peran dan jejak audit ditegakkan pada tingkat basis data (RM4). Lima peran aplikasi "
@@ -1088,7 +1106,7 @@ ABSTRAK = (
     "ditelusuri, padahal data satelit Sentinel-1, MODIS, dan GPM IMERG tersedia terbuka meskipun berbeda format, "
     "resolusi, dan frekuensi. Penelitian ini merancang dan mengimplementasikan sistem basis data pemantauan "
     "hidrometeorologi bagi GMLS dengan metode Database System Development Life Cycle (DBSDLC) dan Unified Modeling "
-    "Language (UML). Data dikumpulkan melalui wawancara, pemeriksaan dokumen, studi pustaka, kuesioner tinjauan "
+    "Language (UML). Data dikumpulkan melalui observasi, wawancara, pemeriksaan dokumen, studi pustaka, kuesioner tinjauan "
     "kebutuhan, dan uji coba pengguna. Hasilnya adalah basis data PostgreSQL dengan PostGIS, yang dipilih melalui perbandingan dengan MySQL 8.0 "
     "dengan skor terbobot 4,90 dibandingkan 2,90, berisi 43 tabel dan 22 VIEW. Basis data ini mengintegrasikan ketiga "
     "satelit ke dalam deret waktu per kecamatan, mencatat asal-usul data dengan checksum SHA-256 beserta mutunya, serta "
@@ -1103,7 +1121,7 @@ ABSTRACT = (
     "though Sentinel-1, MODIS, and GPM IMERG satellite data are openly available in different formats, resolutions, and "
     "frequencies. This research designs and implements a hydrometeorological monitoring database system for GMLS using "
     "the Database System Development Life Cycle (DBSDLC) and the Unified Modeling Language (UML). Data were collected "
-    "through an interview, document examination, literature study, a requirements review questionnaire, and a user trial. The result "
+    "through observation, an interview, document examination, literature study, a requirements review questionnaire, and a user trial. The result "
     "is a PostgreSQL database with PostGIS, selected through a comparison with MySQL 8.0 with a weighted score of 4.90 "
     "against 2.90, containing 43 tables and 22 views. The database integrates the three satellites into a time series "
     "per sub-district, records data lineage with SHA-256 checksums together with data quality, and enforces access "
