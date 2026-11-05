@@ -836,6 +836,23 @@ def bab3():
         "dikembangkan dalam kerja sama *Humanity Project* GMLS x UMN. Hasil observasi digunakan untuk menyusun gambaran "
         "sistem berjalan (subbab 3.1.3), menentukan data yang sudah dikelola SIGAP DESA sehingga tidak perlu disimpan "
         "ulang, dan menetapkan batas sistem pada Tabel 3.1."))
+    x.append(para(
+        "Pemeriksaan data_humanity menghasilkan empat temuan. Pertama, data terlengkap GMLS adalah Formulir Asesmen "
+        "Demografi berbasis AppSheet yang diisi relawan GMLS pada 14 Januari hingga 16 Juni 2021, berisi 356 rumah tangga "
+        "di zona rawan tsunami Desa Panggarangan, Kecamatan Panggarangan, lengkap dengan koordinat rumah, data kepala "
+        "keluarga, dan kelompok rentan. Survei ini mendukung *Piloting Tsunami Ready* 2021 bersama BMKG, BNPB, dan "
+        "lembaga lain untuk pengakuan UNESCO. Kedua, data tersebut telah disusun ulang menjadi tabel desa, zona bencana, "
+        "keluarga, warga, rambu, tempat evakuasi, dan 25 kegiatan kesiapsiagaan tahun 2023. Ketiga, data spasial yang "
+        "dimiliki adalah batas administrasi COD-AB BPS 2020 serta peta Kawasan Rawan Bencana gerakan tanah dan tsunami "
+        "Banten dari PVMBG. Keempat, data kejadian yang tersedia hanya katalog gempa bumi global sebanyak 1.633 kejadian. "
+        "Basis data SIGAP DESA (MySQL, 11 tabel) mengelola hierarki wilayah hingga RT, rumah dengan status zona tsunami "
+        "dan koordinat, keluarga, warga, serta titik evakuasi yang ditampilkan melalui Tableau."))
+    x.append(para(
+        "Dari observasi ini disimpulkan bahwa data GMLS berfokus pada kependudukan, kawasan rawan, dan gempa-tsunami, "
+        "sedangkan data hidrometeorologi per kecamatan, seperti curah hujan, genangan, dan kelembapan tanah, beserta "
+        "catatan kejadian banjir dan longsor belum dimiliki. Temuan ini menjadi dasar ruang lingkup Orbit-U: The Monitor: "
+        "data kependudukan dan titik evakuasi tetap dikelola SIGAP DESA, sedangkan basis data yang dirancang mengisi "
+        "kekosongan data hidrometeorologi dengan memakai batas kecamatan COD-AB yang sama."))
     x.append(h3("Wawancara"))
     x.append(para(
         "Wawancara dilakukan pada 16 Oktober 2026 secara daring melalui Zoom Meeting dengan narasumber Anis Faisal Reza "

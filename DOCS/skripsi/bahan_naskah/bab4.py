@@ -555,7 +555,10 @@ def blocks():
     b += [H3("Implementasi")]
     b += [P("Arsitektur sistem terdiri atas penyedia data resmi, lapisan ETL berbahasa Python, penyimpanan (PostgreSQL dan "
             "*filesystem*), serta lapisan aplikasi berupa REST API FastAPI dan web ({G:arsitektur}). ETL menulis ke basis data "
-            "sebagai monitor_etl, sedangkan API membaca dan menulis sebagai monitor_app dengan SET LOCAL ROLE per *request*.")]
+            "sebagai monitor_etl, sedangkan API membaca dan menulis sebagai monitor_app dengan SET LOCAL ROLE per *request*. "
+            "Aplikasi yang telah diimplementasikan dapat diakses di https://orbit-u.hakimhakim.workers.dev/, sedangkan kode "
+            "sumber, skrip DDL dan kueri, konfigurasi, kamus data, serta README untuk reproduksi tersedia pada repositori "
+            "https://github.com/not-notyou-you/orbit_u_monitor.")]
     b += [FIG("arsitektur", "arsitektur.png", "Arsitektur Sistem", 14.0)]
     b += [P("Setiap satelit diproses melalui tier berurutan dan menghasilkan COG per band. Nilai per kecamatan dihitung dari "
             "COG dengan agregasi zonal berbobot luas irisan sel dan poligon, lalu disimpan ke region_observations dan dipakai "
