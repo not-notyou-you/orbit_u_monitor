@@ -979,7 +979,7 @@ def bab3():
                   "atau tidak dicoba, menilai kemudahan pada skala 1 (sangat sulit) hingga 5 (sangat mudah), dan "
                   "menuliskan kendala bila ada. S5 dan S6 bersifat pilihan karena merupakan tugas Analis. Di akhir "
                   "formulir, responden menilai apakah aplikasi layak dipakai, layak dengan perbaikan, atau tidak layak. "
-                  "Setiap kegagalan yang ditemukan dikembalikan ke tahap implementasi."))
+                  "Setiap kendala yang ditemukan dikembalikan ke tahap implementasi."))
     return "".join(x)
 
 

@@ -682,7 +682,7 @@ def blocks():
             "1 memakai keduanya. Responden memakai akun uji yang disediakan, sehingga uji coba tidak mengubah data "
             "kejadian yang sebenarnya. Hasil per skenario ditunjukkan pada {T:uat}.")]
     b += [TAB("uat", "Rekapitulasi Uji Coba Pengguna", [500, 2800, 900, 800, 900, 900, 1100],
-              ["No", "Skenario", "Berhasil", "Dengan Kesulitan", "Tidak Berhasil", "Tidak Dicoba", "Rata-rata Kemudahan"], [
+              ["No", "Skenario", "Berhasil", "Dengan Kesulitan", "Belum Berhasil", "Tidak Dicoba", "Rata-rata Kemudahan"], [
         ["S1", "Melihat keadaan di tempat pengguna berada", "13", "0", "0", "0", "4,31"],
         ["S2", "Mengatur pemberitahuan melalui surel", "7", "1", "4", "1", "3,75"],
         ["S3", "Melihat citra satelit", "13", "0", "0", "0", "4,54"],
@@ -695,12 +695,12 @@ def blocks():
             "rata-rata kemudahan 4,36. Skenario S5 dan S6 tidak dicoba oleh lima responden karena keduanya merupakan tugas "
             "akun Analis dan bersifat pilihan pada formulir. Sebanyak 9 responden menilai aplikasi layak dipakai dan 4 "
             "menilai layak dengan perbaikan; tidak ada responden yang menilai tidak layak.")]
-    b += [P("Kegagalan terpusat pada S2: empat responden tidak berhasil menyimpan alamat surel pemberitahuan, dan sebagian "
-            "tidak mengetahui bahwa pengaturan ini mengharuskan pengguna masuk (*login*) lebih dulu. Satu kegagalan pada S4 "
-            "terjadi karena responden tidak menemukan daftar kejadian. Kegagalan ini ditelusuri ke catatan sistem dan tidak "
+    b += [P("Kesulitan terbanyak ada pada S2: empat responden belum berhasil menyimpan alamat surel pemberitahuan, dan "
+            "sebagian belum mengetahui bahwa pengaturan ini mengharuskan pengguna masuk (*login*) lebih dulu. Pada S4, satu "
+            "responden kesulitan menemukan daftar kejadian. Kedua temuan ini ditelusuri ke catatan sistem dan tidak "
             "ditemukan galat: log aplikasi mencatat penyimpanan surel dan pembukaan daftar kejadian oleh responden lain "
             "berhasil, dan skenario yang sama diselesaikan oleh responden lain pada perangkat yang sama jenisnya. Dengan "
-            "demikian, kegagalan bersumber dari langkah pengguna, bukan dari fungsi sistem, dan sejalan dengan saran "
+            "demikian, kesulitan tersebut berasal dari langkah pengguna yang belum dikenal, bukan dari fungsi sistem, dan sejalan dengan saran "
             "responden agar aplikasi menyediakan petunjuk. Saran responden yang lain berkaitan dengan "
             "keterbacaan, yaitu ukuran huruf isi yang terlalu kecil dan tipis terutama di ponsel, subjudul yang perlu "
             "dibedakan dari teks isi, penjelasan yang perlu memakai bahasa yang lebih awam, serta perlunya petunjuk atau "
