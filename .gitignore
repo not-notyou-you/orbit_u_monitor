@@ -253,5 +253,8 @@ benchmark/data/
 # Bukti tangkapan layar UI (±19 MB) disimpan lokal, tidak di repo
 tests/screenshots/
 
-# Profil browser yang dipakai DOCS/skripsi/referensi/unduh_pdf.py (cache, cookie, sesi login)
+# Semua isi DOCS masuk repo (pdf, png, jpeg, log tidak dikecualikan)
+!DOCS/**
+
+# Kecuali profil browser unduh_pdf.py: cache, cookie, dan sesi login (~154 MB)
 DOCS/skripsi/referensi/pdf/.browser/

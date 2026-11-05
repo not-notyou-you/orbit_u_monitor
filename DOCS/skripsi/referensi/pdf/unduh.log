@@ -1,0 +1,112 @@
+2026-10-29 09:58:41,767 INFO    RIS: referensi_bab1,2,3.ris | 67 entri (65 ber-DOI) | output: D:\NOT-NOTYOU-YOU\themonitor\DOCS\referensi\pdf
+2026-10-29 09:58:46,087 INFO    Unpaywall: aktif | CORE: mati (tanpa CORE_API_KEY) | Scholar: mati | Browser: aktif
+2026-10-29 09:58:46,087 INFO    
+[58/67] Third and Boyce–Codd normal form for property graphs
+2026-10-29 09:58:46,087 DEBUG     [mdpi] tidak ada kandidat
+2026-10-29 09:58:54,321 INFO      [unpaywall     ] OK 2.8 MB  <https://link.springer.com/content/pdf/10.1007/s00778-025-00902-2.pdf>
+2026-10-29 09:58:54,321 INFO    
+[59/67] Synthesizing Third Normal Form Schemata that Minimize Integrity Maintenance and Update Ove
+2026-10-29 09:58:54,321 DEBUG     [mdpi] tidak ada kandidat
+2026-10-29 09:58:55,860 INFO      [unpaywall     ] gagal: HTTP 403 (paywall/blokir bot)  <https://dl.acm.org/doi/pdf/10.1145/3725362>
+2026-10-29 09:58:58,220 DEBUG     [openalex] tidak ada kandidat
+2026-10-29 09:58:58,610 DEBUG     [semantic] tidak ada kandidat
+2026-10-29 09:58:59,735 DEBUG     [crossref] tidak ada kandidat
+2026-10-29 09:58:59,735 DEBUG     [sciencedirect] tidak ada kandidat
+2026-10-29 09:59:05,021 DEBUG     [europepmc] tidak ada kandidat
+2026-10-29 09:59:05,021 DEBUG     [core] tidak ada kandidat
+2026-10-29 09:59:05,526 DEBUG     [doaj] tidak ada kandidat
+2026-10-29 09:59:06,731 DEBUG     [zenodo] tidak ada kandidat
+2026-10-29 09:59:07,324 DEBUG     [arxiv] tidak ada kandidat
+2026-10-29 09:59:20,729 DEBUG     [semantic-judul] HTTP 429
+2026-10-29 09:59:20,729 DEBUG     [semantic-judul] tidak ada kandidat
+2026-10-29 09:59:21,087 INFO      [doi           ] gagal: HTTP 403 (paywall/blokir bot)  <https://doi.org/10.1145/3725362>
+2026-10-29 09:59:22,091 DEBUG     [scholar] tidak ada kandidat
+2026-10-29 09:59:22,091 INFO      mencoba ulang lewat browser (2 URL)...
+2026-10-29 09:59:25,297 INFO          >>> CAPTCHA di browser! Selesaikan di jendela Chromium (menunggu s/d 120 detik)
+2026-10-29 09:59:32,514 INFO      [browser       ] OK 3.1 MB  <https://dl.acm.org/doi/pdf/10.1145/3725362>
+2026-10-29 09:59:32,514 INFO    
+[60/67] Protecting Data Integrity of Web Applications with Database Constraints Inferred from Appl
+2026-10-29 09:59:32,514 DEBUG     [mdpi] tidak ada kandidat
+2026-10-29 09:59:32,899 INFO      [unpaywall     ] gagal: HTTP 403 (paywall/blokir bot)  <https://dl.acm.org/doi/pdf/10.1145/3575693.3575699>
+2026-10-29 09:59:34,550 DEBUG     [openalex] tidak ada kandidat
+2026-10-29 09:59:34,793 DEBUG     [semantic] tidak ada kandidat
+2026-10-29 09:59:35,355 INFO      [crossref      ] gagal: HTTP 403 (paywall/blokir bot)  <https://dl.acm.org/doi/10.1145/3575693.3575699>
+2026-10-29 09:59:36,359 DEBUG     [sciencedirect] tidak ada kandidat
+2026-10-29 09:59:40,673 DEBUG     [europepmc] tidak ada kandidat
+2026-10-29 09:59:40,673 DEBUG     [core] tidak ada kandidat
+2026-10-29 09:59:40,930 DEBUG     [doaj] tidak ada kandidat
+2026-10-29 09:59:41,153 DEBUG     [zenodo] tidak ada kandidat
+2026-10-29 09:59:41,522 DEBUG     [arxiv] tidak ada kandidat
+2026-10-29 09:59:54,604 DEBUG     [semantic-judul] tidak ada kandidat
+2026-10-29 09:59:54,767 INFO      [doi           ] gagal: HTTP 403 (paywall/blokir bot)  <https://doi.org/10.1145/3575693.3575699>
+2026-10-29 09:59:55,770 DEBUG     [scholar] tidak ada kandidat
+2026-10-29 09:59:55,770 INFO      mencoba ulang lewat browser (3 URL)...
+2026-10-29 09:59:57,533 INFO      [browser       ] OK 1.9 MB  <https://dl.acm.org/doi/pdf/10.1145/3575693.3575699>
+2026-10-29 09:59:57,533 INFO    
+[61/67] Foreign Key Constraints to Maintain Referential Integrity in Distributed Database in Micro
+2026-10-29 09:59:57,533 DEBUG     [mdpi] tidak ada kandidat
+2026-10-29 09:59:58,476 INFO      [unpaywall     ] OK 0.8 MB  <https://thesai.org/Downloads/Volume16No6/Paper_96-Foreign_Key_Constraints_to_Maintain_Referential_Integrity.pdf>
+2026-10-29 09:59:58,476 INFO    
+[62/67] Perancangan Dan Implementasi System Incremental Backup Database Postgresql Menggunakan Apl
+2026-10-29 09:59:58,476 DEBUG     [mdpi] tidak ada kandidat
+2026-10-29 09:59:59,321 INFO      [unpaywall     ] OK 0.3 MB  <https://jurnal.polgan.ac.id/index.php/jmp/article/download/12539/1702>
+2026-10-29 09:59:59,322 INFO    
+[63/67] Desain Model Relational Database Perpustakaan SMP Negeri 13 Tarakan menggunakan Metode Dat
+2026-10-29 09:59:59,322 DEBUG     [mdpi] tidak ada kandidat
+2026-10-29 10:00:03,676 INFO      [unpaywall     ] OK 0.9 MB  <https://jutei.ukdw.ac.id/index.php/jurnal/article/download/398/101>
+2026-10-29 10:00:03,676 INFO    
+[64/67] Perancangan Basis Data Sistem Reservasi Wisma Universitas Terbuka dengan Metode Database L
+2026-10-29 10:00:03,676 DEBUG     [mdpi] tidak ada kandidat
+2026-10-29 10:00:23,467 INFO      [unpaywall     ] gagal: HTTP 522  <https://openjournal.unpam.ac.id/index.php/JTSI/article/download/45421/21799>
+2026-10-29 10:00:25,567 DEBUG     [openalex] tidak ada kandidat
+2026-10-29 10:00:25,802 DEBUG     [semantic] tidak ada kandidat
+2026-10-29 10:00:27,398 DEBUG     [crossref] tidak ada kandidat
+2026-10-29 10:00:27,398 DEBUG     [sciencedirect] tidak ada kandidat
+2026-10-29 10:00:30,924 DEBUG     [europepmc] tidak ada kandidat
+2026-10-29 10:00:30,924 DEBUG     [core] tidak ada kandidat
+2026-10-29 10:00:31,478 DEBUG     [doaj] tidak ada kandidat
+2026-10-29 10:00:32,908 DEBUG     [zenodo] tidak ada kandidat
+2026-10-29 10:00:34,317 DEBUG     [arxiv] tidak ada kandidat
+2026-10-29 10:00:47,886 DEBUG     [semantic-judul] HTTP 429
+2026-10-29 10:00:47,886 DEBUG     [semantic-judul] tidak ada kandidat
+2026-10-29 10:01:07,678 INFO      [doi           ] gagal: HTTP 522  <https://doi.org/10.32493/jtsi.v7i4.45421>
+2026-10-29 10:01:08,687 DEBUG     [scholar] tidak ada kandidat
+2026-10-29 10:01:08,687 INFO      mencoba ulang lewat browser (2 URL)...
+2026-10-29 10:01:31,623 DEBUG         link PDF di halaman: []
+2026-10-29 10:01:41,905 INFO      [browser       ] gagal: browser: tidak menemukan PDF di halaman  <https://openjournal.unpam.ac.id/index.php/JTSI/article/download/45421/21799>
+2026-10-29 10:02:04,490 DEBUG         link PDF di halaman: []
+2026-10-29 10:02:14,668 INFO      [browser       ] gagal: browser: tidak menemukan PDF di halaman  <https://doi.org/10.32493/jtsi.v7i4.45421>
+2026-10-29 10:02:14,668 INFO      -> GAGAL (2 URL dicoba)
+2026-10-29 10:02:14,668 INFO    
+[65/67] UML Design of Business Intelligence System for Small-Scale Enterprises
+2026-10-29 10:02:14,668 DEBUG     [mdpi] tidak ada kandidat
+2026-10-29 10:02:19,445 INFO      [unpaywall     ] OK 1.7 MB  <https://journal-isi.org/index.php/isi/article/download/672/340>
+2026-10-29 10:02:19,445 INFO    
+[66/67] Seamless transformation from use case to sequence diagrams
+2026-10-29 10:02:19,445 DEBUG     [mdpi] tidak ada kandidat
+2026-10-29 10:02:20,321 INFO      [unpaywall     ] gagal: HTTP 403 (paywall/blokir bot)  <https://doi.org/10.7717/peerj-cs.1444>
+2026-10-29 10:02:23,308 DEBUG         link di halaman https://pmc.ncbi.nlm.nih.gov/articles/PMC10319259/pdf/peerj-cs-09-1444.pdf -> halaman HTML, bukan PDF
+2026-10-29 10:02:23,584 DEBUG         link di halaman https://pmc.ncbi.nlm.nih.gov:443/articles/PMC10319259/pdf/peerj-cs-09-1444.pdf -> halaman HTML, bukan PDF
+2026-10-29 10:02:23,584 INFO      [unpaywall     ] gagal: 2 link PDF di halaman gagal (halaman HTML, bukan PDF)  <https://www.ncbi.nlm.nih.gov/pmc/articles/10319259>
+2026-10-29 10:02:24,816 INFO      [unpaywall     ] gagal: HTTP 403 (paywall/blokir bot)  <https://doaj.org/article/7a4197a2cfc3421c908d369e31e69a57>
+2026-10-29 10:02:27,333 DEBUG     [openalex] tidak ada kandidat
+2026-10-29 10:02:27,964 DEBUG     [semantic] tidak ada kandidat
+2026-10-29 10:02:29,983 INFO      [crossref      ] gagal: HTTP 403 (paywall/blokir bot)  <https://peerj.com/articles/cs-1444.pdf>
+2026-10-29 10:02:31,090 INFO      [crossref      ] gagal: HTTP 403 (paywall/blokir bot)  <https://peerj.com/articles/cs-1444.xml>
+2026-10-29 10:02:33,310 INFO      [crossref      ] gagal: HTTP 403 (paywall/blokir bot)  <https://peerj.com/articles/cs-1444.html>
+2026-10-29 10:02:34,318 DEBUG     [sciencedirect] tidak ada kandidat
+2026-10-29 10:02:45,117 INFO      [europepmc     ] OK 10.8 MB  <https://pmc-oa-opendata.s3.amazonaws.com/PMC10319259.1/PMC10319259.1.pdf>
+2026-10-29 10:02:45,117 INFO    
+[67/67] Process mapping: A case study in the contract sector of the Public Defender's office in th
+2026-10-29 10:02:45,117 DEBUG     [mdpi] tidak ada kandidat
+2026-10-29 10:02:54,755 INFO      [unpaywall     ] OK 0.5 MB  <https://itegam-jetia.org/journal/index.php/jetia/en/article/download/1012/592>
+2026-10-29 10:02:55,158 INFO    
+=== Selesai dalam 249 detik ===
+2026-10-29 10:02:55,158 INFO      gagal                1
+2026-10-29 10:02:55,158 INFO      ok                   9
+2026-10-29 10:02:55,158 INFO    
+Perlu diunduh manual (akses kampus / minta ke penulis):
+2026-10-29 10:02:55,158 INFO      64  10.32493/jtsi.v7i4.45421  Perancangan Basis Data Sistem Reservasi Wisma Universitas Terbuka deng
+2026-10-29 10:02:55,158 INFO    
+Laporan: D:\NOT-NOTYOU-YOU\themonitor\DOCS\referensi\pdf\laporan.csv
+Log    : D:\NOT-NOTYOU-YOU\themonitor\DOCS\referensi\pdf\unduh.log
