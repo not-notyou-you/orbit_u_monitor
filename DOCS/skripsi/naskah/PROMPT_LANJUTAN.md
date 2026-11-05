@@ -7,7 +7,7 @@ Saya melanjutkan pekerjaan skripsi dari percakapan sebelumnya. Tolong baca konte
 
 ## Keadaan naskah sekarang
 - Naskah final: `themonitor/DOCS/skripsi/naskah/SKRIPSI FINAL.docx` (halaman awal, BAB I–V, Daftar Pustaka 60 entri gaya IEEE). Lampiran sengaja belum disusun.
-- Naskah TIDAK disunting manual. Naskah dibangun ulang dari skrip di `themonitor/DOCS/skripsi/naskah/`:
+- Naskah TIDAK disunting manual. Naskah dibangun ulang dari skrip di `themonitor/DOCS/skripsi/bahan_naskah/` (build_skripsi.py, bab4.py, bab5_front.py):
   - `build_skripsi.py` (BAB I–III, daftar pustaka `REF`, sitasi `[@kunci]` dinomori otomatis menurut urutan kemunculan, halaman awal dan BAB V disisipkan dari `bab5_front.py`);
   - `bab4.py` (BAB IV sebagai daftar blok; rujukan gambar/tabel `{G:kunci}`/`{T:kunci}` dinomori otomatis);
   - gambar di `gambar_bab4/`, `alur_penelitian.png`, `peta_wilayah.png` (folder dan berkas gambar ini tidak ada di repo; dibangkitkan ulang dari `DOCS/skripsi/bahan_naskah/` dengan `shot3.py` dan skrip gambar lain); skrip gambar `alur.py`, `peta.py`, `chart_q.py`, `render_mmd.py`, `erdcore.py`, sumber Mermaid di `mermaid/`.
