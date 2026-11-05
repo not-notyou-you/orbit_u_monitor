@@ -287,7 +287,7 @@ def blocks():
     b += [P("Model logikal relasional disusun dari model konseptual dan masih bebas dari DBMS. Hasilnya terdiri atas 43 "
             "relasi yang dikelompokkan ke dalam enam modul. Relasi inti modul M6 Observasi, Peringatan, dan Kejadian, yang "
             "menjawab RM1 dan RM3, ditunjukkan pada {G:erdl} dengan domain umum (integer, string, decimal, date); ERD logikal "
-            "lengkap per modul dilampirkan.")]
+            "lengkap per modul tersedia pada repositori kode sumber penelitian.")]
     b += [FIG("erdl", "erd_logikal_core.png", "ERD Logikal Relasi Inti Modul M6", 14.0)]
     b += [P("Empat puluh dari 43 relasi memiliki kunci primer *surrogate* sendiri. Tiga relasi lainnya berkunci primer "
             "komposit: band_forecast_points dan band_forecast_scores merupakan entitas lemah karena kunci primernya memuat "
@@ -439,7 +439,7 @@ def blocks():
         ["", "", "user_activity_logs", "132"],
     ])]
     b += [P("ERD fisik relasi inti modul M6 dengan tipe data PostgreSQL ditunjukkan pada {G:erdf}. ERD fisik seluruh modul dan kamus data "
-            "lengkap dilampirkan. Kamus data dibangkitkan oleh tools/data_dictionary.py dari COMMENT pada setiap tabel dan "
+            "lengkap tersedia pada repositori kode sumber penelitian. Kamus data dibangkitkan oleh tools/data_dictionary.py dari COMMENT pada setiap tabel dan "
             "kolom, dan kewajiban COMMENT ini diuji oleh test_schema_comments, sehingga kamus data tidak dapat berbeda dari "
             "skema.")]
     b += [FIG("erdf", "erd_fisik_core.png", "ERD Fisik Relasi Inti Modul M6", 14.0)]
@@ -592,7 +592,7 @@ def blocks():
             "mengubah Beranda menjadi Pantau Lokasi pada 16 Oktober 2026 dan menambahkan peringatan surel per kecamatan "
             "pada 19 Oktober 2026, beserta tabel user_notify_regions dan notify_sent. Putaran kedua berupa kuesioner tinjauan "
             "kebutuhan oleh GMLS dan uji coba aplikasi oleh 13 pengguna, yang tindak lanjutnya dibahas pada subbab 4.3.4.")]
-    b += [P("Tampilan utama prototipe diambil dari video demonstrasi pada lampiran. {G:sc_beranda} menunjukkan Beranda Pantau Lokasi yang menampilkan status kecamatan "
+    b += [P("Tampilan utama prototipe diambil dari video demonstrasi aplikasi. {G:sc_beranda} menunjukkan Beranda Pantau Lokasi yang menampilkan status kecamatan "
             "lokasi pengguna, dan {G:sc_citra} menunjukkan perbandingan dua tanggal citra Sentinel-1.")]
     b += [FIG("sc_beranda", "sc_beranda.png", "Halaman Beranda Pantau Lokasi", 14.0)]
     b += [P('Tangkapan layar tersebut diambil dengan akun Relawan yang berada di Kecamatan Bayah. Status Waspada dipicu oleh peta genangan optik MODIS yang melewati ambang, waktu pembaruan menunjukkan perhitungan Job Hidromet terakhir, dan luas 145 km² berasal dari kolom area_km2 yang dihitung otomatis dari poligon kecamatan. Daftar di atas peta menunjukkan status kesepuluh kecamatan sekaligus.')]
