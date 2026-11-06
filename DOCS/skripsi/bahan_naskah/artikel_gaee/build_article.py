@@ -2,7 +2,10 @@
 import html, json, re, sys, zipfile
 from PIL import Image
 sys.path.insert(0, __file__.rsplit("\\", 1)[0].rsplit("/", 1)[0])
-import content as C
+import importlib, os
+C = importlib.import_module(os.environ.get("ARTIKEL_CONTENT", "content"))
+LF, LT, LS, LA, LK = (getattr(C, "LABEL_FIG", "Fig."), getattr(C, "LABEL_TAB", "Table"), getattr(C, "LABEL_SRC", "Source"),
+                      getattr(C, "LABEL_ABS", "Abstract:"), getattr(C, "LABEL_KW", "Keywords: "))
 
 tpl, refs_p, figdir, out = sys.argv[1:5]
 REFS = json.load(open(refs_p, encoding="utf-8"))
@@ -12,6 +15,9 @@ for kind, val in C.BODY:  # nomor gambar/tabel/persamaan menurut urutan penempat
     if kind == "FIG": fig_no[val] = len(fig_no) + 1
     if kind == "TAB": tab_no[val] = len(tab_no) + 1
     if kind == "EQ": eq_no[val] = len(eq_no) + 1
+
+
+HL = '<w:highlight w:val="green"/>'
 
 
 def esc(s): return html.escape(s, quote=False)
@@ -34,16 +40,19 @@ def cite(m):
 
 def text(s):
     s = re.sub(r"\[(@[^\]]+)\]", cite, s)
-    s = re.sub(r"\{F:(\w+)\}", lambda m: f"Fig. {fig_no[m.group(1)]}", s)
-    s = re.sub(r"\{T:(\w+)\}", lambda m: f"Table {tab_no[m.group(1)]}", s)
+    s = re.sub(r"\{F:(\w+)\}", lambda m: f"{LF} {fig_no[m.group(1)]}", s)
+    s = re.sub(r"\{T:(\w+)\}", lambda m: f"{LT} {tab_no[m.group(1)]}", s)
     return s
 
 
 def runs(s, base=""):
     s = text(s); out = []
-    for tok in re.split(r"(\*[^*]+\*|~[^~]+~|\^[^^]+\^)", s):
+    if "highlight" not in base: s = re.sub(r"(\[[^\]]*(?:to be|To be|Supervisor|supervisor|belum diisi|pembimbing)[^\]]*\])", r"==\1==", s)
+    for tok in re.split(r"(==[^=]+==|\*[^*]+\*|~[^~]+~|\^[^^]+\^)", s):
         if not tok: continue
         rp = base
+        if tok.startswith("=="):
+            out.append(runs(tok[2:-2], base + HL)); continue
         if tok[0] == "*": rp += "<w:i/>"; tok = tok[1:-1]
         elif tok[0] == "~": rp += '<w:vertAlign w:val="subscript"/>'; tok = tok[1:-1]
         elif tok[0] == "^": rp += '<w:vertAlign w:val="superscript"/>'; tok = tok[1:-1]
@@ -56,7 +65,7 @@ def P(style, s, extra=""):
 
 
 def H(level, s):
-    return P("GaEESectionTitle", s, f'<w:numPr><w:ilvl w:val="{level}"/><w:numId w:val="11"/></w:numPr>')
+    return P("GaEESectionTitle", s, f'<w:numPr><w:ilvl w:val="{level}"/><w:numId w:val="99"/></w:numPr>')
 
 
 rels_add, rid = [], [100]
@@ -78,8 +87,8 @@ def figure(key):
            f'<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>'
            '</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>')
     return (f'<w:p><w:pPr><w:pStyle w:val="GaEEFigure"/><w:keepNext/></w:pPr>{drw}</w:p>'
-            + P("GaEEFigureTitle", f"Fig. {fig_no[key]}. {title}", "<w:keepNext/>")
-            + P("GaEEFigureSource", f"Source: {src}"))
+            + P("GaEEFigureTitle", f"{LF} {fig_no[key]}. {title}", "<w:keepNext/>")
+            + P("GaEEFigureSource", f"{LS}: {src}"))
 
 
 DBL = "".join(f'<w:{s} w:val="double" w:sz="4" w:space="0" w:color="auto"/>' for s in ("top", "left", "bottom", "right"))
@@ -98,7 +107,7 @@ def table(key):
     tbl = (f'<w:tbl><w:tblPr><w:tblW w:w="{tw}" w:type="dxa"/><w:jc w:val="center"/><w:tblBorders>{DBL}'
            '<w:insideH w:val="double" w:sz="4" w:space="0" w:color="auto"/><w:insideV w:val="double" w:sz="4" w:space="0" w:color="auto"/>'
            f'</w:tblBorders><w:tblLook w:val="01E0"/></w:tblPr><w:tblGrid>{grid}</w:tblGrid>{body}</w:tbl>')
-    return P("GaEETableTitle", f"Table {tab_no[key]}. {title}", "<w:keepNext/>") + tbl + P("GaEETableSource", f"Source: {src}")
+    return P("GaEETableTitle", f"{LT} {tab_no[key]}. {title}", "<w:keepNext/>") + tbl + P("GaEETableSource", f"{LS}: {src}")
 
 
 M = 'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"'
@@ -138,19 +147,20 @@ x = []
 au = []
 for i, (name, aff) in enumerate(C.AUTHORS):
     if i: au.append('<w:r><w:t xml:space="preserve">, </w:t></w:r>')
-    au.append(f'<w:r><w:t>{esc(name)}</w:t></w:r>')
+    au.append(runs(name))
     au.append(f'<w:r><w:rPr><w:rStyle w:val="Odwoanieprzypisudolnego"/></w:rPr><w:footnoteReference w:id="{i + 1}"/></w:r>')
 x.append(f'<w:p><w:pPr><w:pStyle w:val="GaEEAuthors"/></w:pPr>{"".join(au)}</w:p>')
 x.append(P("GaEETitle", C.TITLE))
-x.append(P("GaEEAbstractWord", "Abstract:"))
+x.append(P("GaEEAbstractWord", LA))
 x.append(P("GaEENormal", C.ABSTRACT))
-x.append(f'<w:p><w:pPr><w:pStyle w:val="GaEEKeywords"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Keywords: </w:t></w:r>{runs(C.KEYWORDS)}</w:p>')
+x.append(f'<w:p><w:pPr><w:pStyle w:val="GaEEKeywords"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">{LK}</w:t></w:r>{runs(C.KEYWORDS)}</w:p>')
 for kind, val in C.BODY:
     x.append({"H1": lambda v: H(0, v), "H2": lambda v: H(1, v), "P": lambda v: P("GaEENormal", v),
               "FIG": figure, "TAB": table, "EQ": equation}[kind](val))
 for t, body in C.CLOSING:
-    x.append(P("GaEEClosingSectionTitle", t)); x.append(P("GaEENormal", body))
-x.append(P("GaEEClosingSectionTitle", "References"))
+    x.append(P("GaEEClosingSectionTitle", t))
+    x.append(P("GaEENormal", body) if t in ("Acknowledgements", "Ucapan Terima Kasih") else f'<w:p><w:pPr><w:pStyle w:val="GaEENormal"/></w:pPr>{runs(body, HL)}</w:p>')
+x.append(P("GaEEClosingSectionTitle", getattr(C, "LABEL_REF", "References")))
 
 
 def ref(k):
@@ -183,8 +193,11 @@ fn = z.read("word/footnotes.xml").decode("utf-8")
 for i, (name, aff) in enumerate(C.AUTHORS):
     new = (f'<w:footnote w:id="{i + 1}"><w:p><w:pPr><w:pStyle w:val="GaEEFootnote"/></w:pPr><w:r><w:rPr>'
            f'<w:rStyle w:val="Odwoanieprzypisudolnego"/><w:vertAlign w:val="baseline"/></w:rPr><w:footnoteRef/></w:r>'
-           f'<w:r><w:t xml:space="preserve"> {esc(aff)}</w:t></w:r></w:p></w:footnote>')
+           f'{runs(" " + aff)}</w:p></w:footnote>')
     fn = re.sub(rf'<w:footnote w:id="{i + 1}">.*?</w:footnote>', new, fn, flags=re.S)
+numb = z.read("word/numbering.xml").decode("utf-8")  # numId 11 templat mulai dari 2; buat 99 = abstractNum 2 mulai 1
+numb = numb.replace("</w:numbering>", '<w:num w:numId="99"><w:abstractNumId w:val="2"/><w:lvlOverride w:ilvl="0">'
+                    '<w:startOverride w:val="1"/></w:lvlOverride></w:num></w:numbering>')
 rels = z.read("word/_rels/document.xml.rels").decode("utf-8")
 rels = rels.replace("</Relationships>", "".join(
     f'<Relationship Id="{r}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/{f}"/>'
@@ -199,7 +212,7 @@ zo = zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED)
 for it in z.infolist():
     if it.filename == "word/media/image1.wmf": continue
     data = {"word/document.xml": doc, "word/footnotes.xml": fn, "word/_rels/document.xml.rels": rels,
-            "[Content_Types].xml": ct, "docProps/core.xml": core}.get(it.filename)
+            "[Content_Types].xml": ct, "word/numbering.xml": numb, "docProps/core.xml": core}.get(it.filename)
     zo.writestr(it, data.encode("utf-8") if data is not None else z.read(it.filename))
 for r, f in rels_add:
     zo.write(f"{figdir}/{f}", f"word/media/{f}")

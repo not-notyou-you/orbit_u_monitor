@@ -16,6 +16,9 @@ for k, v in C.BODY:
 cited = set()
 
 
+HL = '<w:highlight w:val="green"/>'
+
+
 def esc(s): return html.escape(s, quote=False)
 
 
@@ -45,9 +48,13 @@ def text(s):
 
 def runs(s, base=""):
     out = []
-    for tok in re.split(r"(\*\*[^*]+\*\*|\*[^*]+\*|~[^~]+~|\^[^^]+\^)", text(s)):
+    s = text(s)
+    if "highlight" not in base: s = re.sub(r"(\[[^\]]*(?:to be|To be|Supervisor|supervisor)[^\]]*\])", r"==\1==", s)
+    for tok in re.split(r"(==[^=]+==|\*\*[^*]+\*\*|\*[^*]+\*|~[^~]+~|\^[^^]+\^)", s):
         if not tok: continue
         rp = base
+        if tok.startswith("=="):
+            out.append(runs_hl(tok[2:-2], base)); continue
         if tok.startswith("**"): rp += "<w:b/>"; tok = tok[2:-2]
         elif tok[0] == "*": rp += "<w:i/>"; tok = tok[1:-1]
         elif tok[0] == "~": rp += '<w:vertAlign w:val="subscript"/>'; tok = tok[1:-1]
@@ -56,8 +63,12 @@ def runs(s, base=""):
     return "".join(out)
 
 
-def P(s, style="Normal", ppr=""):
-    return f'<w:p><w:pPr><w:pStyle w:val="{style}"/>{ppr}</w:pPr>{runs(s)}</w:p>'
+def runs_hl(s, base=""):
+    return runs(s.replace("==", ""), base + HL) if "==" not in s else runs(s, base)
+
+
+def P(s, style="Normal", ppr="", hl=False):
+    return f'<w:p><w:pPr><w:pStyle w:val="{style}"/>{ppr}</w:pPr>{runs(s, HL if hl else "")}</w:p>'
 
 
 rels, media = [], []
@@ -148,7 +159,7 @@ x.append(P(C.TITLE, "Title"))
 au = []
 for i, (n, a, corr) in enumerate(C.AUTHORS):
     if i: au.append('<w:r><w:t xml:space="preserve"> · </w:t></w:r>')
-    au.append(f'<w:r><w:t>{esc(n)}</w:t></w:r><w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr>'
+    au.append(runs(n) + f'<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr>'
               f'<w:t>{a}{"*" if corr else ""}</w:t></w:r>')
 x.append(f'<w:p><w:pPr><w:pStyle w:val="Authors"/></w:pPr>{"".join(au)}</w:p>')
 for i, a in enumerate(C.AFFIL):
@@ -177,7 +188,7 @@ for k, v in C.AVAILABILITY: x.append(P(f"**{k}:** {v}", "List"))
 x.append(P("Abbreviations", "Heading1U"))
 for k, v in C.ABBREV: x.append(P(f"**{k}** {v}", "List"))
 x.append(P("Declarations", "Heading1U"))
-for k, v in C.DECLARATIONS: x.append(P(f"**{k}** {v}"))
+for k, v in C.DECLARATIONS: x.append(P(f"**{k}** {v}", hl=True))
 x.append(P("References", "Heading1U"))
 
 
@@ -209,7 +220,7 @@ def key_sort(k):
 for k in sorted(cited, key=key_sort):
     x.append(P(ref(k), "Reference"))
 x.append(P("Software files", "Heading1U"))
-x.append(P(C.SOFTWARE_FILES))
+x.append(P(C.SOFTWARE_FILES, hl=True))
 
 # ---------------- paket docx
 NS = ('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
