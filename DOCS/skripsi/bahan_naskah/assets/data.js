@@ -1,5 +1,5 @@
 window.SKRIPSI_DATA = {
- "generated": "2026-10-24 18:40",
+ "generated": "2026-11-06 18:14",
  "tables": {
   "administrative_regions": {
    "desc": "Batas wilayah resmi COD-AB Indonesia (BPS via OCHA/HDX): Kabupaten Lebak (level 2) dan kecamatannya (level 3). AOI GMLS = kecamatan in_aoi (M8).",
@@ -6496,10 +6496,10 @@ window.SKRIPSI_DATA = {
     "status": "dijalankan",
     "rows": "10",
     "runs": "30",
-    "median_ms": "0.452",
-    "p95_ms": "0.537",
-    "min_ms": "0.448",
-    "max_ms": "0.553"
+    "median_ms": "0.453",
+    "p95_ms": "0.487",
+    "min_ms": "0.45",
+    "max_ms": "0.544"
    },
    {
     "engine": "PostgreSQL",
@@ -6508,10 +6508,10 @@ window.SKRIPSI_DATA = {
     "status": "dijalankan",
     "rows": "30",
     "runs": "30",
-    "median_ms": "0.293",
-    "p95_ms": "0.307",
-    "min_ms": "0.252",
-    "max_ms": "0.468"
+    "median_ms": "0.307",
+    "p95_ms": "0.313",
+    "min_ms": "0.258",
+    "max_ms": "0.313"
    },
    {
     "engine": "PostgreSQL",
@@ -6520,10 +6520,10 @@ window.SKRIPSI_DATA = {
     "status": "dijalankan",
     "rows": "12",
     "runs": "30",
-    "median_ms": "1.342",
-    "p95_ms": "2.15",
-    "min_ms": "1.045",
-    "max_ms": "2.181"
+    "median_ms": "1.147",
+    "p95_ms": "1.306",
+    "min_ms": "1.094",
+    "max_ms": "1.346"
    },
    {
     "engine": "PostgreSQL",
@@ -6532,10 +6532,10 @@ window.SKRIPSI_DATA = {
     "status": "dijalankan",
     "rows": "3",
     "runs": "30",
-    "median_ms": "1.764",
-    "p95_ms": "2.722",
-    "min_ms": "0.977",
-    "max_ms": "3.033"
+    "median_ms": "1.057",
+    "p95_ms": "1.235",
+    "min_ms": "1.038",
+    "max_ms": "1.955"
    },
    {
     "engine": "PostgreSQL",
@@ -6544,10 +6544,10 @@ window.SKRIPSI_DATA = {
     "status": "dijalankan",
     "rows": "6",
     "runs": "30",
-    "median_ms": "0.823",
-    "p95_ms": "1.569",
-    "min_ms": "0.572",
-    "max_ms": "1.671"
+    "median_ms": "0.651",
+    "p95_ms": "0.794",
+    "min_ms": "0.631",
+    "max_ms": "0.905"
    },
    {
     "engine": "MySQL 8.0",
@@ -6556,10 +6556,10 @@ window.SKRIPSI_DATA = {
     "status": "dijalankan",
     "rows": "10",
     "runs": "30",
-    "median_ms": "1.136",
-    "p95_ms": "1.3",
-    "min_ms": "0.953",
-    "max_ms": "1.351"
+    "median_ms": "0.868",
+    "p95_ms": "1.05",
+    "min_ms": "0.845",
+    "max_ms": "1.115"
    },
    {
     "engine": "MySQL 8.0",
@@ -6568,10 +6568,10 @@ window.SKRIPSI_DATA = {
     "status": "dijalankan",
     "rows": "30",
     "runs": "30",
-    "median_ms": "0.666",
-    "p95_ms": "0.71",
-    "min_ms": "0.642",
-    "max_ms": "0.718"
+    "median_ms": "0.677",
+    "p95_ms": "0.757",
+    "min_ms": "0.67",
+    "max_ms": "0.844"
    },
    {
     "engine": "MySQL 8.0",
@@ -6580,10 +6580,10 @@ window.SKRIPSI_DATA = {
     "status": "dijalankan",
     "rows": "12",
     "runs": "30",
-    "median_ms": "22.567",
-    "p95_ms": "23.029",
-    "min_ms": "17.702",
-    "max_ms": "23.114"
+    "median_ms": "18.633",
+    "p95_ms": "19.334",
+    "min_ms": "17.813",
+    "max_ms": "19.709"
    },
    {
     "engine": "MySQL 8.0",
@@ -6592,10 +6592,10 @@ window.SKRIPSI_DATA = {
     "status": "dijalankan",
     "rows": "3",
     "runs": "30",
-    "median_ms": "16.641",
-    "p95_ms": "17.215",
-    "min_ms": "14.679",
-    "max_ms": "17.32"
+    "median_ms": "15.131",
+    "p95_ms": "15.886",
+    "min_ms": "14.82",
+    "max_ms": "16.982"
    },
    {
     "engine": "MySQL 8.0",
@@ -6604,10 +6604,10 @@ window.SKRIPSI_DATA = {
     "status": "dijalankan",
     "rows": "6",
     "runs": "30",
-    "median_ms": "0.425",
-    "p95_ms": "0.492",
-    "min_ms": "0.416",
-    "max_ms": "0.505"
+    "median_ms": "0.451",
+    "p95_ms": "0.558",
+    "min_ms": "0.435",
+    "max_ms": "0.665"
    }
   ],
   "features": [
@@ -6689,8 +6689,8 @@ window.SKRIPSI_DATA = {
     "rows": "76720",
     "query": "Q1",
     "result_rows": "10",
-    "median_ms": "0.516",
-    "p95_ms": "0.536",
+    "median_ms": "0.496",
+    "p95_ms": "0.611",
     "data_mb": "5.0",
     "index_mb": "6.3",
     "grow_seconds": "0.0"
@@ -6701,8 +6701,8 @@ window.SKRIPSI_DATA = {
     "rows": "76720",
     "query": "Q2",
     "result_rows": "30",
-    "median_ms": "0.288",
-    "p95_ms": "0.291",
+    "median_ms": "0.254",
+    "p95_ms": "0.257",
     "data_mb": "5.0",
     "index_mb": "6.3",
     "grow_seconds": "0.0"
@@ -6713,8 +6713,8 @@ window.SKRIPSI_DATA = {
     "rows": "76720",
     "query": "Q6",
     "result_rows": "360",
-    "median_ms": "10.298",
-    "p95_ms": "15.223",
+    "median_ms": "9.291",
+    "p95_ms": "9.514",
     "data_mb": "5.0",
     "index_mb": "6.3",
     "grow_seconds": "0.0"
@@ -6725,11 +6725,11 @@ window.SKRIPSI_DATA = {
     "rows": "767200",
     "query": "Q1",
     "result_rows": "10",
-    "median_ms": "0.516",
-    "p95_ms": "0.528",
+    "median_ms": "0.549",
+    "p95_ms": "0.644",
     "data_mb": "47.6",
     "index_mb": "62.1",
-    "grow_seconds": "14.2"
+    "grow_seconds": "12.1"
    },
    {
     "engine": "PostgreSQL",
@@ -6737,11 +6737,11 @@ window.SKRIPSI_DATA = {
     "rows": "767200",
     "query": "Q2",
     "result_rows": "30",
-    "median_ms": "0.303",
-    "p95_ms": "0.374",
+    "median_ms": "0.294",
+    "p95_ms": "0.301",
     "data_mb": "47.6",
     "index_mb": "62.1",
-    "grow_seconds": "14.2"
+    "grow_seconds": "12.1"
    },
    {
     "engine": "PostgreSQL",
@@ -6749,11 +6749,11 @@ window.SKRIPSI_DATA = {
     "rows": "767200",
     "query": "Q6",
     "result_rows": "3610",
-    "median_ms": "201.092",
-    "p95_ms": "213.454",
+    "median_ms": "186.886",
+    "p95_ms": "199.929",
     "data_mb": "47.6",
     "index_mb": "62.1",
-    "grow_seconds": "14.2"
+    "grow_seconds": "12.1"
    },
    {
     "engine": "PostgreSQL",
@@ -6761,11 +6761,11 @@ window.SKRIPSI_DATA = {
     "rows": "2301600",
     "query": "Q1",
     "result_rows": "10",
-    "median_ms": "0.526",
-    "p95_ms": "0.627",
+    "median_ms": "0.501",
+    "p95_ms": "0.648",
     "data_mb": "142.7",
     "index_mb": "186.5",
-    "grow_seconds": "40.0"
+    "grow_seconds": "28.5"
    },
    {
     "engine": "PostgreSQL",
@@ -6773,11 +6773,11 @@ window.SKRIPSI_DATA = {
     "rows": "2301600",
     "query": "Q2",
     "result_rows": "30",
-    "median_ms": "0.295",
-    "p95_ms": "0.359",
+    "median_ms": "0.269",
+    "p95_ms": "0.272",
     "data_mb": "142.7",
     "index_mb": "186.5",
-    "grow_seconds": "40.0"
+    "grow_seconds": "28.5"
    },
    {
     "engine": "PostgreSQL",
@@ -6785,119 +6785,119 @@ window.SKRIPSI_DATA = {
     "rows": "2301600",
     "query": "Q6",
     "result_rows": "10810",
-    "median_ms": "653.786",
-    "p95_ms": "717.418",
+    "median_ms": "579.265",
+    "p95_ms": "599.569",
     "data_mb": "142.7",
     "index_mb": "186.5",
-    "grow_seconds": "40.0"
+    "grow_seconds": "28.5"
    },
    {
-    "engine": "MySQL 8.0",
+    "engine": "MySQL 8.0 (mysqlclient)",
     "scale": "1",
     "rows": "76720",
     "query": "Q1",
     "result_rows": "10",
-    "median_ms": "0.792",
-    "p95_ms": "0.811",
+    "median_ms": "0.622",
+    "p95_ms": "0.845",
     "data_mb": "4.5",
     "index_mb": "9.0",
     "grow_seconds": "0.0"
    },
    {
-    "engine": "MySQL 8.0",
+    "engine": "MySQL 8.0 (mysqlclient)",
     "scale": "1",
     "rows": "76720",
     "query": "Q2",
     "result_rows": "30",
-    "median_ms": "0.642",
-    "p95_ms": "0.652",
+    "median_ms": "0.388",
+    "p95_ms": "0.492",
     "data_mb": "4.5",
     "index_mb": "9.0",
     "grow_seconds": "0.0"
    },
    {
-    "engine": "MySQL 8.0",
+    "engine": "MySQL 8.0 (mysqlclient)",
     "scale": "1",
     "rows": "76720",
     "query": "Q6",
     "result_rows": "360",
-    "median_ms": "39.461",
-    "p95_ms": "41.176",
+    "median_ms": "33.246",
+    "p95_ms": "34.036",
     "data_mb": "4.5",
     "index_mb": "9.0",
     "grow_seconds": "0.0"
    },
    {
-    "engine": "MySQL 8.0",
+    "engine": "MySQL 8.0 (mysqlclient)",
     "scale": "10",
     "rows": "767200",
     "query": "Q1",
     "result_rows": "10",
-    "median_ms": "1.9",
-    "p95_ms": "2.027",
+    "median_ms": "0.88",
+    "p95_ms": "2.463",
     "data_mb": "38.6",
     "index_mb": "68.2",
-    "grow_seconds": "64.7"
+    "grow_seconds": "73.5"
    },
    {
-    "engine": "MySQL 8.0",
+    "engine": "MySQL 8.0 (mysqlclient)",
     "scale": "10",
     "rows": "767200",
     "query": "Q2",
     "result_rows": "30",
-    "median_ms": "1.154",
-    "p95_ms": "1.411",
+    "median_ms": "0.415",
+    "p95_ms": "0.46",
     "data_mb": "38.6",
     "index_mb": "68.2",
-    "grow_seconds": "64.7"
+    "grow_seconds": "73.5"
    },
    {
-    "engine": "MySQL 8.0",
+    "engine": "MySQL 8.0 (mysqlclient)",
     "scale": "10",
     "rows": "767200",
     "query": "Q6",
     "result_rows": "3610",
-    "median_ms": "396.798",
-    "p95_ms": "414.126",
+    "median_ms": "334.005",
+    "p95_ms": "344.568",
     "data_mb": "38.6",
     "index_mb": "68.2",
-    "grow_seconds": "64.7"
+    "grow_seconds": "73.5"
    },
    {
-    "engine": "MySQL 8.0",
+    "engine": "MySQL 8.0 (mysqlclient)",
     "scale": "30",
     "rows": "2301600",
     "query": "Q1",
     "result_rows": "10",
-    "median_ms": "0.972",
-    "p95_ms": "1.034",
+    "median_ms": "1.629",
+    "p95_ms": "1.821",
     "data_mb": "113.7",
     "index_mb": "198.4",
-    "grow_seconds": "292.8"
+    "grow_seconds": "289.7"
    },
    {
-    "engine": "MySQL 8.0",
+    "engine": "MySQL 8.0 (mysqlclient)",
     "scale": "30",
     "rows": "2301600",
     "query": "Q2",
     "result_rows": "30",
-    "median_ms": "0.75",
-    "p95_ms": "0.76",
+    "median_ms": "1.276",
+    "p95_ms": "1.386",
     "data_mb": "113.7",
     "index_mb": "198.4",
-    "grow_seconds": "292.8"
+    "grow_seconds": "289.7"
    },
    {
-    "engine": "MySQL 8.0",
+    "engine": "MySQL 8.0 (mysqlclient)",
     "scale": "30",
     "rows": "2301600",
     "query": "Q6",
     "result_rows": "10810",
-    "median_ms": "5577.347",
-    "p95_ms": "9824.657",
+    "median_ms": "1666.361",
+    "p95_ms": "6039.925",
     "data_mb": "113.7",
     "index_mb": "198.4",
-    "grow_seconds": "292.8"
+    "grow_seconds": "289.7"
    }
   ],
   "concurrency": [
@@ -6905,80 +6905,80 @@ window.SKRIPSI_DATA = {
     "engine": "PostgreSQL",
     "clients": "1",
     "seconds": "10",
-    "queries": "23973",
-    "qps": "2397.3",
-    "median_ms": "0.433",
-    "p95_ms": "0.602",
+    "queries": "22550",
+    "qps": "2255.0",
+    "median_ms": "0.472",
+    "p95_ms": "0.629",
     "errors": "0"
    },
    {
     "engine": "PostgreSQL",
     "clients": "4",
     "seconds": "10",
-    "queries": "73960",
-    "qps": "7396.0",
-    "median_ms": "0.51",
-    "p95_ms": "0.799",
+    "queries": "72748",
+    "qps": "7274.8",
+    "median_ms": "0.539",
+    "p95_ms": "0.76",
     "errors": "0"
    },
    {
     "engine": "PostgreSQL",
     "clients": "8",
     "seconds": "10",
-    "queries": "85226",
-    "qps": "8522.6",
-    "median_ms": "0.896",
-    "p95_ms": "1.369",
+    "queries": "82037",
+    "qps": "8203.7",
+    "median_ms": "0.933",
+    "p95_ms": "1.393",
     "errors": "0"
    },
    {
     "engine": "PostgreSQL",
     "clients": "16",
     "seconds": "10",
-    "queries": "81264",
-    "qps": "8126.4",
-    "median_ms": "1.724",
-    "p95_ms": "3.58",
+    "queries": "79735",
+    "qps": "7973.5",
+    "median_ms": "1.832",
+    "p95_ms": "3.567",
     "errors": "0"
    },
    {
     "engine": "MySQL 8.0 (mysqlclient)",
     "clients": "1",
     "seconds": "10",
-    "queries": "19067",
-    "qps": "1906.7",
-    "median_ms": "0.529",
-    "p95_ms": "0.766",
+    "queries": "16746",
+    "qps": "1674.6",
+    "median_ms": "0.616",
+    "p95_ms": "0.789",
     "errors": "0"
    },
    {
     "engine": "MySQL 8.0 (mysqlclient)",
     "clients": "4",
     "seconds": "10",
-    "queries": "63393",
-    "qps": "6339.3",
-    "median_ms": "0.619",
-    "p95_ms": "0.94",
+    "queries": "65827",
+    "qps": "6582.7",
+    "median_ms": "0.611",
+    "p95_ms": "0.869",
     "errors": "0"
    },
    {
     "engine": "MySQL 8.0 (mysqlclient)",
     "clients": "8",
     "seconds": "10",
-    "queries": "70262",
-    "qps": "7026.2",
-    "median_ms": "1.09",
-    "p95_ms": "1.699",
+    "queries": "71212",
+    "qps": "7121.2",
+    "median_ms": "1.078",
+    "p95_ms": "1.678",
     "errors": "0"
    },
    {
     "engine": "MySQL 8.0 (mysqlclient)",
     "clients": "16",
     "seconds": "10",
-    "queries": "71612",
-    "qps": "7161.2",
-    "median_ms": "2.041",
-    "p95_ms": "4.012",
+    "queries": "70450",
+    "qps": "7045.0",
+    "median_ms": "2.072",
+    "p95_ms": "4.112",
     "errors": "0"
    }
   ],
@@ -6987,32 +6987,32 @@ window.SKRIPSI_DATA = {
     "engine": "PostgreSQL",
     "test": "Insert batch 50.000 baris",
     "runs": "3",
-    "median_s": "0.993",
-    "rows_per_s": "50361",
+    "median_s": "1.518",
+    "rows_per_s": "32940",
     "final_rows": "60000"
    },
    {
     "engine": "PostgreSQL",
     "test": "Upsert 20.000 baris (50% konflik)",
     "runs": "3",
-    "median_s": "0.487",
-    "rows_per_s": "41084",
+    "median_s": "0.985",
+    "rows_per_s": "20312",
     "final_rows": "60000"
    },
    {
     "engine": "MySQL 8.0 (mysqlclient)",
     "test": "Insert batch 50.000 baris",
     "runs": "3",
-    "median_s": "8.167",
-    "rows_per_s": "6122",
+    "median_s": "6.653",
+    "rows_per_s": "7516",
     "final_rows": "60000"
    },
    {
     "engine": "MySQL 8.0 (mysqlclient)",
     "test": "Upsert 20.000 baris (50% konflik)",
     "runs": "3",
-    "median_s": "0.944",
-    "rows_per_s": "21178",
+    "median_s": "1.245",
+    "rows_per_s": "16070",
     "final_rows": "60000"
    }
   ]
@@ -7393,13 +7393,13 @@ window.SKRIPSI_DATA = {
    "administrative_regions": 29,
    "api_tokens": 1,
    "app_settings": 13,
-   "audit_log": 531,
-   "disaster_events": 18,
-   "band_forecasts": 1342,
-   "band_forecast_points": 18870,
-   "band_forecast_scores": 5762,
+   "audit_log": 550,
+   "disaster_events": 37,
+   "band_forecasts": 1419,
+   "band_forecast_points": 19935,
+   "band_forecast_scores": 6117,
    "cleanup_operations": 0,
-   "dataset_jobs": 1043,
+   "dataset_jobs": 1049,
    "live_areas": 1,
    "processing_logs": 6361,
    "generated_reports": 3,
@@ -7408,10 +7408,10 @@ window.SKRIPSI_DATA = {
    "quality_alerts": 16,
    "user_notify_regions": 1,
    "notify_sent": 0,
-   "region_observations": 72850,
+   "region_observations": 73100,
    "fusion_strategies": 3,
    "alert_rules": 4,
-   "data_lineage": 8142,
+   "data_lineage": 8167,
    "datasets": 3,
    "live_events": 436,
    "fusion_products": 4,
@@ -7421,13 +7421,13 @@ window.SKRIPSI_DATA = {
    "regions_of_interest": 11,
    "roles": 5,
    "scene_job_state": 156,
-   "user_activity_logs": 132,
+   "user_activity_logs": 133,
    "satellite_sources": 4,
    "satellite_scenes": 89,
-   "nasa_scenes": 2230,
+   "nasa_scenes": 2238,
    "alert_events": 210,
-   "data_products": 15850,
-   "processing_jobs": 7958,
+   "data_products": 15900,
+   "processing_jobs": 7986,
    "live_scenes": 57,
    "dataset_source_config": 8,
    "quality_thresholds": 9,
@@ -7447,9 +7447,9 @@ window.SKRIPSI_DATA = {
   ],
   "obs_range": [
    "2024-01-01",
-   "2026-10-22"
+   "2026-10-27"
   ],
-  "at": "2026-10-24 18:40",
+  "at": "2026-11-06 18:14",
   "indexes": [
    {
     "t": "administrative_regions",
@@ -8976,26 +8976,6 @@ window.SKRIPSI_DATA = {
   ],
   "members": [
    {
-    "role": "monitor_admin",
-    "member": "monitor_app"
-   },
-   {
-    "role": "monitor_data_engineer",
-    "member": "monitor_app"
-   },
-   {
-    "role": "monitor_analyst",
-    "member": "monitor_app"
-   },
-   {
-    "role": "monitor_user",
-    "member": "monitor_app"
-   },
-   {
-    "role": "monitor_public",
-    "member": "monitor_app"
-   },
-   {
     "role": "monitor_public",
     "member": "monitor_user"
    },
@@ -9014,6 +8994,26 @@ window.SKRIPSI_DATA = {
    {
     "role": "monitor_analyst",
     "member": "monitor_admin"
+   },
+   {
+    "role": "monitor_admin",
+    "member": "monitor_app"
+   },
+   {
+    "role": "monitor_data_engineer",
+    "member": "monitor_app"
+   },
+   {
+    "role": "monitor_analyst",
+    "member": "monitor_app"
+   },
+   {
+    "role": "monitor_user",
+    "member": "monitor_app"
+   },
+   {
+    "role": "monitor_public",
+    "member": "monitor_app"
    }
   ],
   "policies": [

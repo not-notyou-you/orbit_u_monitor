@@ -1,5 +1,5 @@
 engine,test,runs,median_s,rows_per_s,final_rows
-PostgreSQL,Insert batch 50.000 baris,3,0.993,50361,60000
-PostgreSQL,Upsert 20.000 baris (50% konflik),3,0.487,41084,60000
-MySQL 8.0 (mysqlclient),Insert batch 50.000 baris,3,8.167,6122,60000
-MySQL 8.0 (mysqlclient),Upsert 20.000 baris (50% konflik),3,0.944,21178,60000
+PostgreSQL,Insert batch 50.000 baris,3,1.518,32940,60000
+PostgreSQL,Upsert 20.000 baris (50% konflik),3,0.985,20312,60000
+MySQL 8.0 (mysqlclient),Insert batch 50.000 baris,3,6.653,7516,60000
+MySQL 8.0 (mysqlclient),Upsert 20.000 baris (50% konflik),3,1.245,16070,60000

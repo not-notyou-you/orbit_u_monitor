@@ -43,7 +43,7 @@ Hasil lengkapnya ada di [PERBANDINGAN_DBMS.md](PERBANDINGAN_DBMS.md), dengan kod
 | a. Kerangka acuan | Tujuh kriteria berbobot (PERBANDINGAN_DBMS.md §3.8): **keamanan per peran & audit 25%**, **spasial 20%**, analitik & skala 15%, tulis/ETL 10%, konkurensi baca 10%, integritas relasional & rekursif 10%, biaya & ekosistem 10% |
 | b. Daftar pendek | PostgreSQL 18 + PostGIS dan MySQL 8.0 (alasan pemilihan: PERBANDINGAN_DBMS.md §1) |
 | c. Evaluasi produk | Skema setara, data sintetis deterministik (`benchmark/generate.py`), kueri Q1–Q5 (`timing.csv`), uji fitur F1–F3 (`features.csv`), skalabilitas/konkurensi/tulis (`extended_*.csv`) |
-| d. Rekomendasi | **PostgreSQL + PostGIS**, skor terbobot 4,90 vs 2,90 |
+| d. Rekomendasi | **PostgreSQL + PostGIS**, skor terbobot 4,90 vs 3,05 (uji ulang 6 Nov 2026, data kedua DBMS di disk yang sama) |
 
 Penentunya bukan selisih milidetik. Ada tiga kebutuhan yang di MySQL tidak terpenuhi atau perlu disiasati:
 kontrol akses per peran di dalam basis data (RM4), kueri spasial, dan kueri analitik ketika data membesar.

@@ -35,7 +35,7 @@ Saya melanjutkan pekerjaan skripsi dari percakapan sebelumnya. Tolong baca konte
 - 43 tabel (12 master), 22 VIEW, 528 kolom, 226 constraint (PK 43, FK 80, UNIQUE 36, CHECK 67), 162 indeks, 29 trigger, 3 policy RLS.
 - region_observations 72.850 record (1 Jan 2024–22 Okt 2026), alert_events 210; 17 tabel transaksi ≥ 100 record.
 - Wilayah: 10 kecamatan (Banjarsari, Bayah, Cibeber, Cigemblong, Cihara, Cijaku, Cilograng, Malingping, Panggarangan, Wanasalam), ±1.575,8 km².
-- DBMS: PostgreSQL 18.6 + PostGIS 3.6.2 vs MySQL 8.0.40, skor 4,90 vs 2,90.
+- DBMS: PostgreSQL 18.6 + PostGIS 3.6.2 vs MySQL 8.0.40, skor 4,90 vs 3,05 (uji ulang 6 Nov 2026, kedua DBMS di HDD yang sama; lihat PERBANDINGAN_DBMS.md §2.5).
 - Pengujian: pytest 1.185 kasus (1.183 lulus, 0 gagal, 2 dilewati); test_rbac_api 165 kasus; grant_matrix 390 sel; backup/restore dan kill-and-resume lulus.
 - Ambang hujan BMKG: lebat 50, sangat lebat 100, ekstrem >150 mm/hari; aturan longsor belum aktif.
 - Kebutuhan pengguna K1–K6; kuesioner tinjauan lima bagian (formulir web). Hasil: K1, K3–K6 sesuai (3/3); K2 1 sesuai, 1 perlu diubah, 1 tidak sesuai; persetujuan 1 disetujui, 2 dengan perbaikan.

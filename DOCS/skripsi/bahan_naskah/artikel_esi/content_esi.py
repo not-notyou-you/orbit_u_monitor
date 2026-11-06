@@ -163,11 +163,8 @@ BODY = [
       "row-level security. A web client presents the latest condition per sub-district, imagery, warnings based on "
       "the 50, 100 and 150 mm thresholds of the Indonesian meteorological agency, and disaster events."),
 ("H2", "DBMS selection procedure"),
-("P", "PostgreSQL 18.6 with PostGIS 3.6.2 and MySQL 8.0.40 were compared on an equivalent schema with identical "
-      "deterministic synthetic data (28 sub-districts, 76 720 observations) and default configurations. Five core "
-      "queries were run 30 times after five warm-up runs in three separate runs, and medians are reported. Security "
-      "features, scalability, concurrency and write throughput were also tested, and seven weighted criteria were "
-      "scored from 1 to 5, the total being"),
+("P", "PostgreSQL 18.6 with PostGIS 3.6.2 and MySQL 8.0.40 were compared on an equivalent schema with identical deterministic synthetic data (a grid of 28 synthetic sub-district polygons, ten forming the area of interest; 76 720 observations; synthetic warnings and events, so that warning evaluation can be measured) and default configurations. All tests ran on one machine (Intel Core i7-7700, 32 GB RAM, Windows 10) with the data directories of both systems on the same 7200 rpm HDD, a 128 MB buffer and a flush on every commit. Five core "
+      "queries were run 30 times after five warm-up runs in three separate runs, and medians are reported. Security features, scalability (a monthly summary over the whole table, Q6, up to 2.3 million rows), concurrency and write throughput were also tested. PostgreSQL used the C-based psycopg2; MySQL used PyMySQL for the core queries, and the extended tests were repeated with the C-based mysqlclient so that driver overhead does not penalise MySQL. Seven criteria, weighted by the authors from the problem formulation, were scored from 1 to 5: performance by the ratio of the summed median times of the tests behind each criterion (5 faster or within 10%, 4 below 2×, 3 for 2–5×, 2 above 5× or when a query had to be rewritten), features by availability (5 native, 2 workaround, 1 unavailable), and cost and familiarity qualitatively. The total is"),
 ("EQ", "score"),
 ("P", "where *w*~i~ is the weight and *s*~i~ the score of criterion *i*. An AI assistant was used in preparing this "
       "manuscript as described in the Declarations; it was not used to produce data or results."),
@@ -183,25 +180,21 @@ BODY = [
 ("FIG", "arch"),
 ("H2", "DBMS comparison"),
 ("P", "PostgreSQL was faster in four of five core queries ({T:bench}, {F:bench}), most clearly for polygon "
-      "intersection with area computation (Q3, 17×) and for the evaluation of warnings against events (Q4, 9×). The "
+      "intersection with area computation (Q3, 16×) and for the evaluation of warnings against events (Q4, 14×). The "
       "equivalent Q3 failed in MySQL with error 3516 because the geographic intersection produced a "
       "GeometryCollection and had to be rewritten. MySQL was faster in the recursive lineage query Q5, although both "
-      "completed below 1 ms. Result rows were identical, and Q3 areas agreed within 0.1% per sub-district. Over 2.3 "
-      "million rows a summary query took 654 ms in PostgreSQL and 5577 ms in MySQL, and inserts were 8.2 times "
-      "faster in PostgreSQL."),
+      "completed below 1 ms. Result rows were identical, and Q3 areas agreed within 0.1% per sub-district. Over 2.3 million rows the summary query Q6 took 579 ms in PostgreSQL and 1666 ms in MySQL (2.9× with mysqlclient), and inserts were 4.4–6.2 times "
+      "faster in PostgreSQL, with both data directories on the same physical disk."),
 ("TAB", "bench"),
 ("FIG", "bench"),
 ("P", "The decision rested on functional rather than temporal differences ({T:score}): MySQL 8.0 switches roles only "
       "per session, lacks row-level security and requires one audit trigger per table. PostgreSQL scored 4.90 and "
-      "MySQL 2.90. Because the PostgreSQL data resided on an SSD and the MySQL data on an HDD, MySQL was additionally "
-      "given the maximum score on the two storage-sensitive criteria; its total rose to 3.55, which did not change the "
-      "outcome."),
+      "MySQL 3.05. A first run with PostgreSQL on an SSD and MySQL on an HDD had overstated the storage-sensitive differences (with PyMySQL, Q6 8.5× and inserts 8.2×; MySQL total 2.90). Repeating every test on one disk reduced these to 2.8× and 4.4–6.2× and raised MySQL's analytics score from 2 to 3, while the spatial query (16×), warning evaluation (14×) and security features showed that the decisive differences do not stem from storage."),
 ("TAB", "score"),
 ("H2", "Verification and recovery"),
 ("P", "{T:eval} summarises the evaluation. The final automated run executed 1185 test cases: 1183 passed, none "
       "failed, and 2 were skipped because they need the full boundary shapefile. All core queries completed below "
-      "2 ms, and the system reached 8523 queries per second with eight clients. A copy of the production database "
-      "(44 tables, 146 541 rows) was dumped and restored, after which the MD5 hashes of all rows, sequences, "
+      "2 ms, and the system reached 8204 queries per second with eight clients. A copy of the production database (44 tables, i.e. the 43 schema tables plus the PostGIS table spatial_ref_sys; 146 541 rows) was dumped and restored, after which the MD5 hashes of all rows, sequences, "
       "constraints and 163 indexes were identical [@ahmad]. A backfill of ten dates killed with SIGKILL resumed only "
       "the two remaining dates, without duplicates or wrong values, in three of three repetitions, and a job started "
       "while its lock was held was skipped as designed."),
@@ -232,7 +225,7 @@ BODY = [
       "land. IMERG underestimates extreme daily rainfall [@ansori], and warnings inherit this. A view that classifies "
       "hits, misses and false alarms exists, but no verified official hydrometeorological events were available for "
       "the study area, so warning skill could not yet be quantified. Point-in-time recovery was not tested because WAL "
-      "archiving was not enabled, and the benchmark used synthetic data and default configurations."),
+      "archiving was not enabled, and the benchmark used synthetic data, default configurations and an HDD on one desktop machine; tuned configurations could change the ratios but not the missing features of MySQL 8.0."),
 
 ("H1", "Conclusions"),
 ("P", "Orbit-U: The Monitor shows that a relational spatial database can serve as the persistent, traceable layer "
@@ -240,7 +233,7 @@ BODY = [
       "series by overlap-weighted zonal aggregation with an explicit valid fraction; variables are rows, so the schema "
       "is stable; every value is linked by checksums and lineage edges to its raw scene; revisions follow a stated "
       "precedence through idempotent upserts; and access control and auditing are enforced in PostgreSQL/PostGIS, "
-      "which was selected over MySQL 8.0 with a weighted score of 4.90 against 2.90. The design passed automated, "
+      "which was selected over MySQL 8.0 with a weighted score of 4.90 against 3.05. The design passed automated, "
       "security and recovery tests and has been operating with real data since 2024. Future work includes adaptive "
       "water thresholds, exact geodesic weights, evaluation of warning skill as verified events accumulate, mobile "
       "notification, and continuous WAL archiving."),

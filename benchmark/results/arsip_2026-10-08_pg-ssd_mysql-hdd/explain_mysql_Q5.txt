@@ -1,0 +1,12 @@
+-> Nested loop inner join  (cost=7.35 rows=2) (actual time=0.0458..0.0509 rows=6 loops=1)
+    -> Sort: a.depth  (cost=6.4..6.4 rows=2) (actual time=0.0427..0.0431 rows=6 loops=1)
+        -> Filter: (a.product_id is not null)  (cost=4.64..6 rows=2) (actual time=0.0363..0.0375 rows=6 loops=1)
+            -> Table scan on a  (cost=4.54..5.8 rows=2) (actual time=0.036..0.0364 rows=6 loops=1)
+                -> Materialize recursive CTE anc  (cost=3.28..3.28 rows=2) (actual time=0.0356..0.0356 rows=6 loops=1)
+                    -> Rows fetched before execution  (cost=0..0 rows=1) (actual time=100e-6..200e-6 rows=1 loops=1)
+                    -> Repeat until convergence
+                        -> Nested loop inner join  (cost=3.08 rows=1) (actual time=0.00565..0.014 rows=2.5 loops=2)
+                            -> Filter: ((a.depth < 6) and (a.product_id is not null))  (cost=2.73 rows=1) (actual time=850e-6..0.0014 rows=3 loops=2)
+                                -> Scan new records on a  (cost=2.73 rows=2) (actual time=450e-6..550e-6 rows=3 loops=2)
+                            -> Index lookup on l using lineage_child (child_product_id=a.product_id)  (cost=0.35 rows=1) (actual time=0.00343..0.0039 rows=0.833 loops=6)
+    -> Single-row index lookup on p using PRIMARY (product_id=a.product_id)  (cost=0.283 rows=1) (actual time=0.00112..0.00113 rows=1 loops=6)

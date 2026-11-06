@@ -2,7 +2,7 @@
 
 Dokumen ini menjawab tahap **DBMS Selection** di SKRIPSI.txt (langkah a–d) dan hasil akhir **Rekomendasi DBMS**.
 
-Pengujian dijalankan 8 Oktober 2026 dengan dua skrip:
+Pengujian dijalankan ulang 6 November 2026 dengan **kedua data directory di disk fisik yang sama** (HDD D:), menggantikan pengujian 8 Oktober 2026 yang menaruh PostgreSQL di SSD dan MySQL di HDD (§2.5). Dua skrip yang dipakai:
 
 - `benchmark/run.py`: kueri inti Q1–Q5 dan fitur F1–F3.
 - `benchmark/extended.py`: skalabilitas, konkurensi, dan tulis.
@@ -59,7 +59,7 @@ Pedoman Connolly & Begg yang dipakai SKRIPSI.txt menyarankan daftar pendek beris
 | Data | Data sintetis deterministik (seed 20260929), dibuat sama persis untuk kedua DBMS: 28 kecamatan, 76.720 observasi (3 tahun × 10 kecamatan × 7 band), 1.076 alert, 150 kejadian, 5.182 produk, 3.982 lineage. **Bukan data produksi** |
 | Skema | Setara: tipe, PK/FK, UNIQUE, CHECK, dan index yang sama, termasuk index spasial di kedua DBMS |
 | Validasi hasil | Jumlah baris setiap kueri sama di kedua DBMS. Luas Q3 dicocokkan per kecamatan, selisih maksimum 0,1% |
-| Lingkungan | Satu mesin, berjalan berurutan (rincian di §2.4). PostgreSQL 18.6 + PostGIS 3.6.2 dan MySQL 8.0.40 Community |
+| Lingkungan | Satu mesin, berjalan berurutan (rincian di §2.4). PostgreSQL 18.6 + PostGIS 3.6.2 dan MySQL 8.0.40 Community, **data keduanya di disk yang sama** |
 | Konfigurasi | Bawaan, tanpa tuning. Buffer kedua DBMS sama-sama 128 MB (`shared_buffers` dan `innodb_buffer_pool_size`) |
 | Driver | psycopg2 2.9 (C) untuk PostgreSQL. Untuk MySQL: pymysql (Python murni) dan mysqlclient 2.3 (C). Lihat §2.3 |
 
@@ -73,7 +73,7 @@ Pedoman Connolly & Begg yang dipakai SKRIPSI.txt menyarankan daftar pendek beris
 | **D. Konkurensi (E2)** | 1, 4, 8, 16 klien serentak menjalankan campuran Q1 dan Q2 dengan parameter acak | Throughput (kueri/detik), latensi median dan p95 | 10 detik per titik (setelah 1 detik pemanasan) |
 | **E. Tulis/ETL (E3)** | Insert batch 50.000 baris; upsert 20.000 baris (50% konflik). Keduanya INSERT multi-baris per 1.000 baris | Baris/detik | 3 ulangan, median |
 
-Totalnya: 5 kueri inti × 3 run × 30 pengukuran, 3 kueri × 3 skala, 4 tingkat konkurensi × 2 driver, dan 2 uji tulis × 2 driver. Seluruhnya sekitar 700 ribu eksekusi kueri.
+Totalnya: 5 kueri inti × 3 run × 30 pengukuran, 3 kueri × 3 skala × 2 driver, 4 tingkat konkurensi × 2 driver, dan 2 uji tulis × 2 driver. Seluruhnya sekitar 700 ribu eksekusi kueri.
 
 ### 2.3 Koreksi di tengah pengujian
 
@@ -81,7 +81,8 @@ Tiga hal ditemukan dan dibetulkan supaya perbandingannya adil. Semuanya dicatat 
 
 1. **Q3 MySQL error 3516** saat ditulis setara secara langsung (lihat §3.2). Kuerinya ditulis ulang khusus untuk MySQL.
 2. **Upsert MySQL lewat pymysql semula dikirim per baris.** Sintaks alias `AS new` tidak dikenali pymysql sebagai INSERT multi-baris, sehingga hasil awalnya 5,0 detik. Setelah diganti ke `VALUES(value)`, hasilnya 1,1 detik. Angka 5,0 detik tidak dipakai.
-3. **Driver pymysql membuat MySQL tampak jauh lebih lambat di uji konkurensi.** Karena pymysql ditulis murni dalam Python, uji E2 dan E3 diulang dengan driver C (mysqlclient). Hasilnya berbeda besar untuk konkurensi (§3.5), jadi **angka yang dipakai untuk kesimpulan adalah angka dari driver C**.
+3. **Driver pymysql membuat MySQL tampak jauh lebih lambat di uji konkurensi.** Karena pymysql ditulis murni dalam Python, uji E1, E2, dan E3 diulang dengan driver C (mysqlclient). Hasilnya berbeda besar untuk konkurensi (§3.5), jadi **angka yang dipakai untuk kesimpulan adalah angka dari driver C**.
+4. **Disk tidak setara pada pengujian 8 Oktober** (PostgreSQL di SSD, MySQL di HDD). Seluruh pengujian diulang dengan klaster PostgreSQL khusus benchmark di HDD yang sama dengan MySQL (§2.4–§2.5). Angka 8 Oktober tidak dipakai lagi untuk kesimpulan.
 
 ### 2.4 Perangkat keras dan lingkungan uji
 
@@ -90,17 +91,33 @@ Tiga hal ditemukan dan dibetulkan supaya perbandingannya adil. Semuanya dicatat 
 | Komputer | Dell Inspiron 3668 (desktop) |
 | CPU | Intel Core i7-7700 @ 3,60 GHz: 4 core, 8 thread |
 | RAM | 32 GB (2 × 16 GB DDR4-2400) |
-| Disk 0 (C:) | SK hynix SC311 SSD SATA 128 GB, sisa ruang ±4 GB saat uji |
-| Disk 1 (D:) | Toshiba DT01ACA100 HDD SATA 1 TB (7.200 rpm) |
+| Disk 0 (C:) | SK hynix SC311 SSD SATA 128 GB (sistem operasi; **tidak dipakai** untuk data uji) |
+| Disk 1 (D:) | Toshiba DT01ACA100 HDD SATA 1 TB (7.200 rpm), **data kedua DBMS** |
 | Sistem operasi | Windows 10 Pro 22H2 (10.0.19045) |
 | Klien uji | Python 3.10.11 di mesin yang sama; koneksi lewat localhost (TCP) |
-| PostgreSQL | 18.6 + PostGIS 3.6.2, service Windows, data di **C:\Program Files\PostgreSQL\18\data (SSD)** |
-| MySQL | 8.0.40 Community ZIP portable, data di **D:\_bench_mysql\data (HDD)** |
-| Konfigurasi | Bawaan kedua DBMS. Buffer 128 MB; PostgreSQL `max_parallel_workers_per_gather` = 2; MySQL `innodb_flush_log_at_trx_commit` = 1 |
+| PostgreSQL | 18.6 + PostGIS 3.6.2, klaster benchmark terpisah (`initdb`, port 5433, dijalankan `pg_ctl`), data di **D:\_bench_pg\data (HDD)**. PostgreSQL produksi (port 5432, C:) tidak dipakai |
+| MySQL | 8.0.40 Community ZIP portable, port 3307, data di **D:\_bench_mysql\data (HDD)** |
+| Konfigurasi | Bawaan kedua DBMS. Buffer 128 MB; PostgreSQL `max_parallel_workers_per_gather` = 2, `synchronous_commit` = on, `fsync` = on; MySQL `innodb_flush_log_at_trx_commit` = 1, `sync_binlog` = 1. Keduanya mem-*flush* log ke disk setiap COMMIT |
+| Bukti | `environment.json` mencatat `data_directory`, nama disk fisik, dan jenis media (SSD/HDD) tiap DBMS yang dibaca saat uji; `storage_equal` = true |
 
-> **Ketidaksetaraan penyimpanan.** Data PostgreSQL berada di SSD, sedangkan data MySQL di HDD. Ini memengaruhi uji yang bergantung pada disk, yaitu tulis/ETL (E3), proses memperbesar tabel, dan Q6 di ×30 yang datanya melebihi buffer. Untuk uji-uji ini, selisih pada §3.3 dan §3.6 **belum bisa diatribusikan sepenuhnya ke DBMS**.
+> **Kesetaraan penyimpanan.** Kedua data directory berada di HDD yang sama, sehingga selisih pada uji tulis (E3), proses memperbesar tabel, dan Q6 ×30 kini bisa diatribusikan ke DBMS. `run.py` menolak berjalan bila `BENCH_REQUIRE_SAME_DISK=1` dan kedua DBMS tidak di disk yang sama.
 >
-> Kueri yang datanya sudah di memori (Q1–Q5, E2 konkurensi, E1 ×1 dan ×10 untuk Q1/Q2) dan fitur F1–F3 tidak bergantung pada disk, sehingga tidak terpengaruh. Untuk hasil yang setara, uji tulis dan uji skala perlu diulang dengan kedua data directory di disk yang sama (§6).
+> HDD dipilih (bukan SSD) karena SSD C: hanya tersisa ±6 GB, tidak cukup untuk dua DBMS pada skala ×30 beserta log-nya. Angka absolut uji tulis karena itu lebih rendah daripada di SSD, tetapi perbandingannya adil.
+
+### 2.5 Pengaruh disk: hasil 8 Oktober (SSD vs HDD) dibanding 6 November (HDD vs HDD)
+
+| Uji | Selisih 8 Okt (PG SSD, MySQL HDD) | Selisih 6 Nov (keduanya HDD) | Terpengaruh disk? |
+|---|---|---|---|
+| Q3 irisan spasial | 17× | 16× | Tidak |
+| Q4 evaluasi alert | 9× | 14× | Tidak |
+| Q6 rekap ×30 (driver C) | 8,5× (pymysql) | **2,9×** | **Ya, besar** |
+| Waktu memperbesar ×30 | 293 vs 40 detik (7×) | 290 vs 29 detik (10×) | Tidak |
+| Insert batch 50.000 baris | 8,2× | **4,4×** | **Ya** |
+| Upsert 20.000 baris | 1,9× | **1,3×** | **Ya** |
+| Konkurensi (driver C) | PG unggul 13–26% | PG unggul 11–35% | Tidak |
+| Fitur F1–F3 | sama | sama | Tidak |
+
+Jadi kecurigaan pada §6 versi lama terbukti: sekitar dua pertiga keunggulan Q6 ×30 dan sekitar separuh keunggulan insert berasal dari SSD, bukan dari PostgreSQL. Arsip hasil lama ada di `benchmark/results/arsip_2026-10-08_pg-ssd_mysql-hdd/`.
 
 ---
 
@@ -112,16 +129,16 @@ Median dari run terakhir. Kolom "rentang 3 run" menunjukkan kestabilan hasil.
 
 | Kueri | Isi | PostgreSQL | rentang 3 run | MySQL | rentang 3 run | MySQL ÷ PG |
 |---|---|---|---|---|---|---|
-| Q1 | Pivot 5 band per kecamatan, satu tanggal | **0,45** | 0,45–0,50 | 1,14 | 0,94–1,14 | 2,5× |
-| Q2 | Tren 30 hari satu kecamatan | **0,29** | 0,27–0,29 | 0,67 | 0,67–0,83 | 2,3× |
-| Q3 | Irisan poligon + luas geodesik | **1,34** | 1,09–1,34 | 22,57 | 20,2–24,0 | **17×** |
-| Q4 | Evaluasi alert: hit / miss / false alarm | **1,76** | 1,04–1,76 | 16,64 | 16,6–18,6 | **9×** |
-| Q5 | Lineage 6 tingkat (`WITH RECURSIVE`) | 0,82 | 0,62–0,82 | **0,43** | 0,42–0,61 | 0,5× (**MySQL lebih cepat**) |
+| Q1 | Pivot 5 band per kecamatan, satu tanggal | **0,45** | 0,45–0,47 | 0,87 | 0,87–1,49 | 1,9× |
+| Q2 | Tren 30 hari satu kecamatan | **0,31** | 0,30–0,31 | 0,68 | 0,67–0,68 | 2,2× |
+| Q3 | Irisan poligon + luas geodesik | **1,15** | 1,14–1,15 | 18,63 | 18,3–18,6 | **16×** |
+| Q4 | Evaluasi alert: hit / miss / false alarm | **1,06** | 0,99–1,06 | 15,13 | 14,8–15,1 | **14×** |
+| Q5 | Lineage 6 tingkat (`WITH RECURSIVE`) | 0,65 | 0,62–0,66 | **0,45** | 0,45–0,46 | 0,7× (**MySQL lebih cepat**) |
 
 **Cara membaca angka ini:**
 
-- Kueri inti diukur lewat pymysql. Untuk kueri di bawah 1 ms (Q1, Q2), sebagian selisihnya berasal dari driver. Uji konkurensi dengan 1 klien memakai driver C menunjukkan selisih sebenarnya untuk Q1/Q2 hanya sekitar **1,25×** (§3.4).
-- Q3 dan Q4 dikonfirmasi lewat `EXPLAIN ANALYZE`: waktu eksekusi di dalam server MySQL sendiri sudah 19–21 ms. Jadi selisihnya berasal dari server, bukan dari driver.
+- Kueri inti diukur lewat pymysql. Untuk kueri di bawah 1 ms (Q1, Q2), sebagian selisihnya berasal dari driver. Uji konkurensi dengan 1 klien memakai driver C menunjukkan selisih sebenarnya untuk Q1/Q2 hanya sekitar **1,35×** (§3.4).
+- Q3 dan Q4 dikonfirmasi lewat `EXPLAIN ANALYZE`: waktu eksekusi di dalam server MySQL sendiri sudah sekitar 17 ms, sedangkan PostgreSQL 0,6–0,8 ms. Jadi selisihnya berasal dari server, bukan dari driver.
 - Q5 lebih cepat di MySQL walaupun lewat driver yang lebih lambat. Ini keunggulan nyata MySQL, meskipun keduanya sama-sama di bawah 1 ms.
 
 **Penyebab selisih Q3 dan Q4** (dari `explain_*_Q*.txt`):
@@ -139,24 +156,25 @@ Supaya Q3 tetap bisa dibandingkan, versi MySQL ditulis ulang: hanya luas anggota
 
 ### 3.3 Skalabilitas (E1)
 
-Tabel observasi diperbesar 10× dan 30×. Waktu dalam milidetik.
+Tabel observasi diperbesar 10× dan 30×. Waktu dalam milidetik, MySQL lewat driver C (mysqlclient); hasil lewat pymysql ada di `extended_scaling.csv` dan polanya sama (Q6 ×30: 591 vs 1.636 ms).
 
 | Skala | Baris | Q1 PG | Q1 MySQL | Q2 PG | Q2 MySQL | **Q6 PG** | **Q6 MySQL** | Q6 MySQL ÷ PG |
 |---|---|---|---|---|---|---|---|---|
-| ×1 | 76.720 | 0,52 | 0,79 | 0,29 | 0,64 | 10 | 39 | 3,8× |
-| ×10 | 767.200 | 0,52 | 1,90 | 0,30 | 1,15 | 201 | 397 | 2,0× |
-| ×30 | 2.301.600 | 0,53 | 0,97 | 0,30 | 0,75 | **654** | **5.577** | **8,5×** |
+| ×1 | 76.720 | 0,50 | 0,62 | 0,25 | 0,39 | 9 | 33 | 3,6× |
+| ×10 | 767.200 | 0,55 | 0,88 | 0,29 | 0,42 | 187 | 334 | 1,8× |
+| ×30 | 2.301.600 | 0,50 | 1,63 | 0,27 | 1,28 | **579** | **1.666** | **2,9×** |
 
 | Skala | PG data + index (MB) | MySQL data + index (MB) | Waktu memperbesar PG | Waktu memperbesar MySQL |
 |---|---|---|---|---|
 | ×1 | 5,0 + 6,3 = 11,3 | 4,5 + 9,0 = 13,5 | – | – |
-| ×10 | 47,6 + 62,1 = 109,7 | 38,6 + 68,2 = 106,8 | 14 detik | 65 detik |
-| ×30 | 142,7 + 186,5 = 329,2 | 113,7 + 198,4 = 312,1 | 40 detik | 293 detik |
+| ×10 | 47,6 + 62,1 = 109,7 | 38,6 + 68,2 = 106,8 | 12 detik | 74 detik |
+| ×30 | 142,7 + 186,5 = 329,2 | 113,7 + 198,4 = 312,1 | 29 detik | 290 detik |
 
 **Temuan:**
 
-- **Kueri ber-index (Q1, Q2) tetap stabil di kedua DBMS** sampai 2,3 juta baris. Dashboard harian tidak akan melambat di DBMS mana pun. (Angka MySQL ×10 yang lebih tinggi dari ×30 adalah variasi pengukuran.)
-- **Kueri rekap seluruh tabel (Q6) di MySQL anjlok di ×30**: 5,6 detik, dengan p95 9,8 detik. PostgreSQL tumbuh hampir linear (0,65 detik). Penyebabnya, data + index (312 MB) sudah melebihi buffer 128 MB, sementara PostgreSQL juga memanfaatkan cache sistem operasi dan eksekusi paralel (2 worker bawaan). Q6 mewakili laporan bulanan dan halaman Forecast untuk rentang panjang.
+- **Kueri ber-index (Q1, Q2) tetap di bawah 2 ms di kedua DBMS** sampai 2,3 juta baris. PostgreSQL datar; MySQL naik sedikit di ×30 (Q1 0,88 → 1,63 ms) karena data + index sudah melebihi buffer 128 MB. Dashboard harian tidak akan melambat di DBMS mana pun.
+- **Kueri rekap seluruh tabel (Q6) di ×30**: PostgreSQL 0,58 detik, MySQL 1,67 detik (2,9×). p95 MySQL melonjak sampai 6,0 detik, sedangkan PostgreSQL stabil (0,60 detik). Selisih ini jauh lebih kecil daripada 8,5× pada pengujian SSD vs HDD (§2.5), tetapi tetap ada: PostgreSQL memakai eksekusi paralel (2 worker bawaan) dan cache sistem operasi. Q6 mewakili laporan bulanan dan halaman Forecast untuk rentang panjang.
+- **Memperbesar tabel (INSERT … SELECT) 10× lebih cepat di PostgreSQL** walaupun di disk yang sama.
 - **Ukuran penyimpanan hampir sama** (selisih sekitar 5%). Data mentah MySQL lebih ringkas, tetapi index-nya lebih besar.
 
 ### 3.4 Konkurensi (E2): driver C untuk kedua DBMS
@@ -165,31 +183,33 @@ Campuran Q1 dan Q2, durasi 10 detik per titik, tanpa galat di semua titik.
 
 | Klien | PG kueri/detik | PG p95 (ms) | MySQL kueri/detik | MySQL p95 (ms) | PG ÷ MySQL |
 |---|---|---|---|---|---|
-| 1 | 2.397 | 0,60 | 1.907 | 0,77 | 1,26× |
-| 4 | 7.396 | 0,80 | 6.339 | 0,94 | 1,17× |
-| 8 | 8.523 | 1,37 | 7.026 | 1,70 | 1,21× |
-| 16 | 8.126 | 3,58 | 7.161 | 4,01 | 1,13× |
+| 1 | 2.255 | 0,63 | 1.675 | 0,79 | 1,35× |
+| 4 | 7.275 | 0,76 | 6.583 | 0,87 | 1,11× |
+| 8 | 8.204 | 1,39 | 7.121 | 1,68 | 1,15× |
+| 16 | 7.974 | 3,57 | 7.045 | 4,11 | 1,13× |
 
-**Temuan:** keduanya naik hampir linear sampai 4 klien, lalu jenuh di sekitar 8 klien (sesuai 8 thread CPU). PostgreSQL unggul **13–26%**. Selisih ini **kecil**, dan kedua DBMS jauh melampaui kebutuhan GMLS (puluhan pengguna, bukan ribuan kueri per detik).
+**Temuan:** keduanya naik hampir linear sampai 4 klien, lalu jenuh di sekitar 8 klien (sesuai 8 thread CPU). PostgreSQL unggul **11–35%** (terbesar pada 1 klien, 11–15% saat serentak). Selisih ini **kecil**, dan kedua DBMS jauh melampaui kebutuhan GMLS (puluhan pengguna, bukan ribuan kueri per detik). Hasil ini praktis sama dengan pengujian 8 Oktober, karena data uji konkurensi sudah di memori.
 
 ### 3.5 Efek driver (pymysql vs mysqlclient)
 
 | Uji | MySQL + pymysql | MySQL + mysqlclient | PostgreSQL + psycopg2 |
 |---|---|---|---|
-| Konkurensi 16 klien (kueri/detik) | 1.557 | 7.161 | 8.126 |
-| Insert batch (baris/detik) | 7.823 | 6.122 | 50.361 |
-| Upsert (baris/detik) | 17.286 | 21.178 | 41.084 |
+| Konkurensi 16 klien (kueri/detik) | 1.374 | 7.045 | 7.974 |
+| Insert batch (baris/detik) | 7.638 | 7.516 | 32.940–47.275 |
+| Upsert (baris/detik) | 20.350 | 16.070 | 20.312–44.148 |
 
-Driver Python murni memangkas throughput MySQL sampai 4,6×. **Kalau MySQL dipakai dengan Python, mysqlclient wajib dipilih.** Sebaliknya, lambatnya insert MySQL tetap muncul dengan kedua driver, jadi itu berasal dari server.
+Driver Python murni memangkas throughput MySQL sampai 5,1×. **Kalau MySQL dipakai dengan Python, mysqlclient wajib dipilih.** Sebaliknya, lambatnya insert MySQL tetap muncul dengan kedua driver, jadi itu berasal dari server.
 
 ### 3.6 Tulis/ETL (E3): median 3 ulangan
 
 | Uji | PostgreSQL | MySQL (mysqlclient) | PG ÷ MySQL |
 |---|---|---|---|
-| Insert batch 50.000 baris | 0,99 detik (**50.361 baris/detik**) | 8,17 detik (6.122 baris/detik) | 8,2× |
-| Upsert 20.000 baris, 50% konflik | 0,49 detik (**41.084 baris/detik**) | 0,94 detik (21.178 baris/detik) | 1,9× |
+| Insert batch 50.000 baris | 1,52 detik (**32.940 baris/detik**) | 6,65 detik (7.516 baris/detik) | 4,4× |
+| Upsert 20.000 baris, 50% konflik | 0,99 detik (**20.312 baris/detik**) | 1,25 detik (16.070 baris/detik) | 1,3× |
 
-Pola yang sama terlihat saat memperbesar tabel di E1: PostgreSQL 40 detik, MySQL 293 detik. Job Hidromet harian hanya menulis ratusan baris, jadi perbedaan ini **terasa di backfill** (bertahun-tahun data sekaligus), bukan di operasi harian.
+Angka PostgreSQL di HDD bervariasi antar-sesi: pada sesi pymysql, PostgreSQL mencatat 1,06 detik (insert) dan 0,45 detik (upsert), yaitu 6,2× dan 2,2× terhadap MySQL. Jadi rentang yang jujur adalah **insert 4,4–6,2× dan upsert 1,3–2,2×**. Dibanding pengujian SSD vs HDD (8,2× dan 1,9×), keunggulan insert PostgreSQL menyusut kira-kira separuh, tetapi tidak hilang.
+
+Pola yang sama terlihat saat memperbesar tabel di E1: PostgreSQL 29 detik, MySQL 290 detik. Job Hidromet harian hanya menulis ratusan baris, jadi perbedaan ini **terasa di backfill** (bertahun-tahun data sekaligus), bukan di operasi harian.
 
 ### 3.7 Fitur keamanan dan audit
 
@@ -204,18 +224,18 @@ Arsitektur hak akses Orbit-U (`SET LOCAL ROLE monitor_<role>` per request, lihat
 
 ### 3.8 Skor terbobot
 
-Bobot diturunkan dari kerangka acuan §1.1. Skala 1–5.
+Bobot diturunkan dari kerangka acuan §1.1. Skala 1–5. Dibanding pengujian 8 Oktober, skor MySQL untuk analitik dan skala naik dari 2 ke 3 karena selisih Q6 ×30 menyusut dari 8,5× ke 2,9× setelah disk disetarakan; total MySQL naik dari 2,90 ke 3,05. Skor lain tetap.
 
 | Kriteria | Bobot | PostgreSQL | MySQL 8.0 | Dasar |
 |---|---|---|---|---|
 | Keamanan per peran dan audit (K5, K6) | 25% | 5 | 2 | §3.7 |
-| Spasial (K2) | 20% | 5 | 2 | Q3 17×, galat 3516 |
-| Analitik dan skala (K3) | 15% | 5 | 2 | Q4 9×, Q6 ×30 8,5× |
-| Tulis/ETL (K7) | 10% | 5 | 3 | Insert 8×, upsert 2× |
-| Konkurensi baca | 10% | 5 | 4 | Selisih 13–26% |
+| Spasial (K2) | 20% | 5 | 2 | Q3 16×, galat 3516 |
+| Analitik dan skala (K3) | 15% | 5 | 3 | Q4 14×, Q6 ×30 2,9× (disk setara) |
+| Tulis/ETL (K7) | 10% | 5 | 3 | Insert 4,4–6,2×, upsert 1,3–2,2× |
+| Konkurensi baca | 10% | 5 | 4 | Selisih 11–35% |
 | Integritas relasional dan rekursif (K1, K4) | 10% | 5 | 5 | Keduanya punya FK; Q5 MySQL lebih cepat, tetapi keduanya < 1 ms |
 | Biaya, ekosistem, keakraban pengguna (K8) | 10% | 4 | 5 | Keduanya gratis; MySQL lebih umum di hosting murah dan sudah dipakai GMLS |
-| **Total** | 100% | **4,90** | **2,90** | |
+| **Total** | 100% | **4,90** | **3,05** | |
 
 ---
 
@@ -238,14 +258,14 @@ Di ketiganya, MySQL kalah jauh atau butuh penyiasatan.
 ### 5.1 Keunggulan PostgreSQL dibanding MySQL pada project ini
 
 1. **Keamanan berlapis di database (RM4).** Hanya PostgreSQL yang bisa mempersempit hak lewat `SET LOCAL ROLE` dan otomatis memulihkannya di akhir transaksi. PostgreSQL juga punya row-level security dan trigger audit generik satu fungsi untuk semua tabel. Di MySQL, ketiganya tidak ada atau harus ditulis manual per tabel. Ini satu-satunya keunggulan yang **tidak bisa ditutup** dengan menambah hardware.
-2. **Spasial.** Irisan kecamatan dan luas geodesik 17× lebih cepat dan tidak perlu penyiasatan. Di MySQL, kueri setara langsung error dan setiap kueri luas harus ditulis ulang.
-3. **Kueri analitik.** Evaluasi alert 9× lebih cepat karena CTE dihitung sekali. Rekap bulanan pada 2,3 juta baris 8,5× lebih cepat (0,65 detik vs 5,6 detik). Selisihnya membesar seiring bertambahnya data, padahal angka per kecamatan di project ini **disimpan selamanya**.
-4. **Penulisan ETL.** Insert batch 8× lebih cepat dan upsert 2× lebih cepat. Backfill bertahun-tahun data selesai jauh lebih singkat.
-5. **Konkurensi baca sedikit lebih tinggi**, 13–26%. Ini keunggulan kecil yang tidak menentukan.
+2. **Spasial.** Irisan kecamatan dan luas geodesik 16× lebih cepat dan tidak perlu penyiasatan. Di MySQL, kueri setara langsung error dan setiap kueri luas harus ditulis ulang.
+3. **Kueri analitik.** Evaluasi alert 14× lebih cepat karena CTE dihitung sekali. Rekap bulanan pada 2,3 juta baris 2,9× lebih cepat (0,58 detik vs 1,67 detik) dengan p95 yang jauh lebih stabil (0,60 vs 6,0 detik). Selisihnya membesar seiring bertambahnya data, padahal angka per kecamatan di project ini **disimpan selamanya**.
+4. **Penulisan ETL.** Insert batch 4,4–6,2× lebih cepat dan upsert 1,3–2,2× lebih cepat di disk yang sama. Backfill bertahun-tahun data selesai jauh lebih singkat.
+5. **Konkurensi baca sedikit lebih tinggi**, 11–35%. Ini keunggulan kecil yang tidak menentukan.
 
 ### 5.2 Keunggulan MySQL dibanding PostgreSQL pada project ini
 
-1. **Kueri rekursif lineage (Q5) lebih cepat:** 0,43 ms vs 0,82 ms. Dalam praktik tidak terasa, karena keduanya di bawah 1 ms.
+1. **Kueri rekursif lineage (Q5) lebih cepat:** 0,45 ms vs 0,65 ms. Dalam praktik tidak terasa, karena keduanya di bawah 1 ms.
 2. **Penyimpanan data mentah lebih ringkas**, sekitar 20% lebih kecil. Tetapi index-nya lebih besar, sehingga totalnya hanya selisih sekitar 5%.
 3. **Lebih akrab bagi GMLS.** SIGAP DESA sudah memakai PHP/MySQL, jadi pengelola tidak perlu belajar DBMS baru, dan hosting murah lebih banyak yang menyediakan MySQL.
 4. **Kueri ber-index dan baca serentak sama-sama memadai.** Untuk halaman dashboard harian, MySQL tidak menjadi hambatan.
@@ -260,44 +280,64 @@ Karena itu PostgreSQL direkomendasikan untuk Orbit-U. MySQL tetap tepat untuk SI
 
 ## 6. Keterbatasan
 
-- **Disk tidak setara (§2.4):** PostgreSQL di SSD, MySQL di HDD. Keunggulan PostgreSQL di tulis/ETL (§3.6) dan Q6 ×30 (§3.3) mungkin lebih kecil kalau kedua DBMS berada di disk yang sama. Keunggulan di keamanan (F1–F3), spasial (Q3), dan evaluasi alert (Q4) tidak terpengaruh, karena data uji tersebut sudah ada di memori.
+- **Disk setara, tetapi HDD (§2.4).** Kedua DBMS kini di disk yang sama. Karena SSD tidak cukup ruang, pengujian dilakukan di HDD; urutan hasil di SSD diperkirakan sama, tetapi angka absolut uji tulis akan lebih tinggi. Uji tulis PostgreSQL di HDD bervariasi antar-sesi (§3.6), sehingga dilaporkan sebagai rentang.
+- PostgreSQL benchmark memakai klaster terpisah (port 5433) dengan binari yang sama dengan produksi, bukan service produksi.
+- MySQL bawaan menulis binary log (`sync_binlog` = 1), yang tidak punya padanan langsung di PostgreSQL. Ini bagian dari konfigurasi bawaan yang diuji "apa adanya".
 - Data sintetis. Skala terbesar yang diuji 2,3 juta baris; data produksi berisi 72.850 baris `region_observations` (24 Okt 2026).
-- Konfigurasi bawaan tanpa tuning. Dengan `innodb_buffer_pool_size` lebih besar, Q6 MySQL di ×30 kemungkinan membaik. Uji ini mengukur perilaku "apa adanya", sesuai kondisi GMLS yang tidak punya DBA.
+- Konfigurasi bawaan tanpa tuning. Dengan `innodb_buffer_pool_size` lebih besar, Q1/Q2 dan Q6 MySQL di ×30 kemungkinan membaik. Uji ini mengukur perilaku "apa adanya", sesuai kondisi GMLS yang tidak punya DBA.
 - Klien dan server di mesin yang sama. Klien Python ikut memakai CPU saat uji konkurensi.
-- Kueri inti dan E1 untuk MySQL diukur lewat pymysql. Selisih Q1/Q2 di bawah 1 ms sebagian berasal dari driver (§3.1). Q3, Q4, dan Q6 didominasi waktu server.
+- Kueri inti untuk MySQL diukur lewat pymysql. Selisih Q1/Q2 di bawah 1 ms sebagian berasal dari driver (§3.1). Q3 dan Q4 didominasi waktu server. E1 diukur dengan kedua driver.
 - MongoDB tidak diukur waktunya karena skemanya tidak setara (§1.2).
 
 ## 7. Cara mengulang
 
-```
-venv\Scripts\pip install pymysql mysqlclient
-venv\Scripts\python benchmark\generate.py
-set BENCH_MYSQL_PORT=3307
-set PYTHONIOENCODING=utf-8
+Kedua DBMS harus memakai disk fisik yang sama. Siapkan klaster PostgreSQL khusus benchmark di disk tempat data MySQL berada (sekali saja):
 
-venv\Scripts\python benchmark\run.py --engine all            :: A, B (kueri inti, fitur)
-venv\Scripts\python benchmark\extended.py                    :: C, D, E dengan pymysql
-venv\Scripts\python benchmark\run.py --engine all            :: kembalikan ke skala ×1
-set BENCH_MYSQL_DRIVER=mysqlclient
-set BENCH_TESTS=e3,e2
-set BENCH_SUFFIX=_mysqlclient
-venv\Scripts\python benchmark\extended.py                    :: D, E dengan driver C
+```
+"C:\Program Files\PostgreSQL\18\bin\initdb" -D D:\_bench_pg\data -U postgres -A trust -E UTF8 --locale=C
+"C:\Program Files\PostgreSQL\18\bin\pg_ctl" -D D:\_bench_pg\data -o "-p 5433 -c listen_addresses=127.0.0.1" -l D:\_bench_pg\pg.log start
 ```
 
-MySQL 8.0.40 yang dipakai adalah versi ZIP portable di `D:\_bench_mysql`, dijalankan manual di port 3307 (bukan service Windows):
+MySQL 8.0.40 ZIP portable di `D:\_bench_mysql`, dijalankan manual di port 3307 (bukan service Windows):
 
 ```
 D:\_bench_mysql\mysql-8.0.40-winx64\bin\mysqld --basedir=D:\_bench_mysql\mysql-8.0.40-winx64 --datadir=D:\_bench_mysql\data --port=3307 --bind-address=127.0.0.1 --console
 ```
+
+Lalu:
+
+```
+venv\Scripts\pip install pymysql mysqlclient
+venv\Scripts\python benchmark\generate.py
+set BENCH_PG_HOST=127.0.0.1
+set BENCH_PG_PORT=5433
+set BENCH_PG_PASSWORD=
+set BENCH_MYSQL_PORT=3307
+set BENCH_REQUIRE_SAME_DISK=1
+set PYTHONIOENCODING=utf-8
+
+venv\Scripts\python benchmark\run.py --engine all            :: A, B (ulang 3×; salinan per run di results\run_inti\)
+venv\Scripts\python benchmark\extended.py                    :: C, D, E dengan pymysql
+venv\Scripts\python benchmark\run.py --engine all            :: kembalikan ke skala ×1
+set BENCH_MYSQL_DRIVER=mysqlclient
+set BENCH_SUFFIX=_mysqlclient
+venv\Scripts\python benchmark\extended.py                    :: C, D, E dengan driver C
+venv\Scripts\python benchmark\run.py --engine all            :: kembalikan ke skala ×1
+```
+
+Tanpa `BENCH_PG_*`, skrip memakai `DB_*` dari `.env` (PostgreSQL produksi di C:), dan `environment.json` akan mencatat `storage_equal` = false.
 
 Berkas hasil:
 
 | Berkas | Isi |
 |---|---|
 | `timing.csv`, `features.csv`, `explain_*.txt` | Kueri inti dan fitur |
-| `extended_scaling.csv` | Skalabilitas |
+| `extended_scaling.csv`, `extended_scaling_mysqlclient.csv` | Skalabilitas lewat pymysql dan driver C |
 | `extended_concurrency.csv`, `extended_write.csv` | Konkurensi dan tulis lewat pymysql |
-| `extended_concurrency_mysqlclient.csv`, `extended_write_mysqlclient.csv` | Konkurensi dan tulis lewat driver C (**dipakai untuk kesimpulan**) |
+| `extended_*_mysqlclient.csv` | Skala, konkurensi, dan tulis lewat driver C (**dipakai untuk kesimpulan**) |
+| `run_inti/timing_run1..3.csv` | Kueri inti per run (rentang 3 run) |
+| `environment.json` | Versi, konfigurasi, data directory, disk fisik, dan jenis media tiap DBMS |
+| `arsip_2026-10-08_pg-ssd_mysql-hdd/` | Hasil lama yang disknya tidak setara (hanya untuk §2.5) |
 
 ## 8. Kode pengujian
 
@@ -305,10 +345,10 @@ Kode lengkap ada di folder `benchmark/`:
 
 | Berkas | Baris | Isi |
 |---|---|---|
-| `generate.py` | 178 | Pembangkit data sintetis (seed tetap) |
-| `engines.py` | 342 | Skema setara, pemuat data, kueri Q1–Q5 per dialek, uji fitur F1–F3 |
-| `run.py` | 226 | Pengukuran kueri inti dan fitur |
-| `extended.py` | 307 | Skalabilitas, konkurensi, tulis |
+| `generate.py` | 162 | Pembangkit data sintetis (seed tetap) |
+| `engines.py` | 317 | Skema setara, pemuat data, kueri Q1–Q5 per dialek, uji fitur F1–F3 |
+| `run.py` | 234 | Pengukuran kueri inti dan fitur |
+| `extended.py` | 278 | Skalabilitas, konkurensi, tulis |
 
 Saran penempatan di naskah:
 

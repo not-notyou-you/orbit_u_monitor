@@ -1,0 +1,61 @@
+{
+ "generated_at": "2026-10-08T06:08:05+00:00",
+ "machine": {
+  "os": "Windows-10-10.0.19045-SP0",
+  "python": "3.10.11",
+  "cpu": "Intel64 Family 6 Model 158 Stepping 9, GenuineIntel",
+  "logical_cpus": 8,
+  "ram_gb": 31.9
+ },
+ "method": {
+  "warmup": 5,
+  "runs": 30,
+  "statistic": "median dan p95 waktu eksekusi + fetch di klien"
+ },
+ "data": {
+  "seed": 20260929,
+  "period": [
+   "2023-01-01",
+   "2025-12-31"
+  ],
+  "rows": {
+   "regions": 28,
+   "observations": 76720,
+   "alerts": 1076,
+   "disasters": 150,
+   "products": 5182,
+   "lineage": 3982
+  },
+  "note": "DATA SINTETIS — bukan data produksi"
+ },
+ "engines": {
+  "PostgreSQL": {
+   "version": "PostgreSQL 18.6 on x86_64-windows",
+   "postgis": "3.6.2",
+   "database": "themonitor_bench",
+   "load_seconds": 2.64,
+   "row_counts": {
+    "regions": 28,
+    "observations": 76720,
+    "alert_events": 1076,
+    "disaster_events": 150,
+    "data_products": 5182,
+    "data_lineage": 3982
+   },
+   "q5_product_id": 6
+  },
+  "MySQL 8.0": {
+   "version": "8.0.40",
+   "database": "themonitor_bench",
+   "load_seconds": 22.24,
+   "row_counts": {
+    "regions": 28,
+    "observations": 76720,
+    "alert_events": 1076,
+    "disaster_events": 150,
+    "data_products": 5182,
+    "data_lineage": 3982
+   }
+  }
+ }
+}

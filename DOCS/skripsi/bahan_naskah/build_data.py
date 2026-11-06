@@ -168,7 +168,7 @@ def main():
         "bench": {
             "timing": read_csv("timing.csv"),
             "features": read_csv("features.csv"),
-            "scaling": read_csv("extended_scaling.csv"),
+            "scaling": read_csv("extended_scaling_mysqlclient.csv"),
             # PERBANDINGAN_DBMS.md §3.4/§3.6 memakai run driver C (mysqlclient) untuk kedua DBMS
             "concurrency": read_csv("extended_concurrency_mysqlclient.csv"),
             "write": read_csv("extended_write_mysqlclient.csv"),

@@ -19,7 +19,7 @@ ax.set_xlabel("Longitude (°E)", fontsize=8); ax.set_ylabel("Latitude (°)", fon
 ax.text(0.01, 0.01, "10 sub-districts, %.1f km$^2$ (WGS 84)" % tot, transform=ax.transAxes, fontsize=7)
 fig.tight_layout(); fig.savefig(out + "/fig1_study_area.png"); print("area", tot)
 
-qs = ["Q1", "Q2", "Q3", "Q4", "Q5"]; pg = [0.45, 0.29, 1.34, 1.76, 0.82]; my = [1.14, 0.67, 22.57, 16.64, 0.43]
+qs = ["Q1", "Q2", "Q3", "Q4", "Q5"]; pg = [0.45, 0.31, 1.15, 1.06, 0.65]; my = [0.87, 0.68, 18.63, 15.13, 0.45]
 fig, ax = plt.subplots(figsize=(6.4, 3.0), dpi=300); x = range(5); w = 0.38
 b1 = ax.bar([i - w/2 for i in x], pg, w, label="PostgreSQL 18.6 + PostGIS 3.6.2", color="#333333")
 b2 = ax.bar([i + w/2 for i in x], my, w, label="MySQL 8.0.40", color="#ffffff", edgecolor="#333333", hatch="///", linewidth=0.8)

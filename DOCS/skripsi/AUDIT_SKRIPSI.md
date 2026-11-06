@@ -38,7 +38,7 @@ Status: **Terjawab** = ada artefak yang bisa ditunjukkan · **Sebagian** = artef
 | Hasil akhir (SKRIPSI.txt bagian D) | Artefak |
 |---|---|
 | Rancangan conceptual, logical, physical; data dictionary; DDL; constraints; indexing; security | `database/monitor_schema.sql`, `monitor_security.sql`, `monitor_seed.sql`; DATABASE.md; `tools/data_dictionary.py` → `../generated/data_dictionary.md` + `erd_physical.mmd` |
-| Rekomendasi DBMS | `../PERBANDINGAN_DBMS.md` (PostgreSQL + PostGIS 4,90 vs MySQL 8.0 2,90), `benchmark/results/*.csv` |
+| Rekomendasi DBMS | `../PERBANDINGAN_DBMS.md` (PostgreSQL + PostGIS 4,90 vs MySQL 8.0 3,05; diuji ulang di disk yang sama, M83), `benchmark/results/*.csv` |
 | Implementasi / prototype yang dapat diuji | Aplikasi web `web/` + REST API `api/` (OpenAPI `/docs`), berjalan di server produksi (README §9) |
 | API / middleware | Tidak wajib (penelitian tidak berfokus integrasi). Tetap ada: REST API + token API pribadi (M33) |
 | Benchmark, integrity report, security test, evidence | `benchmark/results/`, `../hasil_uji/`, `tests/security/grant_matrix.sql` |

@@ -368,23 +368,26 @@ def blocks():
     b += [P("Pemilihan DBMS mengikuti empat langkah dan kriteria pada subbab 3.4.2. Kandidat dalam daftar pendek adalah "
             "PostgreSQL 18.6 dengan PostGIS 3.6.2 dan MySQL 8.0.40 Community. Keduanya diuji pada skema yang setara (tipe, "
             "PK, FK, UNIQUE, CHECK, dan indeks yang sama, termasuk indeks spasial) dengan data sintetis deterministik yang "
-            "sama, yaitu 28 kecamatan dan 76.720 observasi, menggunakan konfigurasi bawaan. MongoDB 7 hanya dinilai dari "
+            "sama, yaitu 28 kecamatan dan 76.720 observasi, menggunakan konfigurasi bawaan. Data directory kedua DBMS ditempatkan pada disk fisik yang sama (HDD 7.200 rpm) agar uji yang bergantung pada media penyimpanan setara. MongoDB 7 hanya dinilai dari "
             "fiturnya karena tidak mendukung *foreign key*. Hasil kueri inti ditunjukkan pada {T:q} dan {G:qchart}.")]
     b += [TAB("q", "Median Waktu Kueri Inti (milidetik)", [600, 3700, 1200, 1200, 1200], ["Kueri", "Isi", "PostgreSQL", "MySQL", "MySQL ÷ PG"], [
-        ["Q1", "Pivot hujan per kecamatan, satu tanggal", "0,45", "1,14", "2,5×"],
-        ["Q2", "Tren 30 hari satu kecamatan satu band", "0,29", "0,67", "2,3×"],
-        ["Q3", "Irisan poligon dan luas geodesik", "1,34", "22,57", "17×"],
-        ["Q4", "Evaluasi peringatan: *hit*, *miss*, *false alarm*", "1,76", "16,64", "9×"],
-        ["Q5", "Lineage 6 tingkat (WITH RECURSIVE)", "0,82", "0,43", "0,5×"],
+        ["Q1", "Pivot hujan per kecamatan, satu tanggal", "0,45", "0,87", "1,9×"],
+        ["Q2", "Tren 30 hari satu kecamatan satu band", "0,31", "0,68", "2,2×"],
+        ["Q3", "Irisan poligon dan luas geodesik", "1,15", "18,63", "16×"],
+        ["Q4", "Evaluasi peringatan: *hit*, *miss*, *false alarm*", "1,06", "15,13", "14×"],
+        ["Q5", "Lineage 6 tingkat (WITH RECURSIVE)", "0,65", "0,45", "0,7×"],
     ])]
-    b += [P('Median diambil dari run terakhir di antara tiga run terpisah, dan urutan hasilnya stabil: rentang tiga run Q3 adalah 1,09–1,34 milidetik di PostgreSQL dan 20,2–24,0 milidetik di MySQL. Pada Q1 dan Q2, sebagian selisih berasal dari *driver* pymysql; pada uji konkurensi dengan *driver* C untuk kedua DBMS, selisihnya hanya sekitar 1,25 kali.')]
+    b += [P('Median diambil dari run terakhir di antara tiga run terpisah, dan urutan hasilnya stabil: rentang tiga run Q3 adalah 1,14–1,15 milidetik di PostgreSQL dan 18,3–18,6 milidetik di MySQL. Pada Q1 dan Q2, sebagian selisih berasal dari *driver* pymysql; pada uji konkurensi dengan *driver* C untuk kedua DBMS, selisihnya hanya sekitar 1,35 kali.')]
     b += [FIG("qchart", "chart_q.png", "Perbandingan Median Waktu Kueri Inti", 14.0)]
     b += [P("PostgreSQL lebih cepat pada Q1–Q4, terutama kueri spasial (Q3) dan evaluasi peringatan (Q4). Kueri Q3 yang ditulis "
             "setara bahkan gagal di MySQL dengan galat 3516 karena irisan geografis menghasilkan GeometryCollection, sehingga "
             "kueri harus ditulis ulang khusus untuk MySQL. MySQL lebih cepat pada kueri rekursif Q5, meskipun keduanya di bawah "
-            "1 milidetik. Pada uji skalabilitas, kueri rekap seluruh tabel (Q6) dengan 2,3 juta baris memerlukan 654 milidetik "
-            "di PostgreSQL dan 5.577 milidetik di MySQL. Pada uji konkurensi dengan *driver* C, PostgreSQL unggul 13–26%, dan "
-            "pada uji tulis PostgreSQL 8,2 kali lebih cepat untuk *insert* dan 1,9 kali untuk *upsert*.")]
+            "1 milidetik. Pada uji skalabilitas, kueri rekap seluruh tabel (Q6) dengan 2,3 juta baris memerlukan 579 milidetik "
+            "di PostgreSQL dan 1.666 milidetik di MySQL. Pada uji konkurensi dengan *driver* C, PostgreSQL unggul 11–35%, dan "
+            "pada uji tulis PostgreSQL 4,4–6,2 kali lebih cepat untuk *insert* dan 1,3–2,2 kali untuk *upsert*. Pengujian "
+            "awal yang menempatkan data PostgreSQL di SSD dan data MySQL di HDD menghasilkan selisih Q6 8,5 kali dan "
+            "*insert* 8,2 kali; setelah kedua DBMS ditempatkan pada disk yang sama, selisih tersebut menyusut, sedangkan "
+            "selisih Q3, Q4, konkurensi, dan hasil uji fitur tidak berubah berarti.")]
     b += [P("Hasil uji fitur keamanan, yang paling menentukan bagi RM4, ditunjukkan pada {T:fitur}.")]
     b += [TAB("fitur", "Hasil Uji Fitur Keamanan dan Audit", [2300, 2900, 2700], ["Fitur", "PostgreSQL", "MySQL 8.0"], [
         ["F1 SET ROLE per transaksi", "Didukung; SET LOCAL ROLE mempersempit hak dan kembali otomatis setelah transaksi", "Sebagian; berlaku per sesi, hak akun tetap berlaku sehingga DELETE tetap diizinkan"],
@@ -396,24 +399,22 @@ def blocks():
             "aplikasi. Skor terbobot dihitung dengan persamaan pada subbab 3.4.2 dan ditunjukkan pada {T:skor}.")]
     b += [TAB("skor", "Skor Terbobot Pemilihan DBMS", [3300, 900, 1200, 1100, 1400], ["Kriteria", "Bobot", "PostgreSQL", "MySQL", "Dasar"], [
         ["Keamanan per peran dan audit", "25%", "5", "2", "F1–F3"],
-        ["Kueri spasial", "20%", "5", "2", "Q3 17×, galat 3516"],
-        ["Analitik dan skala", "15%", "5", "2", "Q4 9×, Q6 8,5×"],
-        ["Penulisan data ETL", "10%", "5", "3", "*Insert* 8×, *upsert* 2×"],
-        ["Konkurensi baca", "10%", "5", "4", "Selisih 13–26%"],
+        ["Kueri spasial", "20%", "5", "2", "Q3 16×, galat 3516"],
+        ["Analitik dan skala", "15%", "5", "3", "Q4 14×, Q6 2,9×"],
+        ["Penulisan data ETL", "10%", "5", "3", "*Insert* 4,4–6,2×, *upsert* 1,3–2,2×"],
+        ["Konkurensi baca", "10%", "5", "4", "Selisih 11–35%"],
         ["Integritas relasional dan rekursif", "10%", "5", "5", "Keduanya mendukung FK"],
         ["Biaya, ekosistem, keakraban", "10%", "4", "5", "MySQL dipakai SIGAP DESA"],
-        ["**Total**", "100%", "**4,90**", "**2,90**", ""],
+        ["**Total**", "100%", "**4,90**", "**3,05**", ""],
     ])]
     b += [P("Berdasarkan skor tersebut, DBMS yang direkomendasikan adalah PostgreSQL dengan PostGIS. Penentunya bukan selisih "
             "milidetik pada kueri sederhana, melainkan kontrol akses per peran di dalam basis data, kueri spasial, dan kueri "
             "analitik saat data membesar. Keunggulan MySQL bersifat operasional, yaitu lebih akrab bagi GMLS karena SIGAP DESA "
-            "memakai PHP/MySQL. Pengujian memiliki keterbatasan: data PostgreSQL berada di SSD sedangkan data MySQL di HDD, "
-            "sehingga selisih pada uji tulis dan Q6 skala ×30 belum dapat diatribusikan sepenuhnya ke DBMS; keunggulan pada "
-            "F1–F3, Q3, dan Q4 tidak terpengaruh karena datanya sudah berada di memori. Untuk menguji apakah keterbatasan ini "
-            "mengubah rekomendasi, MySQL diberi skor 5 pada kriteria yang dapat terpengaruh media penyimpanan, yaitu "
-            "penulisan data ETL serta analitik dan skala. Skor MySQL naik menjadi 3,55, masih di bawah 4,90 untuk "
-            "PostgreSQL, karena selisih terbesar berasal dari keamanan per peran dan kueri spasial yang tidak bergantung "
-            "pada media penyimpanan. Rekomendasi PostgreSQL dengan PostGIS tidak berubah.")]
+            "memakai PHP/MySQL. Karena kedua DBMS diuji pada disk yang sama, selisih pada uji tulis dan Q6 skala ×30 dapat "
+            "diatribusikan ke DBMS. Dibanding pengujian awal dengan disk yang tidak setara, skor MySQL pada kriteria analitik "
+            "dan skala naik dari 2 menjadi 3 dan totalnya dari 2,90 menjadi 3,05, masih di bawah 4,90 untuk PostgreSQL, "
+            "karena selisih terbesar berasal dari keamanan per peran dan kueri spasial yang tidak bergantung pada media "
+            "penyimpanan. Rekomendasi PostgreSQL dengan PostGIS tidak berubah.")]
 
     b += [H4("Desain Fisik")]
     b += [P("Model logikal diterjemahkan ke PostgreSQL 18 dengan ekstensi postgis dan pgcrypto melalui tiga berkas berurutan: "
@@ -739,8 +740,8 @@ def blocks():
             "serta memastikan monitor_app tidak memiliki hak tanpa SET ROLE. Seluruh pengujian tersebut lulus.")]
     b += [H4("Query")]
     b += [P("Kinerja kueri diuji melalui benchmark pada subbab 4.2.2.3. Pada PostgreSQL, kelima kueri inti selesai di bawah "
-            "2 milidetik (median 0,29–1,76 milidetik), kueri rekap Q6 pada 2,3 juta baris selesai dalam 654 milidetik, dan "
-            "throughput mencapai 8.523 kueri per detik pada 8 klien. Hasil setiap kueri divalidasi dengan jumlah baris yang "
+            "2 milidetik (median 0,31–1,15 milidetik), kueri rekap Q6 pada 2,3 juta baris selesai dalam 579 milidetik, dan "
+            "throughput mencapai 8.204 kueri per detik pada 8 klien. Hasil setiap kueri divalidasi dengan jumlah baris yang "
             "sama di kedua DBMS, dan luas irisan Q3 cocok per kecamatan dengan selisih maksimum 0,1%.")]
     b += [H4("Backup/Recovery")]
     b += [P("Pengujian pencadangan dan pemulihan dijalankan pada 23 Oktober 2026 dengan PostgreSQL 18.6 terhadap salinan "
@@ -772,7 +773,7 @@ def blocks():
             "dan nasa_scenes, lalu nilai rasternya diringkas dengan agregasi zonal ke satu deret waktu region_observations "
             "dengan kunci alternatif (region_id, band_id, obs_date). Sebelas variabel dari tiga satelit disimpan sebagai baris, "
             "sehingga variabel baru tidak mengubah skema. Kueri spasial dan deret waktu ditangani PostgreSQL dengan PostGIS, "
-            "yang terpilih melalui DBMS Selection dengan skor 4,90 dibandingkan 2,90. Hasil ini sejalan dengan rekomendasi "
+            "yang terpilih melalui DBMS Selection dengan skor 4,90 dibandingkan 3,05. Hasil ini sejalan dengan rekomendasi "
             "basis data geospasial terintegrasi untuk mengurangi duplikasi [@dev] dan dengan keunggulan PostGIS atas MySQL "
             "pada kueri spasial [@kaptsov].")]
     b += [P("**RM2.** Ketertelusuran dijamin oleh data_products yang mencatat setiap berkas beserta *checksum* SHA-256, "

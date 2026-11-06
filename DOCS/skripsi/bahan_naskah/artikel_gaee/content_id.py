@@ -21,7 +21,7 @@ ABSTRACT = (
     "Sentinel-1, MODIS, dan GPM IMERG diringkas dengan agregasi zonal berbobot luas menjadi satu deret waktu per "
     "kecamatan, setiap nilai dihubungkan ke berkas sumbernya melalui checksum SHA-256 dan graf lineage, serta kontrol "
     "akses berbasis peran dan audit ditegakkan di dalam basis data. PostgreSQL dengan PostGIS dipilih dibanding MySQL 8.0 "
-    "dengan skor berbobot 4,90 berbanding 2,90. Skema berisi 43 tabel dan 22 view lulus 1183 dari 1185 uji otomatis "
+    "dengan skor berbobot 4,90 berbanding 3,05. Skema berisi 43 tabel dan 22 view lulus 1183 dari 1185 uji otomatis "
     "(2 dilewati), menjawab seluruh kueri inti di bawah 2 ms, dan dipulihkan secara identik dari backup. GMLS menyetujui "
     "rancangan dengan revisi, dan 13 pengguna menyelesaikan 62 dari 67 percobaan tugas.")
 KEYWORDS = "basis data spasial, PostGIS, penginderaan jauh satelit, lineage data, mitigasi bencana"
@@ -100,6 +100,14 @@ BODY = [
       "permukaan pada 250 m [@klein], tetapi piksel optik sering tidak valid karena tutupan awan [@tang]. Karena "
       "sumber-sumber ini tidak dapat dibandingkan piksel demi piksel, kecamatan dipilih sebagai unit analisis bersama."),
 ("TAB", "data"),
+("P", "Ketiga misi saling melengkapi, bukan saling menggantikan. Sentinel-1 merupakan radar aktif yang dapat mengamati "
+      "menembus awan, tetapi hanya melintas setiap 6–12 hari; MODIS mengamati setiap hari, tetapi kehilangan piksel "
+      "saat berawan; IMERG mengukur hujan yang mendahului banjir, bukan genangannya. Resolusinya juga berbeda hingga tiga "
+      "orde besaran, dari sekitar 10 m sampai 0,1° (kira-kira 11 km), sehingga nilai direduksi ke tingkat kecamatan "
+      "sebelum dibandingkan. Jenis run IMERG berbeda latensinya: Early dan Late tersedia dalam hitungan jam, sedangkan "
+      "Final terbit sekitar 3,5 bulan kemudian; nilai tersimpan hanya diganti oleh run yang tidak lebih buruk (Final di "
+      "atas Late di atas Early), sehingga peringatan dapat memakai hujan hampir waktu nyata sementara arsip berangsur "
+      "menjadi Final."),
 ("H2", "Metode pengembangan"),
 ("P", "Penelitian mengikuti Database System Development Life Cycle (DBSDLC): perencanaan basis data (pernyataan misi dan "
       "delapan tujuan misi), definisi sistem (batas sistem dan user view untuk lima peran), pengumpulan dan analisis "
@@ -129,11 +137,9 @@ BODY = [
 ("P", "Pemilihan DBMS mengikuti empat langkah: menetapkan kerangka acuan, menyusun daftar pendek, mengevaluasi produk, "
       "dan merekomendasikan satu produk. PostgreSQL 18.6 dengan PostGIS 3.6.2 dan MySQL 8.0.40 Community masuk daftar "
       "pendek; MongoDB 7 hanya dinilai dari fitur karena tidak mendukung foreign key. Kedua kandidat relasional diberi "
-      "skema setara dengan tipe, kunci, constraint, dan indeks yang sama, termasuk indeks spasial, serta data sintetis "
-      "deterministik yang sama (28 kecamatan dan 76 720 observasi) dengan konfigurasi bawaan. Lima kueri inti (Q1–Q5) "
+      "skema setara dengan tipe, kunci, constraint, dan indeks yang sama, termasuk indeks spasial, serta data sintetis deterministik yang sama dengan konfigurasi bawaan: kisi 28 poligon kecamatan sintetis, sepuluh di antaranya membentuk wilayah kajian agar predikat spasial juga mengenai wilayah tetangga, 76 720 observasi, 1076 peringatan, dan 150 kejadian; kejadian sintetis ini memungkinkan Q4 diukur walaupun kejadian resmi terverifikasi belum ada. Semua uji dijalankan pada satu mesin (Intel Core i7-7700, 4 inti dan 8 thread, RAM 32 GB, Windows 10), dan data directory kedua sistem ditempatkan pada HDD 7200 rpm yang sama dengan buffer 128 MB dan penulisan ke disk pada setiap commit, sehingga hasil yang peka media penyimpanan dapat dibandingkan. Lima kueri inti (Q1–Q5) "
       "masing-masing dijalankan 30 kali setelah 5 kali pemanasan dalam tiga run terpisah, dan yang dilaporkan adalah "
-      "mediannya. Fitur keamanan (F1–F3), skalabilitas, konkurensi, dan throughput tulis juga diuji. Produk dinilai 1 "
-      "hingga 5 pada tujuh kriteria berbobot, dan skor total dihitung sebagai:"),
+      "mediannya. Fitur keamanan (F1–F3), skalabilitas (rekap bulanan per kecamatan atas seluruh tabel, Q6, pada 1, 10, dan 30 kali volume data, hingga 2,3 juta baris), konkurensi, dan throughput tulis juga diuji. Uji tulis diulang dalam dua sesi, dan karena PostgreSQL di HDD bervariasi antar-sesi, hasilnya dilaporkan sebagai rentang. PostgreSQL diakses melalui psycopg2, driver berbasis C; MySQL diukur dengan PyMySQL (Python murni) untuk kueri inti, dan uji skalabilitas, konkurensi, serta tulis diulang dengan mysqlclient yang berbasis C, agar overhead driver Python tidak merugikan MySQL. Produk dinilai 1 hingga 5 pada tujuh kriteria berbobot. Kriteria kinerja dinilai dari rasio sistem yang lebih lambat terhadap yang lebih cepat, dihitung dari jumlah median waktu uji di balik setiap kriteria sehingga uji dengan keterlambatan absolut terbesar paling menentukan: 5 untuk sistem yang lebih cepat atau selisih dalam 10%, 4 untuk kurang dari 2 kali, 3 untuk 2–5 kali, dan 2 untuk lebih dari 5 kali atau bila kueri harus ditulis ulang; kriteria fitur bernilai 5 bila fitur tersedia bawaan, 2 bila memerlukan penyiasatan, dan 1 bila tidak dapat disediakan. Biaya, ekosistem, dan keakraban dinilai secara kualitatif. Bobot ditetapkan penulis dari rumusan masalah (P1–P4), bukan ditanyakan kepada GMLS. Skor total dihitung sebagai:"),
 ("EQ", "score"),
 ("P", "dengan *w*~i~ adalah bobot dan *s*~i~ skor kriteria *i*. Enam evaluasi minimum rancangan adalah tinjauan "
       "kebutuhan, uji integritas, fungsional, keamanan, kueri, dan backup/recovery. Integritas dan perilaku fungsional "
@@ -153,6 +159,12 @@ BODY = [
       "tabel transaksi dengan sedikitnya 100 record masing-masing, termasuk 72 850 observasi kecamatan, 15 850 produk "
       "data, 8142 sisi lineage, dan 7958 job pemrosesan."),
 ("FIG", "arch"),
+("P", "Dua sifat arsitektur ini tidak terlihat dari lapisannya saja. Pertama, basis data hanya menyimpan nilai dan "
+      "metadata, sedangkan berkas raster tetap di sistem berkas; karena itu basis data tetap cukup kecil untuk di-dump "
+      "secara rutin, dan raster yang hilang dapat dibangkitkan ulang dari penyedia. Kedua, ETL dan API tidak pernah "
+      "memakai role yang sama: API tidak dapat menulis observasi dan ETL tidak dapat membaca akun pengguna, sehingga "
+      "kesalahan atau penyalahgunaan di satu lapisan tidak menjangkau data lapisan lain. Klien web tidak pernah "
+      "terhubung langsung ke basis data."),
 ("H2", "Integrasi dan keterlacakan (P1, P2)"),
 ("P", "Inti rancangan adalah relasi region_observations ({F:erd}) dengan kunci alternatif (region_id, band_id, "
       "obs_date). Sebelas variabel dari tiga misi disimpan sebagai baris, bukan kolom: hamburan balik VV dan VH, persentase "
@@ -192,26 +204,33 @@ BODY = [
       "kepada warga berasal."),
 ("H2", "Pemilihan DBMS"),
 ("P", "Median waktu eksekusi kueri inti disajikan pada {T:bench} dan {F:bench}. PostgreSQL lebih cepat pada Q1–Q4, "
-      "paling jelas pada irisan spasial dengan luas geodesik (Q3, 17 kali) dan evaluasi peringatan terhadap kejadian (Q4, "
-      "9 kali). Q3 yang setara bahkan gagal di MySQL dengan galat 3516 karena irisan geografis menghasilkan "
+      "paling jelas pada irisan spasial dengan luas geodesik (Q3, 16 kali) dan evaluasi peringatan terhadap kejadian (Q4, "
+      "14 kali). Q3 yang setara bahkan gagal di MySQL dengan galat 3516 karena irisan geografis menghasilkan "
       "GeometryCollection, sehingga harus ditulis ulang khusus untuk MySQL. MySQL lebih cepat pada kueri lineage rekursif "
       "Q5, meskipun keduanya selesai di bawah 1 ms. Jumlah baris setiap kueri identik di kedua sistem, dan luas irisan Q3 "
-      "cocok per kecamatan dengan selisih di bawah 0,1%. Pada uji skalabilitas, kueri ringkasan atas 2,3 juta baris "
-      "memerlukan 654 ms di PostgreSQL dan 5577 ms di MySQL; PostgreSQL 13–26% lebih cepat pada pembacaan konkuren dan "
-      "8,2 kali lebih cepat untuk insert."),
+      "cocok per kecamatan dengan selisih di bawah 0,1%. Pada uji skalabilitas, kueri rekap Q6 atas 2,3 juta baris memerlukan 579 ms di PostgreSQL dan 1666 ms di MySQL (2,9 kali dengan mysqlclient), dengan p95 MySQL naik hingga 6,0 detik; PostgreSQL 11–35% lebih cepat pada pembacaan konkuren dan "
+      "4,4–6,2 kali lebih cepat untuk insert. Data directory kedua sistem berada pada disk fisik yang sama, dan jumlah baris uji 2,3 juta baris identik."),
 ("TAB", "bench"),
+("P", "Kolom rasio perlu dibaca bersama waktu absolutnya. Pada Q1, Q2 dan Q5 selisihnya di bawah 1 ms dan tidak "
+      "terasa bagi pengguna, sehingga keunggulan MySQL pada Q5 tidak menentukan. Selisih yang berarti ada pada Q3 dan Q4, "
+      "sekitar 17 ms dan 14 ms per eksekusi, karena kueri ini diulang untuk setiap kecamatan dan peringatan dalam job "
+      "harian dan bertambah seiring arsip, seperti ditunjukkan uji 2,3 juta baris."),
 ("FIG", "bench"),
 ("P", "Perbedaan yang menentukan bersifat fungsional, bukan waktu ({T:score}). PostgreSQL mendukung SET LOCAL ROLE, "
       "yang mempersempit hak untuk satu transaksi dan kembali otomatis, kebijakan row-level security, dan satu fungsi "
       "trigger audit yang menyimpan baris lama dan baru sebagai JSON. MySQL 8.0 hanya berganti peran per sesi sementara "
       "hak akun tetap berlaku, tidak memiliki row-level security, dan memerlukan trigger per tabel untuk audit. MySQL "
-      "unggul hanya pada biaya, ekosistem, dan keakraban, karena aplikasi desa yang ada menggunakan MySQL. Data PostgreSQL "
-      "disimpan di SSD dan data MySQL di HDD. Untuk menguji apakah hal ini memengaruhi rekomendasi, MySQL diberi skor "
-      "maksimum pada dua kriteria yang peka terhadap media penyimpanan (penulisan ETL, serta analitik dan skala); totalnya "
-      "naik menjadi 3,55, tetap di bawah 4,90, karena selisih terbesar berasal dari keamanan dan kueri spasial yang tidak "
-      "bergantung pada media penyimpanan. Hal ini sejalan dengan perbandingan terdahulu yang mengunggulkan PostGIS untuk "
+      "unggul hanya pada biaya, ekosistem, dan keakraban, karena aplikasi desa yang ada menggunakan MySQL. Pengujian "
+      "awal dengan PostgreSQL di SSD dan MySQL di HDD membesar-besarkan selisih yang peka media penyimpanan: dengan klien PyMySQL yang sama, kueri rekap Q6 menyusut dari 8,5 menjadi 2,8 kali dan insert dari 8,2 menjadi 4,4–6,2 kali setelah kedua sistem ditempatkan pada disk yang sama. Kueri spasial (17 menjadi 16 kali) dan fitur keamanan tidak berubah, dan evaluasi peringatan Q4 bahkan melebar dari 9 menjadi 14 kali, sehingga keunggulan PostgreSQL pada kueri-kueri ini bukan berasal dari media penyimpanan. Skor analitik MySQL karena itu naik dari 2 "
+      "menjadi 3 dan totalnya dari 2,90 menjadi 3,05, tetap di bawah 4,90, karena selisih terbesar berasal dari keamanan "
+      "dan kueri spasial yang tidak bergantung pada media penyimpanan. Hal ini sejalan dengan perbandingan terdahulu yang mengunggulkan PostGIS untuk "
       "beban kerja spasial [@kaptosv, @papasani]."),
 ("TAB", "score"),
+("P", "Mengikuti rumusan masalah, keamanan berbasis role dan audit mendapat bobot terbesar karena basis data harus "
+      "melindungi peringatan dan akun pengguna (P4), disusul kueri spasial yang menjadi dasar agregasi zonal. Dari "
+      "selisih total 1,85 poin, keamanan berbasis role menyumbang 0,75 dan kueri spasial 0,60, atau hampir tiga perempat; "
+      "integritas tidak menyumbang karena kedua sistem bernilai 5, dan biaya, ekosistem dan keakraban menjadi "
+      "satu-satunya kriteria yang mengunggulkan MySQL, sebesar 0,10."),
 ("H2", "Informasi, kontrol akses, dan audit (P3, P4)"),
 ("P", "Informasi disajikan melalui 22 view, REST API, dan klien web: kondisi terkini untuk kecamatan tempat pengguna "
       "berada, peringatan hujan berdasarkan ambang 50, 100, dan 150 mm dari badan meteorologi nasional yang dikirim melalui "
@@ -228,9 +247,7 @@ BODY = [
 ("P", "Hasil enam evaluasi minimum dirangkum pada {T:eval}. Run uji otomatis terdiri atas 1185 kasus uji, dengan 1183 "
       "lulus, tidak ada yang gagal, dan 2 dilewati karena memerlukan shapefile batas wilayah lengkap; run sebelumnya "
       "menemukan dua kegagalan yang diperbaiki sebelum run akhir. Kelima kueri inti selesai di bawah 2 ms, dan sistem "
-      "mencapai 8523 kueri per detik dengan delapan klien. Backup dan recovery diuji pada salinan basis data produksi "
-      "dengan 44 tabel dan 146 541 baris: setelah restore, hash MD5 seluruh baris, sequence, constraint, dan 163 indeks "
-      "identik, sesuai dengan peran struktur log dan dump dalam pemulihan yang andal [@ahmad]. Backfill yang dihentikan "
+      "mencapai 8204 kueri per detik dengan delapan klien. Backup dan recovery diuji pada salinan basis data produksi dengan 44 tabel (43 tabel skema ditambah tabel PostGIS spatial_ref_sys) dan 146 541 baris: setelah restore, hash MD5 seluruh baris, sequence, constraint, dan 163 indeks (termasuk primary key spatial_ref_sys) identik, sesuai dengan peran struktur log dan dump dalam pemulihan yang andal [@ahmad]. Backfill yang dihentikan "
       "di tengah pemrosesan hanya melanjutkan tanggal yang tersisa tanpa duplikat."),
 ("TAB", "eval"),
 ("P", "Pada tinjauan kebutuhan, ketiga responden GMLS (ketua dan dua relawan) menilai R1 dan R3–R6 sesuai. Untuk R2, "
@@ -251,8 +268,7 @@ BODY = [
       "evaluasi ini masih kosong. IMERG diketahui cenderung meremehkan hujan harian ekstrem [@ansori], dan peringatan "
       "mewarisi keterbatasan ini. Point-in-time recovery tidak diuji karena pengarsipan WAL tidak diaktifkan, dan berkas "
       "raster tidak dicadangkan karena dapat dibangkitkan ulang dari penyedia, sementara nilai per kecamatan tetap "
-      "tersimpan di basis data. Benchmark menggunakan data sintetis dan konfigurasi bawaan, dan asimetri media "
-      "penyimpanannya hanya ditangani melalui uji sensitivitas yang dijelaskan di atas."),
+      "tersimpan di basis data. Benchmark menggunakan data sintetis, konfigurasi bawaan, dan HDD pada satu komputer desktop; waktu tulis absolut di SSD atau di server produksi akan lebih rendah, dan konfigurasi yang disetel dapat mengubah rasio, tetapi tidak mengubah fitur yang tidak dimiliki MySQL 8.0 (pergantian peran per transaksi dan row-level security)."),
 
 ("H1", "Kesimpulan"),
 ("P", "Basis data relasional spasial telah dirancang dan diimplementasikan dengan DBSDLC untuk kelompok mitigasi "
@@ -260,8 +276,8 @@ BODY = [
       "kecamatan melalui agregasi zonal berbobot luas, dengan sebelas variabel disimpan sebagai baris sehingga variabel "
       "baru tidak mengubah skema. Setiap nilai dapat ditelusuri ke berkas sumbernya melalui checksum dan graf lineage, "
       "serta kontrol akses berbasis peran dan audit ditegakkan di dalam basis data itu sendiri. PostgreSQL dengan PostGIS "
-      "dipilih dibanding MySQL 8.0 dengan skor berbobot 4,90 berbanding 2,90, dan hasil ini tidak berubah ketika kriteria "
-      "terkait penyimpanan diberi kondisi terbaik bagi MySQL. Keenam evaluasi minimum terpenuhi, GMLS menyetujui "
+      "dipilih dibanding MySQL 8.0 dengan skor berbobot 4,90 berbanding 3,05, diukur dengan kedua "
+      "sistem pada disk yang sama. Keenam evaluasi minimum terpenuhi, GMLS menyetujui "
       "rancangan dengan revisi, dan pengguna awam menyelesaikan 92,5% percobaan tugas."),
 ("P", "Rancangan ini menunjukkan bahwa organisasi komunitas yang tidak memiliki data hidrometeorologi sendiri dapat "
       "memperoleh sumber data yang dapat ditelusuri dari misi satelit terbuka apabila integrasi, lineage, dan keamanan "
@@ -292,22 +308,22 @@ TABLES = {
     "bench": ("Median waktu eksekusi kueri inti [ms]", "Diolah penulis",
               [700, 4388, 1500, 1400, 1300],
               ["Kueri", "Isi", "PostgreSQL", "MySQL", "MySQL/PG"],
-              [["Q1", "Pivot hujan per kecamatan, satu tanggal", "0,45", "1,14", "2,5×"],
-               ["Q2", "Tren 30 hari, satu kecamatan dan band", "0,29", "0,67", "2,3×"],
-               ["Q3", "Irisan poligon dengan luas geodesik", "1,34", "22,57", "17×"],
-               ["Q4", "Evaluasi peringatan: hit, miss, false alarm", "1,76", "16,64", "9×"],
-               ["Q5", "Lineage enam tingkat (WITH RECURSIVE)", "0,82", "0,43", "0,5×"]]),
+              [["Q1", "Pivot hujan per kecamatan, satu tanggal", "0,45", "0,87", "1,9×"],
+               ["Q2", "Tren 30 hari, satu kecamatan dan band", "0,31", "0,68", "2,2×"],
+               ["Q3", "Irisan poligon dengan luas geodesik", "1,15", "18,63", "16×"],
+               ["Q4", "Evaluasi peringatan: hit, miss, false alarm", "1,06", "15,13", "14×"],
+               ["Q5", "Lineage enam tingkat (WITH RECURSIVE)", "0,65", "0,45", "0,7×"]]),
     "score": ("Skor berbobot pemilihan DBMS", "Diolah penulis",
               [3600, 1000, 1400, 1100, 2188],
               ["Kriteria", "Bobot", "PostgreSQL", "MySQL", "Dasar"],
               [["Keamanan berbasis peran dan audit", "25%", "5", "2", "F1–F3"],
-               ["Kueri spasial", "20%", "5", "2", "Q3 17×, galat 3516"],
-               ["Analitik dan skala", "15%", "5", "2", "Q4 9×, 2,3 juta baris 8,5×"],
-               ["Penulisan ETL", "10%", "5", "3", "Insert 8×, upsert 2×"],
-               ["Pembacaan konkuren", "10%", "5", "4", "13–26%"],
+               ["Kueri spasial", "20%", "5", "2", "Q3 16×, ditulis ulang (galat 3516)"],
+               ["Analitik dan skala", "15%", "5", "3", "Q4 14×, Q6 2,9×; jumlah 2,9×"],
+               ["Penulisan ETL", "10%", "5", "3", "Insert 4,4–6,2×, upsert 1,3–2,2×; jumlah 3,2–5,0×"],
+               ["Pembacaan konkuren", "10%", "5", "4", "11–35%"],
                ["Integritas relasional dan rekursif", "10%", "5", "5", "Keduanya mendukung FK"],
                ["Biaya, ekosistem, keakraban", "10%", "4", "5", "MySQL dipakai setempat"],
-               ["Total", "100%", "4,90", "2,90", ""]]),
+               ["Total", "100%", "4,90", "3,05", ""]]),
     "eval": ("Hasil enam evaluasi minimum", "Diolah penulis",
              [2300, 4188, 2800],
              ["Evaluasi", "Bukti", "Hasil"],

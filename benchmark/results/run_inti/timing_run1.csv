@@ -1,0 +1,11 @@
+engine,query,description,status,rows,runs,median_ms,p95_ms,min_ms,max_ms
+PostgreSQL,Q1,Statistik hari ini: pivot hujan per kecamatan satu tanggal,dijalankan,10,30,0.467,0.536,0.453,0.564
+PostgreSQL,Q2,Tren 30 hari satu kecamatan satu band,dijalankan,30,30,0.31,0.327,0.259,0.345
+PostgreSQL,Q3,Spasial: kecamatan beririsan poligon + luas irisan geodesik (km²),dijalankan,12,30,1.151,1.36,1.133,1.453
+PostgreSQL,Q4,"Evaluasi alert: hit / miss / false alarm (WARNING+, 0–3 hari)",dijalankan,3,30,1.041,1.17,1.033,1.248
+PostgreSQL,Q5,Lineage: leluhur satu produk sampai 6 tingkat (WITH RECURSIVE),dijalankan,6,30,0.655,0.818,0.638,0.895
+MySQL 8.0,Q1,Statistik hari ini: pivot hujan per kecamatan satu tanggal,dijalankan,10,30,1.489,2.751,0.957,3.229
+MySQL 8.0,Q2,Tren 30 hari satu kecamatan satu band,dijalankan,30,30,0.673,0.733,0.641,0.839
+MySQL 8.0,Q3,Spasial: kecamatan beririsan poligon + luas irisan geodesik (km²),dijalankan,12,30,18.444,20.239,17.845,21.606
+MySQL 8.0,Q4,"Evaluasi alert: hit / miss / false alarm (WARNING+, 0–3 hari)",dijalankan,3,30,15.063,15.644,14.601,16.622
+MySQL 8.0,Q5,Lineage: leluhur satu produk sampai 6 tingkat (WITH RECURSIVE),dijalankan,6,30,0.458,0.559,0.442,0.599

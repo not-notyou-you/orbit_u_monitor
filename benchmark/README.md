@@ -41,8 +41,14 @@ python benchmark/run.py --engine all         # PostgreSQL + MySQL (MySQL dilewat
 python benchmark/run.py --engine pg          # hanya PostgreSQL
 ```
 
-Koneksi PostgreSQL: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` dari `.env` (butuh hak `CREATE DATABASE`
-dan ekstensi PostGIS terpasang). Koneksi MySQL:
+Koneksi PostgreSQL: `BENCH_PG_HOST`, `BENCH_PG_PORT`, `BENCH_PG_USER`, `BENCH_PG_PASSWORD`; bila tidak diisi,
+jatuh ke `DB_*` dari `.env` (butuh hak `CREATE DATABASE` dan ekstensi PostGIS terpasang).
+
+**Perbandingan adil butuh disk yang sama.** Data directory PostgreSQL produksi ada di SSD C:, data MySQL benchmark
+di HDD D:. Karena itu pakai klaster PostgreSQL khusus benchmark di disk yang sama dengan MySQL (port 5433), lalu
+set `BENCH_PG_PORT=5433` dan `BENCH_REQUIRE_SAME_DISK=1`. `run.py` mencatat data directory, disk fisik, dan jenis
+media (SSD/HDD) tiap DBMS di `environment.json` (`storage_equal`) dan menolak berjalan bila disknya berbeda.
+Perintah lengkap: `DOCS/PERBANDINGAN_DBMS.md` §7. Koneksi MySQL:
 
 ```bash
 pip install pymysql
@@ -58,9 +64,10 @@ bukan diisi angka perkiraan.
 - `timing.csv`: `median_ms` dan `p95_ms` dari 30 eksekusi (waktu eksekusi + pengambilan baris di klien Python,
   koneksi lokal). Bandingkan antar-DBMS per kueri, bukan antar-kueri.
 - `features.csv`: `DIDUKUNG` / `SEBAGIAN` / `TIDAK DIDUKUNG` dengan bukti singkat.
-- `environment.json`: versi DBMS dan PostGIS, CPU, RAM, OS, jumlah baris yang dimuat, lama pemuatan.
+- `environment.json`: versi DBMS dan PostGIS, konfigurasi buffer/durabilitas, data directory + disk + media, CPU, RAM, OS, jumlah baris yang dimuat, lama pemuatan.
+- `arsip_2026-10-08_pg-ssd_mysql-hdd/`: hasil lama dengan disk tidak setara; jangan dipakai untuk kesimpulan.
 - `explain_*.txt`: rencana eksekusi aktual (`EXPLAIN ANALYZE`) untuk pembahasan index.
 
 Skor terbobot akhir (tujuh kriteria: keamanan per peran & audit 25%, spasial 20%, analitik & skala 15%,
 tulis/ETL 10%, konkurensi baca 10%, integritas relasional & rekursif 10%, biaya & ekosistem 10%) dan
-rekomendasinya ada di `DOCS/PERBANDINGAN_DBMS.md` §3.8–§4 (PostgreSQL 4,90, MySQL 2,90).
+rekomendasinya ada di `DOCS/PERBANDINGAN_DBMS.md` §3.8–§4 (PostgreSQL 4,90, MySQL 3,05; uji ulang 6 Nov 2026 dengan disk setara).

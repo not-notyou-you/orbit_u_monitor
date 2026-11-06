@@ -16,7 +16,7 @@ ABSTRACT = (
     "community mitigation group in Banten, Indonesia. Sentinel-1, MODIS and GPM IMERG observations are reduced by "
     "area-weighted zonal aggregation to one time series per sub-district, every value is linked to its source file "
     "through SHA-256 checksums and a lineage graph, and role-based access control and auditing are enforced inside the "
-    "database. PostgreSQL with PostGIS was selected over MySQL 8.0 with a weighted score of 4.90 against 2.90. The "
+    "database. PostgreSQL with PostGIS was selected over MySQL 8.0 with a weighted score of 4.90 against 3.05. The "
     "schema of 43 tables and 22 views passed 1183 of 1185 automated tests (2 skipped), answered all core queries below "
     "2 ms and was restored exactly from backup. GMLS approved the design with revisions, and 13 users completed 62 of "
     "67 task attempts.")
@@ -95,6 +95,13 @@ BODY = [
       "250 m [@klein], but optical pixels are frequently invalid under cloud cover [@tang]. Because the sources cannot be "
       "compared pixel by pixel, the sub-district was chosen as the common unit of analysis."),
 ("TAB", "data"),
+("P", "The three missions complement rather than duplicate one another. Sentinel-1 is an active radar that observes "
+      "through cloud but revisits the area only every 6–12 days; MODIS observes daily but loses pixels under cloud; IMERG "
+      "measures the rainfall that precedes flooding rather than the water itself. Their resolutions also span three "
+      "orders of magnitude, from about 10 m to 0.1° (roughly 11 km), which is why the values are reduced to the "
+      "sub-district before they are compared. The IMERG runs differ in latency: Early and Late are available within "
+      "hours, whereas Final appears about 3.5 months later; a stored value is replaced only by a run that is not worse "
+      "(Final over Late over Early), so warnings can use near-real-time rainfall while the archive converges to Final."),
 ("H2", "Development method"),
 ("P", "The Database System Development Life Cycle (DBSDLC) was followed: database planning (mission statement and eight "
       "mission objectives), system definition (system boundary and user views for five roles), requirements collection "
@@ -123,11 +130,9 @@ BODY = [
 ("P", "DBMS selection followed four steps: establishing the terms of reference, short-listing, evaluating the products "
       "and recommending one. PostgreSQL 18.6 with PostGIS 3.6.2 and MySQL 8.0.40 Community were short-listed; MongoDB 7 "
       "was assessed only by features because it does not support foreign keys. Both relational candidates received an "
-      "equivalent schema with the same types, keys, constraints and indexes, including spatial indexes, and the same "
-      "deterministic synthetic data (28 sub-districts and 76 720 observations) with default configurations. Five core "
+      "equivalent schema with the same types, keys, constraints and indexes, including spatial indexes, and the same deterministic synthetic data with default configurations: a grid of 28 synthetic sub-district polygons, ten of which form the area of interest so that spatial predicates also meet neighbouring areas, 76 720 observations, 1076 warnings and 150 events, the latter allowing Q4 to be measured although no verified official events exist yet. All tests ran on one machine (Intel Core i7-7700, 4 cores and 8 threads, 32 GB RAM, Windows 10), and the data directories of both systems were placed on the same 7200 rpm HDD with a 128 MB buffer and a flush to disk on every commit, so that storage-sensitive results are comparable. Five core "
       "queries (Q1–Q5) were each executed 30 times after 5 warm-up runs in three separate runs, and medians are reported. "
-      "Security features (F1–F3), scalability, concurrency and write throughput were tested in addition. The products "
-      "were scored from 1 to 5 on seven weighted criteria, and the total score was calculated as:"),
+      "Security features (F1–F3), scalability (a monthly summary per sub-district over the whole table, Q6, at 1, 10 and 30 times the data volume, up to 2.3 million rows), concurrency and write throughput were tested in addition. Write tests were repeated in two sessions, and because PostgreSQL varied between sessions on the HDD, their results are reported as ranges. PostgreSQL was accessed through psycopg2, a C-based driver; MySQL was measured with the pure-Python PyMySQL for the core queries, and the scalability, concurrency and write tests were repeated with the C-based mysqlclient, so that the overhead of a Python driver does not penalise MySQL. The products were scored from 1 to 5 on seven weighted criteria. Performance criteria were scored by the ratio of the slower to the faster system, computed from the summed median times of the tests behind each criterion so that the test with the largest absolute delay dominates: 5 for the faster system or a difference within 10%, 4 for less than 2 times, 3 for 2–5 times, and 2 for more than 5 times or when a query had to be rewritten; feature criteria received 5 when the feature is native, 2 when it needs a workaround and 1 when it cannot be provided. Cost, ecosystem and familiarity was scored qualitatively. The weights were set by the authors from the problem formulation (P1–P4), not elicited from GMLS. The total score was calculated as:"),
 ("EQ", "score"),
 ("P", "where *w*~i~ is the weight and *s*~i~ the score of criterion *i*. The six minimum evaluations of the design were "
       "requirements review, integrity, functional, security, query and backup/recovery testing. Integrity and functional "
@@ -147,6 +152,11 @@ BODY = [
       "transaction tables with at least 100 records each, including 72 850 sub-district observations, 15 850 data "
       "products, 8142 lineage edges and 7958 processing jobs."),
 ("FIG", "arch"),
+("P", "Two properties of this architecture are not visible from the layers alone. First, the database stores only values "
+      "and metadata, while the raster files stay in the file system; the database therefore remains small enough for a "
+      "regular dump, and lost rasters can be regenerated from the providers. Second, the ETL and the API never share a "
+      "role: the API cannot write observations, and the ETL cannot read user accounts, so an error or misuse in one "
+      "layer does not reach the data of the other. The web client never connects to the database directly."),
 ("H2", "Integration and traceability (P1, P2)"),
 ("P", "The core of the design is the relation region_observations ({F:erd}), with the alternate key (region_id, band_id, "
       "obs_date). Eleven variables from three missions are stored as rows rather than columns: VV and VH backscatter, "
@@ -186,26 +196,33 @@ BODY = [
       "comes from."),
 ("H2", "DBMS selection"),
 ("P", "Median execution times of the core queries are given in {T:bench} and {F:bench}. PostgreSQL was faster in Q1–Q4, "
-      "most clearly in the spatial intersection with geodesic area (Q3, 17 times) and the evaluation of warnings against "
-      "events (Q4, 9 times). The equivalent Q3 even failed in MySQL with error 3516, because the geographic intersection "
+      "most clearly in the spatial intersection with geodesic area (Q3, 16 times) and the evaluation of warnings against "
+      "events (Q4, 14 times). The equivalent Q3 even failed in MySQL with error 3516, because the geographic intersection "
       "produced a GeometryCollection, and had to be rewritten specifically for MySQL. MySQL was faster in the recursive "
       "lineage query Q5, although both completed below 1 ms. Row counts of every query were identical in both systems, "
-      "and the intersection areas of Q3 agreed per sub-district within 0.1%. In the scalability test, a summary query "
-      "over 2.3 million rows took 654 ms in PostgreSQL and 5577 ms in MySQL; PostgreSQL was 13–26% faster under concurrent "
-      "reads and 8.2 times faster for inserts."),
+      "and the intersection areas of Q3 agreed per sub-district within 0.1%. In the scalability test, the summary query Q6 over 2.3 million rows took 579 ms in PostgreSQL and 1666 ms in MySQL (2.9 times with mysqlclient), with the p95 of MySQL rising to 6.0 s; PostgreSQL was 11–35% faster under concurrent "
+      "reads and 4.4–6.2 times faster for inserts. Both data directories resided on the same physical disk, and the row counts of the 2.3-million-row test were identical."),
 ("TAB", "bench"),
+("P", "The ratio column should be read together with the absolute times. In Q1, Q2 and Q5 the difference is below 1 ms "
+      "and is not noticeable to a user, so MySQL's advantage in Q5 is not decisive. The differences that matter are in Q3 "
+      "and Q4, about 17 ms and 14 ms per execution, because these queries are repeated for every sub-district and "
+      "warning in the daily job and grow with the archive, as the 2.3-million-row test shows."),
 ("FIG", "bench"),
 ("P", "The decisive differences were functional rather than temporal ({T:score}). PostgreSQL supports SET LOCAL ROLE, "
       "which narrows privileges for one transaction and reverts automatically, row-level security policies and a single "
       "audit trigger function that stores old and new rows as JSON. MySQL 8.0 switches roles only per session while the "
       "account privileges remain effective, has no row-level security and requires a trigger per table for auditing. "
       "MySQL scored higher only on cost, ecosystem and familiarity, because the existing village application uses MySQL. "
-      "The data of PostgreSQL were stored on an SSD and those of MySQL on an HDD. To test whether this affected the "
-      "recommendation, MySQL was given the maximum score on the two storage-sensitive criteria (ETL writes, and "
-      "analytics and scale); its total rose to 3.55, still below 4.90, because the largest differences come from "
-      "security and spatial queries, which do not depend on the storage medium. This agrees with earlier comparisons "
+      "A first run with PostgreSQL on an SSD and MySQL on an HDD overstated the storage-sensitive differences: with the same PyMySQL client, the summary query Q6 shrank from 8.5 to 2.8 times and inserts from 8.2 to 4.4–6.2 times once both systems were placed on the same disk. The spatial query (17 to 16 times) and the security features did not change, and the warning evaluation Q4 even widened from 9 to 14 times, so the advantage of PostgreSQL in these queries does not stem from the storage medium. MySQL's analytics score therefore rose from 2 "
+      "to 3 and its total from 2.90 to 3.05, still below 4.90, because the largest differences come from security "
+      "and spatial queries, which do not depend on the storage medium. This agrees with earlier comparisons "
       "that favour PostGIS for spatial workloads [@kaptosv, @papasani]."),
 ("TAB", "score"),
+("P", "Following the problem formulation, role-based security and audit carry the largest weight because the "
+      "database must protect warnings and user accounts (P4), followed by spatial queries, which are the basis of the "
+      "zonal aggregation. Of the total difference of 1.85 points, role-based security contributes 0.75 and spatial "
+      "queries 0.60, that is almost three quarters; integrity contributes nothing because both systems scored 5, and cost, "
+      "ecosystem and familiarity is the only criterion in favour of MySQL, by 0.10."),
 ("H2", "Information, access control and audit (P3, P4)"),
 ("P", "Information is presented through 22 views, the REST API and the web client: current conditions for the "
       "sub-district in which the user is located, rainfall warnings based on the 50, 100 and 150 mm thresholds of the "
@@ -222,9 +239,9 @@ BODY = [
 ("P", "The results of the six minimum evaluations are summarised in {T:eval}. The automated test run comprised 1185 test "
       "cases, of which 1183 passed, none failed and 2 were skipped because they require the full boundary shapefile; an "
       "earlier run had revealed two failures, which were corrected before the final run. All five core queries finished "
-      "below 2 ms, and the system reached 8523 queries per second with eight clients. Backup and recovery were tested on "
-      "a copy of the production database with 44 tables and 146 541 rows: after restore, the MD5 hashes of all rows, "
-      "sequences, constraints and 163 indexes were identical, which corresponds to the role of log and dump structures "
+      "below 2 ms, and the system reached 8204 queries per second with eight clients. Backup and recovery were tested on "
+      "a copy of the production database with 44 tables (the 43 tables of the schema plus the PostGIS table spatial_ref_sys) and 146 541 rows: after restore, the MD5 hashes of all rows, "
+      "sequences, constraints and 163 indexes (including the primary key of spatial_ref_sys) were identical, which corresponds to the role of log and dump structures "
       "in reliable recovery [@ahmad]. A backfill killed during processing resumed only the remaining dates without "
       "duplicates."),
 ("TAB", "eval"),
@@ -246,8 +263,7 @@ BODY = [
       "area, so this evaluation remains empty. IMERG is known to underestimate extreme daily rainfall [@ansori], and the "
       "warnings inherit this limitation. Point-in-time recovery was not tested because WAL archiving was not enabled, "
       "and raster files are not backed up because they can be regenerated from the providers while the values per "
-      "sub-district remain in the database. The benchmark used synthetic data and default configurations, and its "
-      "storage asymmetry was addressed only through the sensitivity check described above."),
+      "sub-district remain in the database. The benchmark used synthetic data, default configurations and an HDD on a single desktop machine; absolute write times on an SSD or on the production server would be lower, and tuned configurations could change the ratios, although not the missing features of MySQL 8.0 (per-transaction role switching and row-level security)."),
 
 ("H1", "Conclusion"),
 ("P", "A spatial relational database was designed and implemented with the DBSDLC for a community disaster mitigation "
@@ -255,8 +271,8 @@ BODY = [
       "area-weighted zonal aggregation, with eleven variables stored as rows so that new variables do not change the "
       "schema. Every value is traceable to its source file through checksums and a lineage graph, and role-based access "
       "control and auditing are enforced in the database itself. PostgreSQL with PostGIS was selected over MySQL 8.0 "
-      "with a weighted score of 4.90 against 2.90, a result that remained unchanged when storage-related criteria were "
-      "given their best case for MySQL. All six minimum evaluations were met, GMLS approved the design with revisions, "
+      "with a weighted score of 4.90 against 3.05, measured with both systems on the same disk. "
+      "All six minimum evaluations were met, GMLS approved the design with revisions, "
       "and lay users completed 92.5% of task attempts."),
 ("P", "The design shows that a community organisation without its own hydrometeorological data can obtain a traceable "
       "data source from open satellite missions when the database, rather than the application, carries integration, "
@@ -283,8 +299,8 @@ FIGS = {
             "region_observations; disaster_events reference disaster_types and administrative_regions."),
     "bench": ("fig4_benchmark.png", "Median execution time of core queries (logarithmic scale)", "Own elaboration",
               "Grouped bar chart on a logarithmic scale comparing PostgreSQL and MySQL median times for queries Q1 to Q5. "
-              "PostgreSQL is lower for Q1 to Q4, most strongly for Q3 (1.34 versus 22.57 ms) and Q4 (1.76 versus 16.64 ms); "
-              "MySQL is lower for Q5 (0.43 versus 0.82 ms)."),
+              "PostgreSQL is lower for Q1 to Q4, most strongly for Q3 (1.15 versus 18.63 ms) and Q4 (1.06 versus 15.13 ms); "
+              "MySQL is lower for Q5 (0.45 versus 0.65 ms)."),
 }
 
 TABLES = {
@@ -298,22 +314,22 @@ TABLES = {
     "bench": ("Median execution time of core queries [ms]", "Own elaboration",
               [700, 4388, 1500, 1400, 1300],
               ["Query", "Content", "PostgreSQL", "MySQL", "MySQL/PG"],
-              [["Q1", "Rainfall pivot per sub-district, one date", "0.45", "1.14", "2.5×"],
-               ["Q2", "30-day trend, one sub-district and band", "0.29", "0.67", "2.3×"],
-               ["Q3", "Polygon intersection with geodesic area", "1.34", "22.57", "17×"],
-               ["Q4", "Warning evaluation: hits, misses, false alarms", "1.76", "16.64", "9×"],
-               ["Q5", "Six-level lineage (WITH RECURSIVE)", "0.82", "0.43", "0.5×"]]),
+              [["Q1", "Rainfall pivot per sub-district, one date", "0.45", "0.87", "1.9×"],
+               ["Q2", "30-day trend, one sub-district and band", "0.31", "0.68", "2.2×"],
+               ["Q3", "Polygon intersection with geodesic area", "1.15", "18.63", "16×"],
+               ["Q4", "Warning evaluation: hits, misses, false alarms", "1.06", "15.13", "14×"],
+               ["Q5", "Six-level lineage (WITH RECURSIVE)", "0.65", "0.45", "0.7×"]]),
     "score": ("Weighted scores of the DBMS selection", "Own elaboration",
               [3600, 1000, 1400, 1100, 2188],
               ["Criterion", "Weight", "PostgreSQL", "MySQL", "Basis"],
               [["Role-based security and audit", "25%", "5", "2", "F1–F3"],
-               ["Spatial queries", "20%", "5", "2", "Q3 17×, error 3516"],
-               ["Analytics and scale", "15%", "5", "2", "Q4 9×, 2.3 M rows 8.5×"],
-               ["ETL writes", "10%", "5", "3", "Insert 8×, upsert 2×"],
-               ["Concurrent reads", "10%", "5", "4", "13–26%"],
+               ["Spatial queries", "20%", "5", "2", "Q3 16×, rewritten (error 3516)"],
+               ["Analytics and scale", "15%", "5", "3", "Q4 14×, Q6 2.9×; summed 2.9×"],
+               ["ETL writes", "10%", "5", "3", "Insert 4.4–6.2×, upsert 1.3–2.2×; summed 3.2–5.0×"],
+               ["Concurrent reads", "10%", "5", "4", "11–35%"],
                ["Relational and recursive integrity", "10%", "5", "5", "Both support FK"],
                ["Cost, ecosystem, familiarity", "10%", "4", "5", "MySQL used locally"],
-               ["Total", "100%", "4.90", "2.90", ""]]),
+               ["Total", "100%", "4.90", "3.05", ""]]),
     "eval": ("Results of the six minimum evaluations", "Own elaboration",
              [2300, 4188, 2800],
              ["Evaluation", "Evidence", "Result"],

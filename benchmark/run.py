@@ -50,10 +50,27 @@ def time_query(cur, sql: str, params: dict) -> tuple[list[float], int]:
 
 
 def pg_conninfo() -> dict:
+    """BENCH_PG_* (klaster benchmark terpisah, mis. di disk yang sama dengan MySQL) didahulukan atas DB_* dari .env."""
     from dotenv import load_dotenv
     load_dotenv(HERE.parent / ".env")
-    return {"host": os.getenv("DB_HOST", "localhost"), "port": int(os.getenv("DB_PORT", "5432")),
-            "user": os.getenv("DB_USER", "postgres"), "password": os.getenv("DB_PASSWORD", "")}
+    g = lambda k, d: os.getenv(f"BENCH_PG_{k}", os.getenv(f"DB_{k}", d))
+    return {"host": g("HOST", "localhost"), "port": int(g("PORT", "5432")),
+            "user": g("USER", "postgres"), "password": g("PASSWORD", "")}
+
+
+def storage(data_dir: str) -> dict:
+    """Lokasi data directory dan jenis disk fisiknya (SSD/HDD) — syarat perbandingan yang adil."""
+    info = {"data_directory": data_dir, "drive": None, "disk": None, "media": None}
+    drive = os.path.splitdrive(data_dir.replace("/", "\\"))[0].rstrip(":")
+    if sys.platform != "win32" or not drive:
+        return info
+    info["drive"] = drive.upper()
+    ps = (f"$d = Get-Partition -DriveLetter {drive} | Get-Disk; "
+          "$p = Get-PhysicalDisk | Where-Object DeviceId -eq $d.Number; \"$($d.FriendlyName)|$($p.MediaType)\"")
+    out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True).stdout.strip()
+    if "|" in out:
+        info["disk"], info["media"] = out.split("|", 1)
+    return info
 
 
 def run_pg() -> tuple[list[dict], list[dict], dict]:
@@ -71,8 +88,9 @@ def run_pg() -> tuple[list[dict], list[dict], dict]:
     counts = E.pg_load(conn, DATA)
     load_s = time.perf_counter() - t
     cur = conn.cursor()
-    cur.execute("SELECT version(), postgis_full_version()")
-    ver, gis = cur.fetchone()
+    cur.execute("SELECT version(), postgis_full_version(), current_setting('data_directory'), "
+                "current_setting('shared_buffers'), current_setting('synchronous_commit')")
+    ver, gis, ddir, sbuf, sync = cur.fetchone()
     pid = E.pg_deep_product(conn)
     timing = []
     for q, (desc, sql, params) in E.PG_QUERIES.items():
@@ -90,7 +108,9 @@ def run_pg() -> tuple[list[dict], list[dict], dict]:
     features = [dict(engine="PostgreSQL", **f) for f in E.pg_features(conn)]
     conn.close()
     env = {"version": ver.split(",")[0], "postgis": gis.split(" ")[1].strip('"') if gis else None,
-           "database": DB, "load_seconds": round(load_s, 2), "row_counts": counts, "q5_product_id": pid}
+           "database": DB, "port": ci["port"], "storage": storage(ddir),
+           "config": {"shared_buffers": sbuf, "synchronous_commit": sync},
+           "load_seconds": round(load_s, 2), "row_counts": counts, "q5_product_id": pid}
     return timing, features, env
 
 
@@ -113,8 +133,11 @@ def run_mysql() -> tuple[list[dict], list[dict], dict]:
     except Exception as e:
         return not_run(f"server MySQL tidak terjangkau di {host}: {e}")
     cur = admin.cursor()
-    cur.execute("SELECT VERSION()")
-    ver = cur.fetchone()[0]
+    cur.execute("SELECT VERSION(), @@datadir, @@innodb_buffer_pool_size, @@innodb_flush_log_at_trx_commit, @@sync_binlog")
+    ver, ddir, bpool, flush, sbin = cur.fetchone()
+    my_env = {"port": kw["port"], "storage": storage(ddir),
+              "config": {"innodb_buffer_pool_size": f"{int(bpool) // 2**20}MB",
+                         "innodb_flush_log_at_trx_commit": int(flush), "sync_binlog": int(sbin)}}
     if "MariaDB" in ver or not ver.startswith("8."):
         return not_run(f"server bukan MySQL 8.0 ({ver}); hasil tidak setara")
     guard(DB)
@@ -142,7 +165,8 @@ def run_mysql() -> tuple[list[dict], list[dict], dict]:
         print(f"MySQL {q}: median {timing[-1]['median_ms']} ms, p95 {timing[-1]['p95_ms']} ms, {n} baris")
     features = [dict(engine="MySQL 8.0", **f) for f in E.mysql_features(conn, DB)]
     conn.close()
-    return timing, features, {"version": ver, "database": DB, "load_seconds": round(load_s, 2), "row_counts": counts}
+    return timing, features, {"version": ver, "database": DB, **my_env, "load_seconds": round(load_s, 2),
+                              "row_counts": counts}
 
 
 def machine() -> dict:
@@ -190,6 +214,14 @@ def main(argv: list[str]) -> int:
     if a.engine in ("mysql", "all"):
         t, f, e = run_mysql()
         timing += t; features += f; env["engines"]["MySQL 8.0"] = e
+    disks = {k: (v.get("storage") or {}).get("disk") or (v.get("storage") or {}).get("drive")
+             for k, v in env["engines"].items() if "storage" in v}
+    if len(disks) == 2:
+        env["storage_equal"] = len(set(disks.values())) == 1
+        if not env["storage_equal"]:
+            print(f"PERINGATAN: data directory di disk berbeda {disks}; uji tulis/skala tidak setara.")
+            if os.getenv("BENCH_REQUIRE_SAME_DISK") == "1":
+                sys.exit("DITOLAK: BENCH_REQUIRE_SAME_DISK=1 dan kedua DBMS tidak di disk yang sama.")
     features += [dict(engine="MongoDB 7 (fitur saja)", **f) for f in E.MONGODB_FEATURES]
     write_csv(RESULTS / "timing.csv", timing)
     write_csv(RESULTS / "features.csv", features)
