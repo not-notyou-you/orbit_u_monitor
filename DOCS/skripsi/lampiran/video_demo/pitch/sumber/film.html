@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><title>Orbit-U Pitch</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--n:#1f2a5a;--deep:#0d1330;--deep2:#182250;--bg:#eef7f0;--grid:#dbeee0;--acc:#7fe0ea;--soft:#d3f2f6;--mut:#4a5388;--amber:#f0b24a;--red:#e2485a;--card:#fafdfb}
+*{box-sizing:border-box}
+html,body{margin:0;background:#000;overflow:hidden}
+body{font-family:"Nunito","Segoe UI",system-ui,sans-serif;color:var(--n)}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:#000}
+.sc{position:absolute;inset:0;display:none;overflow:hidden}
+.sc.mint{background:linear-gradient(var(--grid) 2px,transparent 2px) 0 0/64px 64px,linear-gradient(90deg,var(--grid) 2px,transparent 2px) 0 0/64px 64px,var(--bg)}
+.sc.dark{background:radial-gradient(1400px 900px at 50% 35%,var(--deep2),var(--deep));color:#fff}
+.abs{position:absolute}
+.cap{position:absolute;font-weight:900;line-height:1.1;letter-spacing:-.01em;opacity:0;will-change:transform,opacity}
+.cap em{font-style:normal;color:var(--acc)}
+.mint .cap em{color:#0a6470}
+.kick{position:absolute;display:inline-flex;align-items:center;gap:14px;font-weight:800;font-size:28px;letter-spacing:.12em;text-transform:uppercase;padding:10px 26px;border:3px solid var(--n);border-radius:999px;background:var(--acc);color:var(--n);opacity:0;white-space:nowrap}
+.dark .kick{border-color:var(--acc);background:transparent;color:var(--acc)}
+.card{background:var(--card);border:3px solid var(--n);border-radius:24px;box-shadow:12px 12px 0 var(--acc),12px 12px 0 3px var(--n)}
+.chip{display:inline-flex;align-items:center;gap:12px;font-weight:800;font-size:28px;padding:12px 26px;border:3px solid var(--n);border-radius:999px;background:#fff;color:var(--n);white-space:nowrap}
+.dark .chip{background:rgba(127,224,234,.1);border-color:var(--acc);color:#fff}
+svg.ic{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;overflow:visible}
+svg.ic [pathLength]{stroke-dasharray:1;stroke-dashoffset:0}
+.pill{background:rgba(13,19,48,.86);border-radius:28px;padding:22px 48px}
+.phone{position:absolute;background:#141b3c;border-radius:62px;padding:16px;box-shadow:0 0 0 3px var(--n),16px 16px 0 var(--acc),16px 16px 0 3px var(--n)}
+.phone .scr{position:relative;width:421px;height:912px;border-radius:46px;overflow:hidden;background:#fff}
+.phone .scr img{position:absolute;inset:0;width:100%;height:100%;display:block}
+.rip{position:absolute;width:90px;height:90px;margin:-45px 0 0 -45px;border-radius:50%;border:5px solid var(--n);background:rgba(127,224,234,.45);opacity:0;pointer-events:none}
+.win{position:absolute;overflow:hidden;border:3px solid var(--n);border-radius:22px;background:#fff;box-shadow:14px 14px 0 var(--acc),14px 14px 0 3px var(--n)}
+.win img{position:absolute;inset:0;width:100%;height:100%;display:block;transform-origin:50% 40%}
+.tile{position:absolute;width:38px;height:38px;margin:-19px 0 0 -19px;border:2px solid rgba(127,224,234,.9);opacity:0;will-change:transform,opacity}
+#fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:99}
+</style></head>
+<body><div id="stage"><div id="fade"></div></div>
+<script src="assets/data.js"></script>
+<script>
+'use strict';
+const W=1920,H=1080,XF=0.6;
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const P=(t,a,b)=>cl((t-a)/(b-a));
+const eo=x=>1-Math.pow(1-x,3);
+const eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const lerp=(a,b,u)=>a+(b-a)*u;
+function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const stage=$('#stage');
+function vis(el,t,a,b,o={}){const i=eo(P(t,a,a+(o.din||.7))),u=b==null?0:eio(P(t,b-(o.dout||.5),b));const op=i*(1-u);
+  el.style.opacity=op.toFixed(4);const dy=(o.dy==null?34:o.dy)*(1-i)-(o.up||0)*u,dx=(o.dx||0)*(1-i),sc=o.s?lerp(o.s,1,i):1;
+  el.style.transform=(o.pre||'')+`translate(${dx.toFixed(2)}px,${dy.toFixed(2)}px) scale(${sc.toFixed(4)})`;return op}
+function draw(svg,p){$$('[pathLength]',svg).forEach(e=>{e.style.strokeDashoffset=(1-cl(p)).toFixed(4)})}
+let pending=[];
+function setImg(img,src){if(img.dataset.s!==src){img.dataset.s=src;img.src=src;pending.push(img.decode().catch(()=>{}))}}
+function clipSrc(m,t){t=cl(t,0,m.dur-1e-6);let a=0;for(const s of m.segs){if(t<a+s.dur){const u=(t-a)/s.dur;return 'assets/'+s.frames[Math.min(s.frames.length-1,Math.floor(u*s.frames.length))]}a+=s.dur}
+  const l=m.segs[m.segs.length-1];return 'assets/'+l.frames[l.frames.length-1]}
+
+/* ---------- ikon SVG garis (viewBox 48) ---------- */
+function gearD(cx,cy,r1,r2,n){let d='';for(let i=0;i<n;i++){const a=i/n*Math.PI*2,w=Math.PI/n;const pts=[[r1,a-w*.55],[r2,a-w*.3],[r2,a+w*.3],[r1,a+w*.55]];
+  pts.forEach(([r,an],j)=>{d+=(i===0&&j===0?'M':'L')+(cx+r*Math.cos(an)).toFixed(2)+' '+(cy+r*Math.sin(an)).toFixed(2)})}return d+'Z'}
+const IC={
+ sat:`<g transform="rotate(-35 24 24)"><rect pathLength="1" x="19" y="16" width="10" height="16" rx="2"/><rect pathLength="1" x="3" y="19" width="13" height="10" rx="1"/><rect pathLength="1" x="32" y="19" width="13" height="10" rx="1"/><line pathLength="1" x1="9.5" y1="19" x2="9.5" y2="29"/><line pathLength="1" x1="38.5" y1="19" x2="38.5" y2="29"/><line pathLength="1" x1="16" y1="24" x2="19" y2="24"/><line pathLength="1" x1="29" y1="24" x2="32" y2="24"/><line pathLength="1" x1="24" y1="32" x2="24" y2="36"/><path pathLength="1" d="M19 40a5 5 0 0 1 10 0"/></g>`,
+ gear:`<path pathLength="1" d="${gearD(24,24,15,20,8)}"/><circle pathLength="1" cx="24" cy="24" r="6.5"/>`,
+ phone:`<rect pathLength="1" x="13" y="3" width="22" height="42" rx="4.5"/><line pathLength="1" x1="21" y1="8" x2="27" y2="8"/><path pathLength="1" d="M24 34c-4.2-5-6.5-8.3-6.5-11.5a6.5 6.5 0 0 1 13 0c0 3.2-2.3 6.500-6.500 11.500z"/><circle pathLength="1" cx="24" cy="22.500" r="2.200"/>`,
+ pin:`<path pathLength="1" d="M24 44C14 32 9 25 9 18a15 15 0 0 1 30 0c0 7-5 14-15 26z"/><circle pathLength="1" cx="24" cy="18" r="5.500"/>`,
+ mail:`<rect pathLength="1" x="5" y="10" width="38" height="28" rx="4"/><polyline pathLength="1" points="6,13 24,27 42,13"/>`,
+ cloud:`<path pathLength="1" d="M14 33h21a8 8 0 0 0 1.200-15.900A11.500 11.500 0 0 0 14.200 19 7 7 0 0 0 14 33z"/><line pathLength="1" x1="24" y1="24" x2="24" y2="42"/><polyline pathLength="1" points="19,37.500 24,42.500 29,37.500"/>`,
+ db:`<ellipse pathLength="1" cx="24" cy="11" rx="15" ry="5.500"/><path pathLength="1" d="M9 11v26c0 3 6.700 5.500 15 5.500s15-2.500 15-5.500V11"/><path pathLength="1" d="M9 24c0 3 6.700 5.500 15 5.500s15-2.500 15-5.500"/>`,
+ api:`<polyline pathLength="1" points="16,15 7,24 16,33"/><polyline pathLength="1" points="32,15 41,24 32,33"/><line pathLength="1" x1="28" y1="10" x2="20" y2="38"/>`,
+ web:`<rect pathLength="1" x="4" y="7" width="40" height="34" rx="4"/><line pathLength="1" x1="4" y1="16" x2="44" y2="16"/><polyline pathLength="1" points="10,34 18,26 24,30 37,21"/><line pathLength="1" x1="9" y1="11.500" x2="11" y2="11.500"/><line pathLength="1" x1="15" y1="11.500" x2="17" y2="11.500"/>`,
+ check:`<circle pathLength="1" cx="24" cy="24" r="19"/><polyline pathLength="1" points="14,25 21,32 34,17"/>`,
+ lock:`<rect pathLength="1" x="9" y="21" width="30" height="22" rx="4"/><path pathLength="1" d="M15 21v-6a9 9 0 0 1 18 0v6"/><line pathLength="1" x1="24" y1="29" x2="24" y2="35"/>`,
+ hash:`<line pathLength="1" x1="17" y1="6" x2="13" y2="42"/><line pathLength="1" x1="34" y1="6" x2="30" y2="42"/><line pathLength="1" x1="7" y1="17" x2="42" y2="17"/><line pathLength="1" x1="5" y1="31" x2="40" y2="31"/>`,
+ key:`<circle pathLength="1" cx="15" cy="31" r="9"/><polyline pathLength="1" points="21.500,24.500 41,5"/><polyline pathLength="1" points="33,13 39,19"/><polyline pathLength="1" points="28,18 32,22"/>`
+};
+const ico=(k,size,extra='')=>`<svg class="ic" viewBox="0 0 48 48" width="${size}" height="${size}" ${extra}>${IC[k]}</svg>`;
+
+/* ---------- peta kecamatan dari GeoJSON asli ---------- */
+function regionShapes(box){
+  const fs=DATA.regions.features;let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;const k0=Math.cos(-6.8*Math.PI/180);
+  const rings=f=>f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;
+  fs.forEach(f=>rings(f).forEach(p=>p[0].forEach(([x,y])=>{x*=k0;x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)})));
+  const k=Math.min(box.w/(x1-x0),box.h/(y1-y0)),ox=box.x+(box.w-(x1-x0)*k)/2,oy=box.y+(box.h-(y1-y0)*k)/2;
+  return fs.map(f=>{let d='',sx=0,sy=0,n=0;rings(f).forEach(p=>{p[0].forEach(([x,y],i)=>{const X=ox+(x*k0-x0)*k,Y=oy+(y1-y)*k;d+=(i?'L':'M')+X.toFixed(1)+' '+Y.toFixed(1);sx+=X;sy+=Y;n++});d+='Z'});
+    return{name:f.properties.name,d,cx:sx/n,cy:sy/n}})}
+
+/* ---------- registri adegan ---------- */
+const SC=[];
+function scene(id,t0,t1,cls,html,init){const el=document.createElement('section');el.className='sc '+cls;el.id=id;el.innerHTML=html;stage.insertBefore(el,$('#fade'));
+  const s={id,t0,t1,el};s.update=init(el,s);SC.push(s)}
+
+/* ===== 1. PEMBUKA (0–20) ===== */
+scene('open',0,20,'dark',`
+ <canvas id="rain" width="1920" height="1080" class="abs" style="inset:0"></canvas>
+ <svg id="omap" class="abs" style="inset:0" viewBox="0 0 1920 1080"></svg>
+ <div class="kick" id="o_k" style="left:150px;top:300px">${ico('pin',34)}Lebak Selatan · Banten</div>
+ <div class="cap" id="o_c1" style="left:150px;top:400px;width:820px;font-size:88px">Hujan deras bisa menjadi banjir dalam <em>hitungan jam.</em></div>
+ <div class="abs" id="o_pin" style="left:885px;top:215px;color:var(--acc);opacity:0">${ico('pin',150)}</div>
+ <div class="cap" id="o_c2" style="left:260px;top:420px;width:1400px;text-align:center;font-size:112px">Bagaimana kondisi di <em>lokasi saya</em> hari ini?</div>
+`,(el)=>{
+  const shapes=regionShapes({x:1020,y:170,w:780,h:760}),svg=$('#omap',el);
+  svg.innerHTML=shapes.map((s,i)=>`<path pathLength="1" data-i="${i}" d="${s.d}" fill="#24336e" fill-opacity="0" stroke="#7fe0ea" stroke-width="3" stroke-linejoin="round" stroke-dasharray="1" stroke-dashoffset="1"/>`).join('');
+  const paths=$$('path',svg),warn=new Set(['Bayah','Malingping','Wanasalam','Banjarsari']);
+  const cv=$('#rain',el),cx=cv.getContext('2d'),r=rng(7),drops=[...Array(190)].map(()=>({x:r()*2300-200,ph:r(),sp:.75+r()*.7,len:40+r()*80,a:.12+r()*.3}));
+  return t=>{
+    cx.clearRect(0,0,W,H);const gain=lerp(.55,1,P(t,5,9))*lerp(1,.45,P(t,11,13));cx.lineCap='round';cx.lineWidth=2.4;
+    drops.forEach(d=>{const y=((d.ph+t*d.sp)%1.25)*H-140,x=d.x-y*.2;cx.strokeStyle=`rgba(160,225,240,${(d.a*gain).toFixed(3)})`;cx.beginPath();cx.moveTo(x,y);cx.lineTo(x-d.len*.2,y+d.len);cx.stroke()});
+    const mo=lerp(1,.1,eio(P(t,11.2,12.4)));svg.style.opacity=mo;
+    paths.forEach((p,i)=>{p.style.strokeDashoffset=(1-eio(P(t,1+i*.22,3+i*.22))).toFixed(4);const f=eo(P(t,3.6,5));
+      const w=warn.has(shapes[i].name)?eio(P(t,6.8+i*.12,8.2+i*.12)):0,pulse=w*(.78+.22*Math.sin(t*4+i));
+      p.setAttribute('fill',w>0?`rgb(${Math.round(lerp(36,240,pulse))},${Math.round(lerp(51,178,pulse))},${Math.round(lerp(110,74,pulse))})`:'#24336e');p.setAttribute('fill-opacity',(f*.95).toFixed(3))});
+    vis($('#o_k',el),t,.7,11.4);vis($("#o_c1",el),t,3.4,11.4);
+    const po=vis($('#o_pin',el),t,12.3,19.9,{dy:-40});draw($('#o_pin svg',el),P(t,12.3,13.6));
+    $('#o_pin',el).style.transform+=` translateY(${(Math.sin(t*2.2)*8*po).toFixed(2)}px)`;
+    vis($('#o_c2',el),t,13,19.9);
+  }});
+
+/* ===== 2. MASALAH -> SOLUSI (20–55) ===== */
+(()=>{const SATS=[{x:430,y:210,n:'Sentinel-1',s:'radar · ESA'},{x:960,y:165,n:'MODIS',s:'optik · NASA'},{x:1490,y:210,n:'GPM IMERG',s:'curah hujan · NASA'}];
+const N=156,r=rng(21),T=[...Array(N)].map((_,i)=>{const k=i%3,g=(r()+r()+r())/3-.5;const gs=[...Array(4)].map(()=>Math.round(40+r()*190));
+  return{k,te:5.2+i*.078,px:SATS[k].x+g*760,py:815+r()*190+Math.abs(g)*40,rot:(r()-.5)*150,gs,j:r()}});
+scene('sat',20,55,'dark',`
+ <div class="abs sc mint" id="s_mint" style="display:block;opacity:0"></div>
+ <svg class="abs" id="s_svg" style="inset:0" viewBox="0 0 1920 1080"><path d="M-80 330 Q960 20 2000 330" fill="none" stroke="#7fe0ea" stroke-opacity=".35" stroke-width="2.500" stroke-dasharray="4 14"/>
+  ${SATS.map((s,i)=>`<line class="beam" x1="${s.x}" y1="${s.y+190}" x2="${s.x}" y2="800" stroke="#7fe0ea" stroke-width="3" stroke-dasharray="6 16" opacity="0"/>`).join('')}</svg>
+ ${SATS.map((s,i)=>`<div class="abs s_sat" style="left:${s.x-230}px;top:${s.y-70}px;width:460px;text-align:center;opacity:0"><div style="color:#fff">${ico("sat",170)}</div>
+   <div style="font-weight:900;font-size:40px;margin-top:6px">${s.n}</div><div style="font-weight:700;font-size:26px;color:var(--acc)">${s.s}</div></div>`).join('')}
+ <div id="s_tiles" class="abs" style="inset:0">${T.map(t=>`<div class="tile" style="background:linear-gradient(90deg,rgb(${t.gs[0]},${t.gs[0]},${t.gs[0]}) 50%,rgb(${t.gs[1]},${t.gs[1]},${t.gs[1]}) 50%) top/100% 50% no-repeat,linear-gradient(90deg,rgb(${t.gs[2]},${t.gs[2]},${t.gs[2]}) 50%,rgb(${t.gs[3]},${t.gs[3]},${t.gs[3]}) 50%) bottom/100% 50% no-repeat"></div>`).join('')}</div>
+ ${['Data satelit tersedia <em>setiap hari.</em>','Tapi mentah, besar, dan <em>sulit dibaca.</em>','Yang dibutuhkan: <em>jawaban,</em> bukan berkas raster.'].map(x=>`<div class="cap s_cap" style="left:160px;top:500px;width:1600px;text-align:center;font-size:84px"><span class="pill" style="display:inline-block">${x}</span></div>`).join('')}
+ <div class="abs" id="s_ring" style="left:960px;top:330px;width:0;height:0;opacity:0"><svg class="abs" style="left:-330px;top:-330px" width="660" height="660" viewBox="-330 -330 660 660"><ellipse rx="300" ry="112" fill="none" stroke="#1f2a5a" stroke-width="3" stroke-dasharray="3 12" transform="rotate(-18)"/><circle id="s_dot" r="13" fill="#7fe0ea" stroke="#1f2a5a" stroke-width="4"/></svg></div>
+ <div class="abs" id="s_logo" style="left:810px;top:180px;width:300px;height:300px;border-radius:50%;background:var(--acc);border:4px solid var(--n);box-shadow:12px 12px 0 var(--n);opacity:0;padding:14px"><img src="assets/logo.svg" style="width:100%;height:100%;display:block"></div>
+ <div class="cap" id="s_t" style="left:0;top:545px;width:1920px;text-align:center;font-size:138px;color:var(--n)">Orbit-U: The Monitor</div>
+ <div class="cap" id="s_tag" style="left:0;top:720px;width:1920px;text-align:center;font-size:56px;font-weight:700;color:var(--mut)">Data tiga satelit, dibaca per kecamatan.</div>
+ <div class="abs" id="s_chip" style="left:0;top:850px;width:1920px;text-align:center;opacity:0"><span class="chip" style="background:var(--soft);border-color:var(--n);color:var(--n)">Untuk Gugus Mitigasi Lebak Selatan (GMLS)</span></div>
+`,(el)=>{const tiles=$$('.tile',el),sats=$$('.s_sat',el),beams=$$('.beam',el),caps=$$('.s_cap',el);const CT=[[1,6.3],[6.9,13.2],[13.8,19.6]];
+  return t=>{
+    const out=eio(P(t,19.6,20.8)),mint=eio(P(t,20.8,22.6));$('#s_mint',el).style.opacity=mint;$('#s_svg',el).style.opacity=1-out;
+    sats.forEach((s,i)=>{const a=eo(P(t,1.2+i*.55,2+i*.55));s.style.opacity=a*(1-out);s.style.transform=`translateY(${(Math.sin(t*1.1+i*2)*9-(1-a)*40).toFixed(2)}px)`;draw(s,P(t,1.2+i*.55,2.6+i*.55))});
+    beams.forEach((b,i)=>{b.setAttribute('opacity',(.5*P(t,5,5.8)).toFixed(3));b.setAttribute('stroke-dashoffset',(-t*90).toFixed(1))});
+    caps.forEach((c,i)=>vis(c,t,CT[i][0],CT[i][1]));
+    const ring=eio(P(t,20.6,22.6)),gone=eio(P(t,22.5,23.5));
+    tiles.forEach((e,i)=>{const d=T[i],s=SATS[d.k],u=P(t,d.te,d.te+.95),uu=u*u;let x=lerp(s.x,d.px,u),y=lerp(s.y+200,d.py,uu),rot=d.rot*u,sc=1,op=P(t,d.te,d.te+.15)*.92;
+      if(ring>0){const a=i/N*Math.PI*2+t*.5,R=250+(i%3)*44,rr=cl(ring*1.25-d.j*.25);const tx=960+Math.cos(a)*R,ty=330+Math.sin(a)*R;x=lerp(x,tx,eio(rr));y=lerp(y,ty,eio(rr));rot=lerp(rot,a*57.3+45,eio(rr));
+        const g2=cl(gone*1.3-d.j*.3);x=lerp(x,960,g2);y=lerp(y,330,g2);sc=1-g2;op*=1-g2*g2}
+      e.style.opacity=op.toFixed(3);e.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)})`});
+    const lg=$('#s_logo',el),lp=eo(P(t,22.9,23.9));lg.style.opacity=P(t,22.9,23.3);lg.style.transform=`scale(${(lerp(.3,1,lp)+Math.sin(P(t,22.9,24.4)*Math.PI)*.07).toFixed(4)})`;
+    const rg=$('#s_ring',el);rg.style.opacity=P(t,23.6,24.4);const an=t*1.3,ca=Math.cos(-18*Math.PI/180),sa=Math.sin(-18*Math.PI/180),ex=300*Math.cos(an),ey=112*Math.sin(an);
+    $('#s_dot',el).setAttribute('cx',(ex*ca-ey*sa).toFixed(1));$('#s_dot',el).setAttribute('cy',(ex*sa+ey*ca).toFixed(1));
+    vis($('#s_t',el),t,23.8,null,{dy:50});vis($('#s_tag',el),t,25,null);vis($('#s_chip',el),t,26.6,null);
+  }})})();
+
+/* ===== 3. CARA KERJA (55–80) ===== */
+scene('how',55,80,'mint',`
+ <div class="kick" id="h_k" style="left:150px;top:90px">Cara kerjanya</div>
+ <div class="cap" id="h_h" style="left:150px;top:170px;width:1620px;font-size:76px">Dari orbit ke layar Anda, <em>otomatis setiap hari.</em></div>
+ <svg class="abs" style="inset:0" viewBox="0 0 1920 1080" id="h_ar">${[0,1].map(i=>`<g class="arr" opacity="0"><line x1="${622+i*580}" y1="650" x2="${716+i*580}" y2="650" stroke="#1f2a5a" stroke-width="5" stroke-dasharray="10 12" stroke-linecap="round"/><polyline points="${702+i*580},632 ${722+i*580},650 ${702+i*580},668" fill="none" stroke="#1f2a5a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></g>`).join('')}</svg>
+ ${[['sat','Diambil otomatis','Sentinel-1, MODIS, dan GPM langsung dari sumber resmi ESA dan NASA.'],['gear','Diolah dan dicek','Kualitas diperiksa. Asal-usul setiap berkas dicatat.'],['phone','Tampil per kecamatan','Status, citra, dan angka untuk 10 kecamatan.']].map((c,i)=>`
+ <div class="card abs h_card" style="left:${150+i*580}px;top:380px;width:460px;height:560px;padding:38px 40px;opacity:0">
+  <div style="display:flex;align-items:center;justify-content:space-between"><div style="width:170px;height:170px;border-radius:50%;background:var(--soft);border:3px solid var(--n);display:grid;place-items:center">${ico(c[0],104)}</div>
+  <div style="font-weight:900;font-size:120px;line-height:1;color:var(--acc);-webkit-text-stroke:3px var(--n)">${i+1}</div></div>
+  <div style="font-weight:900;font-size:50px;line-height:1.1;margin-top:34px">${c[1]}</div><div style="font-weight:600;font-size:31px;line-height:1.35;margin-top:16px;color:var(--mut)">${c[2]}</div></div>`).join('')}
+`,(el)=>{const cards=$$('.h_card',el),arr=$$('.arr',el),T0=[2,8.5,15];
+  return t=>{vis($('#h_k',el),t,.4,null);vis($('#h_h',el),t,.8,null);
+    cards.forEach((c,i)=>{const a=T0[i],act=eio(P(t,a,a+.8))*(1-eio(P(t,a+5.8,a+6.6)))*(t<21?1:0),fin=eio(P(t,21.5,22.3));const up=Math.max(act,fin*.5);
+      vis(c,t,a,null,{dy:70,pre:`translateY(${(-16*up).toFixed(2)}px) rotate(${((i-1)*-.6*(1-up)).toFixed(3)}deg) `});draw(c,P(t,a+.2,a+2))});
+    arr.forEach((g,i)=>{g.setAttribute('opacity',P(t,T0[i+1]-.9,T0[i+1]-.3).toFixed(3));$('line',g).setAttribute('stroke-dashoffset',(-t*40).toFixed(1))});
+  }});
+
+/* ===== 4. WARGA: PONSEL + EMAIL (80–125) ===== */
+scene('phone',80,125,'mint',`
+ <div class="kick p_k" style="left:150px;top:230px">Untuk warga</div>
+ <div class="kick p_k" style="left:150px;top:230px">${ico('mail',36)}Peringatan email</div>
+ ${['Pilih <em>kecamatan</em> Anda.','Jawaban dalam <em>bahasa sehari-hari.</em>','Lengkap dengan <em>bukti citra satelit.</em>','Angka terbaru dan <em>tren 30 hari.</em>','Tidak normal? <em>Peringatan dikirim ke email.</em>'].map(x=>`<div class="cap p_cap" style="left:150px;top:330px;width:930px;font-size:98px">${x}</div>`).join('')}
+ <div class="abs p_sub" style="left:150px;top:800px;display:flex;gap:18px;opacity:0"><span class="chip">Tanpa akun</span><span class="chip">Langsung dari peramban</span></div>
+ <div class="abs p_sub" style="left:150px;top:800px;display:flex;gap:18px;opacity:0"><span class="chip">Ringkasan</span><span class="chip">Bukti</span><span class="chip">Detail teknis</span></div>
+ <div class="phone" id="p_ph" style="left:1250px;top:68px"><div class="scr"><img id="p_a"><img id="p_b" style="opacity:0"><img id="p_c" style="opacity:0"><div class="rip" id="p_r"></div></div></div>
+`,(el)=>{const M=DATA.man,caps=$$('.p_cap',el),ks=$$('.p_k',el),subs=$$('.p_sub',el),A=1,C=14.2,E=31,K=421/390;
+  const CT=[[.6,7.2],[7.6,14.2],[14.8,23.1],[23.5,30.2],[31.2,44.6]];
+  const taps=[[A+M.mobA.marks.tap.t,M.mobA.marks.tap],[C+M.mobC.marks.tap.t,M.mobC.marks.tap]];
+  return t=>{const ph=$('#p_ph',el);vis(ph,t,.2,null,{dy:120,din:1});
+    setImg($('#p_a',el),clipSrc(M.mobA,t-A));setImg($('#p_b',el),clipSrc(M.mobC,t-C));setImg($('#p_c',el),clipSrc(M.mail,t-E-.6));
+    $('#p_b',el).style.opacity=P(t,C-.5,C);$('#p_c',el).style.opacity=P(t,E-.5,E);
+    caps.forEach((c,i)=>vis(c,t,CT[i][0],CT[i][1]));
+    vis(ks[0],t,.4,30.4,{dy:0});vis(ks[1],t,31,44.8,{dy:0});draw(ks[1],P(t,31,32.2));
+    vis(subs[0],t,1.6,30.2);vis(subs[1],t,33.5,44.6);
+    const rp=$('#p_r',el);let ro=0;taps.forEach(([tt,m])=>{const u=P(t,tt-.35,tt+.45);if(u>0&&u<1){ro=Math.sin(u*Math.PI);rp.style.left=(m.x*K)+'px';rp.style.top=(m.y*K)+'px';rp.style.transform=`scale(${lerp(.5,1.25,u).toFixed(3)})`}});rp.style.opacity=ro.toFixed(3);
+  }});
+
+/* ===== 5. RELAWAN & ANALIS: DESKTOP (125–160) ===== */
+(()=>{const CL=[['Peta 3D: citra radar di atas relief',7],['Arsip citra dari tiga satelit',7],['Prakiraan statistik 15 hari',7],['Catatan kejadian bencana',7],['Laporan PDF otomatis',7]];
+scene('desk',125,160,'mint',`
+ <div class="kick" id="d_k" style="left:150px;top:52px">Untuk relawan dan analis</div>
+ ${CL.map(c=>`<div class="cap d_cap" style="left:150px;top:118px;width:1500px;font-size:62px">${c[0]}</div>`).join('')}
+ <div class="abs" id="d_dots" style="right:156px;top:66px;display:flex;gap:14px">${CL.map(()=>`<i style="display:block;width:22px;height:22px;border-radius:50%;border:3px solid var(--n);background:#fff"></i>`).join('')}</div>
+ <div class="win" id="d_win" style="left:262px;top:224px;width:1396px;height:785px">
+  <img class="d_im" id="d_3d"><img class="d_im" src="assets/d_citra.png"><img class="d_im" src="assets/d_citra_s1.png"><img class="d_im" src="assets/d_forecast.png"><img class="d_im" src="assets/d_kejadian.png"><img class="d_im" src="assets/d_laporan.png">
+  ${[0,1,2].map(i=>`<img class="d_pdf" src="assets/pdf_${i}.png" style="inset:auto;left:${520+i*250}px;top:70px;width:auto;height:680px;border:3px solid var(--n);box-shadow:10px 10px 0 rgba(31,42,90,.35);opacity:0">`).join('')}
+ </div>
+`,(el)=>{const ims=$$('.d_im',el),caps=$$('.d_cap',el),dots=$$('#d_dots i',el),pdfs=$$('.d_pdf',el);
+  /* jadwal gambar: [mulai, akhir] */
+  const S=[[0,7],[7,10.6],[10.6,14],[14,21],[21,28],[28,35]];
+  return t=>{vis($('#d_k',el),t,.3,null,{dy:0});vis($('#d_win',el),t,.2,null,{dy:90,din:1});
+    setImg(ims[0],'assets/t3d/f'+String(Math.round(cl((t-.5)/6.3)*(DATA.t3d-1))).padStart(4,'0')+'.jpg');
+    ims.forEach((im,i)=>{const [a,b]=S[i];im.style.opacity=i===0?1:P(t,a-.5,a).toFixed(3);const u=P(t,a-.5,b+.5);im.style.transform=i===0?'':`scale(${lerp(1,1.045,u).toFixed(4)})`});
+    let a=0;CL.forEach((c,i)=>{vis(caps[i],t,a+.15,i<CL.length-1?a+c[1]:null,{dy:24,dout:.35,din:.5});dots[i].style.background=(t>=a&&t<a+c[1])?'var(--n)':(t>=a?'var(--acc)':'#fff');a+=c[1]});
+    pdfs.forEach((p,i)=>{const u=eo(P(t,29.6+i*.45,30.6+i*.45));p.style.opacity=u;p.style.transform=`translate(${((1-u)*500).toFixed(1)}px,${(i*14).toFixed(0)}px) rotate(${((i-1)*2.200*u).toFixed(2)}deg)`});
+  }})})();
+
+/* ===== 6. TEKNIS (160–180) ===== */
+(()=>{const ND=[['cloud','API resmi','CDSE · LANCE · GES DISC'],['gear','ETL Python','terjadwal, otomatis'],['db','PostgreSQL + PostGIS','metadata, observasi, audit'],['api','FastAPI','REST API'],['web','Web','HTML, JS, Leaflet']];
+const X=i=>240+i*360;
+scene('tech',160,180,'dark',`
+ <div class="kick" id="t_k" style="left:150px;top:70px">Di balik layar</div>
+ <div class="cap" id="t_h" style="left:150px;top:146px;width:1620px;font-size:70px">Sistem basis data yang <em>bisa ditelusuri.</em></div>
+ <svg class="abs" style="inset:0" viewBox="0 0 1920 1080" id="t_svg">${[0,1,2,3].map(i=>`<g class="t_ln" opacity="0"><line x1="${X(i)+92}" y1="400" x2="${X(i+1)-92}" y2="400" stroke="#7fe0ea" stroke-opacity=".45" stroke-width="4"/>${[0,1,2].map(j=>`<circle class="t_dot" data-i="${i}" data-j="${j}" cy="400" r="8" fill="#7fe0ea"/>`).join('')}</g>`).join('')}</svg>
+ ${ND.map((n,i)=>`<div class="abs t_nd" style="left:${X(i)-170}px;top:310px;width:340px;text-align:center;opacity:0"><div style="width:170px;height:170px;margin:0 auto;border-radius:36px;border:3px solid var(--acc);background:rgba(127,224,234,.08);display:grid;place-items:center;color:#fff">${ico(n[0],96)}</div>
+  <div style="font-weight:900;font-size:33px;margin-top:20px">${n[1]}</div><div style="font-weight:700;font-size:23px;color:var(--acc);margin-top:4px">${n[2]}</div></div>`).join('')}
+ <div class="abs" style="left:150px;top:640px;width:760px;display:flex;flex-direction:column;gap:22px;align-items:flex-start">
+  ${[['hash','Lineage SHA-256 untuk setiap berkas'],['lock','5 peran, ditegakkan di basis data'],['key','REST API dengan token']].map(c=>`<span class="chip t_chip" style="font-size:34px;padding:16px 32px;opacity:0">${ico(c[0],40)}${c[1]}</span>`).join('')}</div>
+ <div class="win t_th" style="left:980px;top:640px;width:560px;height:315px;opacity:0;border-color:var(--acc);box-shadow:12px 12px 0 rgba(127,224,234,.35)"><img src="assets/d_data.png"></div>
+ <div class="win t_th" style="left:1250px;top:720px;width:560px;height:315px;opacity:0;border-color:var(--acc);box-shadow:12px 12px 0 rgba(127,224,234,.35)"><img src="assets/d_docs.png"></div>
+`,(el)=>{const nd=$$('.t_nd',el),ln=$$('.t_ln',el),dots=$$('.t_dot',el),chips=$$('.t_chip',el),th=$$('.t_th',el);
+  return t=>{vis($('#t_k',el),t,.3,null,{dy:0});vis($('#t_h',el),t,.6,null);
+    nd.forEach((n,i)=>{vis(n,t,1.6+i*.9,null,{dy:50});draw(n,P(t,1.7+i*.9,3.2+i*.9))});
+    ln.forEach((g,i)=>g.setAttribute('opacity',P(t,2.3+i*.9,2.9+i*.9).toFixed(3)));
+    dots.forEach(d=>{const i=+d.dataset.i,j=+d.dataset.j,u=(t*.42+j/3)%1;d.setAttribute('cx',(lerp(X(i)+92,X(i+1)-92,u)).toFixed(1));d.setAttribute('opacity',Math.sin(u*Math.PI).toFixed(3))});
+    chips.forEach((c,i)=>{vis(c,t,7.5+i*1.5,null,{dx:-60,dy:0});draw(c,P(t,7.6+i*1.5,8.8+i*1.5))});
+    th.forEach((w,i)=>vis(w,t,12.5+i*1.6,null,{dy:80,pre:`rotate(${i?2:-2}deg) `}));
+  }})})();
+
+/* ===== 7. BATASAN (180–192) ===== */
+(()=>{const r=rng(99),X0=420,X1=1700,D=30,dx=(X1-X0)/D;const rain=[...Array(D)].map((_,i)=>{const b=r();return i===19?1:i===18?.62:i===20?.4:b*b*.5});
+const s1=[3,15,27];
+scene('limit',180,192,'dark',`
+ <div class="cap" id="l_h" style="left:150px;top:90px;width:1620px;font-size:96px"><em>Bukan</em> pendeteksi banjir real-time.</div>
+ <svg class="abs" style="inset:0" viewBox="0 0 1920 1080" id="l_svg" font-family="Nunito" font-weight="800">
+  <text x="150" y="455" fill="#fff" font-size="34">GPM</text><text x="150" y="490" fill="#7fe0ea" font-size="22">hujan, harian</text>
+  <text x="150" y="600" fill="#fff" font-size="34">MODIS</text><text x="150" y="635" fill="#7fe0ea" font-size="22">optik, harian</text>
+  <text x="150" y="730" fill="#fff" font-size="34">Sentinel-1</text><text x="150" y="765" fill="#7fe0ea" font-size="22">radar, 6–12 hari</text>
+  <line x1="${X0}" y1="500" x2="${X1}" y2="500" stroke="#7fe0ea" stroke-opacity=".4" stroke-width="2"/>
+  ${rain.map((v,i)=>`<rect class="l_b" x="${X0+i*dx+6}" width="${dx-12}" rx="5" fill="${i>=18&&i<=20?'#f0b24a':'#7fe0ea'}" data-v="${v}"/>`).join('')}
+  ${rain.map((v,i)=>`<circle class="l_m" cx="${X0+i*dx+dx/2}" cy="610" r="9" fill="${[5,11,12,19,24].includes(i)?'none':'#7fe0ea'}" stroke="#7fe0ea" stroke-width="3" opacity="0"/>`).join('')}
+  ${s1.map(d=>`<g class="l_s" opacity="0"><line x1="${X0+d*dx+dx/2}" y1="380" x2="${X0+d*dx+dx/2}" y2="775" stroke="#fff" stroke-width="3" stroke-dasharray="5 9"/><rect x="${X0+d*dx+dx/2-24}" y="716" width="48" height="48" rx="10" fill="#fff"/></g>`).join('')}
+  <g id="l_ev" opacity="0"><rect x="${X0+18*dx}" y="330" width="${dx*3}" height="440" rx="12" fill="#f0b24a" fill-opacity=".14" stroke="#f0b24a" stroke-width="3" stroke-dasharray="8 8"/><text x="${X0+19.5*dx}" y="312" fill="#f0b24a" font-size="28" text-anchor="middle">banjir bandang surut dalam hitungan jam</text></g>
+ </svg>
+ <div class="cap" id="l_c" style="left:150px;top:830px;width:1620px;font-size:50px;font-weight:800">Hujan harian untuk memantau. <em>Radar untuk verifikasi setelah kejadian.</em></div>
+ <div class="cap" id="l_f" style="left:150px;top:960px;width:1620px;font-size:30px;font-weight:700;color:#aeb8de">Prakiraan bersifat statistik, bukan peringatan resmi. Ikuti BMKG dan BPBD.</div>
+`,(el)=>{const bars=$$('.l_b',el),ms=$$('.l_m',el),ss=$$('.l_s',el);
+  return t=>{vis($('#l_h',el),t,.4,null);
+    bars.forEach((b,i)=>{const u=eo(P(t,1.6+i*.07,2.2+i*.07)),h=4+ +b.dataset.v*150*u;b.setAttribute('y',(500-h).toFixed(1));b.setAttribute('height',h.toFixed(1));b.setAttribute('opacity',u.toFixed(3))});
+    ms.forEach((m,i)=>m.setAttribute('opacity',P(t,2.6+i*.07,3+i*.07).toFixed(3)));
+    ss.forEach((s,i)=>s.setAttribute('opacity',eo(P(t,4.6+i*.5,5.2+i*.5)).toFixed(3)));
+    $('#l_ev',el).setAttribute('opacity',(eo(P(t,6.2,7))*(.8+.2*Math.sin(t*5))).toFixed(3));
+    vis($('#l_c',el),t,7.2,null);vis($('#l_f',el),t,8.6,null,{dy:16});
+  }})})();
+
+/* ===== 8. PENUTUP (192–210) ===== */
+scene('end',192,210,'mint',`
+ <div class="cap" id="e_c" style="left:0;top:70px;width:1920px;text-align:center;font-size:70px">Satu sistem, di <em>desktop</em> dan <em>ponsel.</em></div>
+ <div class="win" id="e_w" style="left:170px;top:230px;width:1250px;height:703px;opacity:0"><img src="assets/d_beranda.png"></div>
+ <div class="phone" id="e_p" style="left:1330px;top:200px;transform-origin:0 0;opacity:0"><div class="scr"><img id="e_pi"></div></div>
+ <div class="abs" id="e_logo" style="left:850px;top:120px;width:220px;height:220px;border-radius:50%;background:var(--acc);border:4px solid var(--n);box-shadow:10px 10px 0 var(--n);opacity:0;padding:10px"><img src="assets/logo.svg" style="width:100%;height:100%;display:block"></div>
+ <div class="cap" id="e_cta" style="left:0;top:400px;width:1920px;text-align:center;font-size:132px">Pantau kecamatan Anda.</div>
+ <div class="abs" id="e_url" style="left:0;top:610px;width:1920px;text-align:center;opacity:0"><span style="display:inline-block;background:var(--n);color:#fff;font-weight:800;font-size:54px;padding:22px 56px;border-radius:999px;box-shadow:8px 8px 0 var(--acc),8px 8px 0 3px var(--n)">orbit-u.hakimhakim.workers.dev</span></div>
+ <div class="cap" id="e_cr" style="left:0;top:800px;width:1920px;text-align:center;font-size:44px;font-weight:900">Orbit-U: The Monitor</div>
+ <div class="cap" id="e_cr2" style="left:0;top:868px;width:1920px;text-align:center;font-size:32px;font-weight:700;color:var(--mut)">Gugus Mitigasi Lebak Selatan · Universitas Multimedia Nusantara</div>
+`,(el)=>{const M=DATA.man;
+  return t=>{setImg($('#e_pi',el),clipSrc(M.mobA,7.4));
+    vis($('#e_c',el),t,.5,6.6);
+    const w=$('#e_w',el);vis(w,t,.7,6.8,{dy:90,up:40,pre:'rotate(-1.500deg) '});
+    const p=$('#e_p',el);vis(p,t,1.3,6.8,{dy:120,up:40,pre:'scale(.78) rotate(2deg) '});
+    const lg=$('#e_logo',el),lp=eo(P(t,7,8));lg.style.opacity=P(t,7,7.4);lg.style.transform=`scale(${lerp(.4,1,lp).toFixed(4)}) rotate(${((1-lp)*-40).toFixed(2)}deg)`;
+    vis($('#e_cta',el),t,7.6,null,{dy:50});vis($('#e_url',el),t,8.8,null);vis($('#e_cr',el),t,10.2,null,{dy:16});vis($('#e_cr2',el),t,10.6,null,{dy:16});
+  }});
+
+const DUR=210;
+window.DUR=DUR;
+window.seek=async T=>{pending=[];
+  SC.forEach((s,i)=>{const nx=SC[i+1],end=nx?nx.t0+XF:s.t1+1,on=T>=s.t0&&T<end;s.el.style.display=on?'block':'none';
+    if(on){s.el.style.opacity=i===0?1:eio(P(T,s.t0,s.t0+XF)).toFixed(4);s.el.style.zIndex=i+1;s.update(T-s.t0,s.t1-s.t0)}});
+  $('#fade').style.opacity=Math.max(1-P(T,0,.9),P(T,DUR-.9,DUR-.1)).toFixed(4);
+  await Promise.all(pending);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return 1};
+window.ready=document.fonts.ready.then(()=>Promise.all([400,700,800,900].map(w=>document.fonts.load(w+' 40px Nunito')))).then(()=>seek(0));
+</script></body></html>
