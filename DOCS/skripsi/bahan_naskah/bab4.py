@@ -45,10 +45,16 @@ def blocks():
             "(subbab 3.1). Alur sistem yang sedang berjalan digambarkan dengan *activity diagram* ber-*swimlane* pada "
             "{G:asis}.")]
     b += [FIG("asis", "asis.png", "Activity Diagram Sistem Berjalan (As-Is)", 13.0)]
-    b += [P("Informasi cuaca diterbitkan BMKG dan disalurkan melalui Are You In Sys. GMLS membaca informasi yang masih "
-            "berupa area potensi hujan, lalu meneruskan peringatan tanpa menetapkan status bencana. Bila terjadi kejadian, "
-            "masyarakat melapor melalui Are You In Sys, sedangkan GMLS tidak mencatat kejadian sendiri dan merujuk pada data "
-            "dampak pemerintah. Kondisi ini diidentifikasi dengan metode 5W1H pada {T:5w1h}.")]
+    b += [P("{G:asis} menggambarkan alur informasi bencana yang berjalan di GMLS dalam empat *swimlane*, yaitu BMKG/BNPB, "
+            "Are You In Sys, GMLS, dan Masyarakat. Alur dimulai ketika BMKG menerbitkan informasi cuaca dan citra radar. "
+            "Informasi ini masih berupa area potensi hujan, belum spesifik ke lokasi warga, lalu ditampilkan kembali oleh "
+            "Are You In Sys bersama peta BNPB.")]
+    b += [P("GMLS membaca informasi area tersebut dan memutuskan apakah kondisi berpotensi bahaya. Bila ya, GMLS "
+            "menyampaikan peringatan kepada masyarakat. Peringatan ini bersifat saran dan bukan penetapan status bencana. "
+            "Bila terjadi kejadian, masyarakat melapor melalui Are You In Sys, sedangkan GMLS tidak mencatat kejadian sendiri "
+            "dan merujuk pada data dampak dari pemerintah yang menurut narasumber belum rapi. Ketiga cabang alur bertemu pada "
+            "satu *merge node* sebelum *final node*, sehingga terlihat bahwa tidak ada satu pun langkah yang menghasilkan "
+            "catatan tersimpan di pihak GMLS. Kondisi ini diidentifikasi lebih lanjut dengan metode 5W1H pada {T:5w1h}.")]
     b += [TAB("5w1h", "Identifikasi Masalah dengan 5W1H", [1000, 3500, 3400], ["Unsur", "Kondisi Sistem Berjalan", "Kebutuhan Sistem Usulan"], [
         ["What", "Informasi cuaca dari BMKG (termasuk radar) diterima melalui Are You In Sys. Tidak ada data hujan per kecamatan yang tersimpan. GMLS tidak mencatat kejadian sendiri dan data dampak bergantung pada data pemerintah yang menurut narasumber tidak rapi",
          "Basis data pemantauan hidrometeorologi per kecamatan dan arsip kejadian bencana dari sumber resmi"],
@@ -66,6 +72,14 @@ def blocks():
     b += [P("Akar masalah dari tabel tersebut dikelompokkan ke dalam tiga aspek, yaitu data, proses, serta pengguna dan "
             "akses, sebagaimana ditunjukkan pada {G:masalah}.")]
     b += [FIG("masalah", "masalah.png", "Diagram Sebab-Akibat Masalah Pemantauan Hidrometeorologi GMLS", 14.0)]
+    b += [P("{G:masalah} mengelompokkan akar masalah dari {T:5w1h} ke dalam tiga aspek yang bermuara pada satu akibat, "
+            "yaitu kondisi hidrometeorologi Lebak Selatan tidak terpantau secara terstruktur dan peringatan tidak dapat "
+            "dievaluasi. Pada aspek data, informasi BMKG hanya berupa area, citra satelit tidak diolah per kecamatan, dan "
+            "data kejadian dari pemerintah tidak rapi sementara GMLS tidak mencatat kejadian sendiri.")]
+    b += [P("Pada aspek proses, GMLS belum memiliki penanggung jawab (PIC) informasi potensi bencana, peringatan disusun "
+            "tanpa ambang per kecamatan, dan peringatan tidak pernah dinilai terhadap kejadian yang benar-benar terjadi. Pada "
+            "aspek pengguna dan akses, situs rujukan sulit dipahami orang awam dan belum ada wadah data bersama yang "
+            "dilengkapi pembagian hak akses dan jejak perubahan.")]
     b += [P("Diagram tersebut menunjukkan bahwa masalah tidak hanya bersumber dari ketiadaan data, tetapi juga dari "
             "proses yang bergantung pada pembacaan manual dan dari belum adanya pembagian akses. Karena itu, solusi "
             "tidak cukup berupa penyimpanan data, melainkan juga otomatisasi dan kontrol akses. Setiap kelompok masalah "
@@ -79,6 +93,17 @@ def blocks():
     b += [P("Alur sistem usulan (To-Be) pada {G:tobe} memindahkan pekerjaan pengambilan dan pengolahan data ke *scheduler*, "
             "sehingga relawan dan analis cukup membaca hasilnya dan menindaklanjuti peringatan.")]
     b += [FIG("tobe", "tobe.png", "Activity Diagram Sistem Usulan (To-Be)", 12.0)]
+    b += [P("{G:tobe} menunjukkan alur sistem usulan dengan empat *swimlane*: Scheduler, Basis Data, Relawan, dan Analis. "
+            "Scheduler (aktor sistem yang terhubung sebagai role monitor_etl) mengunduh data Sentinel-1, MODIS, dan GPM IMERG "
+            "dari API resmi, mengolah raster, dan menghitung nilai per kecamatan. Hasilnya disimpan ke region_observations, "
+            "sedangkan berkas keluaran dan transformasinya disimpan ke data_products dan data_lineage.")]
+    b += [P("Scheduler kemudian membandingkan hujan dengan alert_rules yang aktif. Bila tidak melewati ambang, alur langsung "
+            "berakhir. Bila melewati ambang, peringatan disimpan ke alert_events dan alur bercabang secara paralel melalui "
+            "*fork node*. Pada cabang pertama, *scheduler* mengirim surel ke pengguna yang berlangganan kecamatan tersebut, "
+            "lalu Relawan membaca surel dan membuka Beranda; cabang ini berakhir pada *flow final node* karena Relawan hanya "
+            "membaca. Pada cabang kedua, Analis menindaklanjuti (*acknowledge*) peringatan dan, bila terjadi kejadian, "
+            "mencatatnya ke disaster_events. Perubahan oleh Analis direkam ke audit_log oleh *trigger*, dan peringatan yang "
+            "telah memiliki pasangan kejadian dapat dinilai melalui v_evaluasi_alert.")]
 
     b += [P('Perbedaan utama sistem usulan terhadap sistem berjalan ada pada tiga hal. Pertama, peringatan dibangkitkan dari angka per kecamatan dan aturan ambang yang tersimpan, bukan dari pembacaan informasi area secara manual. Kedua, setiap tindak lanjut peringatan dan setiap kejadian tercatat di basis data. Ketiga, karena keduanya tercatat, peringatan dapat dibandingkan dengan kejadian melalui v_evaluasi_alert, sesuatu yang tidak dapat dilakukan pada sistem berjalan.')]
     b += [H3("User Requirements")]
@@ -100,11 +125,20 @@ def blocks():
     ])]
     b += [P('Setiap rumusan masalah didukung oleh sekurang-kurangnya satu *mission objective*, dan setiap *mission objective* menunjuk tabel utama yang mewujudkannya. Hal ini memungkinkan pemeriksaan per tabel pada tahap desain fisik. MO7 dan MO8 juga menunjukkan bahwa keamanan dan jejak audit sudah direncanakan sejak tahap perencanaan, bukan ditambahkan pada tahap implementasi.')]
     b += [H4("System Definition")]
-    b += [P("Batas sistem ditunjukkan pada {G:batas}. Di dalam batas sistem terdapat ETL dan *scheduler*, basis data, REST API, "
-            "dan aplikasi web. Penyedia data satelit hanya dibaca. Berkas raster (COG, HDF5, PNG, PDF) disimpan di *filesystem*, "
-            "sedangkan basis data hanya menyimpan lokasi dan *checksum*-nya. SIGAP DESA beserta data warganya tidak terhubung "
-            "dengan sistem ini.")]
-    b += [FIG("batas", "batas.png", "Batas Sistem Orbit-U: The Monitor", 13.0)]
+    b += [P("*System definition* menetapkan ruang lingkup basis data dan pihak yang berinteraksi dengannya. Batas sistem "
+            "ditunjukkan pada {G:batas}.")]
+    b += [FIG("batas", "batas.png", "Batas Sistem Orbit-U: The Monitor", 14.0)]
+    b += [P("{G:batas} memisahkan komponen di dalam dan di luar batas sistem. Di dalam batas sistem terdapat empat komponen "
+            "yang saling berurutan: ETL Python dengan APScheduler, basis data PostgreSQL/PostGIS, REST API FastAPI, dan "
+            "aplikasi web. Basis data menyimpan metadata scene, observasi per kecamatan, lineage, mutu, peringatan, kejadian, "
+            "laporan, akun, log, dan audit.")]
+    b += [P("Di luar batas sistem terdapat empat penyedia data yang hanya dibaca, yaitu ESA Copernicus CDSE (Sentinel-1 GRD), "
+            "NASA LANCE/LAADS (MODIS), NASA GES DISC (GPM IMERG), dan OCHA COD-AB (batas kecamatan). *Filesystem* raster juga "
+            "ditempatkan di luar basis data: ETL menulis berkas COG, HDF5, PNG, dan PDF ke *filesystem*, API membacanya "
+            "kembali, sedangkan basis data hanya menyimpan lokasi dan *checksum* berkas. Pengguna lima peran mengakses sistem "
+            "melalui aplikasi web, sedangkan skrip atau sistem lain mengakses REST API dengan token API. SIGAP DESA, yang "
+            "menyimpan data warga, KK, NIK, titik evakuasi, dan kawasan rawan bencana, digambar dengan garis putus-putus tanpa "
+            "penghubung karena tidak terhubung dan datanya tidak diambil alih oleh sistem ini.")]
     b += [P("Pandangan pengguna (*user views*) untuk lima peran dirangkum pada {T:uv}. Peran yang lebih tinggi mewarisi hak "
             "peran di bawahnya.")]
     b += [TAB("uv", "User Views per Peran", [1400, 1600, 2700, 2200], ["Peran", "Cara Mendapat Akun", "Data yang Dilihat", "Data yang Ditulis"], [
@@ -147,6 +181,15 @@ def blocks():
             "monitor_etl. Generalisasi aktor pada {G:aktor} menunjukkan bahwa Relawan mewarisi use case Pengunjung, Analis "
             "dan Data Engineer mewarisi use case Relawan, dan Administrator mewarisi keduanya.")]
     b += [FIG("aktor", "aktor.png", "Generalisasi Aktor", 11.0)]
+    b += [P("{G:aktor} menggunakan relasi generalisasi UML, yaitu garis dengan kepala segitiga kosong yang menunjuk ke aktor "
+            "induk. Relawan merupakan spesialisasi Pengunjung, sehingga mewarisi seluruh use case Pengunjung. Analis dan Data "
+            "Engineer sama-sama merupakan spesialisasi Relawan tetapi tidak saling mewarisi, sehingga Analis tidak dapat "
+            "mengelola dataset dan Data Engineer tidak dapat mencatat kejadian. Administrator merupakan spesialisasi Analis "
+            "sekaligus Data Engineer sehingga memiliki kedua kelompok hak tersebut.")]
+    b += [P("Scheduler digambar dengan notasi UML untuk aktor non-manusia, yaitu persegi dengan kata kunci «actor», karena "
+            "Scheduler bukan orang, melainkan proses terjadwal. Catatan (*note*) yang dihubungkan dengan garis putus-putus "
+            "menjelaskan bahwa aktor ini terhubung ke basis data sebagai role monitor_etl. Scheduler tidak ikut dalam hierarki "
+            "generalisasi karena haknya tidak diturunkan dari peran pengguna aplikasi.")]
     b += [P("Use case diambil dari *route* API dan kunci izin di api/routes/auth.py. Daftar lengkapnya ditunjukkan pada "
             "{T:uc}, sedangkan diagram per aktor untuk Analis dan Data Engineer ditunjukkan pada {G:uc_a} dan {G:uc_d}.")]
     b += [TAB("uc", "Daftar Use Case", [800, 4800, 2300], ["Kode", "Use Case", "Aktor"], [
@@ -181,8 +224,29 @@ def blocks():
     ])]
     b += [P('Empat dari 28 use case dijalankan aktor Scheduler tanpa interaksi pengguna, yaitu UC-22, UC-23, UC-24, dan UC-27. Use case ini yang mengisi sebagian besar tabel transaksi, sedangkan use case aktor manusia lebih banyak membaca data melalui VIEW dan hanya menulis pada tabel tertentu sesuai perannya.')]
     b += [FIG("uc_a", "uc_a.png", "Use Case Diagram Aktor Analis", 14.0)]
-    b += [P('Use case Analis berpusat pada peringatan dan kejadian, yaitu melihat prakiraan (UC-10), menindaklanjuti peringatan (UC-11), mengelola kejadian (UC-12), dan melihat evaluasi peringatan (UC-13). Ketiga use case terakhir saling berkaitan, karena evaluasi hanya bermakna bila peringatan ditindaklanjuti dan kejadian dicatat beserta status verifikasinya.')]
+    b += [P("{G:uc_a} menampilkan enam use case yang dimiliki langsung oleh Analis, dengan kode sesuai {T:uc}: UC-10 melihat "
+            "prakiraan dan analisa daerah, UC-11 menindaklanjuti peringatan hujan, UC-12 mengelola kejadian bencana, UC-13 "
+            "melihat evaluasi peringatan (*hit*, *miss*, dan *false alarm*), UC-14 mengunduh laporan keadaan wilayah, dan UC-21 "
+            "melihat log halaman Kejadian. Use case UC-10 memuat keadaan terbaru semua band dan prakiraan 15 hari. UC-11, "
+            "UC-12, dan UC-13 saling berkaitan, karena evaluasi hanya bermakna bila peringatan ditindaklanjuti dan kejadian "
+            "dicatat beserta status verifikasinya.")]
+    b += [P("Dua use case tambahan dihubungkan dengan relasi «extend» karena bersifat opsional dan hanya dijalankan bila "
+            "Analis memilihnya: mengunduh PDF analisa daerah memperluas UC-10, dan mengekspor atau mengimpor kejadian dalam "
+            "format Excel memperluas UC-12. Arah panah «extend» menunjuk ke use case dasar sesuai aturan UML. *Login* (UC-06) "
+            "tidak digambar sebagai «include» karena merupakan prasyarat (*precondition*) seluruh use case, bukan bagian dari "
+            "alurnya. Selain enam use case tersebut, Analis juga mewarisi use case Relawan (UC-01 sampai UC-09, UC-25, dan "
+            "UC-26) melalui generalisasi pada {G:aktor}, sehingga use case warisan tidak digambar ulang.")]
     b += [FIG("uc_d", "uc_d.png", "Use Case Diagram Aktor Data Engineer", 14.0)]
+    b += [P("{G:uc_d} menampilkan enam use case Data Engineer: UC-15 mengelola scene per satelit, termasuk melihat ringkasan "
+            "data per satelit; UC-16 menjalankan *backfill*; UC-17 membuat dan mengunduh dataset historis; UC-18 melakukan "
+            "EDA; UC-14 mengunduh laporan kesehatan data; dan UC-21 melihat log halaman Data.")]
+    b += [P("Menonaktifkan atau memulihkan scene serta memproses ulang scene merupakan perluasan («extend») dari UC-15 karena "
+            "hanya dijalankan pada scene tertentu yang bermasalah. Hak ini dimiliki Data Engineer dan juga Administrator "
+            "melalui pewarisan. Penonaktifan scene selalu mewajibkan pengisian alasan, sehingga keduanya dihubungkan dengan "
+            "«include»; alasan ini ditegakkan oleh CHECK chk_scene_invalidation. Memantau progres dan log *backfill* merupakan "
+            "perluasan UC-16. Pada UC-17, pemilihan strategi *fusion* dihubungkan dengan «extend» karena hanya dilakukan untuk "
+            "dataset multi-sumber; dataset satu sumber menyimpan fusion_strategy bernilai NULL. Mengunduh dataset dalam "
+            "bentuk ZIP juga bersifat opsional sehingga dihubungkan dengan «extend».")]
     b += [P("Use case Data Engineer berpusat pada kesehatan data, yaitu mutu, kelengkapan, dan pengolahan ulang, bukan "
             "pada tindak lanjut peringatan. Karena Analis dan Data Engineer tidak saling mewarisi hak, urusan pengolahan "
             "data terpisah dari keputusan analisis. Skenario use case yang "
@@ -200,15 +264,62 @@ def blocks():
     b += [P("Proses yang paling menentukan isi basis data adalah Job Hidromet harian, yang mengunduh data GPM dan MODIS, "
             "menghitung nilai per kecamatan, lalu membangkitkan peringatan. Alurnya ditunjukkan pada {G:act_hj}.")]
     b += [FIG("act_hj", "act_hj.png", "Activity Diagram Job Hidromet Harian sampai Peringatan Hujan", 14.0)]
+    b += [P("{G:act_hj} menguraikan Job Hidromet dalam tiga *swimlane*, yaitu Scheduler, ETL Hidromet, dan Basis Data. Job "
+            "dipicu setiap hari pukul 02.00 WIB. Sebelum bekerja, *scheduler* mencoba mengambil *advisory lock* hydromet. Bila "
+            "kunci sedang dipegang proses lain, basis data mencatat status SKIPPED_LOCKED dan alur cabang ini berhenti pada "
+            "*flow final node*, sehingga job tidak berjalan ganda.")]
+    b += [P("Bila kunci didapat, ETL masuk ke perulangan per tanggal yang belum berstatus COMPLETED. Untuk setiap tanggal, "
+            "ETL mengunduh granule GPM IMERG dari NASA dengan urutan prioritas run Final, Late, lalu Early. Bila granule belum "
+            "tersedia, tanggal tersebut dicatat WAITING_UPSTREAM dan akan berubah menjadi FAILED setelah tiga hari. Bila "
+            "tersedia, ETL mengakumulasi hujan 24 jam, 72 jam, 7 hari, dan 30 hari menjadi COG; basis data menyimpan hasil "
+            "agregasi zonal ke region_observations dan membandingkannya dengan alert_rules aktif untuk membangkitkan "
+            "alert_events. ETL kemudian mengunduh MODIS (MCDWD dan MOD09) dan mengagregasi FLOOD, NDVI, serta NDWI, lalu "
+            "tanggal dicatat COMPLETED, dengan atau tanpa data MODIS. Setelah tidak ada tanggal tersisa, prakiraan tersimpan "
+            "dihitung dan raster berumur lebih dari 365 hari dihapus, kemudian kunci dilepas.")]
+    b += [P("Status setiap job pada alur tersebut, termasuk WAITING_UPSTREAM, disimpan di kolom status tabel dataset_jobs. "
+            "Siklus nilai kolom ini dimodelkan dengan *state machine diagram* pada {G:state}.")]
+    b += [FIG("state", "state_job.png", "State Machine Diagram Status Job Dataset", 14.0)]
+    b += [P("{G:state} menunjukkan bahwa job dibuat dengan status QUEUED, lalu diambil *worker* dan masuk ke *composite state* "
+            "BERJALAN yang terdiri atas PREPARING, DOWNLOADING, PROCESSING, dan CLEANUP. Bila semua unit selesai, job berakhir "
+            "COMPLETED. Dari state BERJALAN, job dapat dijeda menjadi PAUSED oleh pengguna atau sistem dan dilanjutkan kembali "
+            "dengan menambah resume_count, atau berakhir FAILED bila terjadi galat. Job dapat dibatalkan menjadi CANCELLED "
+            "selama masih QUEUED, PAUSED, atau berjalan sebelum tahap CLEANUP.")]
+    b += [P("Khusus job berjenis HYDROMET_DAILY, bila granule GPM hari itu belum terbit, job masuk ke WAITING_UPSTREAM dan "
+            "dicoba lagi pada jadwal berikutnya paling lama tiga hari (pengaturan hydromet.waiting_max_days), lalu menjadi "
+            "FAILED bila granule tetap belum tersedia. Status ini yang dicatat pada langkah Mencatat status WAITING_UPSTREAM "
+            "di {G:act_hj}. Nilai status yang sah ditegakkan oleh CHECK chk_dataset_job_status, sehingga status di luar "
+            "diagram ini ditolak basis data.")]
     b += [P("Proses yang paling banyak ditulis pengguna adalah pengelolaan kejadian bencana oleh Analis, sebagaimana "
             "ditunjukkan pada {G:act_kj}.")]
-    b += [FIG("act_kj", "act_kj.png", "Activity Diagram Mengelola Kejadian Bencana", 14.0)]
+    b += [FIG("act_kj", "act_kj.png", "Activity Diagram Mengelola Kejadian Bencana", 13.0)]
+    b += [P("{G:act_kj} menggambarkan pengelolaan kejadian oleh Analis dalam tiga *swimlane*: Analis, Sistem (API), dan "
+            "Basis Data. Setelah membuka halaman Kejadian › Kelola, Analis memilih aksi. Untuk aksi hapus, basis data hanya "
+            "mengisi kolom deleted_at (*soft delete*) sehingga baris tidak dihapus secara fisik.")]
+    b += [P("Untuk aksi tambah atau ubah, Analis mengisi jenis bencana, kecamatan, tanggal, keterangan, dan sumber informasi. "
+            "API memvalidasi isian; bila tidak valid, sistem menampilkan dialog galat (misalnya INVALID_DISASTER) dan alur "
+            "kembali ke pengisian formulir melalui *merge node*. Bila valid, data disimpan ke disaster_events dengan INSERT "
+            "atau UPDATE. Kedua cabang bertemu pada *merge node*, lalu basis data mencatat perubahan ke audit_log melalui "
+            "*trigger* audit_row, dan Analis melihat daftar kejadian yang telah diperbarui.")]
     b += [P('Validasi pada alur ini dilakukan di dua tempat. Aplikasi menampilkan dialog galat bila data tidak valid, dan basis data tetap menolak data yang melanggar NOT NULL atau CHECK, misalnya uraian yang kurang dari 10 atau lebih dari 4000 karakter. Penghapusan berupa *soft delete*, sehingga riwayat kejadian tetap tersimpan dan tetap tercatat di audit_log.')]
     b += [H4("Sequence Diagram")]
     b += [P("{G:seq} menunjukkan urutan pesan ketika Relawan membuka citra satelit. Setiap *request* API dijalankan dalam satu "
             "transaksi yang diawali SET LOCAL ROLE sesuai peran pengguna, sehingga batas waktu 365 hari ditegakkan oleh VIEW "
             "v_citra_scenes di basis data, bukan hanya oleh aplikasi.")]
     b += [FIG("seq", "seq_citra.png", "Sequence Diagram Membuka Citra Satelit dengan SET LOCAL ROLE", 14.0)]
+    b += [P("{G:seq} memuat empat *lifeline*, yaitu Relawan, Web, API FastAPI, dan PostgreSQL, dengan 12 pesan bernomor. "
+            "Pesan sinkron digambar dengan panah berkepala penuh, pesan balasan dengan garis putus-putus, dan kotak sempit "
+            "pada *lifeline* menunjukkan periode aktivasi. Relawan membuka menu Citra › Sentinel-1 (1), lalu Web mengirim "
+            "GET /api/citra/areas/{id}/scenes beserta *cookie* sesi (2). API mendekode JWT untuk memperoleh user_id (3), "
+            "memanggil auth_session_user (4), dan menerima peran USER dengan status akun aktif (5). API kemudian memeriksa "
+            "require_role(\"PUBLIC\") (6), yang lolos karena Relawan mewarisi hak Pengunjung. Pesan 3 dan 6 merupakan "
+            "*self-message*, sehingga masing-masing diberi *activation bar* bertumpuk pada *lifeline* API.")]
+    b += [P("Pesan 7 sampai 10 berada dalam satu *combined fragment* dengan operator *critical*. Operator ini menyatakan bahwa "
+            "keempat pesan merupakan satu wilayah kritis yang dijalankan sebagai satu kesatuan tanpa disela, sesuai sifat satu "
+            "transaksi basis data. API menjalankan BEGIN, SET LOCAL ROLE monitor_user, dan set_config('app.user_id', id) (7), "
+            "lalu membaca SELECT … FROM v_citra_scenes (8). VIEW ini membatasi hasil hanya 365 hari terakhir untuk "
+            "monitor_user, sehingga daftar tanggal yang dikembalikan (9) sudah tersaring di basis data. COMMIT (10) mengakhiri "
+            "transaksi dan role kembali secara otomatis ke monitor_app. API mengembalikan 200 JSON (11), dan Web menampilkan "
+            "daftar tanggal serta citra kepada Relawan (12).")]
     b += [P("*Class diagram* tidak disajikan secara terpisah karena struktur data telah digambarkan dengan ERD pada subbab "
             "4.2.2.")]
 
@@ -216,8 +327,9 @@ def blocks():
     b += [H3("Perancangan Database")]
     b += [H4("Desain Konseptual")]
     b += [P("Entitas diidentifikasi dari kebutuhan pada subbab 4.1.2 dan dikelompokkan ke dalam area subjek pada {T:entitas}. "
-            "Model konseptual tidak memuat tipe data maupun kunci *surrogate*; entitas diberi nama bisnis dan kunci yang "
-            "digambar adalah kunci alami.")]
+            "Model konseptual hanya memuat domain umum atribut (teks, bilangan, desimal, tanggal, waktu, logika, geometri), "
+            "bukan tipe data DBMS, dan tidak memuat kunci *surrogate*; entitas diberi nama bisnis dan kunci yang digambar "
+            "adalah kunci alami.")]
     b += [TAB("entitas", "Identifikasi Entitas per Area Subjek", [1300, 3300, 3300], ["Area Subjek", "Entitas Konseptual", "Tabel Fisik"], [
         ["Rujukan", "Sumber Satelit, Variabel (Band), Wilayah Administrasi, Area Pantauan, Jenis Bencana, Aturan Peringatan, Ambang Mutu, Tahap Proses, Strategi Fusion, Jenis Laporan",
          "satellite_sources, spectral_bands, administrative_regions, regions_of_interest, disaster_types, alert_rules, quality_thresholds, processing_stages, fusion_strategies, report_types"],
@@ -227,16 +339,62 @@ def blocks():
         ["Pemantauan", "Observasi Wilayah, Peringatan, Kejadian Bencana, Prakiraan", "region_observations, alert_events, disaster_events, band_forecasts"],
         ["Jejak", "Laporan, Log Aktivitas, Log Audit, Peringatan Terkirim", "generated_reports, user_activity_logs, audit_log, notify_sent"],
     ])]
-    b += [P("Hubungan antarentitas digambarkan dengan notasi *Crow's Foot* dan dipecah per area subjek agar terbaca. "
-            "{G:erda} menunjukkan area Pemantauan, yang menjawab RM1 dan RM3: observasi per wilayah dan variabel, aturan "
-            "dan peringatan, serta kejadian bencana. {G:erdb} menunjukkan area Akuisisi dan Pemrosesan, yang menjawab RM2: "
-            "scene dan granule menghasilkan produk data yang saling terhubung melalui lineage dan menjadi sumber observasi. "
-            "{G:erdc} menunjukkan area Akses, yang menjawab RM4.")]
-    b += [FIG("erda", "erd_a.png", "ERD Konseptual Area Pemantauan", 13.0)]
-    b += [P('Relasi OBSERVASI dengan PERINGATAN berkardinalitas satu ke nol atau banyak, karena satu nilai hujan dapat memicu beberapa aturan sekaligus, misalnya INFO dan WARNING pada hari yang sama. Relasi PENGGUNA dengan PERINGATAN bersifat opsional karena peringatan baru memiliki penindak lanjut setelah ditindaklanjuti Analis. WILAYAH memiliki relasi rekursif karena kecamatan berada di bawah kabupaten.')]
-    b += [FIG("erdb", "erd_b.png", "ERD Konseptual Area Akuisisi, Pemrosesan, dan Prakiraan", 13.0)]
-    b += [P('Setiap PRODUK_DATA berasal dari tepat satu sumber: scene Sentinel-1, granule NASA, atau tanpa keduanya untuk produk gabungan (fusion). Aturan ini ditegakkan oleh CHECK chk_dprods_single_origin pada desain fisik. LINEAGE menghubungkan produk induk dan produk anak sehingga membentuk graf, dan FORECAST disimpan per variabel dengan wilayah yang opsional karena wilayah kosong berarti rerata seluruh wilayah kajian.')]
-    b += [FIG("erdc", "erd_c.png", "ERD Konseptual Area Akses", 10.0)]
+    b += [P("Hubungan antarentitas digambarkan dengan notasi *Crow's Foot* dan dipecah per area subjek agar terbaca pada "
+            "halaman A4. "
+            "{G:erda} menunjukkan area Pemantauan yang menjawab RM1 dan RM3, {G:erdb} menunjukkan area Akuisisi dan Lineage "
+            "yang menjawab RM2, dan {G:erdc} menunjukkan area Akses dan Jejak yang menjawab RM4. Keterhubungan antararea "
+            "dirangkum dalam satu ERD ringkas pada {G:erd_cf}. Tabel operasional modul Dataset dan "
+            "Fusion serta Live Monitoring tidak dimodelkan secara rinci pada tahap konseptual karena berperan sebagai "
+            "pendukung pemrosesan; tabel tersebut tetap tercantum pada pembagian modul dan ERD logikal.")]
+    b += [FIG("erda", "erd_a.png", "ERD Konseptual Area Pemantauan", 14.0)]
+    b += [P("Pada {G:erda}, setiap kotak menyatakan entitas beserta atribut dan domain umumnya, sedangkan garis menyatakan "
+            "relasi yang diberi nama. Kunci alami (*candidate key* terpilih) ditandai PK dan bergaris bawah, dan kunci kandidat "
+            "lain ditandai UK. Ujung garis menyatakan kardinalitas: garis ganda berarti tepat satu, garis dengan lingkaran "
+            "berarti nol atau satu, dan cabang berlingkaran berarti nol atau banyak. Kunci alami yang "
+            "digambar adalah pcode untuk Wilayah, kode_band untuk Variabel, kode_aturan untuk Aturan Peringatan, kode_jenis "
+            "untuk Jenis Bencana, dan username untuk Pengguna. Observasi, Peringatan, dan Kejadian tidak memiliki atribut "
+            "kunci tunggal karena identitasnya ditentukan oleh relasinya, misalnya satu observasi per wilayah, variabel, dan "
+            "tanggal.")]
+    b += [P("Wilayah berelasi rekursif induk dari (0..1 : N) karena kecamatan berada di bawah kabupaten. Setiap Observasi "
+            "diamati di satu Wilayah dan merupakan nilai dari satu Variabel. Satu Observasi dapat memicu banyak Peringatan, "
+            "misalnya INFO dan WARNING pada hari yang sama, dan setiap Peringatan dihasilkan oleh satu Aturan Peringatan serta "
+            "terjadi di satu Wilayah. Relasi terjadi di sengaja disimpan langsung (alert_events.region_id) agar keunikan satu "
+            "peringatan per aturan, kecamatan, dan hari dapat ditegakkan. Pengguna berelasi 0..1 dengan Peringatan pada relasi "
+            "menindaklanjuti. Kejadian wajib memiliki satu jenis, satu lokasi, dan satu pencatat, sedangkan relasi "
+            "memverifikasi bersifat opsional (0..1) karena kejadian baru diverifikasi kemudian.")]
+    b += [FIG("erdb", "erd_b.png", "ERD Konseptual Area Akuisisi dan Lineage", 12.0)]
+    b += [P("{G:erdb} memuat sembilan entitas area akuisisi dan pemrosesan. Kunci alaminya adalah kode_sumber untuk Sumber "
+            "Satelit, kode_area untuk Area Pantauan, id_produk_ESA untuk Scene Sentinel-1, gabungan sumber, tile, produk, dan "
+            "tanggal untuk Granule NASA, nama untuk Dataset, kode_tahap untuk Tahap Proses, dan path_berkas untuk Produk Data. "
+            "Sumber Satelit menerbitkan banyak Granule NASA, dan setiap scene maupun granule wajib berada dalam satu Area "
+            "Pantauan yang memicu pencariannya.")]
+    b += [P("Setiap Job Proses berada pada satu Tahap Proses dan berjangkar pada nol atau satu Scene Sentinel-1 atau Granule "
+            "NASA; job *fusion* tidak berjangkar pada keduanya (chk_pjobs_single_anchor). Setiap Produk Data ditulis oleh tepat "
+            "satu Job Proses dan dapat dimiliki oleh satu Dataset. Lineage digambar sebagai relasi rekursif M:N pada Produk "
+            "Data karena satu produk dapat menjadi induk beberapa produk dan sebaliknya; pada desain logikal relasi ini menjadi "
+            "tabel data_lineage yang juga mencatat job dan tahap pelaku transformasi. Metrik Mutu dinilai dari satu Scene "
+            "Sentinel-1 dan diukur pada satu Produk Data, yaitu COG yang dinilai.")]
+    b += [FIG("erdc", "erd_c.png", "ERD Konseptual Area Akses dan Jejak", 14.0)]
+    b += [P("{G:erdc} berpusat pada Pengguna dengan kunci alami username. Setiap Pengguna dimiliki oleh satu Peran (kunci "
+            "kode_peran dan role_DB), dan relasi rekursif membuat akun (0..1 : N) mencatat Administrator yang membuat akun "
+            "tersebut. Pengguna memiliki banyak Token API (kunci prefix) dan melakukan banyak Log Aktivitas; sisi Pengguna pada "
+            "relasi ini bernilai 0..1 karena *login* gagal dengan *username* tak dikenal tetap dicatat tanpa pengguna.")]
+    b += [P("Relasi berlangganan bersifat M:N antara Pengguna dan Kecamatan, dan pada desain logikal menjadi tabel asosiatif "
+            "user_notify_regions. Peringatan Terkirim mencatat butir yang dikirim kepada satu Pengguna tentang satu Kecamatan. "
+            "Peran menjadi audiens Jenis Laporan (kunci kode_laporan), dan setiap Laporan berjenis satu Jenis Laporan; relasi "
+            "ini menjadi dasar RLS pada generated_reports. Log Audit digambar tanpa relasi karena kolom app_user_id sengaja "
+            "tidak dijadikan *foreign key*, sehingga jejak perubahan tetap utuh walaupun data induknya berubah dan dapat "
+            "mencatat perubahan yang dilakukan langsung lewat psql.")]
+    b += [P("Ketiga area tersebut saling berbagi entitas. Keterhubungannya dirangkum pada {G:erd_cf}.")]
+    b += [FIG("erd_cf", "erd_cf.png", "ERD Konseptual Ringkas Keterhubungan Antararea", 14.0)]
+    b += [P("{G:erd_cf} mengelompokkan seluruh entitas inti ke dalam tiga area subjek dan hanya menggambar relasi yang "
+            "melintasi batas area, dengan notasi *Crow's Foot* yang sama. Atribut dan relasi di dalam setiap area tidak "
+            "digambar ulang karena sudah disajikan pada {G:erda} sampai {G:erdc}. Gambar ini menunjukkan bahwa area "
+            "Pemantauan menjadi penghubung: PENGGUNA dari area Akses dan Jejak menindaklanjuti PERINGATAN, mencatat dan "
+            "memverifikasi KEJADIAN, serta berlangganan WILAYAH, sedangkan PRODUK_DATA dari area Akuisisi dan Lineage menjadi "
+            "sumber OBSERVASI dan SUMBER_SATELIT mengukur VARIABEL. Entitas FORECAST beserta relasinya juga digambar di sini "
+            "karena tidak muncul pada ERD per area: prakiraan disimpan per variabel dengan wilayah yang opsional, karena "
+            "wilayah kosong berarti rerata seluruh wilayah kajian.")]
     b += [P("Setiap entitas memiliki *candidate key* alami. Pada perancangan fisik, kunci primer umumnya berupa kunci *surrogate*, "
             "sedangkan kunci alami dipertahankan sebagai *alternate key* (UNIQUE NOT NULL) agar baris tetap dapat dikenali "
             "tanpa ID internal. Penetapan kunci entitas utama ditunjukkan pada {T:kunci}.")]
@@ -252,6 +410,8 @@ def blocks():
         ["alert_events", "alert_id", "(rule_id, region_id, observation_date)"],
         ["data_lineage", "lineage_id", "(parent_product_id, child_product_id)"],
         ["notify_sent", "notify_id", "(user_id, region_id, item_key, data_date)"],
+        ["band_forecasts", "forecast_id", "(band_id, COALESCE(region_id, 0), data_stamp)"],
+        ["api_tokens", "token_id", "token_prefix"],
         ["user_notify_regions", "(user_id, region_id)", "—"],
     ])]
     b += [P("Domain atribut ditegakkan dengan tipe data, NOT NULL, CHECK, dan ENUM. Sebagai contoh, {T:domain} menunjukkan "
@@ -291,17 +451,37 @@ def blocks():
     b += [P('T6 adalah satu-satunya transaksi yang menggabungkan dua area subjek, yaitu peringatan dan kejadian. Penggabungannya dilakukan oleh VIEW berdasarkan kecamatan, jenis bencana, dan jendela waktu 0–3 hari, bukan oleh *foreign key*, karena peringatan dan kejadian dicatat secara terpisah dan tidak selalu berpasangan.')]
     b += [H4("Desain Logikal")]
     b += [P("Model logikal relasional disusun dari model konseptual dan masih bebas dari DBMS. Hasilnya terdiri atas 43 "
-            "relasi yang dikelompokkan ke dalam enam modul. Relasi inti modul M6 Observasi, Peringatan, dan Kejadian, yang "
-            "menjawab RM1 dan RM3, ditunjukkan pada {G:erdl} dengan domain umum (integer, string, decimal, date); ERD logikal "
-            "lengkap per modul tersedia pada repositori kode sumber penelitian.")]
+            "relasi yang dikelompokkan ke dalam enam modul, sebagaimana ditunjukkan pada {G:modul}.")]
+    b += [FIG("modul", "modul.png", "Pembagian 43 Tabel ke dalam Enam Modul", 13.0)]
+    b += [P("{G:modul} menunjukkan pembagian 43 relasi logikal ke dalam enam modul. M1 Pengguna, Laporan, dan Audit memuat "
+            "delapan tabel tentang hak masuk, token, pengaturan, laporan periodik, dan jejak (RM4). M2 Rujukan Wilayah dan "
+            "Sensor memuat empat tabel master yang dirujuk hampir semua modul. M3 Akuisisi, Pemrosesan, dan Mutu memuat sepuluh "
+            "tabel scene, job, produk, lineage, dan kontrol mutu (RM2). M4 Dataset dan Fusion memuat tujuh tabel dataset "
+            "historis, eksekusi job, *resume* per scene, dan *stack* HDF5. M5 Live Monitoring memuat empat tabel area pantauan "
+            "Sentinel-1 per lintasan. M6 Observasi, Peringatan, dan Kejadian memuat sepuluh tabel inti yang menjawab RM1 dan "
+            "RM3.")]
+    b += [P("Pembagian modul ini dipakai untuk memecah ERD logikal dan fisik agar terbaca pada halaman A4. Relasi inti modul "
+            "M6 ditunjukkan pada {G:erdl} dengan domain umum yang bebas dari DBMS; ERD logikal lengkap kelima modul lain "
+            "tersedia pada repositori kode sumber penelitian.")]
     b += [FIG("erdl", "erd_logikal_core.png", "ERD Logikal Relasi Inti Modul M6", 14.0)]
-    b += [P("Empat puluh dari 43 relasi memiliki kunci primer *surrogate* sendiri. Tiga relasi lainnya berkunci primer "
-            "komposit: band_forecast_points dan band_forecast_scores merupakan entitas lemah karena kunci primernya memuat "
-            "kunci induk (forecast_id), sedangkan user_notify_regions merupakan relasi asosiatif antara users dan "
-            "administrative_regions. Beberapa entitas lain kuat tetapi eksistensinya bergantung pada induk, yang ditegakkan dengan ON DELETE CASCADE "
-            "({T:dependen}).")]
+    b += [P("{G:erdl} menampilkan lima relasi inti modul M6 dengan domain umum (integer, string, decimal, date, datetime, "
+            "boolean, point). Kunci primer ditandai PK dan bergaris bawah, kunci asing ditandai FK dan ditulis miring, serta "
+            "*alternate key* ditandai UK. Pada region_observations, kombinasi (region_id, band_id, obs_date) menjadi "
+            "*alternate key*; pada alert_events, kombinasi (rule_id, region_id, observation_date) menjadi *alternate key*.")]
+    b += [P("Relasi di dalam modul digambar dengan garis *Crow's Foot*: region_observations memicu alert_events, alert_rules "
+            "menghasilkan alert_events, dan disaster_types menjadi rujukan bagi alert_rules dan disaster_events. Kunci asing "
+            "yang menunjuk ke tabel modul lain tidak digambar sebagai garis agar diagram tetap terbaca, tetapi diberi keterangan "
+            "tujuan di kolom kanan, yaitu administrative_regions, spectral_bands, users, data_products, dan dataset_jobs. Pada "
+            "keterangan, garis ganda pada sisi induk menyatakan FK wajib, sedangkan lingkaran dengan garis tunggal menyatakan "
+            "FK yang boleh kosong.")]
+    b += [P("Tiga puluh sembilan dari 43 relasi memiliki kunci primer *surrogate* sendiri, satu relasi (app_settings) memakai "
+            "kunci alami setting_key sebagai kunci primer karena berupa pasangan kunci-nilai, dan tiga relasi lainnya "
+            "berkunci primer komposit: band_forecast_points dan band_forecast_scores merupakan entitas lemah karena kunci "
+            "primernya memuat kunci induk (forecast_id), sedangkan user_notify_regions merupakan relasi asosiatif antara "
+            "users dan administrative_regions. Beberapa entitas lain kuat tetapi eksistensinya bergantung pada induk, yang "
+            "ditegakkan dengan ON DELETE CASCADE ({T:dependen}).")]
     b += [TAB("dependen", "Entitas Lemah dan Entitas Dependen", [2600, 2500, 2800], ["Entitas", "Induk", "Multiplicity"], [
-        ["band_forecast_points (lemah)", "band_forecasts", "1 : 0..15"],
+        ["band_forecast_points (lemah)", "band_forecasts", "1 : 1..30 (horizon bawaan 15 hari; CHECK step 1–30)"],
         ["band_forecast_scores (lemah)", "band_forecasts", "1 : 0..5"],
         ["dataset_source_config", "datasets", "1 : 1..3"],
         ["dataset_jobs", "datasets", "1 : 0..*"],
@@ -322,12 +502,24 @@ def blocks():
             "Ketergantungan fungsional relasi 1NF ditunjukkan pada {G:fd}: nilai dan run bergantung penuh pada kunci, "
             "kecamatan dan kabupaten hanya bergantung pada pcode, dan nama band, satuan, serta sumber hanya bergantung pada "
             "kode_band.")]
-    b += [FIG("fd", "fd.png", "Ketergantungan Fungsional Relasi Observasi 1NF", 13.0)]
+    b += [FIG("fd", "fd.png", "Ketergantungan Fungsional Relasi Observasi 1NF", 14.0)]
+    b += [P("{G:fd} menyusun seluruh atribut relasi Observasi 1NF dalam satu baris. Tiga atribut kunci, yaitu tanggal, pcode, "
+            "dan kode_band, diberi latar berwarna dan bergaris bawah, dan setiap ketergantungan digambar sebagai garis dari "
+            "determinan ke atribut yang ditentukan. Garis di bawah baris menunjukkan ketergantungan terhadap kunci: "
+            "ketergantungan pada pcode dan pada kode_band saja merupakan ketergantungan parsial yang melanggar 2NF. Garis "
+            "putus-putus di atas baris menunjukkan ketergantungan transitif yang melanggar 3NF, yaitu kecamatan menentukan "
+            "kabupaten serta sumber menentukan nama_sumber dan penyedia.")]
     b += [P("Pada 2NF, ketergantungan parsial dihapus dengan memindahkan atribut wilayah ke relasi Wilayah dan atribut band "
             "ke relasi Band. Pada 3NF, ketergantungan transitif dihapus: kabupaten menjadi rujukan rekursif ke Wilayah "
             "(parent_region_id), dan atribut sumber satelit dipindah ke relasi Sumber. Hasil dekomposisinya ditunjukkan pada "
             "{G:nf3}.")]
-    b += [FIG("nf3", "nf3.png", "Hasil Dekomposisi Observasi hingga 3NF", 9.0)]
+    b += [FIG("nf3", "nf3.png", "Hasil Dekomposisi Observasi hingga 3NF", 12.0)]
+    b += [P("{G:nf3} menunjukkan empat relasi hasil dekomposisi. Kabupaten tidak lagi disimpan sebagai kolom, melainkan "
+            "sebagai baris Wilayah tersendiri yang dirujuk melalui pcode_induk. Relasi Observasi hanya menyisakan kunci "
+            "komposit (tanggal, pcode, kode_band) beserta nilai dan run, sehingga setiap baris menyimpan satu fakta. Pada "
+            "desain fisik, Wilayah, Band, dan Sumber masing-masing diwujudkan sebagai administrative_regions, spectral_bands, "
+            "dan satellite_sources dengan kunci *surrogate*, sedangkan pcode, band_code, dan source_code dipertahankan sebagai "
+            "*alternate key*.")]
     b += [P("Contoh kedua adalah peringatan hujan. Atribut aturan (pembanding, ambang, *severity*, jenis) bergantung hanya pada "
             "kode aturan sehingga dipindah ke alert_rules, nama jenis bencana dipindah ke disaster_types, dan nama "
             "kecamatan dipindah ke administrative_regions. Kolom observed_value, threshold_value, dan severity tetap disimpan "
@@ -379,7 +571,9 @@ def blocks():
     ])]
     b += [P('Median diambil dari run terakhir di antara tiga run terpisah, dan urutan hasilnya stabil: rentang tiga run Q3 adalah 1,14–1,15 milidetik di PostgreSQL dan 18,3–18,6 milidetik di MySQL. Pada Q1 dan Q2, sebagian selisih berasal dari *driver* pymysql; pada uji konkurensi dengan *driver* C untuk kedua DBMS, selisihnya hanya sekitar 1,35 kali.')]
     b += [FIG("qchart", "chart_q.png", "Perbandingan Median Waktu Kueri Inti", 14.0)]
-    b += [P("PostgreSQL lebih cepat pada Q1–Q4, terutama kueri spasial (Q3) dan evaluasi peringatan (Q4). Kueri Q3 yang ditulis "
+    b += [P("Sumbu tegak {G:qchart} memakai skala logaritmik agar selisih kecil pada Q1, Q2, dan Q5 tetap terlihat di samping "
+            "selisih besar pada Q3 dan Q4. "
+            "PostgreSQL lebih cepat pada Q1–Q4, terutama kueri spasial (Q3) dan evaluasi peringatan (Q4). Kueri Q3 yang ditulis "
             "setara bahkan gagal di MySQL dengan galat 3516 karena irisan geografis menghasilkan GeometryCollection, sehingga "
             "kueri harus ditulis ulang khusus untuk MySQL. MySQL lebih cepat pada kueri rekursif Q5, meskipun keduanya di bawah "
             "1 milidetik. Pada uji skalabilitas, kueri rekap seluruh tabel (Q6) dengan 2,3 juta baris memerlukan 579 milidetik "
@@ -457,8 +651,13 @@ def blocks():
             "kolom, dan kewajiban COMMENT ini diuji oleh test_schema_comments, sehingga kamus data tidak dapat berbeda dari "
             "skema.")]
     b += [FIG("erdf", "erd_fisik_core.png", "ERD Fisik Relasi Inti Modul M6", 14.0)]
-    b += [P("Dibandingkan ERD logikal, ERD fisik menetapkan tipe data PostgreSQL, termasuk geometri PostGIS dan cap waktu "
-            "berzona, sehingga batasan domain yang semula konseptual kini ditegakkan langsung oleh DBMS. Organisasi berkas dan indeks dirancang berdasarkan pola akses ({T:indeks}). Berkas raster disimpan di "
+    b += [P("{G:erdf} memiliki struktur yang sama dengan {G:erdl}, tetapi domain umum telah diganti dengan tipe PostgreSQL 18 "
+            "dan PostGIS, sehingga batasan domain yang semula konseptual kini ditegakkan langsung oleh DBMS. Kunci *surrogate* "
+            "memakai int2, int4, atau int8 sesuai perkiraan jumlah baris; nilai ukur memakai numeric(p,s) agar presisinya "
+            "pasti; cap waktu memakai timestamptz; dan lokasi kejadian memakai geometry(Point) dengan SRID 4326. Panjang "
+            "varchar mengikuti batas yang ditegakkan aplikasi, misalnya ack_note dan impact_summary varchar(500), sedangkan "
+            "uraian kejadian disimpan sebagai text dengan CHECK panjang 10 sampai 4000 karakter.")]
+    b += [P("Organisasi berkas dan indeks dirancang berdasarkan pola akses ({T:indeks}). Berkas raster disimpan di "
             "*filesystem* dengan tier RAW, ALIGNED, DESPECKLED, INDICES, ACCUMULATED, COG, dan FUSED, sedangkan basis data "
             "hanya menyimpan metadata, lokasi, dan *checksum*-nya.")]
     b += [TAB("indeks", "Rancangan Indeks Berdasarkan Pola Akses", [2900, 1700, 3300], ["Pola Akses", "Jenis Indeks", "Contoh"], [
@@ -489,10 +688,27 @@ def blocks():
             "ini tidak memiliki hak apa pun. *Scheduler* dan *pipeline* terhubung sebagai monitor_etl. Tidak ada role aplikasi "
             "yang berstatus SUPERUSER, CREATEDB, CREATEROLE, atau BYPASSRLS.")]
     b += [FIG("role", "role.png", "Hierarki Role Aplikasi dan Role PostgreSQL", 13.0)]
+    b += [P("{G:role} memisahkan role menjadi dua kelompok. Kelompok kanan berisi lima role peran aplikasi yang tersusun dalam "
+            "hierarki pewarisan; panah segitiga kosong menunjuk ke role yang haknya diwarisi. monitor_user mewarisi "
+            "monitor_public, monitor_analyst dan monitor_data_engineer sama-sama mewarisi monitor_user, dan monitor_admin "
+            "mewarisi keduanya. Setiap role dipetakan ke satu peran aplikasi, yaitu PUBLIC (Pengunjung), USER (Relawan), "
+            "ANALYST (Analis), DATA_ENGINEER (Data Engineer), dan ADMIN (Administrator). Kelompok kiri berisi dua role yang "
+            "dapat *login*. Pada setiap *request*, API yang terhubung sebagai monitor_app menjalankan SET LOCAL ROLE ke salah "
+            "satu dari lima role peran sesuai pengguna yang masuk, sedangkan monitor_etl memakai haknya sendiri dan tidak "
+            "berpindah role.")]
     b += [P("Setiap *request* melewati tiga lapis penegakan ({G:lapis}): menu antarmuka disusun dari kunci izin, *route* API "
             "memeriksa peran, dan basis data menegakkan GRANT, VIEW, RLS, serta mencatat audit. Karena lapis ketiga berada di "
             "basis data, kueri yang lolos dari pemeriksaan API akibat kesalahan program tetap ditolak.")]
     b += [FIG("lapis", "lapis.png", "Tiga Lapis Penegakan Hak Akses", 12.0)]
+    b += [P("{G:lapis} disajikan sebagai *activity diagram* dengan tiga partisi, yaitu antarmuka, API, dan basis data, yang "
+            "ditelusuri oleh satu *request* dari peramban atau skrip. Pada partisi antarmuka, menu disusun dari kunci izin yang "
+            "dikembalikan GET /api/auth/session, sehingga halaman yang tidak diizinkan tidak ditampilkan. Pada partisi API, "
+            "setiap *route* memanggil require_role(...); bila peran tidak memenuhi, *request* ditolak dengan 401 (belum *login*) "
+            "atau 403 ROLE_FORBIDDEN, lalu alur berakhir pada *activity final node*.")]
+    b += [P("Pada partisi basis data, API membuka transaksi dengan BEGIN, SET LOCAL ROLE monitor_<peran>, dan "
+            "set_config('app.user_id', id). Kueri kemudian diperiksa terhadap GRANT tabel dan kolom, VIEW dengan batas waktu "
+            "per peran, dan *policy* RLS. Bila tidak diizinkan, basis data menolak dengan DB_PERMISSION_DENIED. Bila diizinkan "
+            "dan kueri mengubah data, *trigger* audit_row mencatatnya ke audit_log sebelum hasil dikirim.")]
     b += [P("Lapis pertama dan kedua bertujuan memudahkan pengguna dan memberi pesan galat yang jelas, sedangkan lapis "
             "ketiga adalah satu-satunya lapis yang tidak dapat dilewati oleh skrip yang terhubung langsung ke API. Hak akses langsung setiap role terhadap tabel dirangkum pada {T:grant}. Hak peran di bawah juga berlaku untuk "
             "peran di atasnya.")]
@@ -579,14 +795,41 @@ def blocks():
             "sumber, skrip DDL dan kueri, konfigurasi, kamus data, serta README untuk reproduksi tersedia pada repositori "
             "https://github.com/not-notyou-you/orbit_u_monitor.")]
     b += [FIG("arsitektur", "arsitektur.png", "Arsitektur Sistem", 14.0)]
-    b += [P("Setiap satelit diproses melalui tier berurutan dan menghasilkan COG per band. Nilai per kecamatan dihitung dari "
-            "COG dengan agregasi zonal berbobot luas irisan sel dan poligon dikalikan kosinus lintang sel sebagai pendekatan luas di permukaan bumi, lalu disimpan ke region_observations dan dipakai "
-            "untuk peringatan dan prakiraan ({G:pipeline}).")]
-    b += [FIG("pipeline", "pipeline.png", "Pipeline per Satelit", 13.0)]
+    b += [P("{G:arsitektur} menyusun arsitektur dalam empat lapisan dari kiri ke kanan. Penyedia data resmi terdiri atas ESA "
+            "CDSE (Sentinel-1), NASA LANCE/LAADS (MODIS), dan NASA GES DISC (GPM IMERG). Lapisan ETL berbahasa Python "
+            "dikendalikan oleh APScheduler dengan *advisory lock* dan menjalankan pekerjaan terjadwal berupa Job Hidromet "
+            "harian, siklus Live Sentinel-1, laporan periodik, dan prakiraan tersimpan. Peringatan surel kondisi tidak normal "
+            "dikirim setiap kali Job Hidromet harian atau siklus Live selesai. Selain itu terdapat Job Dataset yang dijalankan "
+            "sesuai permintaan Data Engineer.")]
+    b += [P("Lapisan penyimpanan terdiri atas PostgreSQL 18 dengan PostGIS (43 tabel, 22 VIEW, GRANT, RLS, dan audit) yang "
+            "ditulis ETL sebagai monitor_etl, serta *filesystem* untuk berkas COG, HDF5, PNG, dan PDF. Lapisan aplikasi terdiri "
+            "atas REST API FastAPI dengan dokumentasi OpenAPI pada /docs, yang terhubung sebagai monitor_app dengan SET LOCAL "
+            "ROLE per *request*, dan aplikasi web HTML/CSS/JS dengan Leaflet dan MapLibre 3D. Peringatan surel beserta buktinya "
+            "dikirim melalui server SMTP eksternal ke kotak masuk pengguna. Skrip lain dapat mengakses REST API menggunakan "
+            "token API.")]
+    b += [P("Setiap satelit diproses melalui tier berurutan hingga menghasilkan COG per band ({G:pipeline}).")]
+    b += [FIG("pipeline", "pipeline.png", "Pipeline per Satelit", 14.0)]
+    b += [P("{G:pipeline} menunjukkan tier setiap satelit. Sentinel-1 GRD IW (VV dan VH) dikalibrasi ke σ⁰, diproyeksikan ke "
+            "EPSG:4326, dan dipotong ke AOI pada tier ALIGNED, lalu difilter dengan Lee 7×7 pada tier DESPECKLED. COG "
+            "Sentinel-1 kemudian dinilai mutunya dan hasilnya disimpan ke quality_metrics. MODIS (MCDWD dan MOD09A1/GA) "
+            "diselaraskan menjadi peta banjir, lalu diturunkan menjadi indeks NDVI dan NDWI. GPM IMERG diambil dengan prioritas "
+            "run Final, Late, lalu Early, diselaraskan menjadi hujan harian, dan diakumulasi menjadi 24 jam, 72 jam, 7 hari, "
+            "dan 30 hari.")]
+    b += [P("COG dari ketiga satelit digunakan untuk dua keluaran. Pertama, produk FUSED multi-sensor dalam format HDF5. "
+            "Kedua, agregasi zonal per kecamatan dengan bobot luas irisan sel dan poligon dikalikan kosinus lintang sel sebagai "
+            "pendekatan luas di permukaan bumi, yang hasilnya disimpan ke region_observations. Nilai observasi tersebut "
+            "kemudian dipakai untuk membangkitkan alert_events dan menghitung band_forecasts.")]
     b += [P("Setiap berkas keluaran dicatat di data_products dengan *checksum* SHA-256, dan setiap transformasi dicatat di "
-            "data_lineage sebagai sisi graf dari produk induk ke produk anak ({G:lineage}). Dengan demikian, nilai di "
-            "region_observations dapat ditelusuri melalui source_product_id hingga berkas mentah dan scene asalnya.")]
-    b += [FIG("lineage", "lineage.png", "Alur Lineage Data", 6.5)]
+            "data_lineage sebagai sisi graf dari produk induk ke produk anak ({G:lineage}).")]
+    b += [FIG("lineage", "lineage.png", "Alur Lineage Data", 14.0)]
+    b += [P("{G:lineage} mencontohkan lineage satu scene Sentinel-1. Setiap kotak di dalam wadah DATA_PRODUCTS adalah satu "
+            "baris data_products yang menyimpan lokasi berkas dan *checksum* SHA-256, dan setiap panah di antara kotak adalah "
+            "satu baris data_lineage yang mencatat transformation_type-nya: CROP dari RAW ke ALIGNED (kalibrasi dan pemotongan "
+            "ke AOI), LEE_FILTER ke DESPECKLED, dan GOLD_EXPORT ke COG. Setiap baris lineage wajib mencatat processing_jobs "
+            "pelaku dan processing_stages-nya, serta *checksum* masukan dan keluaran.")]
+    b += [P("Produk COG kemudian dinilai mutunya pada tahap QUALITY_ANALYTICS, dan hasilnya disimpan ke quality_metrics per "
+            "scene dan band. Nilai per kecamatan di region_observations menyimpan source_product_id yang menunjuk ke COG "
+            "asalnya, sehingga setiap angka dapat ditelusuri mundur hingga berkas mentah dan satellite_scenes.")]
     b += [P("Karena setiap sisi graf menyimpan *checksum* masukan dan keluaran, perubahan berkas setelah diproses dapat "
             "dideteksi, dan nilai yang meragukan dapat dihitung ulang dari produk induknya tanpa mengunduh ulang seluruh "
             "data. Pekerjaan otomatis dijalankan APScheduler dengan *advisory lock* PostgreSQL agar satu pekerjaan tidak berjalan "
@@ -638,7 +881,14 @@ def blocks():
     b += [H3("Testing")]
     b += [P("Pengujian mencakup enam evaluasi minimum sesuai rancangan pada subbab 3.4.3. Hubungan antara alat uji dan "
             "evaluasi yang dibuktikannya ditunjukkan pada {G:strategi}.")]
-    b += [FIG("strategi", "strategi.png", "Strategi Pengujian", 8.0)]
+    b += [FIG("strategi", "strategi.png", "Strategi Pengujian", 12.0)]
+    b += [P("{G:strategi} memetakan alat uji ke enam evaluasi minimum. Pengujian oleh pengguna terdiri atas wawancara dengan "
+            "Ketua GMLS pada 16 Oktober 2026 dan kuesioner tinjauan kebutuhan, yang keduanya membuktikan evaluasi "
+            "*requirement/user review*. Pengujian teknis berjalan otomatis. Sebanyak 1.185 tes pytest mencakup unit, API, RBAC, "
+            "dan ETL, serta membuktikan evaluasi *integrity*, *functional*, dan *security*. Skrip grant_matrix.sql memeriksa "
+            "GRANT, VIEW, dan RLS sebagai bukti tambahan evaluasi *security*. *Benchmark* Q1 sampai Q6 serta E1 sampai E3 "
+            "membuktikan evaluasi *query*, sedangkan uji pemulihan berupa *backup/restore* serta *kill and resume* membuktikan "
+            "evaluasi *backup/recovery*.")]
     b += [P('Pengujian otomatis dijalankan pada basis data uji yang terpisah, sehingga tidak mengubah data produksi. Uji pencadangan dan pemulihan memakai salinan basis data produksi agar hasilnya mencerminkan data yang sebenarnya.')]
     b += [H4("Requirement/User Review")]
     b += [P("Kuesioner tinjauan kebutuhan dengan lima bagian (Tabel 3.3) diisi pada 27 Oktober 2026 oleh tiga orang "

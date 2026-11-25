@@ -1,0 +1,2981 @@
+{
+ "khan": {
+  "type": "journal-article",
+  "id": "08f40765-7d19-5916-8e58-0cbf722e5946",
+  "title": "A Systematic Review of Disaster Management Systems: Approaches, Challenges, and Future Directions",
+  "author": [
+   {
+    "family": "Khan",
+    "given": "Saad Mazhar",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Shafi",
+    "given": "Imran",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Butt",
+    "given": "Wasi Haider",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Diez",
+    "given": "Isabel de la Torre",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Flores",
+    "given": "Miguel Angel López",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Galán",
+    "given": "Juan Castanedo",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Ashraf",
+    "given": "Imran",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Land",
+  "container-title-short": "Land",
+  "publisher": "MDPI AG",
+  "volume": "12",
+  "issue": "8",
+  "page": "1514",
+  "DOI": "10.3390/land12081514",
+  "URL": "http://dx.doi.org/10.3390/land12081514",
+  "ISSN": "2073-445X",
+  "issued": {
+   "date-parts": [
+    [
+     2023
+    ]
+   ]
+  }
+ },
+ "deng": {
+  "type": "journal-article",
+  "id": "6cf5736f-8105-57ba-8168-ae341efca88c",
+  "title": "The application of database systems in information management",
+  "author": [
+   {
+    "family": "Deng",
+    "given": "Tianle",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Applied and Computational Engineering",
+  "container-title-short": "ACE",
+  "publisher": "EWA Publishing",
+  "volume": "40",
+  "issue": "1",
+  "page": "33-42",
+  "DOI": "10.54254/2755-2721/40/20230625",
+  "URL": "http://dx.doi.org/10.54254/2755-2721/40/20230625",
+  "ISSN": "2755-2721",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "wang": {
+  "type": "journal-article",
+  "id": "06673cf0-4859-55e7-8397-60e447569823",
+  "title": "Digital Platform Empowering China-Pakistan Economic Corridor Disaster Management: Enhancing Data Integration, Resilience, and Policy Innovation",
+  "author": [
+   {
+    "family": "Wang",
+    "given": "Juanle",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Bu",
+    "given": "Kun",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Li",
+    "given": "Congrong",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Yuan",
+    "given": "Yuelei",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Yan",
+    "given": "Xinrong",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Xu",
+    "given": "Chen",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Sajjad",
+    "given": "Meer Muhammad",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Hao",
+    "given": "Lina",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Liu",
+    "given": "Jiazhuo",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Min",
+    "given": "Xiaodong",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "International Journal of Disaster Risk Science",
+  "container-title-short": "Int J Disaster Risk Sci",
+  "publisher": "Springer Science and Business Media LLC",
+  "volume": "16",
+  "issue": "3",
+  "page": "376-391",
+  "DOI": "10.1007/s13753-025-00644-3",
+  "URL": "http://dx.doi.org/10.1007/s13753-025-00644-3",
+  "ISSN": "2095-0055",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "shafiya": {
+  "type": "journal-article",
+  "id": "bce30e96-f353-5a70-bded-4a9c095a68ed",
+  "title": "Development of Java Island-scale Flood Model using CaMa-Flood",
+  "author": [
+   {
+    "family": "Shafiya",
+    "given": "Adristi",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Kuntoro",
+    "given": "Arno Adi",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Wira Rohmat",
+    "given": "Faizal Immaddudin",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Wijayasari",
+    "given": "Winda",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "IOP Conference Series: Earth and Environmental Science",
+  "container-title-short": "IOP Conf. Ser.: Earth Environ. Sci.",
+  "publisher": "IOP Publishing",
+  "volume": "1472",
+  "issue": "1",
+  "page": "012031",
+  "DOI": "10.1088/1755-1315/1472/1/012031",
+  "URL": "http://dx.doi.org/10.1088/1755-1315/1472/1/012031",
+  "ISSN": "1755-1307",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "hidayah": {
+  "type": "journal-article",
+  "id": "4c42e26a-6074-5a0f-a3a8-0ebd613daba1",
+  "title": "Performance of GPM-IMERG satellite precipitation for rainfall-runoff modeling in Indonesia",
+  "author": [
+   {
+    "family": "Hidayah",
+    "given": "Entin",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Saifurridzal",
+    "given": "Saifurridzal",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Wiyono",
+    "given": "Retno Utami Agung",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Widiarti",
+    "given": "Wiwik Yunarni",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Martini",
+    "given": "Resa",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Water Practice &amp; Technology",
+  "publisher": "IWA Publishing",
+  "volume": "19",
+  "issue": "10",
+  "page": "3909-3928",
+  "DOI": "10.2166/wpt.2024.240",
+  "URL": "http://dx.doi.org/10.2166/wpt.2024.240",
+  "ISSN": "1751-231X",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "kovacs": {
+  "type": "journal-article",
+  "id": "b665a226-6ea4-5017-955c-61597f678685",
+  "title": "Copernicus Data Space Ecosystem establishes public cloud processing for earth observation data",
+  "author": [
+   {
+    "family": "Kovács",
+    "given": "Dávid D.",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Musial",
+    "given": "Jan",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Bojanowski",
+    "given": "Jędrzej",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Clarijs",
+    "given": "Dennis",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "de la Mar",
+    "given": "Jurry",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Zlinszky",
+    "given": "András",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Scientific Data",
+  "container-title-short": "Sci Data",
+  "publisher": "Springer Science and Business Media LLC",
+  "volume": "13",
+  "issue": "1",
+  "DOI": "10.1038/s41597-026-06765-8",
+  "URL": "http://dx.doi.org/10.1038/s41597-026-06765-8",
+  "ISSN": "2052-4463",
+  "number": "537",
+  "issued": {
+   "date-parts": [
+    [
+     2026
+    ]
+   ]
+  }
+ },
+ "tarpanelli": {
+  "type": "journal-article",
+  "id": "2447f14b-26a9-5213-9df8-595c1c268251",
+  "title": "Effectiveness of Sentinel-1 and Sentinel-2  for flood detection assessment in Europe",
+  "author": [
+   {
+    "family": "Tarpanelli",
+    "given": "Angelica",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Mondini",
+    "given": "Alessandro C.",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Camici",
+    "given": "Stefania",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Natural Hazards and Earth System Sciences",
+  "container-title-short": "Nat. Hazards Earth Syst. Sci.",
+  "publisher": "Copernicus GmbH",
+  "volume": "22",
+  "issue": "8",
+  "page": "2473-2489",
+  "DOI": "10.5194/nhess-22-2473-2022",
+  "URL": "http://dx.doi.org/10.5194/nhess-22-2473-2022",
+  "ISSN": "1684-9981",
+  "issued": {
+   "date-parts": [
+    [
+     2022
+    ]
+   ]
+  }
+ },
+ "roman": {
+  "type": "journal-article",
+  "id": "2b632a24-13cd-55a0-b3c0-4b8dab5e69ca",
+  "title": "Continuity between NASA MODIS Collection 6.1 and VIIRS Collection 2 land products",
+  "author": [
+   {
+    "family": "Román",
+    "given": "Miguel O.",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Justice",
+    "given": "Chris",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Paynter",
+    "given": "Ian",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Boucher",
+    "given": "Peter B.",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Devadiga",
+    "given": "Sadashiva",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Endsley",
+    "given": "Arthur",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Erb",
+    "given": "Angela",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Friedl",
+    "given": "Mark",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Gao",
+    "given": "Huilin",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Giglio",
+    "given": "Louis",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Gray",
+    "given": "Josh M.",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Hall",
+    "given": "Dorothy",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Hulley",
+    "given": "Glynn",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Kimball",
+    "given": "John",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Knyazikhin",
+    "given": "Yuri",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Lyapustin",
+    "given": "Alexei",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Myneni",
+    "given": "Ranga B.",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Noojipady",
+    "given": "Praveen",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Pu",
+    "given": "Jiabin",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Riggs",
+    "given": "George",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Sarkar",
+    "given": "Sudipta",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Schaaf",
+    "given": "Crystal",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Shah",
+    "given": "Deep",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Tran",
+    "given": "Khuong H.",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Vermote",
+    "given": "Eric",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Wang",
+    "given": "Dongdong",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Wang",
+    "given": "Zhuosen",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Wu",
+    "given": "Aisheng",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Ye",
+    "given": "Yongchang",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Shen",
+    "given": "Yu",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Zhang",
+    "given": "Shuai",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Zhang",
+    "given": "Shuai",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Zhang",
+    "given": "Xiaoyang",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Zhao",
+    "given": "Maosheng",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Davidson",
+    "given": "Carol",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Wolfe",
+    "given": "Robert",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Remote Sensing of Environment",
+  "container-title-short": "Remote Sensing of Environment",
+  "publisher": "Elsevier BV",
+  "volume": "302",
+  "page": "113963",
+  "DOI": "10.1016/j.rse.2023.113963",
+  "URL": "http://dx.doi.org/10.1016/j.rse.2023.113963",
+  "ISSN": "0034-4257",
+  "number": "113963",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "zhu": {
+  "type": "journal-article",
+  "id": "37dd6bdb-6a63-5b69-82dc-375d1b8dcb5b",
+  "title": "Evaluation of IMERG climate trends over land in the TRMM and GPM eras",
+  "author": [
+   {
+    "family": "Zhu",
+    "given": "Siyu",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Li",
+    "given": "Zhi",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Chen",
+    "given": "Mengye",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Wen",
+    "given": "Yixin",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Liu",
+    "given": "Zhong",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Huffman",
+    "given": "George J",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Tsoodle",
+    "given": "Theresa E",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Ferraro",
+    "given": "Sebastian C",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Wang",
+    "given": "Yuzhou",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Hong",
+    "given": "Yang",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Environmental Research Letters",
+  "container-title-short": "Environ. Res. Lett.",
+  "publisher": "IOP Publishing",
+  "volume": "20",
+  "issue": "1",
+  "page": "014064",
+  "DOI": "10.1088/1748-9326/ad984e",
+  "URL": "http://dx.doi.org/10.1088/1748-9326/ad984e",
+  "ISSN": "1748-9326",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "ansori": {
+  "type": "journal-article",
+  "id": "45ee6925-7220-518a-8037-69815aa996cf",
+  "title": "A Comprehensive Evaluation of GPM IMERG Satellite Rainfall Data Across Multiple Temporal and Spatial Scales for Sustainable Flood Risk Management in East Java, Indonesia",
+  "author": [
+   {
+    "family": "Ansori",
+    "given": "Mohamad Bagus",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "JBS",
+    "given": "I.D. Bagus",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Sustainability",
+  "container-title-short": "Sustainability",
+  "publisher": "MDPI AG",
+  "volume": "18",
+  "issue": "9",
+  "page": "4550",
+  "DOI": "10.3390/su18094550",
+  "URL": "http://dx.doi.org/10.3390/su18094550",
+  "ISSN": "2071-1050",
+  "issued": {
+   "date-parts": [
+    [
+     2026
+    ]
+   ]
+  }
+ },
+ "liu": {
+  "type": "journal-article",
+  "id": "4e76288a-fa45-5149-929c-2a03d1e0ede8",
+  "title": "Characterizing the 2022 Extreme Drought Event over the Poyang Lake Basin Using Multiple Satellite Remote Sensing Observations and In Situ Data",
+  "author": [
+   {
+    "family": "Liu",
+    "given": "Sulan",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Wu",
+    "given": "Yunlong",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Xu",
+    "given": "Guodong",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Cheng",
+    "given": "Siyu",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Zhong",
+    "given": "Yulong",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Zhang",
+    "given": "Yi",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Remote Sensing",
+  "container-title-short": "Remote Sensing",
+  "publisher": "MDPI AG",
+  "volume": "15",
+  "issue": "21",
+  "page": "5125",
+  "DOI": "10.3390/rs15215125",
+  "URL": "http://dx.doi.org/10.3390/rs15215125",
+  "ISSN": "2072-4292",
+  "issued": {
+   "date-parts": [
+    [
+     2023
+    ]
+   ]
+  }
+ },
+ "castro": {
+  "type": "journal-article",
+  "id": "f873f865-6bfa-51b8-88ed-78d2bfc2f8b6",
+  "title": "Assessment of the October 2024 Cut-Off Low Event Floods Impact in Valencia (Spain) with Satellite and Geospatial Data",
+  "author": [
+   {
+    "family": "Castro-Melgar",
+    "given": "Ignacio",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Falaras",
+    "given": "Triantafyllos",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Basiou",
+    "given": "Eleftheria",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Parcharidis",
+    "given": "Issaak",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Remote Sensing",
+  "container-title-short": "Remote Sensing",
+  "publisher": "MDPI AG",
+  "volume": "17",
+  "issue": "13",
+  "page": "2145",
+  "DOI": "10.3390/rs17132145",
+  "URL": "http://dx.doi.org/10.3390/rs17132145",
+  "ISSN": "2072-4292",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "weiss": {
+  "type": "journal-article",
+  "id": "79f2ac36-5e85-57a0-b202-4c80ced0f6a9",
+  "title": "SenSARP: A pipeline to pre-process Sentinel-1 SLC data by using ESA SNAP Sentinel-1 Toolbox",
+  "author": [
+   {
+    "family": "Weiß",
+    "given": "Thomas",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Fincke",
+    "given": "Tonio",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Journal of Open Source Software",
+  "container-title-short": "JOSS",
+  "publisher": "The Open Journal",
+  "volume": "7",
+  "issue": "69",
+  "page": "3337",
+  "DOI": "10.21105/joss.03337",
+  "URL": "http://dx.doi.org/10.21105/joss.03337",
+  "ISSN": "2475-9066",
+  "issued": {
+   "date-parts": [
+    [
+     2022
+    ]
+   ]
+  }
+ },
+ "upadhyay": {
+  "type": "journal-article",
+  "id": "8ffd0ad5-ac40-55d1-bf2b-2d11b439abde",
+  "title": "A Flexible Multi-Temporal and Multi-Modal Framework for Sentinel-1 and Sentinel-2 Analysis Ready Data",
+  "author": [
+   {
+    "family": "Upadhyay",
+    "given": "Priti",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Czerkawski",
+    "given": "Mikolaj",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Davison",
+    "given": "Christopher",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Cardona",
+    "given": "Javier",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Macdonald",
+    "given": "Malcolm",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Andonovic",
+    "given": "Ivan",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Michie",
+    "given": "Craig",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Atkinson",
+    "given": "Robert",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Papadopoulou",
+    "given": "Nikela",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Nikas",
+    "given": "Konstantinos",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Tachtatzis",
+    "given": "Christos",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Remote Sensing",
+  "container-title-short": "Remote Sensing",
+  "publisher": "MDPI AG",
+  "volume": "14",
+  "issue": "5",
+  "page": "1120",
+  "DOI": "10.3390/rs14051120",
+  "URL": "http://dx.doi.org/10.3390/rs14051120",
+  "ISSN": "2072-4292",
+  "issued": {
+   "date-parts": [
+    [
+     2022
+    ]
+   ]
+  }
+ },
+ "dev": {
+  "type": "journal-article",
+  "id": "dcd54bf0-9b18-59c7-bd8e-d8f2f6198a99",
+  "title": "Integrated geospatial database design for land use pattern analysis and its impact on local governance: A case study of Manesar Urban Complex, Gurugram, India",
+  "author": [
+   {
+    "family": "Dev",
+    "given": "Manuj",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Krishna",
+    "given": "Vanama Venkata Sai",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Kumar",
+    "given": "Deepak",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Jha",
+    "given": "Manas Kumar",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Journal of Applied and Natural Science",
+  "container-title-short": "JANS",
+  "publisher": "ANSF Publications",
+  "volume": "15",
+  "issue": "4",
+  "page": "1541-1556",
+  "DOI": "10.31018/jans.v15i4.5084",
+  "URL": "http://dx.doi.org/10.31018/jans.v15i4.5084",
+  "ISSN": "2231-5209",
+  "issued": {
+   "date-parts": [
+    [
+     2023
+    ]
+   ]
+  }
+ },
+ "vattumilli": {
+  "type": "journal-article",
+  "id": "b25a84b4-293e-51b9-b2cd-95ffc9ebcc22",
+  "title": "Metadata-Driven ETL Pipelines: A Framework for Scalable Data Integration Architecture",
+  "author": [
+   {
+    "family": "Pradeep Kumar Vattumilli",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "International Journal of Scientific Research in Computer Science, Engineering and Information Technology",
+  "container-title-short": "Int. J. Sci. Res. Comput. Sci. Eng. Inf. Technol",
+  "publisher": "Technoscience Academy",
+  "volume": "10",
+  "issue": "6",
+  "page": "1799-1807",
+  "DOI": "10.32628/cseit241061224",
+  "URL": "http://dx.doi.org/10.32628/CSEIT241061224",
+  "ISSN": "2456-3307",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "gopaluni": {
+  "type": "journal-article",
+  "id": "57637582-7bc0-5fd0-a555-169d0014a7d6",
+  "title": "Metadata Driven Optimization of Distributed ETL Pipelines in Cloud Native Data Warehouses",
+  "author": [
+   {
+    "family": "Jitendra Gopaluni",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "International Journal of Computational and Experimental Science and Engineering",
+  "container-title-short": "IJCESEN",
+  "publisher": "Iskender AKKURT",
+  "volume": "11",
+  "issue": "4",
+  "DOI": "10.22399/ijcesen.4742",
+  "URL": "http://dx.doi.org/10.22399/ijcesen.4742",
+  "ISSN": "2149-9144",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "ananth": {
+  "type": "journal-article",
+  "id": "ad63c9f6-6583-5093-b311-aca75973eb5f",
+  "title": "Governance Frameworks for Large-Scale ETL Ecosystems in Complex Data Environments",
+  "author": [
+   {
+    "family": "Vasudevan Ananthakrishnan",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Journal of Computer Science and Technology Studies",
+  "container-title-short": "JCSTS",
+  "publisher": "Al-Kindi Center for Research and Development",
+  "volume": "8",
+  "issue": "5",
+  "page": "82-87",
+  "DOI": "10.32996/jcsts.2026.8.5.5",
+  "URL": "http://dx.doi.org/10.32996/jcsts.2026.8.5.5",
+  "ISSN": "2709-104X",
+  "issued": {
+   "date-parts": [
+    [
+     2026
+    ]
+   ]
+  }
+ },
+ "male": {
+  "type": "journal-article",
+  "id": "37811bed-25bd-5893-9b76-d7ec5eeb6041",
+  "title": "Decoding Role-Based Access Control (RBAC)",
+  "author": [
+   {
+    "family": "Vinay Reddy Male",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "International Journal of Scientific Research in Computer Science, Engineering and Information Technology",
+  "container-title-short": "Int. J. Sci. Res. Comput. Sci. Eng. Inf. Technol",
+  "publisher": "Technoscience Academy",
+  "volume": "11",
+  "issue": "1",
+  "page": "2082-2090",
+  "DOI": "10.32628/cseit251112211",
+  "URL": "http://dx.doi.org/10.32628/CSEIT251112211",
+  "ISSN": "2456-3307",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "purwitasari": {
+  "type": "journal-article",
+  "id": "8e868231-08e5-597f-bcec-21c14cb03377",
+  "title": "Implementasi Role-Based Access Control (RBAC) untuk Keamanan Sistem Informasi Penjualan Perhiasan pada Postgresql di Pgadmin4 dan Dbeaver",
+  "author": [
+   {
+    "family": "Astri Purwitasari",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Reisa Permatasari",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Agung Brastama Putra",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Jurnal SCRIPT",
+  "container-title-short": "SCRIPT",
+  "publisher": "Institut Sains and Teknologi AKPRIND Yogyakarta",
+  "volume": "13",
+  "issue": "2",
+  "page": "134-143",
+  "DOI": "10.34151/script.v13i2.5464",
+  "URL": "http://dx.doi.org/10.34151/script.v13i2.5464",
+  "ISSN": "2338-6304",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "tilung": {
+  "type": "paper-conference",
+  "id": "67afc8da-863c-5c59-99d8-84c95afee798",
+  "title": "Analysis and Visualization of Earthquake Patterns (2021-2025) in the South Lebak Region Based on the Dataset from Gugus Mitigasi Lebak Selatan",
+  "author": [
+   {
+    "family": "Tilung",
+    "given": "Gilbert Evan",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Prastomo",
+    "given": "Niki",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Reza",
+    "given": "Anis Faisal",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "2025 8th International Conference on New Media Studies (CONMEDIA)",
+  "publisher": "IEEE",
+  "page": "163-170",
+  "DOI": "10.1109/conmedia67140.2025.11290328",
+  "URL": "http://dx.doi.org/10.1109/CONMEDIA67140.2025.11290328",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "wong": {
+  "type": "journal-article",
+  "id": "546c9a24-e894-5383-aaf8-dc4a45c6f137",
+  "title": "Perancangan Dasbor Pra-Bencana Tsunami di Gugus Mitigasi Lebak Selatan: Visualisasi dan Mitigasi di Panggarangan",
+  "author": [
+   {
+    "family": "Wong",
+    "given": "Richard Faustine",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Sanjaya",
+    "given": "Samuel Ady",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Darren",
+    "given": "Christopher",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Yahya",
+    "given": "Howard",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Riyadi",
+    "given": "Muhammad Fikri",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "G-Tech: Jurnal Teknologi Terapan",
+  "container-title-short": "G-Tech",
+  "publisher": "Fakultas Sains dan Teknologi, Unira Malang",
+  "volume": "8",
+  "issue": "4",
+  "page": "2241-2252",
+  "DOI": "10.70609/gtech.v8i4.4763",
+  "URL": "http://dx.doi.org/10.70609/gtech.v8i4.4763",
+  "ISSN": "2623-064X",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "pradipta": {
+  "type": "journal-article",
+  "id": "a0410d2c-903e-5485-a95d-9684a898bc50",
+  "title": "PERANCANGAN PEMODELAN BASIS DATA SISTEM INFORMASI SECARA KONSEPTUAL DAN LOGIKAL",
+  "author": [
+   {
+    "family": "Pradipta",
+    "given": "Rio Ariestia",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Wintoro",
+    "given": "Puput Budi",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Budiyanto",
+    "given": "Deny",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Jurnal Informatika dan Teknik Elektro Terapan",
+  "container-title-short": "JITET",
+  "publisher": "Lembaga Penelitian dan Pengabdian kepada Masyarakat Universitas Lampung",
+  "volume": "10",
+  "issue": "2",
+  "DOI": "10.23960/jitet.v10i2.2541",
+  "URL": "http://dx.doi.org/10.23960/jitet.v10i2.2541",
+  "ISSN": "2303-0577",
+  "issued": {
+   "date-parts": [
+    [
+     2022
+    ]
+   ]
+  }
+ },
+ "rahmawati": {
+  "type": "journal-article",
+  "id": "e79e11fe-702f-5181-8dc0-e048fb84e0c1",
+  "title": "ANALISIS PERANCANGAN DATABASE MANAGEMEN SISTEM UNTUK SISTEM PENUNJANG PROSES BISNIS WEDANG UWUH INSTAN",
+  "author": [
+   {
+    "family": "Titik Rahmawati",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Eka Yulia Sari",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Anjasmara Tanjung Shakti",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Atthaya Nanda Yomura",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "TEKNIMEDIA: Teknologi Informasi dan Multimedia",
+  "container-title-short": "teknimedia",
+  "publisher": "STMIK Syaikh Zainuddin NW Anjani-Lombok Timur",
+  "volume": "4",
+  "issue": "1",
+  "page": "61-69",
+  "DOI": "10.46764/teknimedia.v4i1.104",
+  "URL": "http://dx.doi.org/10.46764/teknimedia.v4i1.104",
+  "ISSN": "2722-6271",
+  "issued": {
+   "date-parts": [
+    [
+     2023
+    ]
+   ]
+  }
+ },
+ "siregar": {
+  "type": "journal-article",
+  "id": "14094b62-3967-5311-aab9-96c12862132b",
+  "title": "SISTEM INFORMASI PEMESANAN MAKANAN ONLINE",
+  "author": [
+   {
+    "family": "Moniqah Febbyanti Siregar",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Ryanalea Ananda Adithia",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Ratu Azizzah",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Iin Ernawati",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Jurnal Riset Sistem Informasi",
+  "container-title-short": "JISSI",
+  "publisher": "CV. Denasya Smart Publisher",
+  "volume": "2",
+  "issue": "4",
+  "page": "13-19",
+  "DOI": "10.69714/4t9nht72",
+  "URL": "http://dx.doi.org/10.69714/4t9nht72",
+  "ISSN": "3047-9010",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "kaptsov": {
+  "type": "journal-article",
+  "id": "30764bed-7a0f-5116-86da-e7be09e0e671",
+  "title": "Applying Postgis for Storage and Processing of Geospatial Data in Logistics System",
+  "author": [
+   {
+    "family": "Kaptosv",
+    "given": "Liubomyr",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "The American Journal of Engineering and Technology",
+  "container-title-short": "tajet",
+  "publisher": "The USA Journals",
+  "volume": "07",
+  "issue": "08",
+  "page": "318-327",
+  "DOI": "10.37547/tajet/volume07issue08-28",
+  "URL": "http://dx.doi.org/10.37547/tajet/volume07issue08-28",
+  "ISSN": "2689-0984",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "kaptsov_api": {
+  "type": "journal-article",
+  "id": "62917bb9-0e72-52f4-8bdd-5d73389d05b5",
+  "title": "RESTful API Design for Geospatial Logistics Platforms Using Type Script and Laravel",
+  "author": [
+   {
+    "family": "Kaptosv",
+    "given": "Liubomyr",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Journal of Information, Technology and Policy",
+  "container-title-short": "JITP",
+  "publisher": "Global Science Publishing Pte. Ltd.",
+  "page": "1-13",
+  "DOI": "10.62836/jitp.2025.515",
+  "URL": "http://dx.doi.org/10.62836/jitp.2025.515",
+  "ISSN": "3041-0649",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "papasani": {
+  "type": "journal-article",
+  "id": "4273f59e-b836-5f21-bdda-82cc5cf6c53c",
+  "title": "PostGIS-powered proximity queries: implementation and Google Maps visualization",
+  "author": [
+   {
+    "family": "Papasani",
+    "given": "Pavan Kumar",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Papasani",
+    "given": "Ravi Teja",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "PeerJ Computer Science",
+  "publisher": "PeerJ",
+  "volume": "11",
+  "page": "e3220",
+  "DOI": "10.7717/peerj-cs.3220",
+  "URL": "http://dx.doi.org/10.7717/peerj-cs.3220",
+  "ISSN": "2376-5992",
+  "number": "e3220",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "tran": {
+  "type": "journal-article",
+  "id": "36c6b749-4382-57a4-8512-aecb8300ccb7",
+  "title": "Surface Water Mapping and Flood Monitoring in the Mekong Delta Using Sentinel-1 SAR Time Series and Otsu Threshold",
+  "author": [
+   {
+    "family": "Tran",
+    "given": "Khuong H.",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Menenti",
+    "given": "Massimo",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Jia",
+    "given": "Li",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Remote Sensing",
+  "container-title-short": "Remote Sensing",
+  "publisher": "MDPI AG",
+  "volume": "14",
+  "issue": "22",
+  "page": "5721",
+  "DOI": "10.3390/rs14225721",
+  "URL": "http://dx.doi.org/10.3390/rs14225721",
+  "ISSN": "2072-4292",
+  "issued": {
+   "date-parts": [
+    [
+     2022
+    ]
+   ]
+  }
+ },
+ "halder": {
+  "type": "journal-article",
+  "id": "5a7d8e4e-38fb-5f3d-87d1-c95f20f6c9d9",
+  "title": "Large-Scale Flood Hazard Monitoring and Impact Assessment on Landscape: Representative Case Study in India",
+  "author": [
+   {
+    "family": "Halder",
+    "given": "Bijay",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Barman",
+    "given": "Subhadip",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Banik",
+    "given": "Papiya",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Das",
+    "given": "Puja",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Bandyopadhyay",
+    "given": "Jatisankar",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Tangang",
+    "given": "Fredolin",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Shahid",
+    "given": "Shamsuddin",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Pande",
+    "given": "Chaitanya B.",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Al-Ramadan",
+    "given": "Baqer",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Yaseen",
+    "given": "Zaher Mundher",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Sustainability",
+  "container-title-short": "Sustainability",
+  "publisher": "MDPI AG",
+  "volume": "15",
+  "issue": "14",
+  "page": "11413",
+  "DOI": "10.3390/su151411413",
+  "URL": "http://dx.doi.org/10.3390/su151411413",
+  "ISSN": "2071-1050",
+  "issued": {
+   "date-parts": [
+    [
+     2023
+    ]
+   ]
+  }
+ },
+ "alonso": {
+  "type": "journal-article",
+  "id": "d8315ddb-70a4-521a-aa76-559e08347fb0",
+  "title": "Detecting Flooded Areas Using Sentinel-1 SAR Imagery",
+  "author": [
+   {
+    "family": "Alonso-Sarria",
+    "given": "Francisco",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Valdivieso-Ros",
+    "given": "Carmen",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Molina-Pérez",
+    "given": "Gabriel",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Remote Sensing",
+  "container-title-short": "Remote Sensing",
+  "publisher": "MDPI AG",
+  "volume": "17",
+  "issue": "8",
+  "page": "1368",
+  "DOI": "10.3390/rs17081368",
+  "URL": "http://dx.doi.org/10.3390/rs17081368",
+  "ISSN": "2072-4292",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "misra": {
+  "type": "journal-article",
+  "id": "c480b7f6-55a0-5b5f-b3ce-6f7830b1e95b",
+  "title": "Mapping global floods with 10 years of satellite radar data",
+  "author": [
+   {
+    "family": "Misra",
+    "given": "Amit",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "White",
+    "given": "Kevin",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Nsutezo",
+    "given": "Simone Fobi",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Straka",
+    "given": "William",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Lavista",
+    "given": "Juan",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Nature Communications",
+  "container-title-short": "Nat Commun",
+  "publisher": "Springer Science and Business Media LLC",
+  "volume": "16",
+  "issue": "1",
+  "DOI": "10.1038/s41467-025-60973-1",
+  "URL": "http://dx.doi.org/10.1038/s41467-025-60973-1",
+  "ISSN": "2041-1723",
+  "number": "5762",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "klein": {
+  "type": "journal-article",
+  "id": "42561627-c310-51da-8364-e5278bdc05c0",
+  "title": "Global WaterPack - The development of global surface water over the past 20 years at daily temporal resolution",
+  "author": [
+   {
+    "family": "Klein",
+    "given": "Igor",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Uereyen",
+    "given": "Soner",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Sogno",
+    "given": "Patrick",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Twele",
+    "given": "André",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Hirner",
+    "given": "Andreas",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Kuenzer",
+    "given": "Claudia",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Scientific Data",
+  "container-title-short": "Sci Data",
+  "publisher": "Springer Science and Business Media LLC",
+  "volume": "11",
+  "issue": "1",
+  "DOI": "10.1038/s41597-024-03328-7",
+  "URL": "http://dx.doi.org/10.1038/s41597-024-03328-7",
+  "ISSN": "2052-4463",
+  "number": "472",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "tang": {
+  "type": "journal-article",
+  "id": "6b6991ff-4976-5340-a988-f13f1ad732cd",
+  "title": "TRIMS LST: a daily 1 km all-weather land surface temperature dataset for China's landmass and surrounding areas (2000–2022)",
+  "author": [
+   {
+    "family": "Tang",
+    "given": "Wenbin",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Zhou",
+    "given": "Ji",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Ma",
+    "given": "Jin",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Wang",
+    "given": "Ziwei",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Ding",
+    "given": "Lirong",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Zhang",
+    "given": "Xiaodong",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Zhang",
+    "given": "Xu",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Earth System Science Data",
+  "container-title-short": "Earth Syst. Sci. Data",
+  "publisher": "Copernicus GmbH",
+  "volume": "16",
+  "issue": "1",
+  "page": "387-419",
+  "DOI": "10.5194/essd-16-387-2024",
+  "URL": "http://dx.doi.org/10.5194/essd-16-387-2024",
+  "ISSN": "1866-3516",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "seyf": {
+  "type": "journal-article",
+  "id": "c931c264-19a0-5b19-80b8-ad7da72b9155",
+  "title": "Verilənlər bazası sistemləri",
+  "author": [
+   {
+    "family": "Seyfullazadə",
+    "given": "Kənan",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "SCIENTIFIC WORK",
+  "container-title-short": "SCIENTIFIC WORK",
+  "publisher": "Azerbaijan Science Center",
+  "volume": "Special",
+  "issue": "Issue 3",
+  "page": "119-121",
+  "DOI": "10.36719/2663-4619/117/119-121",
+  "URL": "http://dx.doi.org/10.36719/2663-4619/117/119-121",
+  "ISSN": "2663-4619",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "sholah": {
+  "type": "journal-article",
+  "id": "ef3c51eb-90b9-568f-9a0c-471f84909fd7",
+  "title": "IMPLEMENTASI CHECKSUM UNTUK KEANDALAN DATA DALAM PESAN AIS UNTUK PENGEMBANGAN SISTEM PREDIKSI DAERAH PENANGKAPAN IKAN",
+  "author": [
+   {
+    "family": "MUHAMMAD NIAL ALANUS SHOLAH",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Imam Sutrisno",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Afif Zuhri Arfianto",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Dimas Pristovani Riananda",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Muhammad Khoirul Hasin",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Basuki Rahmat",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Jurnal 7 Samudra",
+  "container-title-short": "7samudra",
+  "publisher": "Politeknik Pelayaran Surabaya",
+  "volume": "9",
+  "issue": "2",
+  "page": "61-68",
+  "DOI": "10.54992/7samudra.v9i2.186",
+  "URL": "http://dx.doi.org/10.54992/7samudra.v9i2.186",
+  "ISSN": "2656-1611",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "ramli": {
+  "type": "journal-article",
+  "id": "f657e2e8-16ea-5a57-a000-2f9b9235ae9b",
+  "title": "AI-Ready ICT Security for Education: A Holistic Framework to Strengthen Data Integrity at Malaysia’s Data Centre",
+  "author": [
+   {
+    "family": "Ramli",
+    "given": "Azlin",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Darus",
+    "given": "Mohamad Yusof",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "International Journal on e-Learning and Higher Education",
+  "container-title-short": "IJELHE",
+  "publisher": "UiTM Press, Universiti Teknologi MARA",
+  "volume": "21",
+  "issue": "1",
+  "page": "121-139",
+  "DOI": "10.24191/ijelhe.v21n1.2117",
+  "URL": "http://dx.doi.org/10.24191/ijelhe.v21n1.2117",
+  "ISSN": "3030-6663",
+  "issued": {
+   "date-parts": [
+    [
+     2026
+    ]
+   ]
+  }
+ },
+ "chanda": {
+  "type": "journal-article",
+  "id": "8e13a686-2152-5109-bd27-bf87ecb54108",
+  "title": "Automated ETL Pipelines for Modern Data Warehousing: Architectures, Challenges, and Emerging Solutions",
+  "author": [
+   {
+    "family": "Chanda",
+    "given": "Deepak",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "The Eastasouth Journal of Information System and Computer Science",
+  "container-title-short": "ESISCS",
+  "publisher": "PT. Sanskara Karya Internasional",
+  "volume": "1",
+  "issue": "03",
+  "page": "209-212",
+  "DOI": "10.58812/esiscs.v1i03.523",
+  "URL": "http://dx.doi.org/10.58812/esiscs.v1i03.523",
+  "ISSN": "3025-566X",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "gujjala": {
+  "type": "journal-article",
+  "id": "7d5959b6-3001-5dac-bb6f-e68ca96c17af",
+  "title": "Optimizing ETL Pipelines with Delta Lake and Medallion Architecture: A Scalable Approach for Large-Scale Data",
+  "author": [
+   {
+    "family": "Reddy Gujjala",
+    "given": "Praveen Kumar",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "International Journal For Multidisciplinary Research",
+  "container-title-short": "IJFMR",
+  "publisher": "International Journal for Multidisciplinary Research (IJFMR)",
+  "volume": "6",
+  "issue": "6",
+  "DOI": "10.36948/ijfmr.2024.v06i06.55445",
+  "URL": "http://dx.doi.org/10.36948/ijfmr.2024.v06i06.55445",
+  "ISSN": "2582-2160",
+  "number": "55445",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "maryani": {
+  "type": "journal-article",
+  "id": "c0f9c895-85f0-512c-b59d-34a19b536b15",
+  "title": "Blockchain-Based Audit Trails: Improving Transparency and Fraud Detection in Digital Accounting Systems",
+  "author": [
+   {
+    "family": "Maryani",
+    "given": "Neni",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Muchlish",
+    "given": "Munawar",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Mulyadi",
+    "given": "Roza",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Solehah",
+    "given": "Nurhayati",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "International Journal of Advanced Computer Science and Applications",
+  "container-title-short": "ijacsa",
+  "publisher": "The Science and Information Organization",
+  "volume": "17",
+  "issue": "1",
+  "DOI": "10.14569/ijacsa.2026.0170162",
+  "URL": "http://dx.doi.org/10.14569/IJACSA.2026.0170162",
+  "ISSN": "2156-5570",
+  "issued": {
+   "date-parts": [
+    [
+     2026
+    ]
+   ]
+  }
+ },
+ "alshamaa": {
+  "type": "journal-article",
+  "id": "642abc5c-4cd4-59a3-8586-7e35147ab103",
+  "title": "Black box software testing techniques :a literature review",
+  "author": [],
+  "container-title": "passer journal of basic and applied sciences",
+  "container-title-short": "PSR",
+  "publisher": "University of Garmian",
+  "volume": "7",
+  "issue": "2",
+  "DOI": "10.24271/psr.2025.508216.1963",
+  "URL": "http://dx.doi.org/10.24271/psr.2025.508216.1963",
+  "ISSN": "2706-5944",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "maspupah": {
+  "type": "journal-article",
+  "id": "7d56c180-186f-50bb-979d-ab85a4f926ff",
+  "title": "LITERATURE REVIEW: ADVANTAGES AND DISADVANTAGES OF BLACK BOX AND WHITE BOX TESTING METHODS",
+  "author": [
+   {
+    "family": "Maspupah",
+    "given": "Asri",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Jurnal Techno Nusa Mandiri",
+  "container-title-short": "techno",
+  "publisher": "LPPM Universitas Nusa Mandiri",
+  "volume": "21",
+  "issue": "2",
+  "page": "151-162",
+  "DOI": "10.33480/techno.v21i2.5776",
+  "URL": "http://dx.doi.org/10.33480/techno.v21i2.5776",
+  "ISSN": "2527-676X",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "maric": {
+  "type": "journal-article",
+  "id": "71db7d7e-4341-59e7-8e65-2f3b2b316317",
+  "title": "Difference and Application of White-Box, Black-Box, and Grey-Box Testing",
+  "author": [
+   {
+    "family": "Marić",
+    "given": "Vedran",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "International Journal of Innovative Solutions in Engineering",
+  "container-title-short": "ijise",
+  "publisher": "Sveuciliste u Mostaru",
+  "volume": "2",
+  "issue": "1",
+  "page": "39",
+  "DOI": "10.47960/3029-3200.2026.2.1.39",
+  "URL": "http://dx.doi.org/10.47960/3029-3200.2026.2.1.39",
+  "ISSN": "3029-3200",
+  "issued": {
+   "date-parts": [
+    [
+     2026
+    ]
+   ]
+  }
+ },
+ "salih": {
+  "type": "journal-article",
+  "id": "864363ef-8455-5db1-b1e7-dc66b44b492e",
+  "title": "Black Box Testing on Website-Based Guestbook Registration Applications",
+  "author": [
+   {
+    "family": "Salih",
+    "given": "Yasir",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Saefullah",
+    "given": "Rifki",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "International Journal of Mathematics, Statistics, and Computing",
+  "container-title-short": "IJMSC",
+  "publisher": "Research Collaboration Community (RCC)",
+  "volume": "2",
+  "issue": "2",
+  "page": "44-49",
+  "DOI": "10.46336/ijmsc.v2i2.96",
+  "URL": "http://dx.doi.org/10.46336/ijmsc.v2i2.96",
+  "ISSN": "3025-0803",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "balsam": {
+  "type": "journal-article",
+  "id": "635b7db4-c439-59e8-9123-c897ad6b7ceb",
+  "title": "Web application testing—Challenges and opportunities",
+  "author": [
+   {
+    "family": "Balsam",
+    "given": "Sebastian",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Mishra",
+    "given": "Deepti",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Journal of Systems and Software",
+  "container-title-short": "Journal of Systems and Software",
+  "publisher": "Elsevier BV",
+  "volume": "219",
+  "page": "112186",
+  "DOI": "10.1016/j.jss.2024.112186",
+  "URL": "http://dx.doi.org/10.1016/j.jss.2024.112186",
+  "ISSN": "0164-1212",
+  "number": "112186",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "skav": {
+  "type": "journal-article",
+  "id": "d2053b70-e14f-5e66-8126-facdbf6b1faa",
+  "title": "Third and Boyce–Codd normal form for property graphs",
+  "author": [
+   {
+    "family": "Skavantzos",
+    "given": "Philipp",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Link",
+    "given": "Sebastian",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "The VLDB Journal",
+  "container-title-short": "The VLDB Journal",
+  "publisher": "Springer Science and Business Media LLC",
+  "volume": "34",
+  "issue": "2",
+  "DOI": "10.1007/s00778-025-00902-2",
+  "URL": "http://dx.doi.org/10.1007/s00778-025-00902-2",
+  "ISSN": "1066-8888",
+  "number": "23",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "zhang": {
+  "type": "journal-article",
+  "id": "461a44a6-9f02-5149-88b6-a577c4a8a9c3",
+  "title": "Synthesizing Third Normal Form Schemata that Minimize Integrity Maintenance and Update Overheads: Parameterizing 3NF by the Numbers of Minimal Keys and Functional Dependencies",
+  "author": [
+   {
+    "family": "Zhang",
+    "given": "Zhuoxing",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Link",
+    "given": "Sebastian",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Proceedings of the ACM on Management of Data",
+  "container-title-short": "Proc. ACM Manag. Data",
+  "publisher": "Association for Computing Machinery (ACM)",
+  "volume": "3",
+  "issue": "3",
+  "page": "1-25",
+  "DOI": "10.1145/3725362",
+  "URL": "http://dx.doi.org/10.1145/3725362",
+  "ISSN": "2836-6573",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "huang": {
+  "type": "paper-conference",
+  "id": "87a84609-05af-5750-bf6f-f3ad6a7a39ba",
+  "title": "Protecting Data Integrity of Web Applications with Database Constraints Inferred from Application Code",
+  "author": [
+   {
+    "family": "Huang",
+    "given": "Haochen",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Shen",
+    "given": "Bingyu",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Zhong",
+    "given": "Li",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Zhou",
+    "given": "Yuanyuan",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Proceedings of the 28th ACM International Conference on Architectural Support for Programming Languages and Operating Systems, Volume 2",
+  "publisher": "ACM",
+  "page": "632-645",
+  "DOI": "10.1145/3575693.3575699",
+  "URL": "http://dx.doi.org/10.1145/3575693.3575699",
+  "issued": {
+   "date-parts": [
+    [
+     2023
+    ]
+   ]
+  }
+ },
+ "kanwal": {
+  "type": "journal-article",
+  "id": "4da414cf-4054-5ec0-8415-aa4b9e1a98ae",
+  "title": "Foreign Key Constraints to Maintain Referential Integrity in Distributed Database in Microservices Architecture",
+  "author": [
+   {
+    "family": "Kanwal",
+    "given": "Shamsa",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Chaudhry",
+    "given": "Nauman Riaz",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Choudhary",
+    "given": "Reema",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Shaik",
+    "given": "Younus Ahamad",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Yadav",
+    "given": "Pankaj",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Rashid",
+    "given": "Ayesha",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "International Journal of Advanced Computer Science and Applications",
+  "container-title-short": "ijacsa",
+  "publisher": "The Science and Information Organization",
+  "volume": "16",
+  "issue": "6",
+  "DOI": "10.14569/ijacsa.2025.0160696",
+  "URL": "http://dx.doi.org/10.14569/IJACSA.2025.0160696",
+  "ISSN": "2156-5570",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "efendi": {
+  "type": "journal-article",
+  "id": "31c053ab-ab73-595e-b763-f56fd229ca05",
+  "title": "Perancangan Dan Implementasi System Incremental Backup Database Postgresql Menggunakan Aplikasi Barman Di PT. ROF",
+  "author": [
+   {
+    "family": "Efendi",
+    "given": "Yasin",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Sodikin",
+    "given": "Sodikin",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Haryanto",
+    "given": "Rahmat",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Jurnal Minfo Polgan",
+  "container-title-short": "jmp",
+  "publisher": "Politeknik Ganesha",
+  "volume": "12",
+  "issue": "1",
+  "page": "958-965",
+  "DOI": "10.33395/jmp.v12i1.12539",
+  "URL": "http://dx.doi.org/10.33395/jmp.v12i1.12539",
+  "ISSN": "2797-3298",
+  "issued": {
+   "date-parts": [
+    [
+     2023
+    ]
+   ]
+  }
+ },
+ "ahmad": {
+  "type": "journal-article",
+  "id": "ea6fbccb-d0c3-533c-9009-8fd5bccc845b",
+  "title": "ClusteredLog: Optimizing Log Structures for Efficient Data Recovery and Integrity Management in Database Systems",
+  "author": [
+   {
+    "family": "Ahmad",
+    "given": "Mariha Siddika",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Panda",
+    "given": "Brajendra Nath",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Electronics",
+  "container-title-short": "Electronics",
+  "publisher": "MDPI AG",
+  "volume": "13",
+  "issue": "23",
+  "page": "4723",
+  "DOI": "10.3390/electronics13234723",
+  "URL": "http://dx.doi.org/10.3390/electronics13234723",
+  "ISSN": "2079-9292",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "syaddam": {
+  "type": "journal-article",
+  "id": "22b77a79-8c67-5532-b330-07f87a24f9fb",
+  "title": "Desain Model Relational Database Perpustakaan SMP Negeri 13 Tarakan menggunakan Metode Database Life Cycle",
+  "author": [
+   {
+    "family": "Syaddam",
+    "given": "",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Yusril",
+    "given": "Muhammad",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Kawuta",
+    "given": "Agustinus Jimi Jon",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Banni",
+    "given": "Sehlmi Duwiputri",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Ratu",
+    "given": "Yakobus Silfianus",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Jurnal Terapan Teknologi Informasi",
+  "container-title-short": "JUTEI",
+  "publisher": "Duta Wacana Christian University",
+  "volume": "9",
+  "issue": "1",
+  "page": "1-10",
+  "DOI": "10.21460/jutei.2025.91.398",
+  "URL": "http://dx.doi.org/10.21460/jutei.2025.91.398",
+  "ISSN": "2579-5538",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  }
+ },
+ "trihap": {
+  "type": "journal-article",
+  "id": "98eabfb8-05a6-54a3-afcc-588b400f508b",
+  "title": "Perancangan Basis Data Sistem Reservasi Wisma Universitas Terbuka dengan Metode Database Life Cycle",
+  "author": [
+   {
+    "family": "Trihapningsari",
+    "given": "Denisha",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Putri",
+    "given": "Mayang Anglingsari",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Jurnal Teknologi Sistem Informasi dan Aplikasi",
+  "container-title-short": "JTSIA",
+  "publisher": "Universitas Pamulang",
+  "volume": "7",
+  "issue": "4",
+  "page": "1638-1646",
+  "DOI": "10.32493/jtsi.v7i4.45421",
+  "URL": "http://dx.doi.org/10.32493/jtsi.v7i4.45421",
+  "ISSN": "2654-4229",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "esiefa": {
+  "type": "journal-article",
+  "id": "3583c8be-a186-589e-ae78-8984af44ca85",
+  "title": "UML Design of Business Intelligence System for Small-Scale Enterprises",
+  "author": [
+   {
+    "family": "Esiefarienrhe",
+    "given": "Bukohwo Michael",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Moemi",
+    "given": "Thusoyaone Joseph",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "Journal of Information Systems and Informatics",
+  "container-title-short": "J. Inf. Syst. Informatics",
+  "publisher": "Asosiasi Doktor Sistem Informasi Indonesia",
+  "volume": "6",
+  "issue": "1",
+  "page": "495-513",
+  "DOI": "10.51519/journalisi.v6i1.672",
+  "URL": "http://dx.doi.org/10.51519/journalisi.v6i1.672",
+  "ISSN": "2656-4882",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  }
+ },
+ "alyami": {
+  "type": "journal-article",
+  "id": "5af0d5cf-a884-5bda-9943-b20e4f13e447",
+  "title": "Seamless transformation from use case to sequence diagrams",
+  "author": [
+   {
+    "family": "Alyami",
+    "given": "Abdulrahman",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Pileggi",
+    "given": "Salvatore Flavio",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Sohaib",
+    "given": "Osama",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Hawryszkiewycz",
+    "given": "Igor",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "PeerJ Computer Science",
+  "publisher": "PeerJ",
+  "volume": "9",
+  "page": "e1444",
+  "DOI": "10.7717/peerj-cs.1444",
+  "URL": "http://dx.doi.org/10.7717/peerj-cs.1444",
+  "ISSN": "2376-5992",
+  "number": "e1444",
+  "issued": {
+   "date-parts": [
+    [
+     2023
+    ]
+   ]
+  }
+ },
+ "bmkg_sumsel": {
+  "type": "report",
+  "id": "d414aa6b-1719-581a-9699-c963d253ceaa",
+  "title": "Buletin Iklim Edisi Desember 2024: Analisis hujan November 2024 dan prediksi hujan Januari, Februari, dan Maret 2025 di Sumatera Selatan",
+  "author": [
+   {
+    "literal": "Stasiun Klimatologi Kelas I Sumatera Selatan"
+   }
+  ],
+  "publisher": "Badan Meteorologi, Klimatologi, dan Geofisika",
+  "publisher-place": "Palembang, Indonesia",
+  "issued": {
+   "date-parts": [
+    [
+     2024,
+     12
+    ]
+   ]
+  },
+  "URL": "https://staklim-sumsel.bmkg.go.id/wp-content/uploads/2023/09/BULETIN-BMKG-EDISI-DESEMBER-2024.pdf"
+ },
+ "bmkg_kalsel": {
+  "type": "report",
+  "id": "8ba902ab-cb32-5a17-bba5-68c68e0df22c",
+  "title": "Peringatan dini cuaca dan iklim Provinsi Kalimantan Selatan periode Dasarian III Maret 2026",
+  "author": [
+   {
+    "literal": "Stasiun Klimatologi Kalimantan Selatan"
+   }
+  ],
+  "publisher": "Badan Meteorologi, Klimatologi, dan Geofisika",
+  "number": "e.T/ME.01.02/073/KBB3/III/2026",
+  "issued": {
+   "date-parts": [
+    [
+     2026,
+     3,
+     21
+    ]
+   ]
+  },
+  "URL": "https://staklim-kalsel.bmkg.go.id/wp-content/uploads/2026/03/Kalsel-Dasarian-III-Maret-2026-TTE-1_signed.pdf"
+ },
+ "perban": {
+  "type": "legislation",
+  "id": "5bbe0030-166d-5d77-89f2-ab30034434f2",
+  "title": "Peraturan Badan Meteorologi, Klimatologi, dan Geofisika Nomor 9 Tahun 2022 tentang Penyediaan dan Penyebarluasan Peringatan Dini Cuaca Ekstrem",
+  "author": [
+   {
+    "literal": "Badan Meteorologi, Klimatologi, dan Geofisika"
+   }
+  ],
+  "container-title": "Berita Negara Republik Indonesia Tahun 2022 Nomor 891",
+  "issued": {
+   "date-parts": [
+    [
+     2022
+    ]
+   ]
+  }
+ },
+ "nascimento": {
+  "type": "journal-article",
+  "id": "1d6cf5bf-31ad-585c-af07-8e2f20a22b32",
+  "title": "Process mapping: A case study in the contract sector of the Public Defender's office in the state of Amazonas",
+  "author": [
+   {
+    "family": "Nascimento",
+    "given": "Rafaela Barbosa",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Teixeira",
+    "given": "Elton Pereira",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Lima",
+    "given": "Orlem Pinheiro de",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Maduro",
+    "given": "Márcia Ribeiro",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   },
+   {
+    "family": "Silva",
+    "given": "Vanessa Coelho da",
+    "parse-names": false,
+    "dropping-particle": "",
+    "non-dropping-particle": ""
+   }
+  ],
+  "container-title": "ITEGAM- Journal of Engineering and Technology for Industrial Applications (ITEGAM-JETIA)",
+  "container-title-short": "ITEGAM",
+  "publisher": "GN1 Sistemas e Publicacoes Ltd.",
+  "volume": "9",
+  "issue": "44",
+  "DOI": "10.5935/jetia.v9i44.1012",
+  "URL": "http://dx.doi.org/10.5935/jetia.v9i44.1012",
+  "ISSN": "2447-0228",
+  "issued": {
+   "date-parts": [
+    [
+     2023
+    ]
+   ]
+  }
+ },
+ "codab": {
+  "type": "dataset",
+  "id": "1f77268b-900b-59df-8757-6ad907dae859",
+  "title": "Indonesia – Subnational administrative boundaries (COD-AB)",
+  "author": [
+   {
+    "literal": "OCHA Field Information Services Section (FISS)"
+   }
+  ],
+  "publisher": "Humanitarian Data Exchange",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  },
+  "URL": "https://data.humdata.org/dataset/cod-ab-idn"
+ }
+}

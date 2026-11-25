@@ -258,3 +258,9 @@ tests/screenshots/
 
 # Kecuali profil browser unduh_pdf.py: cache, cookie, dan sesi login (~154 MB)
 DOCS/skripsi/referensi/pdf/.browser/
+
+# video demo skripsi (terlalu besar untuk GitHub)
+DOCS/skripsi/lampiran/video_demo/
+DOCS/skripsi/lampiran/video_demo.zip
+# berkas kunci Office
+~$*

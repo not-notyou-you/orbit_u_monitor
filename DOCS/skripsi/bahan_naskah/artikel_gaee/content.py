@@ -2,12 +2,11 @@
 TITLE = ("A Traceable Spatial Database Integrating Sentinel-1, MODIS and GPM IMERG at Sub-district Level "
          "for Community-based Hydrometeorological Disaster Mitigation in South Lebak, Indonesia")
 
-AUTHORS = [("Muhammad Faiq Hakim Ulinnuha", "Universitas Multimedia Nusantara, Faculty of Engineering and Informatics, "
-            "Department of Information Systems, Tangerang, Indonesia, ORCID: [to be completed], "
-            "e-mail: [to be completed]"),
-           ("[Supervisor name]", "Universitas Multimedia Nusantara, Faculty of Engineering and Informatics, "
-            "Department of Information Systems, Tangerang, Indonesia, ORCID: [to be completed], "
-            "e-mail: [to be completed]")]
+AUTHORS = [("Muhammad Faiq Hakim Ulinnuha", "Universitas Multimedia Nusantara, Faculty of Engineering and Informatics, Department of Information Systems, Tangerang, Indonesia, "
+            "ORCID: 0009-0008-6688-700X, e-mail: mfaiq.9c@gmail.com"),
+           ("Irena Vanessa Gunawan", "The IO Foundation, ORCID: 0000-0003-2905-0469, e-mail: irena.vgf@art.maranatha.edu"),
+           ("Monika Evelin Johan", "Universitas Multimedia Nusantara, Faculty of Engineering and Informatics, Department of Information Systems, Tangerang, Indonesia, "
+            "ORCID: 0000-0001-7984-5150, e-mail: monika.evelin@umn.ac.id (corresponding author)")]
 
 ABSTRACT = (
     "Community disaster organisations can access open satellite data but rarely have a database that turns these "
@@ -116,7 +115,9 @@ BODY = [
 ("P", "Requirements were collected through observation, the interview, document examination, a literature study and a "
       "requirements review questionnaire. The questionnaire, written in plain language for non-technical users, asked "
       "GMLS to assess six requirements (R1–R6), the recorded information, the system limits and the role assignment, and "
-      "to approve or reject the design. A second questionnaire was used for a user trial with six task scenarios."),
+      "to approve or reject the design. A second questionnaire was used for a user trial with six task scenarios. "
+      "Respondents were invited with an explanation of the purpose of the study, participation was voluntary and "
+      "submission of the questionnaire was taken as consent; respondents are reported by role only, not by name."),
 ("H2", "Zonal aggregation"),
 ("P", "Each raster is converted to a Cloud-Optimised GeoTIFF per band and reduced to one value per sub-district. Because "
       "an IMERG cell of 0.1° covers only one to six cells per sub-district, taking the nearest cell would bias small "
@@ -137,8 +138,7 @@ BODY = [
 ("P", "where *w*~i~ is the weight and *s*~i~ the score of criterion *i*. The six minimum evaluations of the design were "
       "requirements review, integrity, functional, security, query and backup/recovery testing. Integrity and functional "
       "behaviour were tested with automated black-box scenarios through the REST API [@balsam], security with a GRANT "
-      "matrix and API tests for every role, and recovery with dump-and-restore and process-kill scenarios. The authors' "
-      "use of an AI assistant in preparing this manuscript is described in the closing statement."),
+      "matrix and API tests for every role, and recovery with dump-and-restore and process-kill scenarios."),
 
 ("H1", "Results and Discussion"),
 ("H2", "Architecture and implementation"),
@@ -147,7 +147,9 @@ BODY = [
       "processes them through ordered tiers, writes rasters to the file system and values to the database under a "
       "dedicated ETL role. A FastAPI REST API connects under a separate application role and switches to the role of the "
       "requesting user for every transaction. A web client presents current conditions per sub-district, satellite "
-      "images, warnings and disaster events. The implemented schema contains 43 tables, 22 views, 528 columns, 226 "
+      "images, warnings and disaster events. The production system runs in a Linux container (LXC) on a Proxmox VE host "
+      "provided by The IO Foundation, with four virtual CPUs of an AMD Ryzen AI 9 HX 370 processor, 8 GB of memory and a "
+      "98 GB volume on an NVMe SSD, under Ubuntu 24.04 and PostgreSQL 18.6. The implemented schema contains 43 tables, 22 views, 528 columns, 226 "
       "constraints, 162 indexes, 29 triggers and 3 row-level security policies. It holds 12 master tables and 17 "
       "transaction tables with at least 100 records each, including 72 850 sub-district observations, 15 850 data "
       "products, 8142 lineage edges and 7958 processing jobs."),
@@ -169,9 +171,12 @@ BODY = [
       "sub-district, its regency, the band, its unit and the satellite in every row. Moving the attributes of the area "
       "and of the band to their own relations removed the partial dependencies (2NF); making the regency a recursive "
       "reference to the area relation through parent_region_id and moving the satellite attributes to a source relation "
-      "removed the transitive dependencies (3NF). Weak and dependent entities, such as warnings that cannot exist "
-      "without their rule and sub-district, are identified by composite unique keys. In total the schema defines 43 "
-      "primary keys, 80 foreign keys, 36 unique and 67 check constraints."),
+      "removed the transitive dependencies (3NF). Thirty-nine of the 43 relations have a surrogate primary key, the "
+      "application settings use their natural key, and three have composite primary keys: the points and scores of a "
+      "stored forecast are weak entities whose key contains the key of the forecast, and e-mail subscriptions associate "
+      "users with sub-districts. Natural keys are kept as alternate keys; a warning, for example, is unique per rule, "
+      "sub-district and day. In total the schema defines 43 primary keys, 80 foreign keys, 36 unique and 67 check "
+      "constraints."),
 ("P", "Physical design followed the observed access patterns. GiST indexes serve spatial predicates on boundaries, "
       "scene footprints and event locations; descending B-tree indexes serve the most recent values of a time series; a "
       "partial index covers only unacknowledged warnings; expression indexes support case-insensitive searches; and two "
@@ -287,16 +292,19 @@ FIGS = {
              "Map of ten sub-districts in the southern part of Lebak Regency, Indonesia, outlined and labelled with their "
              "names, with longitude 105.85–106.55 degrees east and latitude 6.4–7.0 degrees south; total area 1575.8 km2."),
     "arch": ("fig2_architecture.png", "System architecture of Orbit-U: The Monitor", "Own elaboration",
-             "Block diagram of four layers: three official satellite data providers feed a Python ETL layer with a "
-             "scheduler, daily hydrometeorological job, Sentinel-1 cycle, reports and e-mail alerts; the ETL writes to a "
-             "PostgreSQL/PostGIS database and a file system; a FastAPI REST API reads both and serves a web client; users "
-             "in five roles receive e-mail through an SMTP server."),
+             "Block diagram of four layers: three official satellite data providers feed a Python ETL layer in which an "
+             "APScheduler with an advisory lock per job runs the daily hydrometeorological job, the Sentinel-1 live cycle, "
+             "periodic reports, stored forecasts and on-demand dataset jobs, and e-mail alerts follow the daily job and the "
+             "live cycle; the ETL writes to a PostgreSQL/PostGIS database and a file system; a FastAPI REST API reads both "
+             "and serves a web client and other scripts with API tokens; users in five roles also receive e-mail through an "
+             "external SMTP server."),
     "erd": ("fig3_erd_core.png", "Core relations for observations, lineage, warnings and events (crow's foot notation)",
             "Own elaboration",
-            "Entity-relationship diagram in crow's foot notation. region_observations references administrative_regions, "
-            "spectral_bands and data_products; data_lineage links pairs of data_products; alert_rules reference "
-            "spectral_bands and disaster_types; alert_events reference alert_rules, administrative_regions and optionally "
-            "region_observations; disaster_events reference disaster_types and administrative_regions."),
+            "Entity-relationship diagram in crow's foot notation with primary, foreign and alternate keys and data types. "
+            "region_observations references administrative_regions, spectral_bands and optionally data_products; "
+            "data_lineage links a parent and a child data_products row; alert_rules reference spectral_bands and "
+            "disaster_types; alert_events reference alert_rules, administrative_regions and optionally region_observations; "
+            "disaster_events reference disaster_types and administrative_regions."),
     "bench": ("fig4_benchmark.png", "Median execution time of core queries (logarithmic scale)", "Own elaboration",
               "Grouped bar chart on a logarithmic scale comparing PostgreSQL and MySQL median times for queries Q1 to Q5. "
               "PostgreSQL is lower for Q1 to Q4, most strongly for Q3 (1.15 versus 18.63 ms) and Q4 (1.06 versus 15.13 ms); "
@@ -345,8 +353,9 @@ CLOSING = [
     ("Funding", "This research received no specific grant from any funding agency in the public, commercial, or "
                 "not-for-profit sectors."),
     ("CRediT Author Contribution", "M. F. H. U.: conceptualization, methodology, software, validation, formal analysis, "
-     "investigation, data curation, writing – original draft preparation, visualization. [Supervisor initials]: "
-     "conceptualization, validation, supervision, writing – review and editing."),
+     "investigation, data curation, writing – original draft preparation, visualization. I. V. G.: "
+     "conceptualization, validation, supervision, writing – review and editing. M. E. J.: conceptualization, "
+     "validation, supervision, writing – review and editing."),
     ("Declaration of Competing Interests", "The authors declare that they have no known competing financial interests or "
      "personal relationships that could have appeared to influence the work reported in this paper."),
     ("Data Availability", "The source code, DDL scripts, queries, configuration, data dictionary and instructions for "
@@ -356,8 +365,9 @@ CLOSING = [
      "are not shared; access may be requested from GMLS."),
     ("Use of Generative AI and AI-Assisted Technologies", "During the preparation of this manuscript, the authors used "
      "Claude (Anthropic) to translate and condense text from the first author's undergraduate thesis into English, to "
-     "draft figures from the authors' data and to format the references. The authors reviewed and edited all content "
-     "and take full responsibility for the publication."),
+     "assist in writing the scripts that render figures from the authors' own data, and to check the formatting of the "
+     "references. All research design, data, analyses and conclusions are the authors' own. The authors reviewed and "
+     "edited the content as needed and take full responsibility for the content of the publication."),
     ("Acknowledgements", "The authors thank the chairman and volunteers of Gugus Mitigasi Lebak Selatan for the interview "
      "and the requirements review, and all participants of the user trial."),
 ]

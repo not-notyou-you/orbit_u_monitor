@@ -75,7 +75,7 @@ Tidak termasuk: `tests/ui/` (browser headless), pengiriman SMTP sungguhan, point
 tetapi kejadian resmi terverifikasi masih terbatas, jadi hasil `v_evaluasi_alert` belum bisa disimpulkan; ditulis
 sebagai keterbatasan. Aturan longsor (`LANDSLIDE_RAIN72`) belum aktif karena ambangnya belum ada.
 
-**Belum ada di repo:** lampiran naskah (ERD semua modul, kamus data lengkap, notulen, hasil uji), dan folder
+**Lampiran naskah** A–L disusun oleh `bahan_naskah/lampiran.py` (12 Nov 2026). **Belum ada di repo:** folder
 gambar `gambar_bab4/`, `alur_penelitian.png`, `peta_wilayah.png` yang dipakai `naskah/build_skripsi.py`.
 
 ---

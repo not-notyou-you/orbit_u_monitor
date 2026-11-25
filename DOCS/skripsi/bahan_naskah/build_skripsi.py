@@ -18,6 +18,9 @@ import sys
 import zipfile
 from xml.sax.saxutils import escape
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import mendeley  # noqa: E402  sitasi dan daftar pustaka berformat Mendeley Cite
+
 SRC, OUT, IMG = sys.argv[1], sys.argv[2], sys.argv[3]
 
 # =====================================================================================================
@@ -87,17 +90,23 @@ REF = {
 }
 
 ORDER = []  # kunci menurut urutan kemunculan pertama
+CITES = []  # (kunci, teks tampilan) per sitasi; ditandai di teks dengan n sampai dibuat XML-nya
+REG = mendeley.Registry("skripsi")
 
 
 def cite(m):
-    nums = []
+    keys, nums = [], []
     for key in re.findall(r"@([\w]+)", m.group(1)):
         if key not in REF:
             raise KeyError(key)
+        if key not in mendeley.ITEMS:
+            raise KeyError(f"{key} belum ada di assets/referensi_csl.json; jalankan csl_referensi.py")
         if key not in ORDER:
             ORDER.append(key)
+        keys.append(key)
         nums.append(ORDER.index(key) + 1)
-    return ", ".join(f"[{n}]" for n in nums)
+    CITES.append((keys, ", ".join(f"[{n}]" for n in nums)))
+    return f"{len(CITES) - 1}"
 
 
 # =====================================================================================================
@@ -109,8 +118,13 @@ FONT = '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Time
 def runs(text, size=24, bold=False):
     text = re.sub(r"\[(@[^\]]+)\]", cite, text)
     out = []
-    for tok in re.split(r"(\*\*.+?\*\*|\*.+?\*|<<.+?>>)", text):
+    for tok in re.split(r"(\d+|\*\*.+?\*\*|\*.+?\*|<<.+?>>)", text):
         if not tok:
+            continue
+        if tok.startswith(""):
+            keys, shown = CITES[int(tok[1:-1])]
+            b = "<w:b/><w:bCs/>" if bold else ""
+            out.append(REG.citation(keys, shown, f'{FONT}{b}<w:sz w:val="{size}"/><w:szCs w:val="{size}"/>'))
             continue
         rpr, t = "", tok
         if tok.startswith("**"):
@@ -1303,9 +1317,11 @@ B2 = bab2()
 B3 = bab3()
 B4 = bab4(sys.argv[4])
 B5 = bab5()
-refs = "".join(
+TAB = f'<w:r><w:rPr>{FONT}<w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:tab/></w:r>'
+refs = mendeley.bibliography("".join(
     '<w:p><w:pPr><w:spacing w:after="120" w:line="240" w:lineRule="auto"/><w:ind w:left="567" w:hanging="567"/>'
-    f'<w:jc w:val="both"/></w:pPr>{runs(f"[{i}] " + REF[k])}</w:p>' for i, k in enumerate(ORDER, 1))
+    f'<w:jc w:val="both"/></w:pPr>{runs(f"[{i}]")}{TAB}{runs(REF[k])}</w:p>' for i, k in enumerate(ORDER, 1)),
+    f'{FONT}<w:sz w:val="24"/><w:szCs w:val="24"/>')
 unused = [k for k in REF if k not in ORDER]
 assert not unused, f"rujukan tidak dikutip: {unused}"
 
@@ -1352,7 +1368,11 @@ rels = rels.replace("</Relationships>", "".join(
     f'Target="media/{name}"/>' for rid, name, _ in IMAGES) + "</Relationships>")
 
 with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as zout:
+    extra = mendeley.package_parts(REG, zin.read("[Content_Types].xml").decode("utf-8"),
+                                   zin.read("_rels/.rels").decode("utf-8"))
     for item in zin.infolist():
+        if item.filename in extra:
+            continue
         data = zin.read(item.filename)
         if item.filename == "word/document.xml":
             data = doc.encode("utf-8")
@@ -1369,6 +1389,8 @@ with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as zout:
                 st = st[:i] + '<w:updateFields w:val="true"/>' + st[i:]
             data = st.encode("utf-8")
         zout.writestr(item, data)
+    for name, data in extra.items():
+        zout.writestr(name, data)
     for _, name, path in IMAGES:
         zout.write(path, f"word/media/{name}")
 

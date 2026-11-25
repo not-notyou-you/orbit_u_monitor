@@ -6,7 +6,7 @@ Saya melanjutkan pekerjaan skripsi dari percakapan sebelumnya. Tolong baca konte
 - Judul: "Perancangan Sistem Basis Data Monitoring Hidrometeorologi untuk Dukungan Mitigasi Bencana Lebak Selatan Berbasis Satelit Sentinel-1, MODIS, dan GPM". Objek: Gugus Mitigasi Lebak Selatan (GMLS). Nama sistem: Orbit-U: The Monitor.
 
 ## Keadaan naskah sekarang
-- Naskah final: `themonitor/DOCS/skripsi/naskah/SKRIPSI FINAL.docx` (halaman awal, BAB I–V, Daftar Pustaka 60 entri gaya IEEE). Lampiran sengaja belum disusun.
+- Naskah final: `themonitor/DOCS/skripsi/naskah/SKRIPSI FINAL.docx` (halaman awal, BAB I–V, Daftar Pustaka 60 entri gaya IEEE, Lampiran A–L). Lampiran disusun oleh `bahan_naskah/lampiran.py` (A Turnitin, B konsultasi, C formulir AI, D notulen, E jawaban tinjauan kebutuhan, F jawaban uji coba, G ERD fisik per modul dari `erd_lampiran.py`, H kamus data, I DDL inti M6, J kueri benchmark, K pytest per berkas, L tautan); skrip ini juga mengganti rujukan "tersedia pada repositori" di BAB III–IV menjadi rujukan lampiran.
 - Naskah TIDAK disunting manual. Naskah dibangun ulang dari skrip di `themonitor/DOCS/skripsi/bahan_naskah/` (build_skripsi.py, bab4.py, bab5_front.py):
   - `build_skripsi.py` (BAB I–III, daftar pustaka `REF`, sitasi `[@kunci]` dinomori otomatis menurut urutan kemunculan, halaman awal dan BAB V disisipkan dari `bab5_front.py`);
   - `bab4.py` (BAB IV sebagai daftar blok; rujukan gambar/tabel `{G:kunci}`/`{T:kunci}` dinomori otomatis);
@@ -43,7 +43,8 @@ Saya melanjutkan pekerjaan skripsi dari percakapan sebelumnya. Tolong baca konte
 
 ## Yang masih terbuka
 - Nama/NIDN pembimbing, kaprodi, dekan, rektor, penguji, dan tanggal di halaman awal; centang pernyataan AI dan persetujuan publikasi (diisi mahasiswa).
-- Lampiran (ERD semua modul, kamus data lengkap, notulen, hasil uji) belum disusun.
+- Lampiran A (laporan Turnitin) masih penanda kuning; Lampiran B perlu baris bimbingan ke-8, nama dosen, dan paraf; kolom output Lampiran C diisi mahasiswa.
+- Urutan bangun: build_skripsi.py → halaman awal → `python erd_lampiran.py <bahan_naskah> <folder_erd>` (venv, Playwright) → `python lampiran.py <naskah.docx> <keluaran.docx> <folder_erd>` → `python isi_formulir.py <keluaran.docx>` (isi Lampiran B: 7 bimbingan 28 Agu–23 Okt 2026; Lampiran C: 9 baris Gemini/ChatGPT/Claude; paraf, nama dosen, dan output AI dikosongkan).
 - Tampilan dokumen belum diperiksa visual di Word.
 
 ## Permintaan saya kali ini

@@ -3,6 +3,8 @@ import html, json, re, sys, zipfile
 from PIL import Image
 sys.path.insert(0, __file__.rsplit("\\", 1)[0].rsplit("/", 1)[0])
 import importlib, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+import mendeley  # sitasi dan daftar pustaka berformat Mendeley Cite (lihat ../mendeley.py)
 C = importlib.import_module(os.environ.get("ARTIKEL_CONTENT", "content"))
 LF, LT, LS, LA, LK = (getattr(C, "LABEL_FIG", "Fig."), getattr(C, "LABEL_TAB", "Table"), getattr(C, "LABEL_SRC", "Source"),
                       getattr(C, "LABEL_ABS", "Abstract:"), getattr(C, "LABEL_KW", "Keywords: "))
@@ -10,6 +12,11 @@ LF, LT, LS, LA, LK = (getattr(C, "LABEL_FIG", "Fig."), getattr(C, "LABEL_TAB", "
 tpl, refs_p, figdir, out = sys.argv[1:5]
 REFS = json.load(open(refs_p, encoding="utf-8"))
 order, num = [], {}
+_BYDOI = {v.get("DOI", "").lower(): v for v in mendeley.ITEMS.values()}
+ITEMS = {k: _BYDOI[m["doi"].lower()] for k, m in REFS.items()}
+ITEMS.update({k: mendeley.ITEMS[k] for k in C.MANUAL})  # rujukan tanpa DOI memakai kunci yang sama dengan skripsi
+REG = mendeley.Registry("gaee", ITEMS)
+CITES = []  # (kunci, teks tampilan); ditandai n di teks sampai dibuat XML-nya
 fig_no, tab_no, eq_no = {}, {}, {}
 for kind, val in C.BODY:  # nomor gambar/tabel/persamaan menurut urutan penempatan
     if kind == "FIG": fig_no[val] = len(fig_no) + 1
@@ -35,7 +42,8 @@ def cite(m):
         j = i
         while j + 1 < len(ns) and ns[j + 1] == ns[j] + 1: j += 1
         parts.append(str(ns[i]) if j == i else (f"{ns[i]}, {ns[j]}" if j == i + 1 else f"{ns[i]}–{ns[j]}")); i = j + 1
-    return "[" + ", ".join(parts) + "]"
+    CITES.append((sorted(keys, key=lambda k: num[k]), "[" + ", ".join(parts) + "]"))
+    return f"{len(CITES) - 1}"
 
 
 def text(s):
@@ -48,9 +56,12 @@ def text(s):
 def runs(s, base=""):
     s = text(s); out = []
     if "highlight" not in base: s = re.sub(r"(\[[^\]]*(?:to be|To be|Supervisor|supervisor|belum diisi|pembimbing)[^\]]*\])", r"==\1==", s)
-    for tok in re.split(r"(==[^=]+==|\*[^*]+\*|~[^~]+~|\^[^^]+\^)", s):
+    for tok in re.split(r"(\d+|==[^=]+==|\*[^*]+\*|~[^~]+~|\^[^^]+\^)", s):
         if not tok: continue
         rp = base
+        if tok.startswith(""):
+            keys, shown = CITES[int(tok[1:-1])]
+            out.append(REG.citation(keys, shown, rp)); continue
         if tok.startswith("=="):
             out.append(runs(tok[2:-2], base + HL)); continue
         if tok[0] == "*": rp += "<w:i/>"; tok = tok[1:-1]
@@ -138,7 +149,7 @@ EQ = {
 
 
 def equation(key):
-    return (f'<w:p><w:pPr><w:pStyle w:val="GaEEEquation"/></w:pPr><m:oMath {M}>{EQ[key]}</m:oMath>'
+    return (f'<w:p><w:pPr><w:pStyle w:val="GaEEEquation"/></w:pPr><w:r><w:tab/></w:r><m:oMath {M}>{EQ[key]}</m:oMath>'
             f'<w:r><w:tab/><w:t>({eq_no[key]})</w:t></w:r></w:p>')
 
 
@@ -159,7 +170,7 @@ for kind, val in C.BODY:
               "FIG": figure, "TAB": table, "EQ": equation}[kind](val))
 for t, body in C.CLOSING:
     x.append(P("GaEEClosingSectionTitle", t))
-    x.append(P("GaEENormal", body) if t in ("Acknowledgements", "Ucapan Terima Kasih") else f'<w:p><w:pPr><w:pStyle w:val="GaEENormal"/></w:pPr>{runs(body, HL)}</w:p>')
+    x.append(P("GaEENormal", body))  # pernyataan penutup sudah final; sorotan hijau tidak dipakai lagi
 x.append(P("GaEEClosingSectionTitle", getattr(C, "LABEL_REF", "References")))
 
 
@@ -180,8 +191,8 @@ def ref(k):
     return s + f". https://doi.org/{m['doi']}"
 
 
-for k in order:
-    x.append(f'<w:p><w:pPr><w:pStyle w:val="GaEEReferences"/></w:pPr>{runs(ref(k))}</w:p>')
+x.append(mendeley.bibliography("".join(
+    f'<w:p><w:pPr><w:pStyle w:val="GaEEReferences"/></w:pPr>{runs(ref(k))}</w:p>' for k in order), ""))
 
 z = zipfile.ZipFile(tpl)
 doc = z.read("word/document.xml").decode("utf-8")
@@ -194,7 +205,10 @@ for i, (name, aff) in enumerate(C.AUTHORS):
     new = (f'<w:footnote w:id="{i + 1}"><w:p><w:pPr><w:pStyle w:val="GaEEFootnote"/></w:pPr><w:r><w:rPr>'
            f'<w:rStyle w:val="Odwoanieprzypisudolnego"/><w:vertAlign w:val="baseline"/></w:rPr><w:footnoteRef/></w:r>'
            f'{runs(" " + aff)}</w:p></w:footnote>')
-    fn = re.sub(rf'<w:footnote w:id="{i + 1}">.*?</w:footnote>', new, fn, flags=re.S)
+    if f'<w:footnote w:id="{i + 1}">' in fn:
+        fn = re.sub(rf'<w:footnote w:id="{i + 1}">.*?</w:footnote>', new, fn, flags=re.S)
+    else:  # templat hanya punya dua catatan kaki penulis
+        fn = fn.replace("</w:footnotes>", new + "</w:footnotes>")
 numb = z.read("word/numbering.xml").decode("utf-8")  # numId 11 templat mulai dari 2; buat 99 = abstractNum 2 mulai 1
 numb = numb.replace("</w:numbering>", '<w:num w:numId="99"><w:abstractNumId w:val="2"/><w:lvlOverride w:ilvl="0">'
                     '<w:startOverride w:val="1"/></w:lvlOverride></w:num></w:numbering>')
@@ -208,14 +222,19 @@ if 'Extension="png"' not in ct:
 core = z.read("docProps/core.xml").decode("utf-8")
 core = re.sub(r"<dc:title>.*?</dc:title>|<dc:title/>", f"<dc:title>{esc(C.TITLE)}</dc:title>", core)
 
+extra = mendeley.package_parts(REG, ct, z.read("_rels/.rels").decode("utf-8"))
+ct = extra.pop("[Content_Types].xml").decode("utf-8")
 zo = zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED)
 for it in z.infolist():
+    if it.filename in extra: continue
     if it.filename == "word/media/image1.wmf": continue
     data = {"word/document.xml": doc, "word/footnotes.xml": fn, "word/_rels/document.xml.rels": rels,
             "[Content_Types].xml": ct, "word/numbering.xml": numb, "docProps/core.xml": core}.get(it.filename)
     zo.writestr(it, data.encode("utf-8") if data is not None else z.read(it.filename))
 for r, f in rels_add:
     zo.write(f"{figdir}/{f}", f"word/media/{f}")
+for name, data in extra.items():
+    zo.writestr(name, data)
 zo.close()
 # hapus relasi ke image1.wmf yang tidak dipakai lagi
 import shutil
@@ -227,6 +246,6 @@ for it in zz.infolist():
     zt.writestr(it, d)
 zt.close(); zz.close(); shutil.move(tmp, out)
 
-plain = re.sub(r"\*|~|\^", "", "".join(text(v) for k, v in C.BODY if k == "P"))
+plain = re.sub(r"\*|~|\^|\d+", "", "".join(text(v) for k, v in C.BODY if k == "P"))
 print("referensi:", len(order), "| karakter isi (paragraf):", len(plain))
 print("tidak dikutip:", [k for k in REFS if k not in num])
